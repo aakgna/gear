@@ -44,19 +44,6 @@ const DeletionPage = () => {
 				router.back();
 				return;
 			} else {
-				const querySnapshot = await firestore()
-					.collection("prevq")
-					.where("uid", "==", userCredential.user.uid)
-					.get();
-				if (querySnapshot) {
-					const batch = firestore().batch();
-					querySnapshot.docs.forEach((doc) => {
-						batch.delete(doc.ref);
-					});
-
-					await batch.commit();
-				}
-
 				await firestore()
 					.collection("users")
 					.doc(userCredential.user.uid)
@@ -119,16 +106,16 @@ const DeletionPage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#efe8e0", // Light background for a fresh look
+		backgroundColor: "black",
 		justifyContent: "center",
 		alignItems: "center",
-		paddingHorizontal: 20, // Adjusted left and right padding
+		paddingHorizontal: 20,
 	},
 	headerContainer: {
-		marginBottom: 30, // Increased margin for better spacing
+		marginBottom: 30,
 	},
 	headerTitle: {
-		color: "#00796B",
+		color: "#0EA5E9", // Rich electric blue
 		fontSize: 28,
 		fontWeight: "bold",
 		textAlign: "center",
@@ -136,40 +123,42 @@ const styles = StyleSheet.create({
 	icon: {
 		width: 64,
 		height: 64,
-		backgroundColor: "#D7CCC8",
+		backgroundColor: "rgba(2, 132, 199, 0.15)", // Semi-transparent deep blue
 		borderRadius: 32,
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: 20, // Increased margin for better spacing
+		marginBottom: 20,
+		borderWidth: 1,
+		borderColor: "#0EA5E9", // Rich electric blue
 	},
 	iconText: {
 		fontSize: 36,
-		color: "#00796B",
+		color: "#7DD3FC", // Bright sky blue
 	},
 	formContainer: {
 		width: "70%",
 	},
 	subtitle: {
 		fontSize: 16,
-		color: "#455A64",
-		marginBottom: 15, // Adjusted margin for better spacing
+		color: "#A5F3FC", // Bright cyan
+		marginBottom: 15,
 		textAlign: "center",
 	},
 	textInput: {
 		width: "100%",
 		height: 50,
 		paddingHorizontal: 16,
-		marginBottom: 20, // Increased margin for better spacing
+		marginBottom: 20,
 		borderWidth: 1,
-		borderColor: "#00796B",
+		borderColor: "#0EA5E9", // Rich electric blue
 		borderRadius: 10,
-		color: "#263238",
-		backgroundColor: "#FFFFFF",
+		color: "#FFFFFF",
+		backgroundColor: "rgba(2, 132, 199, 0.15)", // Semi-transparent deep blue
 	},
 	sendButton: {
 		width: "100%",
 		height: 50,
-		backgroundColor: "#00796B",
+		backgroundColor: "#EF4444", // Red for deletion
 		borderRadius: 10,
 		alignItems: "center",
 		justifyContent: "center",

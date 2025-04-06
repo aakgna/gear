@@ -28,13 +28,13 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>myapp</string>
-          <string>com.aakgna.commonground</string>
+          <string>com.aakgna.commongroundquestions</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.googleusercontent.apps.155048967301-cdsgb0npb9b8omu9t462m6rq1l6r0sbe</string>
+          <string>com.googleusercontent.apps.155048967301-n5vahih4c0ciik5qqt74v3gfni449vbf</string>
         </array>
       </dict>
     </array>

@@ -1,0 +1,37 @@
+{
+	"cli": {
+		"version": ">= 3.13.3"
+	},
+	"build": {
+		"development": {
+			"developmentClient": true,
+			"distribution": "internal"
+		},
+		"development-simulator": {
+			"developmentClient": true,
+			"distribution": "internal",
+			"ios": {
+				"simulator": true
+			}
+		},
+		"preview": {
+			"distribution": "internal"
+		},
+		"production": {
+			"distribution": "store"
+		}
+	},
+	"submit": {
+		"production": {
+			"ios": {
+				"appleId": "hi2aakash@gmail.com",
+				"ascAppId": "6741345907",
+				"appleTeamId": "2W9F399FQ7"
+			},
+			"android": {
+				"track": "production",
+				"releaseStatus": "completed"
+			}
+		}
+	}
+}
