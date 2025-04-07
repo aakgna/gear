@@ -8,6 +8,7 @@ import {
 	StyleSheet,
 	Alert,
 	ActivityIndicator,
+	Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -26,7 +27,7 @@ const StartPage = () => {
 			fetchDailyQuestion();
 			checkUserVote();
 		} else {
-			router.replace("/");
+			router.navigate("/");
 		}
 	}, []);
 
@@ -181,31 +182,65 @@ const StartPage = () => {
 	};
 
 	const totalVotes = agreeCount + disagreeCount;
-	const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 50;
+	const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 0;
 	const disagreePercentage =
-		totalVotes > 0 ? (disagreeCount / totalVotes) * 100 : 50;
+		totalVotes > 0 ? (disagreeCount / totalVotes) * 100 : 0;
 
 	if (isLoading) {
 		return (
-			<View style={styles.container}>
-				<ActivityIndicator size="large" color="#0EA5E9" />
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" style={styles.loadingIndicator} />
 			</View>
 		);
 	}
 
 	return (
 		<View style={styles.container}>
-			<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-				<Text style={styles.logoutButtonText}>Logout</Text>
-			</TouchableOpacity>
+			{/* Header Buttons Container */}
+			<View style={styles.headerButtons}>
+				{hasVoted && (
+					<TouchableOpacity
+						style={styles.discussionButton}
+						onPress={handleDiscussionNavigation}
+					>
+						<Text style={styles.buttonText}>Join Discussion</Text>
+					</TouchableOpacity>
+				)}
 
+				<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+					<Text style={styles.logoutButtonText}>Logout</Text>
+				</TouchableOpacity>
+			</View>
+
+			{/* Main Content */}
 			<Text style={styles.title}>Today's Question</Text>
 
 			<View style={styles.questionContainer}>
 				<Text style={styles.questionText}>{question}</Text>
 			</View>
 
-			{!hasVoted ? (
+			{/* Results Section */}
+			{hasVoted && (
+				<View style={styles.resultsContainer}>
+					<Text style={styles.resultsTitle}>Results</Text>
+					<View style={styles.barContainer}>
+						<View
+							style={[styles.progressBar, { width: `${agreePercentage}%` }]}
+						/>
+					</View>
+					<View style={styles.resultsTextContainer}>
+						<Text style={styles.resultsText}>
+							Agree: {agreePercentage.toFixed(1)}% ({agreeCount})
+						</Text>
+						<Text style={styles.resultsText}>
+							Disagree: {disagreePercentage.toFixed(1)}% ({disagreeCount})
+						</Text>
+					</View>
+				</View>
+			)}
+
+			{/* Voting Buttons */}
+			{!hasVoted && (
 				<View style={styles.buttonContainer}>
 					<TouchableOpacity
 						style={[styles.button, styles.agreeButton]}
@@ -223,47 +258,6 @@ const StartPage = () => {
 						<Text style={styles.buttonText}>Disagree</Text>
 					</TouchableOpacity>
 				</View>
-			) : (
-				<View style={styles.resultsContainer}>
-					<Text style={styles.resultsTitle}>Results</Text>
-					<View style={styles.barContainer}>
-						<View
-							style={[
-								styles.bar,
-								{
-									flexDirection: "row",
-									overflow: "hidden",
-									backgroundColor: "#EF4444", // Red for disagree (background)
-								},
-							]}
-						>
-							<View
-								style={{
-									width: `${agreePercentage}%`,
-									backgroundColor: "#0EA5E9", // Blue for agree
-									height: "100%",
-								}}
-							/>
-						</View>
-					</View>
-					<View style={styles.resultsTextContainer}>
-						<Text style={styles.resultsText}>
-							Agree: {agreePercentage.toFixed(1)}% ({agreeCount})
-						</Text>
-						<Text style={styles.resultsText}>
-							Disagree: {disagreePercentage.toFixed(1)}% ({disagreeCount})
-						</Text>
-					</View>
-				</View>
-			)}
-
-			{hasVoted && (
-				<TouchableOpacity
-					style={styles.discussionButton}
-					onPress={handleDiscussionNavigation}
-				>
-					<Text style={styles.buttonText}>Join Discussion</Text>
-				</TouchableOpacity>
 			)}
 		</View>
 	);
@@ -272,27 +266,34 @@ const StartPage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "black",
-		padding: 20,
+		backgroundColor: "#121212",
+		paddingHorizontal: "5%",
+	},
+	headerButtons: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		paddingTop: Platform.OS === "ios" ? 60 : 30,
+		paddingBottom: 20,
+		paddingHorizontal: 20,
 	},
 	title: {
-		color: "#0EA5E9",
-		fontSize: 28,
-		fontWeight: "bold",
+		color: "#A0A0A0",
+		fontSize: 32,
+		fontWeight: "700",
 		textAlign: "center",
-		marginBottom: 30,
-		marginTop: 100,
+		marginBottom: 20,
+		marginTop: 60,
 	},
 	questionContainer: {
-		backgroundColor: "rgba(2, 132, 199, 0.15)",
-		borderRadius: 15,
+		backgroundColor: "#1E1E1E",
+		borderRadius: 12,
 		padding: 20,
-		marginBottom: 30,
+		marginBottom: 40,
 		borderWidth: 1,
-		borderColor: "#0EA5E9",
+		borderColor: "#5C8374",
 	},
 	questionText: {
-		color: "#A5F3FC",
+		color: "#A0A0A0",
 		fontSize: 20,
 		textAlign: "center",
 		lineHeight: 28,
@@ -305,76 +306,91 @@ const styles = StyleSheet.create({
 	button: {
 		flex: 1,
 		height: 50,
-		borderRadius: 10,
+		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
 	},
 	agreeButton: {
-		backgroundColor: "#0284C7",
+		backgroundColor: "#5C8374",
 	},
 	disagreeButton: {
-		backgroundColor: "#EF4444",
+		backgroundColor: "#5C8374",
 	},
 	buttonText: {
-		color: "#FFFFFF",
-		fontSize: 18,
+		color: "#A0A0A0",
+		fontSize: 16,
 		fontWeight: "600",
 	},
 	resultsContainer: {
 		marginTop: 20,
+		width: "100%",
+		alignItems: "center",
 	},
 	resultsTitle: {
-		color: "#A5F3FC",
+		color: "#A0A0A0",
 		fontSize: 20,
 		textAlign: "center",
 		marginBottom: 15,
 	},
 	barContainer: {
-		width: "100%",
+		width: "90%",
+		height: 20,
+		backgroundColor: "#1E1E1E",
+		borderRadius: 12,
+		overflow: "hidden",
 		marginVertical: 10,
 	},
-	bar: {
-		height: 20,
-		width: "100%",
-		borderRadius: 10,
+	progressBar: {
+		height: "100%",
+		backgroundColor: "#5C8374",
 	},
 	resultsTextContainer: {
-		marginTop: 15,
+		width: "90%",
 		flexDirection: "row",
 		justifyContent: "space-between",
+		marginTop: 10,
 	},
 	resultsText: {
-		color: "#A5F3FC",
-		fontSize: 16,
+		color: "#A0A0A0",
+		fontSize: 14,
 	},
 	logoutButton: {
 		position: "absolute",
-		top: 50,
+		top: Platform.OS === "ios" ? 60 : 30,
 		right: 20,
-		backgroundColor: "rgba(239, 68, 68, 0.2)",
+		backgroundColor: "#1E1E1E",
 		paddingVertical: 8,
 		paddingHorizontal: 16,
-		borderRadius: 8,
+		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: "#EF4444",
+		borderColor: "#5C8374",
 		zIndex: 1,
 	},
 	logoutButtonText: {
-		color: "#EF4444",
-		fontSize: 16,
+		color: "#A0A0A0",
+		fontSize: 14,
 		fontWeight: "600",
 	},
 	discussionButton: {
 		position: "absolute",
-		top: 50,
+		top: Platform.OS === "ios" ? 60 : 30,
 		left: 20,
-		backgroundColor: "rgba(2, 132, 199, 0.2)",
+		backgroundColor: "#1E1E1E",
 		paddingVertical: 8,
 		paddingHorizontal: 16,
-		borderRadius: 8,
+		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: "#0EA5E9",
+		borderColor: "#5C8374",
 		zIndex: 1,
+	},
+	loadingContainer: {
+		flex: 1,
+		backgroundColor: "#121212",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	loadingIndicator: {
+		color: "#5C8374",
 	},
 });
 

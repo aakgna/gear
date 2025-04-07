@@ -102,25 +102,22 @@ const LandingPage = () => {
 	return (
 		<View style={styles.container}>
 			<Image
-				source={require("../assets/images/icon.png")} // Adjust the path to your logo
-				style={styles.logo} // Add styles for the logo
+				source={require("../assets/images/icon.png")}
+				style={styles.logo}
 			/>
 			<View style={styles.logoContainer}>
-				<Text style={styles.logoTextOne}>Common</Text>
-				<Text style={styles.logoTextTwo}>Ground</Text>
+				<Text style={styles.logoTextOne}>Common Ground</Text>
 			</View>
 
 			<View style={styles.taglineContainer}>
-				<Text style={styles.tagline}>
-					Find understanding through discussion
-				</Text>
+				<Text style={styles.tagline}>Enter your phone number to sign in</Text>
 			</View>
 
 			<View style={styles.inputContainer}>
 				<TextInput
 					style={styles.textInput}
-					placeholder="Enter your phone number"
-					placeholderTextColor="#B0BEC5"
+					placeholder="Phone number"
+					placeholderTextColor="#888888"
 					keyboardType="phone-pad"
 					value={phoneNumber}
 					onChangeText={setPhoneNumber}
@@ -135,7 +132,7 @@ const LandingPage = () => {
 					disabled={isLoading}
 				>
 					<Text style={styles.buttonText}>
-						{isLoading ? "Sending..." : "Sign In / Get Started"}
+						{isLoading ? "Sending..." : "Continue"}
 					</Text>
 				</TouchableOpacity>
 			</View>
@@ -143,27 +140,20 @@ const LandingPage = () => {
 			<View style={styles.footerContainer}>
 				<Text style={styles.footerText}>
 					By continuing, you agree to our{" "}
-					<Link
-						href="https://v0-interview-prep-gateway.vercel.app/privacy-policy"
-						style={{ textDecorationLine: "underline" }}
-					>
+					<Link href="..." style={styles.link}>
 						Privacy Policy
 					</Link>{" "}
 					and{" "}
-					<Link
-						href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-						style={{ textDecorationLine: "underline" }}
-					>
-						Apple's Licensed Application End User License Agreement
+					<Link href="..." style={styles.link}>
+						Apple's EULA
 					</Link>
-					. To delete your account please press{" "}
-					<Text
-						style={{ textDecorationLine: "underline" }}
-						onPress={handleDeleteAccount}
-					>
-						here
+				</Text>
+				<Text style={styles.deleteText}>
+					Need help or want to{" "}
+					<Text onPress={handleDeleteAccount} style={styles.link}>
+						delete your account
 					</Text>
-					.
+					?
 				</Text>
 			</View>
 		</View>
@@ -179,57 +169,58 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		flex: 1,
-		backgroundColor: "black",
+		backgroundColor: "#121212", // Charcoal Black
 		padding: 20,
 		justifyContent: "center",
 	},
 	logoContainer: {
 		alignItems: "center",
+		marginBottom: 40,
 	},
 	logoTextOne: {
-		fontSize: 48,
+		fontSize: 45,
 		fontWeight: "700",
-		color: "#0EA5E9", // Rich electric blue
+		color: "#5C8374", // White
 	},
 	logoTextTwo: {
 		fontSize: 48,
 		fontWeight: "700",
-		color: "#EF4444", // Vibrant red
+		color: "#FFFFFF", // White
 	},
 	taglineContainer: {
-		marginVertical: 20,
+		marginBottom: 40,
 		alignItems: "center",
 	},
 	tagline: {
-		fontSize: 20,
-		color: "#A5F3FC", // Bright cyan
+		fontSize: 14,
+		color: "#A0A0A0", // Soft Gray
 		textAlign: "center",
 	},
 	inputContainer: {
 		alignItems: "center",
+		width: "100%",
 	},
 	textInput: {
 		width: "100%",
 		height: 50,
 		paddingHorizontal: 16,
 		marginBottom: 20,
-		borderWidth: 1,
-		borderColor: "#0EA5E9", // Matching electric blue
-		borderRadius: 10,
-		color: "#FFFFFF",
-		backgroundColor: "rgba(2, 132, 199, 0.15)", // Semi-transparent deep blue
+		borderRadius: 12,
+		color: "#FFFFFF", // White
+		backgroundColor: "#1E1E1E", // Deep Gray
+		fontSize: 16,
 	},
 	button: {
 		width: "100%",
 		height: 50,
-		backgroundColor: "#0284C7", // Deep saturated blue
-		borderRadius: 10,
+		backgroundColor: "#5C8374", // Neutral Teal
+		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
 	},
 	buttonText: {
 		color: "#FFFFFF",
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: "600",
 	},
 	buttonDisabled: {
@@ -237,11 +228,24 @@ const styles = StyleSheet.create({
 	},
 	footerContainer: {
 		marginTop: 40,
+		borderTopWidth: 1,
+		borderTopColor: "#333333", // Muted Gray
+		paddingTop: 20,
 	},
 	footerText: {
-		color: "#7DD3FC", // Bright sky blue
+		color: "#A0A0A0", // Soft Gray
 		textAlign: "center",
-		fontSize: 14,
+		fontSize: 12,
+	},
+	link: {
+		color: "#5C8374", // Neutral Teal
+		textDecorationLine: "underline",
+	},
+	deleteText: {
+		color: "#666666", // Slightly lighter than Muted Gray
+		textAlign: "center",
+		fontSize: 12,
+		marginTop: 10,
 	},
 });
 

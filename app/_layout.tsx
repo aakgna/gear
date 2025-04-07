@@ -35,6 +35,13 @@ export default function RootLayout() {
 		<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
 			<Stack screenOptions={{ headerShown: false }}>
 				<Stack.Screen name="index" options={{ headerShown: false }} />
+				<Stack.Screen name="verify" options={{ headerShown: false }} />
+				<Stack.Screen
+					name="start"
+					options={{ headerShown: false, gestureEnabled: false }}
+				/>
+				<Stack.Screen name="discussion" options={{ headerShown: false }} />
+				<Stack.Screen name="deletion" options={{ headerShown: false }} />
 				{/* <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" /> */}
 			</Stack>

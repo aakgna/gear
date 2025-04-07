@@ -109,22 +109,20 @@ const VerifyPhonePage = () => {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.headerContainer}>
-				<Text style={styles.headerTitle}>Verify Your Phone Number</Text>
+				<Text style={styles.headerTitle}>Verify Your Number</Text>
 			</View>
 
-			<View style={styles.icon}>
-				<Text style={styles.iconText}>🔒</Text>
-			</View>
-
-			<View style={styles.formContainer}>
-				<Text style={styles.subtitle}>
+			<View style={styles.taglineContainer}>
+				<Text style={styles.tagline}>
 					Enter the verification code sent to {params.phoneNumber}
 				</Text>
+			</View>
 
+			<View style={styles.inputContainer}>
 				<TextInput
 					style={styles.textInput}
 					placeholder="Enter 6-digit code"
-					placeholderTextColor="#B0BEC5"
+					placeholderTextColor="#888888"
 					keyboardType="number-pad"
 					value={verificationCode}
 					onChangeText={setVerificationCode}
@@ -135,11 +133,11 @@ const VerifyPhonePage = () => {
 				/>
 
 				<TouchableOpacity
-					style={[styles.sendButton, isLoading && styles.buttonDisabled]}
+					style={[styles.button, isLoading && styles.buttonDisabled]}
 					onPress={handleVerifyCode}
 					disabled={isLoading}
 				>
-					<Text style={styles.sendButtonText}>
+					<Text style={styles.buttonText}>
 						{isLoading ? "Verifying..." : "Verify Code"}
 					</Text>
 				</TouchableOpacity>
@@ -164,79 +162,73 @@ const VerifyPhonePage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "black",
+		backgroundColor: "#121212", // Charcoal Black
+		paddingHorizontal: "5%", // Use percentage for dynamic side padding
 		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 20,
 	},
 	headerContainer: {
-		marginBottom: 30,
+		alignItems: "center",
+		marginBottom: 40,
+		paddingHorizontal: 20, // Add padding for header text
 	},
 	headerTitle: {
-		color: "#0EA5E9", // Rich electric blue
-		fontSize: 28,
-		fontWeight: "bold",
+		fontSize: 32,
+		fontWeight: "700",
+		color: "#5C8374", // White
 		textAlign: "center",
 	},
-	icon: {
-		width: 64,
-		height: 64,
-		backgroundColor: "rgba(2, 132, 199, 0.15)", // Semi-transparent deep blue
-		borderRadius: 32,
+	taglineContainer: {
+		marginBottom: 40,
 		alignItems: "center",
-		justifyContent: "center",
-		marginBottom: 20,
-		borderWidth: 1,
-		borderColor: "#0EA5E9", // Rich electric blue
+		paddingHorizontal: 20, // Add padding for tagline text
 	},
-	iconText: {
-		fontSize: 36,
-		color: "#7DD3FC", // Bright sky blue
-	},
-	formContainer: {
-		width: "70%",
-	},
-	subtitle: {
-		fontSize: 16,
-		color: "#A5F3FC", // Bright cyan
-		marginBottom: 15,
+	tagline: {
+		fontSize: 14,
+		color: "#A0A0A0", // Soft Gray
 		textAlign: "center",
+	},
+	inputContainer: {
+		alignItems: "center",
+		width: "100%",
+		paddingHorizontal: 20, // Add padding for input container
 	},
 	textInput: {
-		width: "100%",
+		width: "90%", // Reduce width to prevent edge touching
 		height: 50,
 		paddingHorizontal: 16,
 		marginBottom: 20,
-		borderWidth: 1,
-		borderColor: "#0EA5E9", // Rich electric blue
-		borderRadius: 10,
-		color: "#FFFFFF",
-		backgroundColor: "rgba(2, 132, 199, 0.15)", // Semi-transparent deep blue
+		borderRadius: 12,
+		color: "#FFFFFF", // White
+		backgroundColor: "#1E1E1E", // Deep Gray
+		fontSize: 16,
+		alignSelf: "center", // Center the input
 	},
-	sendButton: {
-		width: "100%",
+	button: {
+		width: "90%", // Match input width
 		height: 50,
-		backgroundColor: "#0284C7", // Deep saturated blue
-		borderRadius: 10,
+		backgroundColor: "#5C8374", // Neutral Teal
+		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
+		marginBottom: 16,
+		alignSelf: "center", // Center the button
 	},
-	sendButtonText: {
+	buttonText: {
 		color: "#FFFFFF",
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: "600",
 	},
 	buttonDisabled: {
 		opacity: 0.7,
 	},
 	resendButton: {
-		marginTop: 10,
-		padding: 10,
+		padding: 12,
 	},
 	resendButtonText: {
-		color: "#7DD3FC", // Bright sky blue
-		fontSize: 16,
+		color: "#5C8374", // Neutral Teal
+		fontSize: 14,
 		textAlign: "center",
+		textDecorationLine: "underline",
 	},
 });
 

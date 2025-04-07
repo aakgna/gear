@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import firestore from "@react-native-firebase/firestore";
 import auth from "@react-native-firebase/auth";
 import {
@@ -9,20 +9,34 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	Alert,
+	Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
 const DiscussionScreen = () => {
 	const params = useLocalSearchParams();
-	const question = params.question;
-	const questionId = params.questionId;
+	const { question, questionId } = params;
 	const [messages, setMessages] = useState([]);
 	const [newMessage, setNewMessage] = useState("");
 	const router = useRouter();
+	const flatListRef = useRef(null);
+
 	useEffect(() => {
-		if (!auth().currentUser) {
-			router.replace("/");
-		}
+		const checkUserStatus = async () => {
+			const userId = auth().currentUser?.uid;
+			if (!userId) {
+				router.replace("/");
+				return;
+			}
+			const userDoc = await firestore().collection("users").doc(userId).get();
+			const userData = userDoc.data();
+			if (!userData) {
+				router.replace("/");
+			} else if (userData.voted === false) {
+				router.replace("/start");
+			}
+		};
+		checkUserStatus();
 	}, []);
 
 	useEffect(() => {
@@ -43,6 +57,13 @@ const DiscussionScreen = () => {
 		return () => unsubscribe();
 	}, [questionId]);
 
+	// Add effect to scroll to bottom when messages change
+	useEffect(() => {
+		if (flatListRef.current && messages.length > 0) {
+			flatListRef.current.scrollToEnd({ animated: true });
+		}
+	}, [messages]);
+
 	const sendMessage = async () => {
 		if (!newMessage.trim()) return;
 
@@ -61,12 +82,11 @@ const DiscussionScreen = () => {
 				.add({
 					text: newMessage,
 					timestamp: firestore.FieldValue.serverTimestamp(),
-					// No user identification stored for anonymity
 				});
 			setNewMessage("");
 			await firestore()
 				.collection("users")
-				.doc(auth().currentUser?.uid)
+				.doc(userId)
 				.update({
 					messages: firestore.FieldValue.increment(-1),
 				});
@@ -77,15 +97,17 @@ const DiscussionScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			{/* Question display at top */}
-			<View style={styles.questionContainer}>
-				<Text style={styles.questionText}>{question}</Text>
+			<View style={styles.headerContainer}>
+				<View style={styles.questionContainer}>
+					<Text style={styles.questionText}>{question}</Text>
+				</View>
 			</View>
 
-			{/* Messages list */}
 			<FlatList
+				ref={flatListRef}
 				data={messages}
 				keyExtractor={(item) => item.id}
+				style={styles.messagesList}
 				renderItem={({ item }) => (
 					<View style={styles.messageContainer}>
 						<Text style={styles.messageText}>{item.text}</Text>
@@ -94,15 +116,18 @@ const DiscussionScreen = () => {
 						</Text>
 					</View>
 				)}
+				onContentSizeChange={() =>
+					flatListRef.current?.scrollToEnd({ animated: true })
+				}
 			/>
 
-			{/* Message input */}
 			<View style={styles.inputContainer}>
 				<TextInput
 					style={styles.input}
 					value={newMessage}
 					onChangeText={setNewMessage}
 					placeholder="Type your message..."
+					placeholderTextColor="#808080"
 				/>
 				<TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
 					<Text style={styles.sendButtonText}>Send</Text>
@@ -115,34 +140,40 @@ const DiscussionScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#1A1A1A", // Dark background
-		padding: 16,
+		backgroundColor: "#121212",
+		paddingTop: Platform.OS === "ios" ? 60 : 30,
+	},
+	headerContainer: {
+		paddingHorizontal: "5%",
+		paddingBottom: 15,
 	},
 	questionContainer: {
-		backgroundColor: "#2A2A2A",
-		padding: 16,
+		backgroundColor: "#1E1E1E",
 		borderRadius: 12,
-		marginBottom: 16,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
-		shadowRadius: 4,
-		elevation: 5,
+		padding: 20,
+		borderWidth: 1,
+		borderColor: "#5C8374",
 	},
 	questionText: {
-		color: "#FFFFFF",
-		fontSize: 18,
-		fontWeight: "600",
+		color: "#A0A0A0",
+		fontSize: 20,
 		textAlign: "center",
+		lineHeight: 28,
+	},
+	messagesList: {
+		flex: 1,
+		paddingHorizontal: "5%",
 	},
 	messageContainer: {
-		backgroundColor: "#2A2A2A",
+		backgroundColor: "#1E1E1E",
 		padding: 12,
-		borderRadius: 8,
+		borderRadius: 12,
 		marginBottom: 8,
+		borderWidth: 1,
+		borderColor: "#5C8374",
 	},
 	messageText: {
-		color: "#FFFFFF",
+		color: "#A0A0A0",
 		fontSize: 16,
 		marginBottom: 4,
 	},
@@ -153,10 +184,10 @@ const styles = StyleSheet.create({
 	},
 	inputContainer: {
 		flexDirection: "row",
-		padding: 8,
-		backgroundColor: "#2A2A2A",
-		borderRadius: 25,
-		marginTop: 8,
+		padding: 16,
+		backgroundColor: "#1E1E1E",
+		borderTopWidth: 1,
+		borderTopColor: "#5C8374",
 		alignItems: "center",
 	},
 	input: {
@@ -165,12 +196,17 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		paddingHorizontal: 12,
 		paddingVertical: 8,
+		backgroundColor: "#2A2A2A",
+		borderRadius: 20,
+		marginRight: 8,
 	},
 	sendButton: {
-		backgroundColor: "#4A90E2", // Blue accent color
+		backgroundColor: "#5C8374",
 		padding: 10,
 		borderRadius: 20,
-		marginLeft: 8,
+		alignItems: "center",
+		justifyContent: "center",
+		width: 70,
 	},
 	sendButtonText: {
 		color: "#FFFFFF",
