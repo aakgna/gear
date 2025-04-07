@@ -66,6 +66,7 @@ const VerifyPhonePage = () => {
 					phoneNumber: params.phoneNumber,
 					voted: false,
 					createdAt: firestore.FieldValue.serverTimestamp(),
+					messages: 3,
 				});
 			}
 

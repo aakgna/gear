@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import firestore from "@react-native-firebase/firestore";
+import auth from "@react-native-firebase/auth";
 import {
 	View,
 	Text,
@@ -7,8 +8,9 @@ import {
 	TextInput,
 	TouchableOpacity,
 	StyleSheet,
+	Alert,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 const DiscussionScreen = () => {
 	const params = useLocalSearchParams();
@@ -16,6 +18,12 @@ const DiscussionScreen = () => {
 	const questionId = params.questionId;
 	const [messages, setMessages] = useState([]);
 	const [newMessage, setNewMessage] = useState("");
+	const router = useRouter();
+	useEffect(() => {
+		if (!auth().currentUser) {
+			router.replace("/");
+		}
+	}, []);
 
 	useEffect(() => {
 		// Subscribe to real-time messages
@@ -39,6 +47,13 @@ const DiscussionScreen = () => {
 		if (!newMessage.trim()) return;
 
 		try {
+			const userId = auth().currentUser?.uid;
+			const userDoc = await firestore().collection("users").doc(userId).get();
+			const userData = userDoc.data();
+			if (userData?.messages <= 0) {
+				Alert.alert("You have no messages left");
+				return;
+			}
 			await firestore()
 				.collection("discussions")
 				.doc(questionId)
@@ -49,6 +64,12 @@ const DiscussionScreen = () => {
 					// No user identification stored for anonymity
 				});
 			setNewMessage("");
+			await firestore()
+				.collection("users")
+				.doc(auth().currentUser?.uid)
+				.update({
+					messages: firestore.FieldValue.increment(-1),
+				});
 		} catch (error) {
 			console.error("Error sending message:", error);
 		}

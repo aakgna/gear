@@ -22,8 +22,12 @@ const StartPage = () => {
 	const router = useRouter();
 
 	useEffect(() => {
-		fetchDailyQuestion();
-		checkUserVote();
+		if (auth().currentUser) {
+			fetchDailyQuestion();
+			checkUserVote();
+		} else {
+			router.replace("/");
+		}
 	}, []);
 
 	const fetchDailyQuestion = async () => {
@@ -75,6 +79,7 @@ const StartPage = () => {
 					// Reset voted status if it's a new day
 					await userDoc.ref.update({
 						voted: false,
+						messages: 3,
 					});
 					setHasVoted(false);
 				} else {
@@ -176,9 +181,9 @@ const StartPage = () => {
 	};
 
 	const totalVotes = agreeCount + disagreeCount;
-	const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 0;
+	const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 50;
 	const disagreePercentage =
-		totalVotes > 0 ? (disagreeCount / totalVotes) * 100 : 0;
+		totalVotes > 0 ? (disagreeCount / totalVotes) * 100 : 50;
 
 	if (isLoading) {
 		return (
@@ -221,8 +226,25 @@ const StartPage = () => {
 			) : (
 				<View style={styles.resultsContainer}>
 					<Text style={styles.resultsTitle}>Results</Text>
-					<View style={styles.resultBar}>
-						<View style={[styles.agreeBar, { width: `${agreePercentage}%` }]} />
+					<View style={styles.barContainer}>
+						<View
+							style={[
+								styles.bar,
+								{
+									flexDirection: "row",
+									overflow: "hidden",
+									backgroundColor: "#EF4444", // Red for disagree (background)
+								},
+							]}
+						>
+							<View
+								style={{
+									width: `${agreePercentage}%`,
+									backgroundColor: "#0EA5E9", // Blue for agree
+									height: "100%",
+								}}
+							/>
+						</View>
 					</View>
 					<View style={styles.resultsTextContainer}>
 						<Text style={styles.resultsText}>
@@ -307,15 +329,14 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginBottom: 15,
 	},
-	resultBar: {
-		height: 20,
-		backgroundColor: "#EF4444",
-		borderRadius: 10,
-		overflow: "hidden",
+	barContainer: {
+		width: "100%",
+		marginVertical: 10,
 	},
-	agreeBar: {
-		height: "100%",
-		backgroundColor: "#0284C7",
+	bar: {
+		height: 20,
+		width: "100%",
+		borderRadius: 10,
 	},
 	resultsTextContainer: {
 		marginTop: 15,
