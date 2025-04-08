@@ -20,6 +20,7 @@ const StartPage = () => {
 	const [hasVoted, setHasVoted] = useState(false);
 	const [agreeCount, setAgreeCount] = useState(0);
 	const [disagreeCount, setDisagreeCount] = useState(0);
+	const [userChoice, setUserChoice] = useState(null);
 	const router = useRouter();
 
 	useEffect(() => {
@@ -35,10 +36,10 @@ const StartPage = () => {
 		try {
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
-
 			const questionDoc = await firestore()
 				.collection("dailyQuestions")
 				.where("date", ">=", today)
+				.where("date", "<", new Date(today.setUTCHours(24)))
 				.orderBy("date", "asc")
 				.limit(1)
 				.get();
@@ -138,6 +139,7 @@ const StartPage = () => {
 				setHasVoted(true);
 				setAgreeCount(data.agreeCount);
 				setDisagreeCount(data.disagreeCount);
+				setUserChoice(choice);
 			}
 		} catch (error) {
 			console.error("Error voting:", error);
@@ -198,15 +200,6 @@ const StartPage = () => {
 		<View style={styles.container}>
 			{/* Header Buttons Container */}
 			<View style={styles.headerButtons}>
-				{hasVoted && (
-					<TouchableOpacity
-						style={styles.discussionButton}
-						onPress={handleDiscussionNavigation}
-					>
-						<Text style={styles.buttonText}>Join Discussion</Text>
-					</TouchableOpacity>
-				)}
-
 				<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
 					<Text style={styles.logoutButtonText}>Logout</Text>
 				</TouchableOpacity>
@@ -221,22 +214,46 @@ const StartPage = () => {
 
 			{/* Results Section */}
 			{hasVoted && (
-				<View style={styles.resultsContainer}>
-					<Text style={styles.resultsTitle}>Results</Text>
-					<View style={styles.barContainer}>
-						<View
-							style={[styles.progressBar, { width: `${agreePercentage}%` }]}
-						/>
+				<>
+					<View style={styles.resultsContainer}>
+						<Text style={styles.resultsTitle}>Results</Text>
+						<View style={styles.barContainer}>
+							<View
+								style={[
+									styles.bar,
+									{
+										flexDirection: "row",
+										overflow: "hidden",
+										backgroundColor: "#814DFF",
+									},
+								]}
+							>
+								<View
+									style={{
+										width: `${agreePercentage}%`,
+										backgroundColor: "#8A2BE2",
+										height: "100%",
+									}}
+								/>
+							</View>
+						</View>
+						<View style={styles.resultsTextContainer}>
+							<Text style={styles.resultsText}>
+								Agree: {agreePercentage.toFixed(1)}% ({agreeCount})
+							</Text>
+							<Text style={styles.resultsText}>
+								Disagree: {disagreePercentage.toFixed(1)}% ({disagreeCount})
+							</Text>
+						</View>
 					</View>
-					<View style={styles.resultsTextContainer}>
-						<Text style={styles.resultsText}>
-							Agree: {agreePercentage.toFixed(1)}% ({agreeCount})
-						</Text>
-						<Text style={styles.resultsText}>
-							Disagree: {disagreePercentage.toFixed(1)}% ({disagreeCount})
-						</Text>
-					</View>
-				</View>
+
+					<TouchableOpacity
+						style={styles.joinDiscussionButton}
+						onPress={handleDiscussionNavigation}
+					>
+						<Text style={styles.discussionButtonText}>Join Discussion</Text>
+					</TouchableOpacity>
+				</>
 			)}
 
 			{/* Voting Buttons */}
@@ -266,7 +283,7 @@ const StartPage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#121212",
+		backgroundColor: "#000000",
 		paddingHorizontal: "5%",
 	},
 	headerButtons: {
@@ -277,7 +294,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 20,
 	},
 	title: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 32,
 		fontWeight: "700",
 		textAlign: "center",
@@ -285,15 +302,15 @@ const styles = StyleSheet.create({
 		marginTop: 60,
 	},
 	questionContainer: {
-		backgroundColor: "#1E1E1E",
+		backgroundColor: "#1A1A1A",
 		borderRadius: 12,
 		padding: 20,
 		marginBottom: 40,
 		borderWidth: 1,
-		borderColor: "#5C8374",
+		borderColor: "#9B30FF",
 	},
 	questionText: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 20,
 		textAlign: "center",
 		lineHeight: 28,
@@ -311,13 +328,13 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 	agreeButton: {
-		backgroundColor: "#5C8374",
+		backgroundColor: "#1A1A1A",
 	},
 	disagreeButton: {
-		backgroundColor: "#5C8374",
+		backgroundColor: "#1A1A1A",
 	},
 	buttonText: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 16,
 		fontWeight: "600",
 	},
@@ -327,7 +344,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	resultsTitle: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 20,
 		textAlign: "center",
 		marginBottom: 15,
@@ -335,14 +352,14 @@ const styles = StyleSheet.create({
 	barContainer: {
 		width: "90%",
 		height: 20,
-		backgroundColor: "#1E1E1E",
 		borderRadius: 12,
 		overflow: "hidden",
 		marginVertical: 10,
 	},
-	progressBar: {
+	bar: {
+		width: "100%",
 		height: "100%",
-		backgroundColor: "#5C8374",
+		borderRadius: 12,
 	},
 	resultsTextContainer: {
 		width: "90%",
@@ -351,46 +368,52 @@ const styles = StyleSheet.create({
 		marginTop: 10,
 	},
 	resultsText: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 14,
 	},
 	logoutButton: {
 		position: "absolute",
 		top: Platform.OS === "ios" ? 60 : 30,
 		right: 20,
-		backgroundColor: "#1E1E1E",
+		backgroundColor: "#1A1A1A",
 		paddingVertical: 8,
 		paddingHorizontal: 16,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: "#5C8374",
+		borderColor: "#1A1A1A",
 		zIndex: 1,
 	},
 	logoutButtonText: {
-		color: "#A0A0A0",
+		color: "#B3B3B3",
 		fontSize: 14,
 		fontWeight: "600",
 	},
-	discussionButton: {
-		position: "absolute",
-		top: Platform.OS === "ios" ? 60 : 30,
-		left: 20,
-		backgroundColor: "#1E1E1E",
+	joinDiscussionButton: {
+		backgroundColor: "#1A1A1A",
 		paddingVertical: 8,
 		paddingHorizontal: 16,
 		borderRadius: 12,
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: 30,
+		marginHorizontal: 20,
 		borderWidth: 1,
-		borderColor: "#5C8374",
-		zIndex: 1,
+		borderColor: "#BF5FFF",
+	},
+	discussionButtonText: {
+		color: "#FFFFFF",
+		fontSize: 20,
+		fontWeight: "600",
+		padding: 5,
 	},
 	loadingContainer: {
 		flex: 1,
-		backgroundColor: "#121212",
+		backgroundColor: "#000000",
 		justifyContent: "center",
 		alignItems: "center",
 	},
 	loadingIndicator: {
-		color: "#5C8374",
+		color: "#9B30FF",
 	},
 });
 

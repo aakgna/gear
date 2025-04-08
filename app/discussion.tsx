@@ -10,6 +10,7 @@ import {
 	StyleSheet,
 	Alert,
 	Platform,
+	KeyboardAvoidingView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
@@ -18,8 +19,13 @@ const DiscussionScreen = () => {
 	const { question, questionId } = params;
 	const [messages, setMessages] = useState([]);
 	const [newMessage, setNewMessage] = useState("");
+	const [isInputFocused, setIsInputFocused] = useState(false);
 	const router = useRouter();
 	const flatListRef = useRef(null);
+
+	// Define constants for text input
+	const MIN_INPUT_HEIGHT = 40;
+	const EXPANDED_INPUT_HEIGHT = 150;
 
 	useEffect(() => {
 		const checkUserStatus = async () => {
@@ -57,11 +63,22 @@ const DiscussionScreen = () => {
 		return () => unsubscribe();
 	}, [questionId]);
 
-	// Add effect to scroll to bottom when messages change
-	useEffect(() => {
+	// Add this function to handle scrolling
+	const scrollToBottom = () => {
 		if (flatListRef.current && messages.length > 0) {
-			flatListRef.current.scrollToEnd({ animated: true });
+			flatListRef.current.scrollToOffset({
+				offset: Number.MAX_SAFE_INTEGER,
+				animated: true,
+			});
 		}
+	};
+
+	// Update the useEffect for messages
+	useEffect(() => {
+		// Double scroll attempt with delay to ensure content is rendered
+		scrollToBottom();
+		const scrollTimer = setTimeout(scrollToBottom, 200);
+		return () => clearTimeout(scrollTimer);
 	}, [messages]);
 
 	const sendMessage = async () => {
@@ -95,8 +112,26 @@ const DiscussionScreen = () => {
 		}
 	};
 
+	// Handle focus and blur events
+	const handleFocus = () => {
+		setIsInputFocused(true);
+		// Scroll to bottom when input is focused to ensure it's visible
+		setTimeout(scrollToBottom, 100);
+	};
+
+	const handleBlur = () => {
+		// Only collapse if there's no text
+		if (!newMessage.trim()) {
+			setIsInputFocused(false);
+		}
+	};
+
 	return (
-		<View style={styles.container}>
+		<KeyboardAvoidingView
+			behavior={Platform.OS === "ios" ? "padding" : "height"}
+			style={styles.container}
+			keyboardVerticalOffset={0}
+		>
 			<View style={styles.headerContainer}>
 				<View style={styles.questionContainer}>
 					<Text style={styles.questionText}>{question}</Text>
@@ -108,6 +143,7 @@ const DiscussionScreen = () => {
 				data={messages}
 				keyExtractor={(item) => item.id}
 				style={styles.messagesList}
+				contentContainerStyle={styles.messagesContent}
 				renderItem={({ item }) => (
 					<View style={styles.messageContainer}>
 						<Text style={styles.messageText}>{item.text}</Text>
@@ -116,31 +152,49 @@ const DiscussionScreen = () => {
 						</Text>
 					</View>
 				)}
-				onContentSizeChange={() =>
-					flatListRef.current?.scrollToEnd({ animated: true })
-				}
+				onContentSizeChange={scrollToBottom}
+				onLayout={scrollToBottom}
+				removeClippedSubviews={false}
+				initialNumToRender={messages.length}
+				maxToRenderPerBatch={messages.length}
+				windowSize={21}
 			/>
 
 			<View style={styles.inputContainer}>
 				<TextInput
-					style={styles.input}
+					style={[
+						styles.input,
+						{
+							height:
+								isInputFocused || newMessage.length > 0
+									? EXPANDED_INPUT_HEIGHT
+									: MIN_INPUT_HEIGHT,
+						},
+					]}
 					value={newMessage}
 					onChangeText={setNewMessage}
 					placeholder="Type your message..."
 					placeholderTextColor="#808080"
+					multiline={true}
+					maxLength={1000}
+					scrollEnabled={true}
+					blurOnSubmit={false}
+					textAlignVertical="top"
+					onFocus={handleFocus}
+					onBlur={handleBlur}
 				/>
 				<TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
 					<Text style={styles.sendButtonText}>Send</Text>
 				</TouchableOpacity>
 			</View>
-		</View>
+		</KeyboardAvoidingView>
 	);
 };
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#121212",
+		backgroundColor: "#000000",
 		paddingTop: Platform.OS === "ios" ? 60 : 30,
 	},
 	headerContainer: {
@@ -148,14 +202,14 @@ const styles = StyleSheet.create({
 		paddingBottom: 15,
 	},
 	questionContainer: {
-		backgroundColor: "#1E1E1E",
+		backgroundColor: "#1A1A1A",
 		borderRadius: 12,
 		padding: 20,
 		borderWidth: 1,
-		borderColor: "#5C8374",
+		borderColor: "#9B30FF",
 	},
 	questionText: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 20,
 		textAlign: "center",
 		lineHeight: 28,
@@ -164,36 +218,45 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingHorizontal: "5%",
 	},
+	messagesContent: {
+		paddingBottom: 20,
+		flexGrow: 1,
+	},
 	messageContainer: {
-		backgroundColor: "#1E1E1E",
+		backgroundColor: "#1A1A1A",
 		padding: 12,
 		borderRadius: 12,
 		marginBottom: 8,
 		borderWidth: 1,
-		borderColor: "#5C8374",
+		borderColor: "#9B30FF",
+		maxWidth: "100%",
 	},
 	messageText: {
-		color: "#A0A0A0",
+		color: "#FFFFFF",
 		fontSize: 16,
 		marginBottom: 4,
+		flexWrap: "wrap",
 	},
 	timestamp: {
-		color: "#808080",
+		color: "#B3B3B3",
 		fontSize: 12,
 		alignSelf: "flex-end",
 	},
 	inputContainer: {
 		flexDirection: "row",
 		padding: 16,
-		backgroundColor: "#1E1E1E",
+		backgroundColor: "#1A1A1A",
 		borderTopWidth: 1,
-		borderTopColor: "#5C8374",
-		alignItems: "center",
+		borderTopColor: "#9B30FF",
+		alignItems: "flex-end",
+		paddingBottom: Platform.OS === "ios" ? 30 : 16,
+		marginBottom: 0,
 	},
 	input: {
 		flex: 1,
 		color: "#FFFFFF",
 		fontSize: 16,
+		lineHeight: 20,
 		paddingHorizontal: 12,
 		paddingVertical: 8,
 		backgroundColor: "#2A2A2A",
@@ -201,12 +264,13 @@ const styles = StyleSheet.create({
 		marginRight: 8,
 	},
 	sendButton: {
-		backgroundColor: "#5C8374",
+		backgroundColor: "#9B30FF",
 		padding: 10,
 		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
 		width: 70,
+		height: 40,
 	},
 	sendButtonText: {
 		color: "#FFFFFF",
@@ -214,7 +278,7 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 	},
 	discussionButton: {
-		backgroundColor: "#4A90E2",
+		backgroundColor: "#9B30FF",
 		padding: 16,
 		borderRadius: 25,
 		alignItems: "center",

@@ -104,8 +104,8 @@ const DeletionPage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#121212", // Charcoal Black
-		paddingHorizontal: "5%", // Use percentage for dynamic side padding
+		backgroundColor: "#000000", // Changed from #121212 to pure black
+		paddingHorizontal: "5%",
 		justifyContent: "center",
 	},
 	headerContainer: {
@@ -116,8 +116,23 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 32,
 		fontWeight: "700",
-		color: "#EF4444",
+		color: "#FF3070", // Changed to Soft Pink-Red for warning/deletion context
 		textAlign: "center",
+	},
+	warningContainer: {
+		backgroundColor: "#1A1A1A", // Changed from #1E1E1E to Dark Gray
+		borderRadius: 12,
+		padding: 20,
+		marginBottom: 30,
+		borderWidth: 1,
+		borderColor: "#FF3070", // Changed to Soft Pink-Red for warning context
+	},
+	warningText: {
+		color: "#FFFFFF", // Changed to pure White
+		fontSize: 16,
+		textAlign: "center",
+		lineHeight: 24,
+		marginBottom: 10,
 	},
 	taglineContainer: {
 		marginBottom: 40,
@@ -126,7 +141,7 @@ const styles = StyleSheet.create({
 	},
 	tagline: {
 		fontSize: 14,
-		color: "#A0A0A0", // Soft Gray
+		color: "#B3B3B3", // Changed from #A0A0A0 to Light Gray
 		textAlign: "center",
 	},
 	inputContainer: {
@@ -140,15 +155,15 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		marginBottom: 20,
 		borderRadius: 12,
-		color: "#FFFFFF",
-		backgroundColor: "#1E1E1E", // Deep Gray
+		color: "#FFFFFF", // Pure White
+		backgroundColor: "#1A1A1A", // Changed to Dark Gray
 		fontSize: 16,
 		alignSelf: "center",
 	},
 	button: {
 		width: "90%",
 		height: 50,
-		backgroundColor: "#EF4444", // Keep red for deletion action
+		backgroundColor: "#FF3070", // Changed to Soft Pink-Red for deletion action
 		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
@@ -156,12 +171,44 @@ const styles = StyleSheet.create({
 		alignSelf: "center",
 	},
 	buttonText: {
-		color: "#FFFFFF",
+		color: "#FFFFFF", // Pure White
 		fontSize: 16,
 		fontWeight: "600",
 	},
 	buttonDisabled: {
 		opacity: 0.7,
+	},
+	cancelButton: {
+		width: "90%",
+		height: 50,
+		backgroundColor: "#1A1A1A", // Changed to Dark Gray
+		borderRadius: 20,
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: 16,
+		alignSelf: "center",
+		borderWidth: 1,
+		borderColor: "#B3B3B3", // Changed to Light Gray
+	},
+	cancelButtonText: {
+		color: "#B3B3B3", // Changed to Light Gray
+		fontSize: 16,
+		fontWeight: "600",
+	},
+	resendButton: {
+		padding: 12,
+	},
+	resendButtonText: {
+		color: "#BF5FFF", // Changed to Bright Purple Glow
+		fontSize: 14,
+		textAlign: "center",
+		textDecorationLine: "underline",
+	},
+	errorText: {
+		color: "#FF3070", // Changed to Soft Pink-Red for errors
+		fontSize: 14,
+		textAlign: "center",
+		marginTop: 10,
 	},
 });
 

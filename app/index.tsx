@@ -102,7 +102,7 @@ const LandingPage = () => {
 	return (
 		<View style={styles.container}>
 			<Image
-				source={require("../assets/images/icon.png")}
+				source={require("../assets/images/Untitled.png")}
 				style={styles.logo}
 			/>
 			<View style={styles.logoContainer}>
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		flex: 1,
-		backgroundColor: "#121212", // Charcoal Black
+		backgroundColor: "#000000", // Changed from #121212 to pure black
 		padding: 20,
 		justifyContent: "center",
 	},
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
 	logoTextOne: {
 		fontSize: 45,
 		fontWeight: "700",
-		color: "#5C8374", // White
+		color: "#FFFFFF", // Changed to Vibrant Purple
 	},
 	logoTextTwo: {
 		fontSize: 48,
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
 	},
 	tagline: {
 		fontSize: 14,
-		color: "#A0A0A0", // Soft Gray
+		color: "#B3B3B3", // Changed to Light Gray for secondary text
 		textAlign: "center",
 	},
 	inputContainer: {
@@ -206,20 +206,20 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		marginBottom: 20,
 		borderRadius: 12,
-		color: "#FFFFFF", // White
-		backgroundColor: "#1E1E1E", // Deep Gray
+		color: "#FFFFFF", // Changed to pure White
+		backgroundColor: "#1A1A1A", // Changed to Dark Gray for secondary background
 		fontSize: 16,
 	},
 	button: {
 		width: "100%",
 		height: 50,
-		backgroundColor: "#5C8374", // Neutral Teal
+		backgroundColor: "#9B30FF", // Changed to Vibrant Purple
 		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
 	},
 	buttonText: {
-		color: "#FFFFFF",
+		color: "#FFFFFF", // Pure White
 		fontSize: 16,
 		fontWeight: "600",
 	},
@@ -229,20 +229,20 @@ const styles = StyleSheet.create({
 	footerContainer: {
 		marginTop: 40,
 		borderTopWidth: 1,
-		borderTopColor: "#333333", // Muted Gray
+		borderTopColor: "#1A1A1A", // Changed to Dark Gray
 		paddingTop: 20,
 	},
 	footerText: {
-		color: "#A0A0A0", // Soft Gray
+		color: "#B3B3B3", // Changed to Light Gray for secondary text
 		textAlign: "center",
 		fontSize: 12,
 	},
 	link: {
-		color: "#5C8374", // Neutral Teal
+		color: "#BF5FFF", // Changed to Bright Purple Glow for interactive elements
 		textDecorationLine: "underline",
 	},
 	deleteText: {
-		color: "#666666", // Slightly lighter than Muted Gray
+		color: "#B3B3B3", // Changed to Light Gray for secondary text
 		textAlign: "center",
 		fontSize: 12,
 		marginTop: 10,

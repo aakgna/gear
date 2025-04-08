@@ -162,59 +162,59 @@ const VerifyPhonePage = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#121212", // Charcoal Black
-		paddingHorizontal: "5%", // Use percentage for dynamic side padding
+		backgroundColor: "#000000", // Changed from #121212 to pure black
+		paddingHorizontal: "5%",
 		justifyContent: "center",
 	},
 	headerContainer: {
 		alignItems: "center",
 		marginBottom: 40,
-		paddingHorizontal: 20, // Add padding for header text
+		paddingHorizontal: 20,
 	},
 	headerTitle: {
 		fontSize: 32,
 		fontWeight: "700",
-		color: "#5C8374", // White
+		color: "#9B30FF", // Changed from #5C8374 to Vibrant Purple
 		textAlign: "center",
 	},
 	taglineContainer: {
 		marginBottom: 40,
 		alignItems: "center",
-		paddingHorizontal: 20, // Add padding for tagline text
+		paddingHorizontal: 20,
 	},
 	tagline: {
 		fontSize: 14,
-		color: "#A0A0A0", // Soft Gray
+		color: "#B3B3B3", // Changed from #A0A0A0 to Light Gray
 		textAlign: "center",
 	},
 	inputContainer: {
 		alignItems: "center",
 		width: "100%",
-		paddingHorizontal: 20, // Add padding for input container
+		paddingHorizontal: 20,
 	},
 	textInput: {
-		width: "90%", // Reduce width to prevent edge touching
+		width: "90%",
 		height: 50,
 		paddingHorizontal: 16,
 		marginBottom: 20,
 		borderRadius: 12,
-		color: "#FFFFFF", // White
-		backgroundColor: "#1E1E1E", // Deep Gray
+		color: "#FFFFFF", // Changed to pure White
+		backgroundColor: "#1A1A1A", // Changed from #1E1E1E to Dark Gray
 		fontSize: 16,
-		alignSelf: "center", // Center the input
+		alignSelf: "center",
 	},
 	button: {
-		width: "90%", // Match input width
+		width: "90%",
 		height: 50,
-		backgroundColor: "#5C8374", // Neutral Teal
+		backgroundColor: "#9B30FF", // Changed from #5C8374 to Vibrant Purple
 		borderRadius: 20,
 		alignItems: "center",
 		justifyContent: "center",
 		marginBottom: 16,
-		alignSelf: "center", // Center the button
+		alignSelf: "center",
 	},
 	buttonText: {
-		color: "#FFFFFF",
+		color: "#FFFFFF", // Pure White
 		fontSize: 16,
 		fontWeight: "600",
 	},
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
 		padding: 12,
 	},
 	resendButtonText: {
-		color: "#5C8374", // Neutral Teal
+		color: "#BF5FFF", // Changed from #5C8374 to Bright Purple Glow
 		fontSize: 14,
 		textAlign: "center",
 		textDecorationLine: "underline",
