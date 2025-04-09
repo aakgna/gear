@@ -80,8 +80,7 @@ const LandingPage = () => {
 				? phoneNumber
 				: `+${phoneNumber}`;
 			const confirmation = await auth().signInWithPhoneNumber(formattedNumber);
-			const verificationId = confirmation.verificationId;
-
+			const verificationId = confirmation.verificationId
 			// Navigate to the deletion page and pass the verificationId
 			router.navigate({
 				pathname: "/deletion", // Adjust this to your actual deletion page path

@@ -126,12 +126,22 @@ const DiscussionScreen = () => {
 		}
 	};
 
+	// Function to handle navigation back to start page
+	const handleBack = () => {
+		router.navigate("/start");
+	};
+
 	return (
 		<KeyboardAvoidingView
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
 			style={styles.container}
 			keyboardVerticalOffset={0}
 		>
+			{/* Add the Back Button here */}
+			<TouchableOpacity style={styles.backButton} onPress={handleBack}>
+				<Text style={styles.backButtonText}>{"< Back"}</Text>
+			</TouchableOpacity>
+
 			<View style={styles.headerContainer}>
 				<View style={styles.questionContainer}>
 					<Text style={styles.questionText}>{question}</Text>
@@ -197,9 +207,22 @@ const styles = StyleSheet.create({
 		backgroundColor: "#000000",
 		paddingTop: Platform.OS === "ios" ? 60 : 30,
 	},
+	backButton: {
+		position: "absolute",
+		top: Platform.OS === "ios" ? 60 : 30,
+		left: 20,
+		zIndex: 10,
+		padding: 10,
+	},
+	backButtonText: {
+		color: "#BF5FFF",
+		fontSize: 16,
+		fontWeight: "600",
+	},
 	headerContainer: {
 		paddingHorizontal: "5%",
 		paddingBottom: 15,
+		marginTop: 50,
 	},
 	questionContainer: {
 		backgroundColor: "#1A1A1A",
