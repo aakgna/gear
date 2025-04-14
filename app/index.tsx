@@ -80,7 +80,7 @@ const LandingPage = () => {
 				? phoneNumber
 				: `+${phoneNumber}`;
 			const confirmation = await auth().signInWithPhoneNumber(formattedNumber);
-			const verificationId = confirmation.verificationId
+			const verificationId = confirmation.verificationId;
 			// Navigate to the deletion page and pass the verificationId
 			router.navigate({
 				pathname: "/deletion", // Adjust this to your actual deletion page path
@@ -100,10 +100,7 @@ const LandingPage = () => {
 
 	return (
 		<View style={styles.container}>
-			<Image
-				source={require("../assets/images/Untitled.png")}
-				style={styles.logo}
-			/>
+			<Image source={require("../assets/images/C.png")} style={styles.logo} />
 			<View style={styles.logoContainer}>
 				<Text style={styles.logoTextOne}>Common Ground</Text>
 			</View>
@@ -161,8 +158,8 @@ const LandingPage = () => {
 
 const styles = StyleSheet.create({
 	logo: {
-		width: 100,
-		height: 100,
+		width: 200,
+		height: 200,
 		alignSelf: "center",
 		marginBottom: 10,
 	},

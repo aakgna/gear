@@ -206,7 +206,7 @@ const StartPage = () => {
 			</View>
 
 			{/* Main Content */}
-			<Text style={styles.title}>Today's Question</Text>
+			<Text style={styles.title}>Today's Topic</Text>
 
 			<View style={styles.questionContainer}>
 				<Text style={styles.questionText}>{question}</Text>
