@@ -8,6 +8,9 @@ import {
 	StyleSheet,
 	Alert,
 	Image,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -93,66 +96,80 @@ const LandingPage = () => {
 			console.error("Error initiating account deletion:", error);
 			Alert.alert(
 				"Error",
-				"Failed to initiate account deletion. Please try again."
+				"Failed to initiate account deletion. Please format number like this +11234567890."
 			);
 		}
 	};
 
 	return (
-		<View style={styles.container}>
-			<Image source={require("../assets/images/C.png")} style={styles.logo} />
-			<View style={styles.logoContainer}>
-				<Text style={styles.logoTextOne}>Common Ground</Text>
-			</View>
+		<KeyboardAvoidingView
+			behavior={Platform.OS === "ios" ? "padding" : "height"}
+			style={styles.keyboardAvoidingContainer}
+		>
+			<ScrollView
+				contentContainerStyle={styles.scrollContainer}
+				keyboardShouldPersistTaps="handled"
+			>
+				<Image source={require("../assets/images/C.png")} style={styles.logo} />
+				<View style={styles.logoContainer}>
+					<Text style={styles.logoTextOne}> The Common Ground</Text>
+				</View>
 
-			<View style={styles.taglineContainer}>
-				<Text style={styles.tagline}>Enter your phone number to sign in</Text>
-			</View>
+				<View style={styles.taglineContainer}>
+					<Text style={styles.tagline}>Enter your phone number to sign in</Text>
+				</View>
 
-			<View style={styles.inputContainer}>
-				<TextInput
-					style={styles.textInput}
-					placeholder="Phone number"
-					placeholderTextColor="#888888"
-					keyboardType="phone-pad"
-					value={phoneNumber}
-					onChangeText={setPhoneNumber}
-					enablesReturnKeyAutomatically={true}
-					returnKeyType="done"
-					editable={!isLoading}
-				/>
+				<View style={styles.inputContainer}>
+					<TextInput
+						style={styles.textInput}
+						placeholder="Phone number"
+						placeholderTextColor="#888888"
+						keyboardType="phone-pad"
+						value={phoneNumber}
+						onChangeText={setPhoneNumber}
+						enablesReturnKeyAutomatically={true}
+						returnKeyType="done"
+						editable={!isLoading}
+					/>
 
-				<TouchableOpacity
-					style={[styles.button, isLoading && styles.buttonDisabled]}
-					onPress={handleVerification}
-					disabled={isLoading}
-				>
-					<Text style={styles.buttonText}>
-						{isLoading ? "Sending..." : "Continue"}
+					<TouchableOpacity
+						style={[styles.button, isLoading && styles.buttonDisabled]}
+						onPress={handleVerification}
+						disabled={isLoading}
+					>
+						<Text style={styles.buttonText}>
+							{isLoading ? "Sending..." : "Continue"}
+						</Text>
+					</TouchableOpacity>
+				</View>
+
+				<View style={styles.footerContainer}>
+					<Text style={styles.footerText}>
+						By continuing, you agree to our{" "}
+						<Link
+							href="https://v0-common-ground-three.vercel.app/privacy-policy"
+							style={styles.link}
+						>
+							Privacy Policy
+						</Link>{" "}
+						and{" "}
+						<Link
+							href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+							style={styles.link}
+						>
+							Apple's EULA
+						</Link>
 					</Text>
-				</TouchableOpacity>
-			</View>
-
-			<View style={styles.footerContainer}>
-				<Text style={styles.footerText}>
-					By continuing, you agree to our{" "}
-					<Link href="..." style={styles.link}>
-						Privacy Policy
-					</Link>{" "}
-					and{" "}
-					<Link href="..." style={styles.link}>
-						Apple's EULA
-					</Link>
-				</Text>
-				<Text style={styles.deleteText}>
-					Need help or want to{" "}
-					<Text onPress={handleDeleteAccount} style={styles.link}>
-						delete your account
+					<Text style={styles.deleteText}>
+						Need help or want to{" "}
+						<Text onPress={handleDeleteAccount} style={styles.link}>
+							delete your account
+						</Text>
+						?
 					</Text>
-					?
-				</Text>
-			</View>
-		</View>
+				</View>
+			</ScrollView>
+		</KeyboardAvoidingView>
 	);
 };
 
@@ -176,7 +193,9 @@ const styles = StyleSheet.create({
 	logoTextOne: {
 		fontSize: 45,
 		fontWeight: "700",
-		color: "#FFFFFF", // Changed to Vibrant Purple
+		color: "#FFFFFF", // Changed to Vibrant Purple,
+		textAlign: "center",
+		alignSelf: "center",
 	},
 	logoTextTwo: {
 		fontSize: 48,
@@ -242,6 +261,15 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		fontSize: 12,
 		marginTop: 10,
+	},
+	keyboardAvoidingContainer: {
+		flex: 1,
+		backgroundColor: "#000000",
+	},
+	scrollContainer: {
+		flexGrow: 1,
+		paddingHorizontal: 20,
+		justifyContent: "center",
 	},
 });
 

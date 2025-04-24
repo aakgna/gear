@@ -99,6 +99,7 @@ const StartPage = () => {
 		const userId = auth().currentUser?.uid;
 		if (!userId) {
 			Alert.alert("Error", "You must be logged in to vote");
+			router.navigate("/");
 			return;
 		}
 
@@ -150,6 +151,10 @@ const StartPage = () => {
 
 	const handleLogout = async () => {
 		try {
+			if (!auth().currentUser) {
+				Alert.alert("User not logged in");
+				router.navigate("/");
+			}
 			await auth().signOut();
 			router.replace("/"); // Navigate to home page
 		} catch (error) {
@@ -160,6 +165,10 @@ const StartPage = () => {
 
 	const handleDiscussionNavigation = async () => {
 		try {
+			if (!auth().currentUser) {
+				Alert.alert("User not logged in");
+				router.navigate("/");
+			}
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 
@@ -252,6 +261,9 @@ const StartPage = () => {
 						onPress={handleDiscussionNavigation}
 					>
 						<Text style={styles.discussionButtonText}>Join Discussion</Text>
+						<Text style={styles.underDiscussionButtonText}>
+							Max 3 Messages Per Day
+						</Text>
 					</TouchableOpacity>
 				</>
 			)}
@@ -405,6 +417,11 @@ const styles = StyleSheet.create({
 		fontSize: 20,
 		fontWeight: "600",
 		padding: 5,
+	},
+	underDiscussionButtonText: {
+		color: "#BF5FFF",
+		fontSize: 12,
+		fontWeight: "600",
 	},
 	loadingContainer: {
 		flex: 1,

@@ -34,6 +34,7 @@ const DiscussionScreen = () => {
 				router.replace("/");
 				return;
 			}
+			checkUserVote();
 			const userDoc = await firestore().collection("users").doc(userId).get();
 			const userData = userDoc.data();
 			if (!userData) {
@@ -44,6 +45,36 @@ const DiscussionScreen = () => {
 		};
 		checkUserStatus();
 	}, []);
+
+	const checkUserVote = async () => {
+		const userId = auth().currentUser?.uid;
+		if (!userId) return;
+
+		try {
+			const userDoc = await firestore().collection("users").doc(userId).get();
+
+			const userData = userDoc.data();
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			// If updatedAt exists, compare only the date portion (YYYY-MM-DD)
+			if (userData?.updatedAt) {
+				const lastVoteDate = userData.updatedAt.substring(0, 10); // Get just YYYY-MM-DD
+				const todayDate = today.toISOString().substring(0, 10); // Get just YYYY-MM-DD
+				const hasVotedToday = lastVoteDate === todayDate;
+				console.log(lastVoteDate, todayDate, hasVotedToday);
+				if (!hasVotedToday && userData.voted) {
+					// Reset voted status if it's a new day
+					await userDoc.ref.update({
+						voted: false,
+						messages: 3,
+					});
+				}
+			}
+		} catch (error) {
+			console.error("Error checking vote:", error);
+		}
+	};
 
 	useEffect(() => {
 		// Subscribe to real-time messages
@@ -85,11 +116,15 @@ const DiscussionScreen = () => {
 		if (!newMessage.trim()) return;
 
 		try {
+			if (!auth().currentUser) {
+				Alert.alert("User not logged in");
+				router.navigate("/");
+			}
 			const userId = auth().currentUser?.uid;
 			const userDoc = await firestore().collection("users").doc(userId).get();
 			const userData = userDoc.data();
 			if (userData?.messages <= 0) {
-				Alert.alert("You have no messages left");
+				Alert.alert("No Messages Left", "Max 3 Messages Per Day");
 				return;
 			}
 			await firestore()
@@ -128,6 +163,10 @@ const DiscussionScreen = () => {
 
 	// Function to handle navigation back to start page
 	const handleBack = () => {
+		if (!auth().currentUser) {
+			Alert.alert("User not logged in");
+			router.navigate("/");
+		}
 		router.navigate("/start");
 	};
 
