@@ -127,21 +127,51 @@ const DiscussionScreen = () => {
 				Alert.alert("No Messages Left", "Max 3 Messages Per Day");
 				return;
 			}
-			await firestore()
-				.collection("discussions")
-				.doc(questionId)
-				.collection("messages")
-				.add({
-					text: newMessage,
-					timestamp: firestore.FieldValue.serverTimestamp(),
-				});
-			setNewMessage("");
-			await firestore()
-				.collection("users")
-				.doc(userId)
-				.update({
-					messages: firestore.FieldValue.increment(-1),
-				});
+			const res = await fetch("https://moderatetext-bok2a3w55q-uc.a.run.app", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ content: newMessage }),
+			});
+			const containsEmail =
+				/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(newMessage);
+			const containsPhone =
+				/(\+?1\s*[-.(]?\s*\d{3}\s*[-.)]?\s*\d{3}\s*[-.]?\s*\d{4})|(\b\d{10}\b)/.test(
+					newMessage
+				);
+			const data = await res.json();
+			if (data.results[0].flagged) {
+				Alert.alert(
+					"Message Not Sent",
+					"Your message goes against Common Ground text moderation guidelines."
+				);
+				setNewMessage("");
+				return;
+			} else if (containsEmail || containsPhone) {
+				Alert.alert(
+					"Message Not Sent",
+					"Your message goes against Common Ground text moderation guidelines. No phone numbers, emails, or addresses."
+				);
+				setNewMessage("");
+				return;
+			} else {
+				await firestore()
+					.collection("discussions")
+					.doc(questionId)
+					.collection("messages")
+					.add({
+						text: newMessage,
+						timestamp: firestore.FieldValue.serverTimestamp(),
+					});
+				setNewMessage("");
+				await firestore()
+					.collection("users")
+					.doc(userId)
+					.update({
+						messages: firestore.FieldValue.increment(-1),
+					});
+			}
 		} catch (error) {
 			console.error("Error sending message:", error);
 		}

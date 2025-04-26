@@ -159,13 +159,17 @@ const LandingPage = () => {
 						>
 							Apple's EULA
 						</Link>
+						. Messages containing content related to profanity, derogatory
+						language, sexual topics, death or harm, violence, public safety
+						concerns, or illicit drugs are not permitted. These actions may lead
+						to account suspension.
 					</Text>
 					<Text style={styles.deleteText}>
-						Need help or want to{" "}
+						Click{" "}
 						<Text onPress={handleDeleteAccount} style={styles.link}>
-							delete your account
-						</Text>
-						?
+							here
+						</Text>{" "}
+						to delete your account
 					</Text>
 				</View>
 			</ScrollView>

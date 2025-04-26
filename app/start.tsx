@@ -255,7 +255,6 @@ const StartPage = () => {
 							</Text>
 						</View>
 					</View>
-
 					<TouchableOpacity
 						style={styles.joinDiscussionButton}
 						onPress={handleDiscussionNavigation}
