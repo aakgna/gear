@@ -127,21 +127,32 @@ const DiscussionScreen = () => {
 				Alert.alert("No Messages Left", "Max 3 Messages Per Day");
 				return;
 			}
-			const res = await fetch("https://moderatetext-bok2a3w55q-uc.a.run.app", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ content: newMessage }),
-			});
+			const res = await fetch(
+				"http://127.0.0.1:5001/commonground-e78a9/us-central1/analyze_toxicity",
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({ content: newMessage }),
+				}
+			);
+			const data = await res.json();
+			const scores = data["attributeScores"];
+			var flag = false;
+			for (const [category, details] of Object.entries(scores)) {
+				if (details.summaryScore.value > 0.7) {
+					flag = true;
+					console.log(`${category}: ${details.summaryScore.value}`);
+				}
+			}
 			const containsEmail =
 				/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(newMessage);
 			const containsPhone =
 				/(\+?1\s*[-.(]?\s*\d{3}\s*[-.)]?\s*\d{3}\s*[-.]?\s*\d{4})|(\b\d{10}\b)/.test(
 					newMessage
 				);
-			const data = await res.json();
-			if (data.results[0].flagged) {
+			if (flag) {
 				Alert.alert(
 					"Message Not Sent",
 					"Your message goes against Common Ground text moderation guidelines."
