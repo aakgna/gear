@@ -21,12 +21,26 @@ const StartPage = () => {
 	const [agreeCount, setAgreeCount] = useState(0);
 	const [disagreeCount, setDisagreeCount] = useState(0);
 	const [userChoice, setUserChoice] = useState(null);
+	const [strikes, setStrikes] = useState(0);
 	const router = useRouter();
 
 	useEffect(() => {
 		if (auth().currentUser) {
 			fetchDailyQuestion();
 			checkUserVote();
+			// Subscribe to user's strikes
+			const userId = auth().currentUser.uid;
+			const unsubscribe = firestore()
+				.collection("users")
+				.doc(userId)
+				.onSnapshot((doc) => {
+					const data = doc.data();
+					if (data && data.strikes !== undefined) {
+						setStrikes(data.strikes);
+					}
+				});
+
+			return () => unsubscribe();
 		} else {
 			router.navigate("/");
 		}
@@ -168,7 +182,27 @@ const StartPage = () => {
 			if (!auth().currentUser) {
 				Alert.alert("User not logged in");
 				router.navigate("/");
+				return;
 			}
+
+			const userId = auth().currentUser.uid;
+			const userDoc = await firestore().collection("users").doc(userId).get();
+			const userData = userDoc.data();
+
+			if (!userData || userData.strikes === undefined) {
+				Alert.alert("Error", "User data not found.");
+				router.navigate("/");
+				return;
+			}
+
+			if (userData.strikes <= 0) {
+				Alert.alert(
+					"Access Denied",
+					"You have been restricted from participating in discussions due to too many reports. Please contact support if you believe this is a mistake."
+				);
+				return;
+			}
+
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 
@@ -263,6 +297,7 @@ const StartPage = () => {
 						<Text style={styles.underDiscussionButtonText}>
 							Max 3 Messages Per Day
 						</Text>
+						<Text style={styles.strikesText}>Strikes Remaining: {strikes}</Text>
 					</TouchableOpacity>
 				</>
 			)}
@@ -430,6 +465,12 @@ const styles = StyleSheet.create({
 	},
 	loadingIndicator: {
 		color: "#9B30FF",
+	},
+	strikesText: {
+		color: "#BF5FFF",
+		fontSize: 12,
+		fontWeight: "600",
+		marginTop: 4,
 	},
 });
 

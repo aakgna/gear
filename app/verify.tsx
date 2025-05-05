@@ -67,6 +67,8 @@ const VerifyPhonePage = () => {
 					voted: false,
 					createdAt: firestore.FieldValue.serverTimestamp(),
 					messages: 3,
+					strikes: 5,
+					infractions: 0,
 				});
 			}
 

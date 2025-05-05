@@ -160,12 +160,16 @@ const LandingPage = () => {
 							Apple's EULA
 						</Link>
 						. Messages containing content related to profanity, derogatory
-						language, sexual topics, death or harm, violence, public safety
-						concerns, or illicit drugs are not permitted. These actions may lead
-						to account suspension.
-					</Text>
-					<Text style={styles.deleteText}>
-						Click{" "}
+						language, sexual topics, death or harm, violence, or public safety
+						concerns are not permitted. These actions may lead to account
+						suspension or ban. Contact{" "}
+						<Link
+							href="https://v0-common-ground-three.vercel.app/"
+							style={styles.link}
+						>
+							support
+						</Link>{" "}
+						for help. Click{" "}
 						<Text onPress={handleDeleteAccount} style={styles.link}>
 							here
 						</Text>{" "}

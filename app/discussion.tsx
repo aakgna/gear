@@ -13,6 +13,7 @@ import {
 	KeyboardAvoidingView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import Icon from "react-native-vector-icons/Feather";
 
 const DiscussionScreen = () => {
 	const params = useLocalSearchParams();
@@ -20,6 +21,7 @@ const DiscussionScreen = () => {
 	const [messages, setMessages] = useState([]);
 	const [newMessage, setNewMessage] = useState("");
 	const [isInputFocused, setIsInputFocused] = useState(false);
+	const [isSending, setIsSending] = useState(false);
 	const router = useRouter();
 	const flatListRef = useRef(null);
 
@@ -77,21 +79,33 @@ const DiscussionScreen = () => {
 	};
 
 	useEffect(() => {
-		// Subscribe to real-time messages
-		const unsubscribe = firestore()
-			.collection("discussions")
-			.doc(questionId)
-			.collection("messages")
-			.orderBy("timestamp", "asc")
-			.onSnapshot((snapshot) => {
-				const newMessages = snapshot.docs.map((doc) => ({
-					id: doc.id,
-					...doc.data(),
-				}));
-				setMessages(newMessages);
-			});
+		let unsubscribe;
+		const fetchBlockedUsersAndSubscribe = async () => {
+			const userId = auth().currentUser?.uid;
+			const userDoc = await firestore().collection("users").doc(userId).get();
+			const blockedUsers = userDoc.data()?.blockedUsers || [];
 
-		return () => unsubscribe();
+			unsubscribe = firestore()
+				.collection("discussions")
+				.doc(questionId)
+				.collection("messages")
+				.orderBy("timestamp", "asc")
+				.onSnapshot((snapshot) => {
+					const newMessages = snapshot.docs
+						.map((doc) => ({
+							id: doc.id,
+							...doc.data(),
+						}))
+						.filter(
+							(message) =>
+								message.isToxic !== true && !blockedUsers.includes(message.user)
+						);
+					setMessages(newMessages);
+				});
+		};
+
+		fetchBlockedUsersAndSubscribe();
+		return () => unsubscribe && unsubscribe();
 	}, [questionId]);
 
 	// Add this function to handle scrolling
@@ -116,6 +130,7 @@ const DiscussionScreen = () => {
 		if (!newMessage.trim()) return;
 
 		try {
+			setIsSending(true);
 			if (!auth().currentUser) {
 				Alert.alert("User not logged in");
 				router.navigate("/");
@@ -123,12 +138,32 @@ const DiscussionScreen = () => {
 			const userId = auth().currentUser?.uid;
 			const userDoc = await firestore().collection("users").doc(userId).get();
 			const userData = userDoc.data();
+			if (userData?.strikes <= 0) {
+				Alert.alert(
+					"Access Denied",
+					"You have been restricted from participating in discussions due to too many reports. Please contact support if you believe this is a mistake"
+				);
+			}
 			if (userData?.messages <= 0) {
 				Alert.alert("No Messages Left", "Max 3 Messages Per Day");
 				return;
 			}
+			const containsEmail =
+				/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(newMessage);
+			const containsPhone =
+				/(\+?1\s*[-.(]?\s*\d{3}\s*[-.)]?\s*\d{3}\s*[-.]?\s*\d{4})|(\b\d{10}\b)|(\+1\d{10})/.test(
+					newMessage
+				);
+			if (containsEmail || containsPhone) {
+				Alert.alert(
+					"Message Not Sent",
+					"Your message goes against Common Ground text moderation guidelines. No phone numbers, emails, or addresses."
+				);
+				setNewMessage("");
+				return;
+			}
 			const res = await fetch(
-				"http://127.0.0.1:5001/commonground-e78a9/us-central1/analyze_toxicity",
+				"https://us-central1-commonground-e78a9.cloudfunctions.net/analyze_toxicity",
 				{
 					method: "POST",
 					headers: {
@@ -146,23 +181,10 @@ const DiscussionScreen = () => {
 					console.log(`${category}: ${details.summaryScore.value}`);
 				}
 			}
-			const containsEmail =
-				/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(newMessage);
-			const containsPhone =
-				/(\+?1\s*[-.(]?\s*\d{3}\s*[-.)]?\s*\d{3}\s*[-.]?\s*\d{4})|(\b\d{10}\b)/.test(
-					newMessage
-				);
 			if (flag) {
 				Alert.alert(
 					"Message Not Sent",
 					"Your message goes against Common Ground text moderation guidelines."
-				);
-				setNewMessage("");
-				return;
-			} else if (containsEmail || containsPhone) {
-				Alert.alert(
-					"Message Not Sent",
-					"Your message goes against Common Ground text moderation guidelines. No phone numbers, emails, or addresses."
 				);
 				setNewMessage("");
 				return;
@@ -174,6 +196,8 @@ const DiscussionScreen = () => {
 					.add({
 						text: newMessage,
 						timestamp: firestore.FieldValue.serverTimestamp(),
+						isToxic: false,
+						user: userId,
 					});
 				setNewMessage("");
 				await firestore()
@@ -185,6 +209,8 @@ const DiscussionScreen = () => {
 			}
 		} catch (error) {
 			console.error("Error sending message:", error);
+		} finally {
+			setIsSending(false);
 		}
 	};
 
@@ -237,9 +263,33 @@ const DiscussionScreen = () => {
 				renderItem={({ item }) => (
 					<View style={styles.messageContainer}>
 						<Text style={styles.messageText}>{item.text}</Text>
-						<Text style={styles.timestamp}>
-							{new Date(item.timestamp?.toDate()).toLocaleTimeString()}
-						</Text>
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								justifyContent: "space-between",
+							}}
+						>
+							<Text style={styles.timestamp}>
+								{new Date(item.timestamp?.toDate()).toLocaleTimeString()}
+							</Text>
+							<TouchableOpacity
+								onPress={() =>
+									router.push({
+										pathname: "/report",
+										params: {
+											messageId: item.id,
+											messageText: item.text,
+											question: questionId,
+											user: item.user,
+											question_text: question,
+										},
+									})
+								}
+							>
+								<Icon name="flag" size={15} color="#BF5FFF" />
+							</TouchableOpacity>
+						</View>
 					</View>
 				)}
 				onContentSizeChange={scrollToBottom}
@@ -272,9 +322,16 @@ const DiscussionScreen = () => {
 					textAlignVertical="top"
 					onFocus={handleFocus}
 					onBlur={handleBlur}
+					editable={!isSending}
 				/>
-				<TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-					<Text style={styles.sendButtonText}>Send</Text>
+				<TouchableOpacity
+					style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+					onPress={sendMessage}
+					disabled={isSending}
+				>
+					<Text style={styles.sendButtonText}>
+						{isSending ? "..." : "Send"}
+					</Text>
 				</TouchableOpacity>
 			</View>
 		</KeyboardAvoidingView>
@@ -391,6 +448,10 @@ const styles = StyleSheet.create({
 		color: "#FFFFFF",
 		fontSize: 18,
 		fontWeight: "600",
+	},
+	sendButtonDisabled: {
+		backgroundColor: "#4F1880",
+		opacity: 0.7,
 	},
 });
 
