@@ -1,5 +1,5 @@
 // StartPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -9,6 +9,7 @@ import {
 	Alert,
 	ActivityIndicator,
 	Platform,
+	AppState,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -22,7 +23,9 @@ const StartPage = () => {
 	const [disagreeCount, setDisagreeCount] = useState(0);
 	const [userChoice, setUserChoice] = useState(null);
 	const [strikes, setStrikes] = useState(0);
+	const [answer, setAnswer] = useState(false);
 	const router = useRouter();
+	const appState = useRef(AppState.currentState);
 
 	useEffect(() => {
 		if (auth().currentUser) {
@@ -46,6 +49,23 @@ const StartPage = () => {
 		}
 	}, []);
 
+	function useAppState() {
+		const [state, setState] = useState(AppState.currentState);
+		useEffect(() => {
+			const sub = AppState.addEventListener("change", setState);
+			return () => sub.remove();
+		}, []);
+		return state; // "active" | "inactive" | "background"
+	}
+
+	const app = useAppState();
+	useEffect(() => {
+		if (app === "active") {
+			fetchDailyQuestion();
+			checkUserVote();
+		}
+	}, [app]);
+
 	const fetchDailyQuestion = async () => {
 		try {
 			const today = new Date();
@@ -63,6 +83,9 @@ const StartPage = () => {
 				setQuestion(questionData.question);
 				setAgreeCount(questionData.agreeCount || 0);
 				setDisagreeCount(questionData.disagreeCount || 0);
+				console.log("questionData.answer", questionData.answer);
+				setAnswer(questionData.answer);
+				console.log(answer);
 			} else {
 				setQuestion("No question available for today");
 			}
@@ -282,10 +305,12 @@ const StartPage = () => {
 						</View>
 						<View style={styles.resultsTextContainer}>
 							<Text style={styles.resultsText}>
-								Agree: {agreePercentage.toFixed(1)}% ({agreeCount})
+								{answer ? "Yes" : "Agree"}: {agreePercentage.toFixed(1)}% (
+								{agreeCount})
 							</Text>
 							<Text style={styles.resultsText}>
-								Disagree: {disagreePercentage.toFixed(1)}% ({disagreeCount})
+								{answer ? "No" : "Disagree"}: {disagreePercentage.toFixed(1)}% (
+								{disagreeCount})
 							</Text>
 						</View>
 					</View>
@@ -310,7 +335,7 @@ const StartPage = () => {
 						onPress={() => handleVote("agree")}
 						disabled={isLoading}
 					>
-						<Text style={styles.buttonText}>Agree</Text>
+						<Text style={styles.buttonText}>{answer ? "Yes" : "Agree"}</Text>
 					</TouchableOpacity>
 
 					<TouchableOpacity
@@ -318,7 +343,7 @@ const StartPage = () => {
 						onPress={() => handleVote("disagree")}
 						disabled={isLoading}
 					>
-						<Text style={styles.buttonText}>Disagree</Text>
+						<Text style={styles.buttonText}>{answer ? "No" : "Disagree"}</Text>
 					</TouchableOpacity>
 				</View>
 			)}

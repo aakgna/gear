@@ -11,6 +11,7 @@ import {
 	Alert,
 	Platform,
 	KeyboardAvoidingView,
+	AppState,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/Feather";
@@ -23,6 +24,7 @@ const DiscussionScreen = () => {
 	const [isInputFocused, setIsInputFocused] = useState(false);
 	const [isSending, setIsSending] = useState(false);
 	const router = useRouter();
+	const appState = useRef(AppState.currentState);
 	const flatListRef = useRef(null);
 
 	// Define constants for text input
@@ -46,6 +48,18 @@ const DiscussionScreen = () => {
 			}
 		};
 		checkUserStatus();
+	}, []);
+	useEffect(() => {
+		const sub = AppState.addEventListener("change", (nextState) => {
+			if (
+				appState.current.match(/inactive|background/) &&
+				nextState === "active"
+			) {
+				checkUserVote();
+			}
+			appState.current = nextState;
+		});
+		return () => sub.remove();
 	}, []);
 
 	const checkUserVote = async () => {
