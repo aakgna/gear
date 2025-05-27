@@ -49,18 +49,20 @@ const DiscussionScreen = () => {
 		};
 		checkUserStatus();
 	}, []);
+	function useAppState() {
+		const [state, setState] = useState(AppState.currentState);
+		useEffect(() => {
+			const sub = AppState.addEventListener("change", setState);
+			return () => sub.remove();
+		}, []);
+		return state; // "active" | "inactive" | "background"
+	}
+	const app = useAppState();
 	useEffect(() => {
-		const sub = AppState.addEventListener("change", (nextState) => {
-			if (
-				appState.current.match(/inactive|background/) &&
-				nextState === "active"
-			) {
-				checkUserVote();
-			}
-			appState.current = nextState;
-		});
-		return () => sub.remove();
-	}, []);
+		if (app === "active") {
+			checkUserVote();
+		}
+	}, [app]);
 
 	const checkUserVote = async () => {
 		const userId = auth().currentUser?.uid;
@@ -85,6 +87,7 @@ const DiscussionScreen = () => {
 						voted: false,
 						messages: 3,
 					});
+					router.navigate("/start");
 				}
 			}
 		} catch (error) {
