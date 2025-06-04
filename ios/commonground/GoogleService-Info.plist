@@ -3,21 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>155048967301-n5vahih4c0ciik5qqt74v3gfni449vbf.apps.googleusercontent.com</string>
+	<string>402531835441-qtm4qchnm2lprlfq8jp0h739mljbtnut.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.155048967301-n5vahih4c0ciik5qqt74v3gfni449vbf</string>
+	<string>com.googleusercontent.apps.402531835441-qtm4qchnm2lprlfq8jp0h739mljbtnut</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCEDBgUua69CTwqbgUqf-K2JEu1P9Qkpes</string>
+	<string>AIzaSyBq3YCgWhtbv_hyt6BKa736hMBhnNNwV7Y</string>
 	<key>GCM_SENDER_ID</key>
-	<string>155048967301</string>
+	<string>402531835441</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.aakgna.commongroundquestions</string>
 	<key>PROJECT_ID</key>
-	<string>commonground-e78a9</string>
+	<string>commonground-a5fd9</string>
 	<key>STORAGE_BUCKET</key>
-	<string>commonground-e78a9.firebasestorage.app</string>
+	<string>commonground-a5fd9.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:155048967301:ios:8793f4d1d614e043683dec</string>
+	<string>1:402531835441:ios:75168519780644b2e73f10</string>
 </dict>
 </plist>
