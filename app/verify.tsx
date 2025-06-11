@@ -1,5 +1,12 @@
-import { View, Text, StyleSheet, TextInput, Pressable } from "react-native";
-import { router } from "expo-router";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Pressable,
+  Alert,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState, useRef, useEffect } from "react";
 import Animated, {
   FadeIn,
@@ -11,12 +18,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft } from "lucide-react-native";
+import auth from "@react-native-firebase/auth";
 
 export default function VerifyScreen() {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(60);
+  const [isVerifying, setIsVerifying] = useState(false);
   const shake = useSharedValue(0);
   const scale = useSharedValue(1);
+  const { verificationId, phoneNumber } = useLocalSearchParams();
 
   const inputRef = useRef(null);
 
@@ -33,14 +43,8 @@ export default function VerifyScreen() {
     };
   });
 
-  const handleVerify = () => {
-    if (code.length === 6) {
-      scale.value = withSequence(
-        withTiming(0.95, { duration: 100 }),
-        withTiming(1, { duration: 100 })
-      );
-      router.replace("/(tabs)");
-    } else {
+  const handleVerify = async () => {
+    if (code.length !== 6) {
       shake.value = withSequence(
         withTiming(-10, { duration: 50 }),
         withTiming(10, { duration: 50 }),
@@ -48,16 +52,66 @@ export default function VerifyScreen() {
         withTiming(10, { duration: 50 }),
         withTiming(0, { duration: 50 })
       );
+      return;
     }
-  };
 
-  const handleResend = () => {
-    if (countdown === 0) {
-      setCountdown(60);
+    setIsVerifying(true);
+    try {
+      // Create a credential with the verification ID and code
+      const credential = auth.PhoneAuthProvider.credential(
+        verificationId as string,
+        code
+      );
+
+      // Sign in with the credential
+      await auth().signInWithCredential(credential);
+
+      // If successful, navigate to the start screen
       scale.value = withSequence(
         withTiming(0.95, { duration: 100 }),
         withTiming(1, { duration: 100 })
       );
+      router.replace("/(tabs)/start");
+    } catch (error: any) {
+      console.error("Verification error:", error);
+      Alert.alert(
+        "Verification Failed",
+        error.message || "Failed to verify code. Please try again."
+      );
+      shake.value = withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (countdown === 0) {
+      try {
+        setIsVerifying(true);
+        const confirmation = await auth().signInWithPhoneNumber(
+          phoneNumber as string
+        );
+        // Update the verificationId in the URL or state
+        setCountdown(60);
+        scale.value = withSequence(
+          withTiming(0.95, { duration: 100 }),
+          withTiming(1, { duration: 100 })
+        );
+      } catch (error: any) {
+        console.error("Resend error:", error);
+        Alert.alert(
+          "Failed to Resend",
+          error.message || "Failed to resend code. Please try again."
+        );
+      } finally {
+        setIsVerifying(false);
+      }
     }
   };
 
@@ -91,6 +145,7 @@ export default function VerifyScreen() {
             value={code}
             onChangeText={setCode}
             autoFocus
+            editable={!isVerifying}
           />
 
           <LinearGradient
@@ -107,6 +162,7 @@ export default function VerifyScreen() {
             { opacity: pressed ? 0.9 : 1 },
           ]}
           onPress={handleVerify}
+          disabled={isVerifying}
         >
           <LinearGradient
             colors={["#9D00FF", "#6A0DAD"]}
@@ -114,7 +170,9 @@ export default function VerifyScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.gradientButton}
           >
-            <Text style={styles.buttonText}>Verify Code</Text>
+            <Text style={styles.buttonText}>
+              {isVerifying ? "Verifying..." : "Verify Code"}
+            </Text>
           </LinearGradient>
         </Pressable>
 
@@ -124,7 +182,7 @@ export default function VerifyScreen() {
             { opacity: pressed && countdown === 0 ? 0.8 : 1 },
           ]}
           onPress={handleResend}
-          disabled={countdown > 0}
+          disabled={countdown > 0 || isVerifying}
         >
           <Text
             style={[styles.resendText, countdown > 0 && styles.resendDisabled]}
@@ -163,6 +221,7 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     marginBottom: 16,
     fontFamily: "Inter-Bold",
+    fontWeight: "700",
   },
   subtitle: {
     fontSize: 18,

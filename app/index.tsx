@@ -23,7 +23,7 @@ export default function SignInScreen() {
   useEffect(() => {
     const subscriber = auth().onAuthStateChanged((user) => {
       if (user && user.phoneNumber) {
-        router.replace("/start");
+        router.replace("/(tabs)/start");
       }
     });
     return subscriber; // unsubscribe on unmount
@@ -62,7 +62,7 @@ export default function SignInScreen() {
         formattedNumber = phoneNumber;
       } else {
         // Fallback: if they already included a “+” or entered anything weird,
-        // just make sure there’s a leading “+” so Firebase doesn’t blow up.
+        // just make sure there's a leading "+" so Firebase doesn't blow up.
         formattedNumber = phoneNumber.startsWith("+")
           ? phoneNumber
           : "+" + phoneNumber.replace(/\D/g, "");
@@ -89,7 +89,7 @@ export default function SignInScreen() {
     }
   };
 
-  // When they tap “Delete Account”, we do the same signInWithPhoneNumber flow
+  // When they tap "Delete Account", we do the same signInWithPhoneNumber flow
   // but route them to the delete‐account screen (instead of /verify).
   const handleDeleteAccount = async () => {
     if (phoneNumber.trim().length === 0) {
@@ -294,8 +294,9 @@ const styles = StyleSheet.create({
     borderRadius: 35,
   },
   appTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontFamily: "Inter-Bold",
+    fontWeight: "900",
     color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 8,
