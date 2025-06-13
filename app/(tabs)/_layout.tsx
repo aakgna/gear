@@ -121,21 +121,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="history"
-        options={{
-          title: "History",
-          tabBarIcon: ({ color, size }) => (
-            <History size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="discussion"
         options={{
           href: null,
           title: "Discussion",
           tabBarIcon: ({ color, size }) => (
             <MessageSquare size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "History",
+          tabBarIcon: ({ color, size }) => (
+            <History size={size} color={color} />
           ),
         }}
       />

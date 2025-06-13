@@ -1,487 +1,482 @@
-import { useEffect, useState, useRef } from "react";
-import firestore from "@react-native-firebase/firestore";
-import auth from "@react-native-firebase/auth";
+// DiscussionScreen.tsx
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
-  Alert,
-  Platform,
+  TextInput,
   KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
   AppState,
+  Pressable,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import Icon from "react-native-vector-icons/Feather";
+import firestore from "@react-native-firebase/firestore";
+import auth from "@react-native-firebase/auth";
+import Animated, { FadeIn, SlideInRight } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+import { ArrowLeft, Flag, Send } from "lucide-react-native";
 
-const DiscussionScreen = () => {
-  const params = useLocalSearchParams();
-  const { question, questionId } = params;
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [isInputFocused, setIsInputFocused] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+export default function DiscussionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { question, questionId } = params as {
+    question: string;
+    questionId: string;
+  };
+
+  const [currentQuestion, setCurrentQuestion] = useState(question);
+  const [currentQuestionId, setCurrentQuestionId] = useState(questionId);
+  const [messages, setMessages] = useState<Array<any>>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const appState = useRef(AppState.currentState);
-  const flatListRef = useRef(null);
 
-  // Define constants for text input
-  const MIN_INPUT_HEIGHT = 40;
-  const EXPANDED_INPUT_HEIGHT = 150;
-
+  // Fetch daily question if not passed via params (e.g., from tab bar)
   useEffect(() => {
-    const checkUserStatus = async () => {
-      const userId = auth().currentUser?.uid;
-      if (!userId) {
-        router.replace("/");
-        return;
-      }
-      checkUserVote();
-      const userDoc = await firestore().collection("users").doc(userId).get();
-      const userData = userDoc.data();
-      if (!userData) {
-        router.replace("/");
-      } else if (userData.voted === false) {
-        router.replace("/start");
+    const fetchCurrentQuestion = async () => {
+      if (!question || !questionId) {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Start of today
+          const questionDoc = await firestore()
+            .collection("dailyQuestions")
+            .where("date", ">=", today)
+            .where("date", "<", new Date(today.getTime() + 24 * 60 * 60 * 1000)) // End of today
+            .orderBy("date", "asc")
+            .limit(1)
+            .get();
+
+          if (!questionDoc.empty) {
+            const qData = questionDoc.docs[0].data();
+            setCurrentQuestion(qData.question);
+            setCurrentQuestionId(questionDoc.docs[0].id);
+          } else {
+            Alert.alert("No question available", "Please try again later.");
+            router.replace("/start"); // Redirect if no question found
+          }
+        } catch (error: any) {
+          console.error("Error fetching daily question in discussion: ", error);
+          Alert.alert("Error", "Failed to load discussion topic.");
+          router.replace("/start"); // Redirect on error
+        }
       }
     };
-    checkUserStatus();
-  }, []);
+
+    fetchCurrentQuestion();
+  }, [question, questionId]);
+
+  // AppState hook to refetch vote-status on resume
   function useAppState() {
     const [state, setState] = useState(AppState.currentState);
     useEffect(() => {
       const sub = AppState.addEventListener("change", setState);
       return () => sub.remove();
     }, []);
-    return state; // "active" | "inactive" | "background"
+    return state;
   }
   const app = useAppState();
   useEffect(() => {
-    if (app === "active") {
-      checkUserVote();
-    }
+    if (app === "active") checkUserVote();
   }, [app]);
 
+  // 1. Ensure user is still allowed here
+  useEffect(() => {
+    (async () => {
+      const uid = auth().currentUser?.uid;
+      if (!uid) {
+        router.replace("/");
+        return;
+      }
+      await checkUserVote();
+    })();
+  }, []);
+
+  // 2. Subscribe to messages, filtering out toxic/blocked
+  useEffect(() => {
+    let unsubscribe: any;
+    (async () => {
+      // Only proceed if currentQuestionId is available
+      if (!currentQuestionId) return;
+
+      const uid = auth().currentUser?.uid;
+      if (!uid) return router.replace("/");
+
+      // fetch blockedUsers for this user
+      const userDoc = await firestore().collection("users").doc(uid).get();
+      const blockedUsers = userDoc.data()?.blockedUsers || [];
+
+      unsubscribe = firestore()
+        .collection("discussions")
+        .doc(currentQuestionId) // Use currentQuestionId here
+        .collection("messages")
+        .orderBy("timestamp", "asc")
+        .onSnapshot((snap) => {
+          if (!snap) return;
+          const fetched = snap.docs
+            .map((d) => ({
+              id: d.id,
+              ...d.data(),
+              isToxic: d.data().isToxic,
+              user: d.data().user,
+              text: d.data().text,
+            }))
+            .filter(
+              (m) =>
+                m.isToxic !== true && !blockedUsers.includes(m.user as string)
+            );
+          setMessages(fetched);
+        });
+    })();
+    return () => unsubscribe && unsubscribe();
+  }, [currentQuestionId]); // Depend on currentQuestionId
+
+  // 3. Auto-scroll on new messages
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  };
+  useEffect(() => {
+    scrollToBottom();
+    const t = setTimeout(scrollToBottom, 200);
+    return () => clearTimeout(t);
+  }, [messages]);
+
+  // -- Logic functions --
+
+  // Check if user voted today & still allowed
   const checkUserVote = async () => {
-    const userId = auth().currentUser?.uid;
-    if (!userId) return;
-
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
     try {
-      const userDoc = await firestore().collection("users").doc(userId).get();
-
-      const userData = userDoc.data();
+      const userDoc = await firestore().collection("users").doc(uid).get();
+      const data = userDoc.data()!;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // If updatedAt exists, compare only the date portion (YYYY-MM-DD)
-      if (userData?.updatedAt) {
-        const lastVoteDate = userData.updatedAt.substring(0, 10); // Get just YYYY-MM-DD
-        const todayDate = today.toISOString().substring(0, 10); // Get just YYYY-MM-DD
-        const hasVotedToday = lastVoteDate === todayDate;
-        console.log(lastVoteDate, todayDate, hasVotedToday);
-        if (!hasVotedToday && userData.voted) {
-          // Reset voted status if it's a new day
-          await userDoc.ref.update({
-            voted: false,
-            messages: 3,
-          });
-          router.navigate("/start");
+      if (data.updatedAt) {
+        const last = data.updatedAt.substring(0, 10);
+        const todayStr = today.toISOString().substring(0, 10);
+        if (!data.voted || last !== todayStr) {
+          await userDoc.ref.update({ voted: false, messages: 3 });
+          router.replace("/start");
         }
+      } else {
+        router.replace("/start");
       }
-    } catch (error) {
-      console.error("Error checking vote:", error);
+    } catch (e: any) {
+      console.error(e);
     }
   };
 
-  useEffect(() => {
-    let unsubscribe;
-    const fetchBlockedUsersAndSubscribe = async () => {
-      try {
-        const userId = auth().currentUser?.uid;
-        if (!userId) {
-          router.replace("/");
-          return;
-        }
-
-        const userDoc = await firestore().collection("users").doc(userId).get();
-        const blockedUsers = userDoc.data()?.blockedUsers || [];
-
-        unsubscribe = firestore()
-          .collection("discussions")
-          .doc(questionId)
-          .collection("messages")
-          .orderBy("timestamp", "asc")
-          .onSnapshot((snapshot) => {
-            if (!snapshot) return;
-
-            const newMessages = snapshot.docs
-              .map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-              }))
-              .filter(
-                (message) =>
-                  message.isToxic !== true &&
-                  !blockedUsers.includes(message.user)
-              );
-            setMessages(newMessages);
-          });
-      } catch (error) {
-        console.error("Error fetching blocked users:", error);
-      }
-    };
-
-    fetchBlockedUsersAndSubscribe();
-    return () => unsubscribe && unsubscribe();
-  }, [questionId]);
-
-  // Add this function to handle scrolling
-  const scrollToBottom = () => {
-    if (flatListRef.current && messages.length > 0) {
-      flatListRef.current.scrollToOffset({
-        offset: Number.MAX_SAFE_INTEGER,
-        animated: true,
-      });
-    }
-  };
-
-  // Update the useEffect for messages
-  useEffect(() => {
-    // Double scroll attempt with delay to ensure content is rendered
-    scrollToBottom();
-    const scrollTimer = setTimeout(scrollToBottom, 200);
-    return () => clearTimeout(scrollTimer);
-  }, [messages]);
-
+  // Send a new message
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+    setIsSending(true);
 
     try {
-      setIsSending(true);
-      if (!auth().currentUser) {
+      const uid = auth().currentUser?.uid;
+      if (!uid) {
         Alert.alert("User not logged in");
-        router.navigate("/");
+        return router.replace("/");
       }
-      const userId = auth().currentUser?.uid;
-      const userDoc = await firestore().collection("users").doc(userId).get();
-      const userData = userDoc.data();
-      if (userData?.strikes <= 0) {
+      const userDoc = await firestore().collection("users").doc(uid).get();
+      const userData = userDoc.data()!;
+      if (userData.strikes <= 0) {
         Alert.alert(
           "Access Denied",
-          "You have been restricted from participating in discussions due to too many reports. Please contact support if you believe this is a mistake"
+          "You have been restricted from participating in discussions."
         );
+        return;
       }
-      if (userData?.messages <= 0) {
+      if (userData.messages <= 0) {
         Alert.alert("No Messages Left", "Max 3 Messages Per Day");
         return;
       }
-      const containsEmail =
-        /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(newMessage);
-      const containsPhone =
-        /(\+?1\s*[-.(]?\s*\d{3}\s*[-.)]?\s*\d{3}\s*[-.]?\s*\d{4})|(\b\d{10}\b)|(\+1\d{10})/.test(
-          newMessage
-        );
-      if (containsEmail || containsPhone) {
-        Alert.alert(
-          "Message Not Sent",
-          "Your message goes against Common Ground text moderation guidelines. No phone numbers, emails, or addresses."
-        );
+
+      // Moderation: no emails/phones
+      const hasEmail = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(
+        newMessage
+      );
+      const hasPhone = /(\+?1[-.\s]?\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/.test(
+        newMessage
+      );
+      if (hasEmail || hasPhone) {
+        Alert.alert("Message Not Sent", "No emails or phone numbers allowed.");
         setNewMessage("");
         return;
       }
+
+      // Toxicity API
       const res = await fetch(
         "https://us-central1-commonground-e78a9.cloudfunctions.net/analyze_toxicity",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: newMessage }),
         }
       );
-      const data = await res.json();
-      const scores = data["attributeScores"];
-      var flag = false;
-      for (const [category, details] of Object.entries(scores)) {
-        if (details.summaryScore.value > 0.7) {
-          flag = true;
-          console.log(`${category}: ${details.summaryScore.value}`);
-        }
-      }
-      if (flag) {
+      const result = await res.json();
+      const scores = result.attributeScores;
+      const tooToxic = Object.values(scores).some(
+        (s: any) => s.summaryScore.value > 0.7
+      );
+      if (tooToxic) {
         Alert.alert(
           "Message Not Sent",
-          "Your message goes against Common Ground text moderation guidelines."
+          "Your message violates our guidelines."
         );
         setNewMessage("");
         return;
-      } else {
-        await firestore()
-          .collection("discussions")
-          .doc(questionId)
-          .collection("messages")
-          .add({
-            text: newMessage,
-            timestamp: firestore.FieldValue.serverTimestamp(),
-            isToxic: false,
-            user: userId,
-          });
-        setNewMessage("");
-        await firestore()
-          .collection("users")
-          .doc(userId)
-          .update({
-            messages: firestore.FieldValue.increment(-1),
-          });
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
+
+      // All good → write to Firestore
+      await firestore()
+        .collection("discussions")
+        .doc(currentQuestionId) // Use currentQuestionId here
+        .collection("messages")
+        .add({
+          text: newMessage,
+          timestamp: firestore.FieldValue.serverTimestamp(),
+          isToxic: false,
+          user: uid,
+        });
+
+      // decrement user messages
+      await firestore()
+        .collection("users")
+        .doc(uid)
+        .update({ messages: firestore.FieldValue.increment(-1) });
+
+      setNewMessage("");
+    } catch (e: any) {
+      console.error(e);
     } finally {
       setIsSending(false);
     }
   };
 
-  // Handle focus and blur events
-  const handleFocus = () => {
-    setIsInputFocused(true);
-    // Scroll to bottom when input is focused to ensure it's visible
-    setTimeout(scrollToBottom, 100);
-  };
-
-  const handleBlur = () => {
-    // Only collapse if there's no text
-    if (!newMessage.trim()) {
-      setIsInputFocused(false);
-    }
-  };
-
-  // Function to handle navigation back to start page
+  // Navigate back to Start
   const handleBack = () => {
-    if (!auth().currentUser) {
-      Alert.alert("User not logged in");
-      router.navigate("/");
-    }
     router.navigate("/start");
   };
+
+  // Flag a message
+  const handleFlag = (message: { id: string; text: string; user: string }) => {
+    router.push({
+      pathname: "/report",
+      params: {
+        messageId: message.id,
+        messageText: message.text,
+        question: currentQuestion, // Use currentQuestion here
+        user: message.user,
+      },
+    });
+  };
+
+  // --- Render UI ---
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      {/* Add the Back Button here */}
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>{"< Back"}</Text>
-      </TouchableOpacity>
-
-      <View style={styles.headerContainer}>
-        <View style={styles.questionContainer}>
-          <Text style={styles.questionText}>{question}</Text>
-        </View>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-        renderItem={({ item }) => (
-          <View style={styles.messageContainer}>
-            <Text style={styles.messageText}>{item.text}</Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <Text style={styles.timestamp}>
-                {new Date(item.timestamp?.toDate()).toLocaleTimeString()}
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/report",
-                    params: {
-                      messageId: item.id,
-                      messageText: item.text,
-                      question: questionId,
-                      user: item.user,
-                      question_text: question,
-                    },
-                  })
-                }
-              >
-                <Icon name="flag" size={15} color="#BF5FFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        onContentSizeChange={scrollToBottom}
-        onLayout={scrollToBottom}
-        removeClippedSubviews={false}
-        initialNumToRender={messages.length}
-        maxToRenderPerBatch={messages.length}
-        windowSize={21}
+      <LinearGradient
+        colors={["#120318", "#1C0529"]}
+        style={StyleSheet.absoluteFill}
       />
 
+      {/* Back Button */}
+      <View style={styles.header}>
+        <Pressable style={styles.backButton} onPress={handleBack}>
+          <ArrowLeft size={24} color="#9D00FF" />
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+      </View>
+
+      {/* Question Card */}
+      <LinearGradient
+        colors={["#9D00FF20", "#6A0DAD20"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.topicCard}
+      >
+        <Text style={styles.topicText}>{currentQuestion}</Text>
+        {/* Use currentQuestion here */}
+      </LinearGradient>
+
+      {/* Messages */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.messagesContainer}
+        contentContainerStyle={styles.messagesContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {messages.map((msg, i) => (
+          <Animated.View
+            key={msg.id}
+            entering={SlideInRight.delay(i * 100).duration(300)}
+            style={styles.messageWrapper}
+          >
+            <LinearGradient
+              colors={["#222222", "#1A1A1A"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.messageBubble}
+            >
+              <Text style={styles.messageText}>{msg.text}</Text>
+              <View style={styles.messageFooter}>
+                <Text style={styles.timestampText}>
+                  {msg.timestamp
+                    ? new Date(msg.timestamp.toDate()).toLocaleTimeString()
+                    : ""}
+                </Text>
+                <Pressable
+                  style={styles.flagButton}
+                  onPress={() => handleFlag(msg)}
+                >
+                  <Flag size={16} color="#9D00FF" />
+                </Pressable>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        ))}
+      </ScrollView>
+
+      {/* Input + Send */}
       <View style={styles.inputContainer}>
         <TextInput
-          style={[
-            styles.input,
-            {
-              height:
-                isInputFocused || newMessage.length > 0
-                  ? EXPANDED_INPUT_HEIGHT
-                  : MIN_INPUT_HEIGHT,
-            },
-          ]}
+          style={styles.input}
+          placeholder="Type your message..."
+          placeholderTextColor="#999"
           value={newMessage}
           onChangeText={setNewMessage}
-          placeholder="Type your message..."
-          placeholderTextColor="#808080"
-          multiline={true}
-          maxLength={1000}
-          scrollEnabled={true}
-          blurOnSubmit={false}
-          textAlignVertical="top"
-          onFocus={handleFocus}
-          onBlur={handleBlur}
+          multiline
           editable={!isSending}
         />
-        <TouchableOpacity
-          style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+        <Pressable
+          style={({ pressed }) => [
+            styles.sendButton,
+            pressed && { opacity: 0.8 },
+          ]}
           onPress={sendMessage}
           disabled={isSending}
         >
-          <Text style={styles.sendButtonText}>
-            {isSending ? "..." : "Send"}
-          </Text>
-        </TouchableOpacity>
+          <LinearGradient
+            colors={["#9D00FF", "#6A0DAD"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.sendButtonGradient}
+          >
+            <Send size={20} color="#fff" />
+          </LinearGradient>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
+  container: { flex: 1, backgroundColor: "#121212" },
+  header: {
     paddingTop: Platform.OS === "ios" ? 60 : 30,
+    paddingHorizontal: 24,
+    marginBottom: 12,
   },
-  backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 30,
-    left: 20,
-    zIndex: 10,
-    padding: 10,
+  backButton: { flexDirection: "row", alignItems: "center" },
+  backText: {
+    color: "#9D00FF",
+    fontSize: 18,
+    marginLeft: 8,
+    fontFamily: "Inter-Medium",
   },
-  backButtonText: {
-    color: "#BF5FFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  headerContainer: {
-    paddingHorizontal: "5%",
-    paddingBottom: 15,
-    marginTop: 50,
-  },
-  questionContainer: {
-    backgroundColor: "#1A1A1A",
-    borderRadius: 12,
+  topicCard: {
+    borderRadius: 16,
     padding: 20,
+    marginHorizontal: 24,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#9B30FF",
+    borderColor: "#9D00FF40",
+    elevation: 5,
+    shadowColor: "#9D00FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  questionText: {
-    color: "#FFFFFF",
-    fontSize: 20,
+  topicText: {
+    fontSize: 18,
+    color: "#fff",
     textAlign: "center",
-    lineHeight: 28,
+    lineHeight: 26,
+    fontFamily: "Inter-Bold",
   },
-  messagesList: {
-    flex: 1,
-    paddingHorizontal: "5%",
-  },
-  messagesContent: {
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  messageContainer: {
-    backgroundColor: "#1A1A1A",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+  messagesContainer: { flex: 1, paddingHorizontal: 24 },
+  messagesContent: { paddingVertical: 10 },
+  messageWrapper: { marginBottom: 16 },
+  messageBubble: {
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "#9B30FF",
-    maxWidth: "100%",
+    borderColor: "#333333",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   messageText: {
-    color: "#FFFFFF",
     fontSize: 16,
-    marginBottom: 4,
-    flexWrap: "wrap",
+    color: "#fff",
+    fontFamily: "Inter-Regular",
+    lineHeight: 24,
   },
-  timestamp: {
-    color: "#B3B3B3",
+  messageFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  timestampText: {
     fontSize: 12,
-    alignSelf: "flex-end",
+    color: "#999999",
+    fontFamily: "Inter-Regular",
   },
+  flagButton: { padding: 4 },
   inputContainer: {
     flexDirection: "row",
-    padding: 16,
-    backgroundColor: "#1A1A1A",
+    alignItems: "center",
+    backgroundColor: "rgba(26,26,26,0.95)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#9B30FF",
-    alignItems: "flex-end",
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
-    marginBottom: 0,
+    borderTopColor: "#333333",
   },
   input: {
     flex: 1,
-    color: "#FFFFFF",
-    fontSize: 16,
-    lineHeight: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "#222222",
     borderRadius: 20,
-    marginRight: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 12,
+    color: "#fff",
+    maxHeight: 100,
+    fontFamily: "Inter-Regular",
   },
   sendButton: {
-    backgroundColor: "#9B30FF",
-    padding: 10,
     borderRadius: 20,
+    overflow: "hidden",
+    elevation: 5,
+    shadowColor: "#9D00FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  sendButtonGradient: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    width: 70,
-    height: 40,
-  },
-  sendButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  discussionButton: {
-    backgroundColor: "#9B30FF",
-    padding: 16,
-    borderRadius: 25,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#4F1880",
-    opacity: 0.7,
   },
 });
-
-export default DiscussionScreen;
