@@ -146,19 +146,10 @@ export default function SignInScreen() {
           entering={SlideInUp.delay(200).duration(800)}
           style={styles.logoContainer}
         >
-          <LinearGradient
-            colors={["#9D00FF", "#6A0DAD"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logoBackground}
-          >
-            <Image
-              source={{
-                uri: "https://images.pexels.com/photos/7241639/pexels-photo-7241639.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-              }}
-              style={styles.logoImage}
-            />
-          </LinearGradient>
+          <Image
+            source={require("/Users/thelegend27/Desktop/repositories/commonground/assets/images/CG2.png")}
+            style={styles.logoImage}
+          />
 
           <Text style={styles.appTitle}>The Common Ground</Text>
           <Text style={styles.subtitle}>
@@ -289,8 +280,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   logoImage: {
-    width: 70,
-    height: 70,
+    width: 140,
+    height: 140,
     borderRadius: 35,
   },
   appTitle: {
@@ -329,6 +320,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.1)",
     paddingRight: 50,
     fontFamily: "Inter-Regular",
+    letterSpacing: 0.5,
   },
   validationIcon: {
     position: "absolute",
