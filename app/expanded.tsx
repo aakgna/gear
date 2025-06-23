@@ -62,8 +62,8 @@ export default function ExpandedQuestionScreen() {
       case "disagree":
         content = question.disagreeArguments;
         title = "Disagree Arguments";
-        icon = <ThumbsDown size={20} color="#777777" />;
-        color = "#777777";
+        icon = <ThumbsDown size={20} color="#9D00FF" />;
+        color = "#9D00FF";
         break;
       case "common":
       default:
@@ -170,28 +170,6 @@ export default function ExpandedQuestionScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.tabButton,
-              activeTab === "common" && styles.activeTabButton,
-              { opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={() => setActiveTab("common")}
-          >
-            <MessageCircle
-              size={20}
-              color={activeTab === "common" ? "#9D00FF" : "#777777"}
-            />
-            <Text
-              style={[
-                styles.tabButtonText,
-                activeTab === "common" && styles.activeTabText,
-              ]}
-            >
-              Common Ground
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.tabButton,
               activeTab === "agree" && styles.activeTabButton,
               { opacity: pressed ? 0.8 : 1 },
             ]}
@@ -208,6 +186,29 @@ export default function ExpandedQuestionScreen() {
               ]}
             >
               Agree
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.tabButton,
+              styles.centerTab,
+              activeTab === "common" && styles.activeTabButton,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={() => setActiveTab("common")}
+          >
+            <MessageCircle
+              size={20}
+              color={activeTab === "common" ? "#9D00FF" : "#777777"}
+            />
+            <Text
+              style={[
+                styles.tabButtonText,
+                activeTab === "common" && styles.activeTabText,
+              ]}
+            >
+              Common Ground
             </Text>
           </Pressable>
 
@@ -327,17 +328,18 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: "row",
-    marginBottom: 24,
+    marginBottom: 16,
     borderRadius: 12,
     backgroundColor: "#1A1A1A",
     overflow: "hidden",
+    alignItems: "center",
   },
   tabButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   activeTabButton: {
     backgroundColor: "#2A2A2A",
@@ -377,5 +379,8 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     lineHeight: 24,
     fontFamily: "Inter-Regular",
+  },
+  centerTab: {
+    marginHorizontal: 8,
   },
 });

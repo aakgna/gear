@@ -284,12 +284,15 @@ const StartPage = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Today's Topic</Text>
+        <View style={styles.logoutContainer}>
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
             <LogOut size={16} color="#E6E6FA" />
           </Pressable>
+        </View>
+
+        <View style={styles.titleContainer}>
+          <Text style={styles.headerTitle}>Today's Topic</Text>
         </View>
       </View>
 
@@ -423,18 +426,14 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingHorizontal: 24,
+    paddingBottom: 10,
+    position: "relative",
   },
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 32,
-    color: "#ffffff",
-    fontFamily: "Inter-Bold",
-    fontWeight: "bold",
+  logoutContainer: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40,
+    right: 24,
+    zIndex: 1,
   },
   logoutButton: {
     flexDirection: "row",
@@ -452,15 +451,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter-Medium",
   },
+  titleContainer: {
+    alignItems: "center",
+    paddingTop: 70,
+  },
+  headerTitle: {
+    fontSize: 32,
+    color: "#ffffff",
+    fontFamily: "Inter-Bold",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: "space-between",
   },
-  questionContainer: { flex: 1, justifyContent: "center" },
+  questionContainer: { flex: 1, justifyContent: "flex-start" },
   topicCard: {
     borderRadius: 16,
     padding: 24,
+    marginTop: 90,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: "#9D00FF40",
@@ -479,6 +490,7 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     flexDirection: "column",
+    marginTop: 24,
     gap: 16,
     paddingHorizontal: 24,
   },

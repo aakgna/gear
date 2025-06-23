@@ -160,11 +160,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
     marginBottom: 20,
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 32,
     color: "#ffffff",
     fontFamily: "Inter-Bold",
+    fontWeight: "bold",
   },
   content: {
     flex: 1,
