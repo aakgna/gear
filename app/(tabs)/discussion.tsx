@@ -11,13 +11,16 @@ import {
   ScrollView,
   AppState,
   Pressable,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import firestore from "@react-native-firebase/firestore";
 import auth from "@react-native-firebase/auth";
 import Animated, { FadeIn, SlideInRight } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, Flag, Send } from "lucide-react-native";
+import { ArrowLeft, Flag, Send, X, Heart } from "lucide-react-native";
+import type { Dispatch, SetStateAction } from "react";
 
 export default function DiscussionScreen() {
   const router = useRouter();
@@ -34,6 +37,17 @@ export default function DiscussionScreen() {
   const [isSending, setIsSending] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const appState = useRef(AppState.currentState);
+  const [threadModalVisible, setThreadModalVisible] = useState(false);
+  const [threadParentMessage, setThreadParentMessage] = useState<{
+    id: string;
+    text: string;
+    user: string;
+  } | null>(null);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({}); // { [messageId]: number }
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [likedMessages, setLikedMessages] = useState<Record<string, boolean>>(
+    {}
+  );
 
   // Fetch daily question if not passed via params (e.g., from tab bar)
   useEffect(() => {
@@ -276,6 +290,40 @@ export default function DiscussionScreen() {
     });
   };
 
+  // Placeholder: update replyCounts when messages change
+  useEffect(() => {
+    // TODO: Replace with Firestore logic to count replies for each message
+    const counts: Record<string, number> = {};
+    messages.forEach((msg: { id: string }) => {
+      // Placeholder: random count for demo
+      counts[msg.id] = Math.floor(Math.random() * 4); // 0-3 replies
+    });
+    setReplyCounts(counts);
+  }, [messages]);
+
+  // Initialize likeCounts with placeholder logic
+  useEffect(() => {
+    // TODO: Replace with Firestore logic to get like counts for each message
+    const counts: Record<string, number> = {};
+    messages.forEach((msg: { id: string }) => {
+      counts[msg.id] = Math.floor(Math.random() * 10); // 0-9 likes
+    });
+    setLikeCounts(counts);
+  }, [messages]);
+
+  // Like handler (placeholder)
+  const handleLike = (msgId: string) => {
+    setLikedMessages((prev) => ({
+      ...prev,
+      [msgId]: !prev[msgId],
+    }));
+    setLikeCounts((prev) => ({
+      ...prev,
+      [msgId]: prev[msgId] ? prev[msgId] - 1 : (prev[msgId] || 0) + 1,
+    }));
+    // TODO: Replace with Firestore logic to toggle like for the user and update like count
+  };
+
   // --- Render UI ---
 
   return (
@@ -315,35 +363,85 @@ export default function DiscussionScreen() {
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
       >
-        {messages.map((msg, i) => (
-          <Animated.View
-            key={msg.id}
-            entering={SlideInRight.delay(i * 100).duration(300)}
-            style={styles.messageWrapper}
-          >
-            <LinearGradient
-              colors={["#222222", "#1A1A1A"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.messageBubble}
-            >
-              <Text style={styles.messageText}>{msg.text}</Text>
-              <View style={styles.messageFooter}>
-                <Text style={styles.timestampText}>
-                  {msg.timestamp
-                    ? new Date(msg.timestamp.toDate()).toLocaleTimeString()
-                    : ""}
-                </Text>
-                <Pressable
-                  style={styles.flagButton}
-                  onPress={() => handleFlag(msg)}
+        {messages.map(
+          (
+            msg: { id: string; text: string; user: string; [key: string]: any },
+            i
+          ) => {
+            const parentMsg = {
+              id: msg.id,
+              text: msg.text || "",
+              user: msg.user || "",
+            };
+            return (
+              <Animated.View
+                key={msg.id}
+                entering={SlideInRight.delay(i * 100).duration(300)}
+                style={styles.messageWrapper}
+              >
+                <LinearGradient
+                  colors={["#222222", "#1A1A1A"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.messageBubble}
                 >
-                  <Flag size={16} color="#9D00FF" />
-                </Pressable>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-        ))}
+                  <Text style={styles.messageText}>{msg.text}</Text>
+                  <View style={styles.messageFooter}>
+                    <Text style={styles.timestampText}>
+                      {msg.timestamp
+                        ? new Date(msg.timestamp.toDate()).toLocaleTimeString()
+                        : ""}
+                    </Text>
+                    <Pressable
+                      style={styles.flagButton}
+                      onPress={() => handleFlag(msg)}
+                    >
+                      <Flag size={16} color="#9D00FF" />
+                    </Pressable>
+                  </View>
+                  {/* Add Like + Reply row */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginTop: 8,
+                    }}
+                  >
+                    <Pressable
+                      style={styles.likeButton}
+                      onPress={() => handleLike(msg.id)}
+                    >
+                      {likedMessages[msg.id] ? (
+                        <Heart color="#E57373" fill="#E57373" size={18} />
+                      ) : (
+                        <Heart color="#888" size={18} />
+                      )}
+                      <Text style={styles.likeCountText}>
+                        {likeCounts[msg.id] || 0}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.replyButton, { marginLeft: 10 }]}
+                      onPress={() => {
+                        setThreadParentMessage(parentMsg);
+                        setThreadModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.replyButtonText}>Reply</Text>
+                      {replyCounts && replyCounts[msg.id] > 0 && (
+                        <View style={styles.replyBadge}>
+                          <Text style={styles.replyBadgeText}>
+                            {replyCounts[msg.id]}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            );
+          }
+        )}
       </ScrollView>
 
       {/* Input + Send */}
@@ -375,9 +473,225 @@ export default function DiscussionScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {/* Thread Modal */}
+      {threadParentMessage && (
+        <ThreadModal
+          visible={threadModalVisible}
+          onClose={() => setThreadModalVisible(false)}
+          parentMessage={threadParentMessage}
+          canReply={true /* TODO: check if user has voted */}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
+
+// --- Thread Modal Component (Placeholder Data) ---
+type ThreadModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  parentMessage: { id: string; text: string; user: string };
+  canReply: boolean;
+};
+
+function ThreadModal({
+  visible,
+  onClose,
+  parentMessage,
+  canReply,
+}: ThreadModalProps) {
+  const [replies, setReplies] = useState<
+    {
+      id: string;
+      text: string;
+      user: string;
+    }[]
+  >([
+    { id: "1", text: "This is a placeholder reply.", user: "UserA" },
+    { id: "2", text: "Another placeholder reply!", user: "UserB" },
+  ]);
+  const [replyText, setReplyText] = useState("");
+
+  // Placeholder for sending notification
+  const sendReplyNotification = (
+    parentUserId: string,
+    replyData: { text: string }
+  ) => {
+    // TODO: Integrate with notification system
+    // e.g., send FCM or in-app notification
+  };
+
+  const handleSendReply = () => {
+    if (!replyText.trim()) return;
+    // Add reply to placeholder list
+    setReplies((prev) => [
+      ...prev,
+      { id: Date.now().toString(), text: replyText, user: "You" },
+    ]);
+    setReplyText("");
+    // Placeholder notification
+    sendReplyNotification(parentMessage.user, { text: replyText });
+    // TODO: Replace with Firestore logic
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <View style={threadStyles.modalOverlay}>
+        <View style={threadStyles.modalContainer}>
+          {/* Header with X button */}
+          <View style={threadStyles.modalHeader}>
+            <Text style={threadStyles.modalTitle}>Thread</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={threadStyles.closeButton}
+            >
+              <X size={24} color="#9D00FF" />
+            </TouchableOpacity>
+          </View>
+          {/* Parent message */}
+          <View style={threadStyles.parentMessageCard}>
+            <Text style={threadStyles.parentMessageText}>
+              {parentMessage.text}
+            </Text>
+          </View>
+          {/* Replies */}
+          <ScrollView style={threadStyles.repliesList}>
+            {replies.map((reply) => (
+              <View key={reply.id} style={threadStyles.replyCard}>
+                <Text style={threadStyles.replyUser}>{reply.user}:</Text>
+                <Text style={threadStyles.replyText}>{reply.text}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          {/* Reply input */}
+          {canReply ? (
+            <View style={threadStyles.replyInputContainer}>
+              <TextInput
+                style={threadStyles.replyInput}
+                placeholder="Type your reply..."
+                placeholderTextColor="#999"
+                value={replyText}
+                onChangeText={setReplyText}
+              />
+              <TouchableOpacity
+                style={threadStyles.sendReplyButton}
+                onPress={handleSendReply}
+              >
+                <Send size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={threadStyles.cannotReplyText}>
+              You must vote to reply in this thread.
+            </Text>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// --- Styles for ThreadModal and reply badge ---
+const threadStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(18,3,24,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "92%",
+    maxHeight: "85%",
+    backgroundColor: "#1C0529",
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: "#9D00FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: "Inter-Bold",
+  },
+  closeButton: {
+    padding: 4,
+  },
+  parentMessageCard: {
+    backgroundColor: "#2A2A2A",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  parentMessageText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter-Medium",
+  },
+  repliesList: {
+    flex: 1,
+    marginBottom: 10,
+    maxHeight: 220,
+  },
+  replyCard: {
+    backgroundColor: "#222",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+  },
+  replyUser: {
+    color: "#9D00FF",
+    fontSize: 13,
+    fontFamily: "Inter-Bold",
+  },
+  replyText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter-Regular",
+  },
+  replyInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#222",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
+  replyInput: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter-Regular",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  sendReplyButton: {
+    backgroundColor: "#9D00FF",
+    borderRadius: 16,
+    padding: 8,
+    marginLeft: 8,
+  },
+  cannotReplyText: {
+    color: "#BF5FFF",
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 14,
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#121212" },
@@ -478,5 +792,50 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: "center",
     justifyContent: "center",
+  },
+  replyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#222",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  replyButtonText: {
+    color: "#9D00FF",
+    fontSize: 15,
+    fontFamily: "Inter-Bold",
+    marginRight: 6,
+  },
+  replyBadge: {
+    backgroundColor: "#9D00FF",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 2,
+    paddingHorizontal: 5,
+  },
+  replyBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Inter-Bold",
+  },
+  likeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  likeCountText: {
+    color: "#aaa",
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    marginLeft: 4,
   },
 });
