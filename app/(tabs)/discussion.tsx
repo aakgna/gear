@@ -53,6 +53,7 @@ export default function DiscussionScreen() {
 	const [replyLikeCounts, setReplyLikeCounts] = useState<
 		Record<string, number>
 	>({});
+	const repliesScrollViewRef = useRef<ScrollView>(null);
 
 	// FIX ME: Do we need this useEffect?
 	// Fetch daily question if not passed via params (e.g., from tab bar)
@@ -298,8 +299,13 @@ export default function DiscussionScreen() {
 
 	// Initialize likeCounts with placeholder logic
 	useEffect(() => {
-		const fetchLikeCounts = async () => {
+		const fetchLikeStates = async () => {
+			const uid = auth().currentUser?.uid;
+			if (!uid) return;
+
+			const liked: Record<string, boolean> = {};
 			const counts: Record<string, number> = {};
+
 			for (const msg of messages) {
 				const docRef = firestore()
 					.collection("discussion")
@@ -308,16 +314,20 @@ export default function DiscussionScreen() {
 					.doc(msg.id);
 				const doc = await docRef.get();
 				if (doc.exists) {
-					const likeCount = doc.data()?.likeCount;
-					if (likeCount) {
-						counts[msg.id] = likeCount;
-					}
+					const data = doc.data();
+					const likeCount = data?.likeCount || 0;
+					const likedBy: string[] = data?.likedBy || [];
+					counts[msg.id] = likeCount;
+					liked[msg.id] = likedBy.includes(uid);
 				}
 			}
 			setLikeCounts(counts);
+			setLikedMessages(liked);
 		};
 
-		fetchLikeCounts();
+		if (messages.length && currentQuestionId) {
+			fetchLikeStates();
+		}
 	}, [messages, currentQuestionId]);
 
 	// Like handler: increment likeCount in Firestore and update local state
@@ -557,6 +567,7 @@ function ThreadModal({
 	const [replyLikeCounts, setReplyLikeCounts] = useState<
 		Record<string, number>
 	>({});
+	const repliesScrollViewRef = useRef<ScrollView>(null);
 
 	// Subscribe to replies for the parent message
 	useEffect(() => {
@@ -750,6 +761,16 @@ function ThreadModal({
 		}
 	};
 
+	const scrollRepliesToBottom = () => {
+		repliesScrollViewRef.current?.scrollToEnd({ animated: true });
+	};
+
+	useEffect(() => {
+		scrollRepliesToBottom();
+		const t = setTimeout(scrollRepliesToBottom);
+		return () => clearTimeout(t);
+	}, [replies]);
+
 	return (
 		<Modal
 			visible={visible}
@@ -758,86 +779,95 @@ function ThreadModal({
 			onRequestClose={onClose}
 		>
 			<View style={threadStyles.modalOverlay}>
-				<View style={threadStyles.modalContainer}>
-					{/* Header with X button */}
-					<View style={threadStyles.modalHeader}>
-						<Text style={threadStyles.modalTitle}>Thread</Text>
-						<TouchableOpacity
-							onPress={onClose}
-							style={threadStyles.closeButton}
-						>
-							<X size={24} color="#9D00FF" />
-						</TouchableOpacity>
-					</View>
-					{/* Parent message */}
-					<View style={threadStyles.parentMessageCard}>
-						<Text style={threadStyles.parentMessageText}>
-							{parentMessage.text}
-						</Text>
-					</View>
-					{/* Replies */}
-					<ScrollView style={threadStyles.repliesList}>
-						{replies.map((reply) => (
-							<View key={reply.id} style={threadStyles.replyCard}>
-								<Text style={threadStyles.replyText}>{reply.text}</Text>
-								<Text style={threadStyles.timestampText}>
-									{reply.time
-										? new Date(reply.time.toDate()).toLocaleTimeString()
-										: ""}
-								</Text>
-								<View
-									style={{
-										flexDirection: "row",
-										alignItems: "center",
-										marginTop: 8,
-									}}
-								>
-									<Pressable
-										style={styles.likeButton}
-										onPress={() => handleLike(reply.id)}
-									>
-										{likedReplies[reply.id] ? (
-											<Heart color="#9D00FF" fill="#9D00FF" size={18} />
-										) : (
-											<Heart color="#9D00FF" size={18} />
-										)}
-										<Text style={styles.likeCountText}>
-											{replyLikeCounts[reply.id] || 0}
-										</Text>
-									</Pressable>
-								</View>
-							</View>
-						))}
-					</ScrollView>
-					{/* Reply input */}
-					{canReply ? (
-						<View style={threadStyles.replyInputContainer}>
-							<TextInput
-								style={threadStyles.replyInput}
-								placeholder="Type your reply..."
-								placeholderTextColor="#999"
-								value={replyText}
-								onChangeText={setReplyText}
-								editable={!isSendingReply}
-							/>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+					style={{ width: "100%", alignItems: "center" }}
+					keyboardVerticalOffset={0}
+				>
+					<View style={threadStyles.modalContainer}>
+						{/* Header with X button */}
+						<View style={threadStyles.modalHeader}>
+							<Text style={threadStyles.modalTitle}>Thread</Text>
 							<TouchableOpacity
-								style={threadStyles.sendReplyButton}
-								onPress={handleSendReply}
-								disabled={isSendingReply}
+								onPress={onClose}
+								style={threadStyles.closeButton}
 							>
-								{isSendingReply ? (
-									<ActivityIndicator size="small" color="#fff" />
-								) : (
-									<Send size={20} color="#fff" />
-								)}
+								<X size={24} color="#9D00FF" />
 							</TouchableOpacity>
 						</View>
-					) : (
-						<Text style={threadStyles.cannotReplyText}>
-							You must vote to reply in this thread.
-						</Text>
-					)}
-				</View>
+						{/* Parent message */}
+						<ScrollView style={threadStyles.parentMessageCard}>
+							<Text style={threadStyles.parentMessageText}>
+								{parentMessage.text}
+							</Text>
+						</ScrollView>
+						{/* Replies */}
+						<ScrollView
+							ref={repliesScrollViewRef}
+							style={threadStyles.repliesList}
+						>
+							{replies.map((reply) => (
+								<View key={reply.id} style={threadStyles.replyCard}>
+									<Text style={threadStyles.replyText}>{reply.text}</Text>
+									<Text style={threadStyles.timestampText}>
+										{reply.time
+											? new Date(reply.time.toDate()).toLocaleTimeString()
+											: ""}
+									</Text>
+									<View
+										style={{
+											flexDirection: "row",
+											alignItems: "center",
+											marginTop: 8,
+										}}
+									>
+										<Pressable
+											style={styles.likeButton}
+											onPress={() => handleLike(reply.id)}
+										>
+											{likedReplies[reply.id] ? (
+												<Heart color="#9D00FF" fill="#9D00FF" size={18} />
+											) : (
+												<Heart color="#9D00FF" size={18} />
+											)}
+											<Text style={styles.likeCountText}>
+												{replyLikeCounts[reply.id] || 0}
+											</Text>
+										</Pressable>
+									</View>
+								</View>
+							))}
+						</ScrollView>
+						{/* Reply input */}
+						{canReply ? (
+							<View style={threadStyles.replyInputContainer}>
+								<TextInput
+									style={threadStyles.replyInput}
+									placeholder="Type your reply..."
+									placeholderTextColor="#999"
+									value={replyText}
+									onChangeText={setReplyText}
+									editable={!isSendingReply}
+								/>
+								<TouchableOpacity
+									style={threadStyles.sendReplyButton}
+									onPress={handleSendReply}
+									disabled={isSendingReply}
+								>
+									{isSendingReply ? (
+										<ActivityIndicator size="small" color="#fff" />
+									) : (
+										<Send size={20} color="#fff" />
+									)}
+								</TouchableOpacity>
+							</View>
+						) : (
+							<Text style={threadStyles.cannotReplyText}>
+								You must vote to reply in this thread.
+							</Text>
+						)}
+					</View>
+				</KeyboardAvoidingView>
 			</View>
 		</Modal>
 	);
@@ -881,15 +911,18 @@ const threadStyles = StyleSheet.create({
 		borderRadius: 12,
 		padding: 12,
 		marginBottom: 10,
+		maxHeight: 200,
+		// minHeight: 44,
 	},
 	parentMessageText: {
 		color: "#fff",
 		fontSize: 16,
 		fontFamily: "Inter-Medium",
+		paddingBottom: 15,
 	},
 	repliesList: {
 		marginBottom: 10,
-		maxHeight: 220,
+		height: 220,
 	},
 	replyCard: {
 		backgroundColor: "#222",
