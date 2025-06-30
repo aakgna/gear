@@ -56,8 +56,8 @@ const StartPage = () => {
 	const app = useAppState();
 	useEffect(() => {
 		if (app === "active") {
-			fetchDailyQuestion();
 			checkUserVote();
+			fetchDailyQuestion();
 		}
 	}, [app]);
 
