@@ -177,10 +177,11 @@ export default function DiscussionScreen() {
 			today.setHours(0, 0, 0, 0);
 
 			if (data.updatedAt) {
-				const last = data.updatedAt.toDate().toISOString().substring(0, 10);
+				const last = data.updatedAt.substring(0, 10);
 				const todayStr = today.toISOString().substring(0, 10);
-				if (!data.voted || last !== todayStr) {
-					await userDoc.ref.update({ voted: false, messages: 3 });
+				const hasVotedToday = last === todayStr;
+				if (!hasVotedToday || !data.voted) {
+					await userDoc.ref.update({ voted: false, messageCount: 100 });
 					router.replace("/start");
 				}
 			} else {

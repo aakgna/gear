@@ -146,6 +146,10 @@ export default function ExpandedQuestionScreen() {
 
 	return (
 		<View style={styles.container}>
+			<LinearGradient
+				colors={["#120318", "#1C0529"]}
+				style={StyleSheet.absoluteFill}
+			/>
 			<View style={styles.header}>
 				<Pressable style={styles.backButton} onPress={handleBack}>
 					<ArrowLeft size={24} color="#9D00FF" />
@@ -186,7 +190,7 @@ export default function ExpandedQuestionScreen() {
 
 						<View style={styles.resultsFooter}>
 							<View style={styles.resultItem}>
-								<ThumbsUp size={16} color="#9D00FF" />
+								<ArrowLeft size={16} color="#E6E6FA" />
 								<Text style={styles.resultText}>
 									{question?.agreePercentage}%
 								</Text>
@@ -200,7 +204,7 @@ export default function ExpandedQuestionScreen() {
 								<Text style={styles.resultText}>
 									{question?.disagreePercentage}%
 								</Text>
-								<ThumbsDown size={16} color="#777777" />
+								<ArrowRight size={16} color="#E6E6FA" />
 							</View>
 						</View>
 					</View>

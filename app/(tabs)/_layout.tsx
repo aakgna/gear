@@ -55,36 +55,42 @@ function TabBar({ state, descriptors, navigation }: TabBarProps) {
 				});
 
 				const checkUserVote = async () => {
-					const uid = auth().currentUser?.uid;
-					if (!uid) return;
+					const userId = auth().currentUser?.uid;
+					if (!userId) return;
 
 					try {
 						const userDoc = await firestore()
 							.collection("users")
-							.doc(uid)
+							.doc(userId)
 							.get();
-						const data = userDoc.data();
+
+						const userData = userDoc.data();
 						const today = new Date();
 						today.setHours(0, 0, 0, 0);
 
-						if (data?.updatedAt) {
-							const lastDate = data.updatedAt
-								.toDate()
-								.toISOString()
-								.substring(0, 10);
-							const todayStr = today.toISOString().substring(0, 10);
-							if (!data.voted || lastDate !== todayStr) {
-								await userDoc.ref.update({ voted: false, messages: 100 });
+						// If updatedAt exists, compare only the date portion (YYYY-MM-DD)
+						if (userData?.updatedAt) {
+							const lastVoteDate = userData.updatedAt.substring(0, 10); // Get just YYYY-MM-DD
+							const todayDate = today.toISOString().substring(0, 10); // Get just YYYY-MM-DD
+							const hasVotedToday = lastVoteDate === todayDate;
+							lastVoteDate, todayDate, hasVotedToday;
+							if (!hasVotedToday || !userData.voted) {
+								// Reset voted status if it's a new day
+								await userDoc.ref.update({
+									voted: false,
+									messageCount: 100,
+								});
 								setVoted(false);
 							} else {
-								setVoted(true);
+								setVoted(userData.voted);
 							}
+						} else {
+							setVoted(false);
 						}
-					} catch (e) {
-						console.error(e);
+					} catch (error) {
+						console.error("Error checking vote:", error);
 					}
 				};
-
 				const onPress = () => {
 					const event = navigation.emit({
 						type: "tabPress",
@@ -95,7 +101,6 @@ function TabBar({ state, descriptors, navigation }: TabBarProps) {
 					if (!isFocused && !event.defaultPrevented) {
 						if (route.name == "discussion") {
 							checkUserVote();
-							console.log("voted is this", voted);
 							if (!voted) {
 								router.push("/(tabs)/start");
 								return;

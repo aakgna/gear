@@ -127,10 +127,11 @@ const StartPage = () => {
 			today.setHours(0, 0, 0, 0);
 
 			if (data?.updatedAt) {
-				const lastDate = data.updatedAt.toDate().toISOString().substring(0, 10);
+				const lastDate = data.updatedAt.substring(0, 10);
 				const todayStr = today.toISOString().substring(0, 10);
-				if (!data.voted || lastDate !== todayStr) {
-					await userDoc.ref.update({ voted: false, messages: 100 });
+				const hasVotedToday = lastDate === todayStr;
+				if (!hasVotedToday || !data.voted) {
+					await userDoc.ref.update({ voted: false, messageCount: 100 });
 					setHasVoted(false);
 				} else {
 					setHasVoted(true);
@@ -188,13 +189,16 @@ const StartPage = () => {
 					[field]: firestore.FieldValue.increment(1),
 				});
 				const uRef = firestore().collection("users").doc(uid);
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				const todayDate = today.toISOString().substring(0, 10);
+
 				batch.set(
 					uRef,
 					{
 						voted: true,
-						updatedAt: firestore.FieldValue.serverTimestamp,
-						strikes: 6,
-						messages: 100,
+						updatedAt: todayDate,
+						messageCount: 100,
 					},
 					{ merge: true }
 				);
@@ -338,7 +342,7 @@ const StartPage = () => {
 							>
 								<Text style={styles.discussionButtonText}>Join Discussion</Text>
 								<Text style={styles.underDiscussionButtonText}>
-									Max 3 Messages Per Day
+									Max 100 Messages Per Day
 								</Text>
 								<Text style={styles.strikesText}>
 									Strikes Remaining: {strikes}

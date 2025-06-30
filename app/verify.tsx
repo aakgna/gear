@@ -72,6 +72,9 @@ export default function VerifyScreen() {
 				.doc(userCredential.user.uid)
 				.get();
 
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const todayDate = today.toISOString().substring(0, 10);
 			if (!userDoc.exists) {
 				await firestore().collection("users").doc(userCredential.user.uid).set({
 					phoneNumber: phoneNumber,
@@ -79,7 +82,7 @@ export default function VerifyScreen() {
 					strikeCount: 0,
 					messageCount: 100,
 					voted: false,
-					updatedAt: firestore.FieldValue.serverTimestamp(),
+					updatedAt: todayDate,
 				});
 			}
 

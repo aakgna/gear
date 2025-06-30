@@ -7,6 +7,8 @@ import {
 	MessageCircle,
 	ThumbsUp,
 	ThumbsDown,
+	ArrowLeft,
+	ArrowRight,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import firestore from "@react-native-firebase/firestore"; // or your Firestore import
@@ -69,6 +71,10 @@ export default function HistoryScreen() {
 
 	return (
 		<View style={styles.container}>
+			<LinearGradient
+				colors={["#120318", "#1C0529"]}
+				style={StyleSheet.absoluteFill}
+			/>
 			<View style={styles.header}>
 				<Text style={styles.headerTitle}>Previous Questions</Text>
 			</View>
@@ -129,9 +135,10 @@ export default function HistoryScreen() {
 
 									<View style={styles.resultsFooter}>
 										<View style={styles.resultItem}>
-											<Text style={styles.resultText}>
+											{/* <Text style={styles.resultText}>
 												{question.top || "Top"}:
-											</Text>
+											</Text> */}
+											<ArrowLeft size={16} color="#E6E6FA" />
 											<Text style={styles.resultText}>
 												{question.agreePercentage}%
 											</Text>
@@ -142,12 +149,13 @@ export default function HistoryScreen() {
 										</Text>
 
 										<View style={styles.resultItem}>
-											<Text style={styles.resultText}>
+											{/* <Text style={styles.resultText}>
 												{question.bottom || "Bottom"}:
-											</Text>
+											</Text> */}
 											<Text style={styles.resultText}>
 												{question.disagreePercentage}%
 											</Text>
+											<ArrowRight size={16} color="#E6E6FA" />
 										</View>
 									</View>
 								</View>

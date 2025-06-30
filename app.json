@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "The Common Ground",
 		"slug": "commonground",
-		"version": "1.0.13",
+		"version": "1.1.1",
 		"orientation": "portrait",
 		"icon": "./assets/images/C.png",
 		"scheme": "myapp",
