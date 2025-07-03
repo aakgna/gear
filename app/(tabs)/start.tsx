@@ -33,6 +33,7 @@ const StartPage = () => {
 	const [strikes, setStrikes] = useState(0);
 	const [top, settop] = useState("");
 	const [bottom, setbottom] = useState("");
+	const [messageCount, setMessageCount] = useState();
 
 	// animation hooks
 	const topScale = useSharedValue(1);
@@ -79,6 +80,7 @@ const StartPage = () => {
 				const data = doc.data();
 				if (data?.strikes !== undefined) {
 					setStrikes(data.strikes);
+					setMessageCount(data.messageCount);
 				}
 			});
 		return () => unsub();
@@ -177,6 +179,8 @@ const StartPage = () => {
 			const qSnap = await firestore()
 				.collection("dailyQuestions")
 				.where("date", ">=", today)
+				.where("date", "<", new Date(today.setUTCHours(24)))
+				.orderBy("date", "asc")
 				.limit(1)
 				.get();
 
@@ -342,7 +346,7 @@ const StartPage = () => {
 							>
 								<Text style={styles.discussionButtonText}>Join Discussion</Text>
 								<Text style={styles.underDiscussionButtonText}>
-									Max 100 Messages Per Day
+									Messages Remaining: {messageCount}
 								</Text>
 								<Text style={styles.strikesText}>
 									Strikes Remaining: {strikes}

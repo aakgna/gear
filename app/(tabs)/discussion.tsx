@@ -303,8 +303,10 @@ export default function DiscussionScreen() {
 			params: {
 				messageId: message.id,
 				messageText: message.text,
-				question: currentQuestion, // Use currentQuestion here
+				question: currentQuestionId, // Use currentQuestion here
 				user: message.user,
+				location: "answers",
+				answerID: null,
 			},
 		});
 	};
@@ -802,8 +804,10 @@ function ThreadModal({
 			params: {
 				messageId: reply.id,
 				messageText: reply.text,
-				question: parentMessage.text,
+				question: currentQuestionId,
 				user: reply.user,
+				location: "comments",
+				answerID: parentMessage.id,
 			},
 		});
 	};

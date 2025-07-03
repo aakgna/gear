@@ -73,7 +73,6 @@ function TabBar({ state, descriptors, navigation }: TabBarProps) {
 							const lastVoteDate = userData.updatedAt.substring(0, 10); // Get just YYYY-MM-DD
 							const todayDate = today.toISOString().substring(0, 10); // Get just YYYY-MM-DD
 							const hasVotedToday = lastVoteDate === todayDate;
-							lastVoteDate, todayDate, hasVotedToday;
 							if (!hasVotedToday || !userData.voted) {
 								// Reset voted status if it's a new day
 								await userDoc.ref.update({

@@ -34,12 +34,15 @@ const major = ["THREAT", "IDENTITY_ATTACK (Doxxing)"];
 
 export default function ReportScreen() {
 	const router = useRouter();
-	const { messageId, messageText, question, user } = useLocalSearchParams() as {
-		messageId: string;
-		messageText: string;
-		question: string;
-		user: string;
-	};
+	const { messageId, messageText, question, user, location, answerID } =
+		useLocalSearchParams() as {
+			messageId: string;
+			messageText: string;
+			question: string;
+			user: string;
+			location: string;
+			answerID: any;
+		};
 
 	const [selectedReason, setSelectedReason] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +60,7 @@ export default function ReportScreen() {
 			.collection("users")
 			.doc(current)
 			.update({
-				blockedUsers: firestore.FieldValue.arrayUnion(user),
+				blocked: firestore.FieldValue.arrayUnion(user),
 			});
 		Alert.alert("User blocked. You will no longer see their messages.");
 		router.navigate("/start");
@@ -109,17 +112,30 @@ export default function ReportScreen() {
 								});
 						}
 						// mark toxic + infractions
-						await firestore()
-							.collection("discussions")
-							.doc(question)
-							.collection("messages")
-							.doc(messageId)
-							.update({ isToxic: true });
+						if (location === "answers") {
+							await firestore()
+								.collection("discussion")
+								.doc(question)
+								.collection(location)
+								.doc(messageId)
+								.update({
+									isToxic: true,
+								});
+						} else {
+							await firestore()
+								.collection("discussion")
+								.doc(question)
+								.collection(location)
+								.doc(answerID)
+								.collection("comment")
+								.doc(messageId)
+								.update({ isToxic: true });
+						}
 						await firestore()
 							.collection("users")
 							.doc(user)
 							.update({
-								infractions: firestore.FieldValue.increment(1),
+								strikeCount: firestore.FieldValue.increment(1),
 							});
 					}
 				}
@@ -146,17 +162,28 @@ export default function ReportScreen() {
 						.update({
 							strikes: firestore.FieldValue.increment(-5),
 						});
-					await firestore()
-						.collection("discussions")
-						.doc(question)
-						.collection("messages")
-						.doc(messageId)
-						.delete();
+					if (location === "answers") {
+						await firestore()
+							.collection("discussion")
+							.doc(question)
+							.collection(location)
+							.doc(messageId)
+							.delete();
+					} else {
+						await firestore()
+							.collection("discussion")
+							.doc(question)
+							.collection(location)
+							.doc(answerID)
+							.collection("comment")
+							.doc(messageId)
+							.delete();
+					}
 					await firestore()
 						.collection("users")
 						.doc(user)
 						.update({
-							infractions: firestore.FieldValue.increment(1),
+							strikeCount: firestore.FieldValue.increment(1),
 						});
 				}
 			}
