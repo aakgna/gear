@@ -59,7 +59,7 @@ export default function DeleteAccountScreen() {
         .delete();
       await userCredential.user.delete();
 
-      // 6) Success alert and navigate to “/”
+      // 6) Success alert and navigate to "/"
       Alert.alert("Success", "Your account has been deleted successfully.");
       router.replace("/"); // or router.navigate("/"), matching old code
       return;
@@ -81,7 +81,7 @@ export default function DeleteAccountScreen() {
 
       {/* Back button (same as new UI) */}
       <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <ArrowLeft size={24} color="#E6E6FA" />
+        <ArrowLeft size={24} color="#9D00FF" />
         <Text style={styles.backText}>Back</Text>
       </Pressable>
 
@@ -94,8 +94,8 @@ export default function DeleteAccountScreen() {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Enter 6-digit code"
-            placeholderTextColor="#666666"
+            placeholder="000000"
+            placeholderTextColor="#6666"
             value={code}
             onChangeText={(text) => {
               setCode(text.replace(/[^0-9]/g, "").slice(0, 6));
@@ -104,6 +104,7 @@ export default function DeleteAccountScreen() {
             keyboardType="number-pad"
             maxLength={6}
             editable={!isLoading}
+            textAlign="center"
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </View>
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backText: {
-    color: "#E6E6FA",
+    color: "#9D00FF",
     fontSize: 18,
     marginLeft: 8,
     fontFamily: "Inter-Medium",
@@ -178,18 +179,22 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   inputContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
     width: "100%",
-    marginBottom: 32,
   },
   input: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 12,
-    padding: 16,
+    fontSize: 36,
     color: "#ffffff",
-    fontSize: 20,
+    letterSpacing: 8,
     textAlign: "center",
-    fontFamily: "Inter-Regular",
-    letterSpacing: 4,
+    paddingVertical: 16,
+    fontFamily: "Inter-Bold",
+    backgroundColor: "transparent", // optional, for consistency
   },
   errorText: {
     color: "#FF1744",
