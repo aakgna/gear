@@ -1204,6 +1204,10 @@ PODS:
     - ExpoModulesCore
   - ExpoBlur (14.0.3):
     - ExpoModulesCore
+  - ExpoCamera (16.1.6):
+    - ExpoModulesCore
+    - ZXingObjC/OneD
+    - ZXingObjC/PDF417
   - ExpoFileSystem (18.0.12):
     - ExpoModulesCore
   - ExpoFont (13.0.4):
@@ -3292,6 +3296,11 @@ PODS:
     - Yoga
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
+  - ZXingObjC/Core (3.6.9)
+  - ZXingObjC/OneD (3.6.9):
+    - ZXingObjC/Core
+  - ZXingObjC/PDF417 (3.6.9):
+    - ZXingObjC/Core
 
 DEPENDENCIES:
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
@@ -3300,6 +3309,7 @@ DEPENDENCIES:
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
+  - ExpoCamera (from `../node_modules/expo-camera/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
@@ -3409,6 +3419,7 @@ SPEC REPOS:
     - nanopb
     - RecaptchaInterop
     - SocketRocket
+    - ZXingObjC
 
 EXTERNAL SOURCES:
   boost:
@@ -3423,6 +3434,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/expo-blur/ios"
+  ExpoCamera:
+    :path: "../node_modules/expo-camera/ios"
   ExpoFileSystem:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
@@ -3602,6 +3615,7 @@ SPEC CHECKSUMS:
   Expo: 75e002fc29a18a72aa3db967b41b29c2b206875d
   ExpoAsset: 48386d40d53a8c1738929b3ed509bcad595b5516
   ExpoBlur: 392c1207f71d0ecf22371621c1fbd44ba84d9742
+  ExpoCamera: 316809537daad6a5bd2c04b98e0589304beb5551
   ExpoFileSystem: 42d363d3b96f9afab980dcef60d5657a4443c655
   ExpoFont: f354e926f8feae5e831ec8087f36652b44a0b188
   ExpoHaptics: 8d199b2f33245ea85289ff6c954c7ee7c00a5b5d
@@ -3704,6 +3718,7 @@ SPEC CHECKSUMS:
   RNVectorIcons: 7075443f1ecfe4012b7a2f65f684baf3faa9d8c1
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 1259c7a8cbaccf7b4c3ddf8ee36ca11be9dee407
+  ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
 PODFILE CHECKSUM: 6dd28acd9de3a8c67763f3e0c37c37c22d472753
 

@@ -81,7 +81,7 @@ export default function DeleteAccountScreen() {
 
       {/* Back button (same as new UI) */}
       <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <ArrowLeft size={24} color="#9D00FF" />
+        <ArrowLeft size={24} color="#FF1744" />
         <Text style={styles.backText}>Back</Text>
       </Pressable>
 
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   backText: {
-    color: "#9D00FF",
+    color: "#FF1744",
     fontSize: 18,
     marginLeft: 8,
     fontFamily: "Inter-Medium",
