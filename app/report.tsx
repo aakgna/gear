@@ -154,9 +154,9 @@ export default function ReportScreen() {
             body: JSON.stringify({ content: messageText }),
           }
         );
-        const { is_doxxing } = await res.json();
+        const is_doxxing = await res.json();
         console.log("is_doxxing", is_doxxing);
-        if (is_doxxing) {
+        if (is_doxxing["is_doxxing"]) {
           await firestore()
             .collection("users")
             .doc(user)
@@ -199,8 +199,8 @@ export default function ReportScreen() {
             body: JSON.stringify({ content: messageText }),
           }
         );
-        const { is_slur } = await res.json();
-        if (is_slur) {
+        const is_slur = await res.json();
+        if (is_slur["is_slur"]) {
           await firestore()
             .collection("users")
             .doc(user)
