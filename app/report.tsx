@@ -18,18 +18,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, CircleCheck as CheckCircle2 } from "lucide-react-native";
 
 const REPORT_REASONS = [
-  "FLIRTATION",
-  "INSULT",
-  "PROFANITY",
-  "SEVERE_TOXICITY",
-  "SEXUALLY_EXPLICIT",
-  "THREAT",
-  "TOXICITY",
-  "IDENTITY_ATTACK (Doxxing)",
-  "I just don't like it",
+  { label: "Flirtation", value: "FLIRTATION" },
+  { label: "Insult", value: "INSULT" },
+  { label: "Profanity", value: "PROFANITY" },
+  { label: "Severe Toxicity", value: "SEVERE_TOXICITY" },
+  { label: "Sexually Explicit", value: "SEXUALLY_EXPLICIT" },
+  { label: "Threat", value: "THREAT" },
+  { label: "Toxicity", value: "TOXICITY" },
+  { label: "Identity Attack (Doxxing)", value: "IDENTITY_ATTACK (Doxxing)" },
+  { label: "Slur", value: "IS_Slur" },
+  { label: "I just don't like it", value: "I just don't like it" },
 ];
 const minor = ["FLIRTATION", "INSULT", "PROFANITY", "TOXICITY"];
-const medium = ["SEVERE_TOXICITY", "SEXUALLY_EXPLICIT"];
+const medium = ["SEVERE_TOXICITY", "SEXUALLY_EXPLICIT", "IS_Slur"];
 const major = ["THREAT", "IDENTITY_ATTACK (Doxxing)"];
 
 export default function ReportScreen() {
@@ -187,6 +188,50 @@ export default function ReportScreen() {
             });
         }
       }
+
+      // 4) Slur Check
+      if (selectedReason === "IS_Slur") {
+        const res = await fetch(
+          "https://us-central1-thecommonground-6259d.cloudfunctions.net/is_slur", // <-- Use your slur endpoint
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: messageText }),
+          }
+        );
+        const { is_slur } = await res.json();
+        if (is_slur) {
+          await firestore()
+            .collection("users")
+            .doc(user)
+            .update({
+              strikes: firestore.FieldValue.increment(-3), // or whatever penalty you want
+            });
+          if (location === "answers") {
+            await firestore()
+              .collection("discussion")
+              .doc(question)
+              .collection(location)
+              .doc(messageId)
+              .delete();
+          } else {
+            await firestore()
+              .collection("discussion")
+              .doc(question)
+              .collection(location)
+              .doc(answerID)
+              .collection("comment")
+              .doc(messageId)
+              .delete();
+          }
+          await firestore()
+            .collection("users")
+            .doc(user)
+            .update({
+              strikeCount: firestore.FieldValue.increment(1),
+            });
+        }
+      }
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to submit report. Please try again.");
@@ -240,20 +285,20 @@ export default function ReportScreen() {
 
         <View style={styles.reasonsContainer}>
           {REPORT_REASONS.map((reason, idx) => (
-            <Animated.View key={reason}>
+            <Animated.View key={reason.value}>
               <Pressable
                 style={({ pressed }) => [
                   styles.reasonItem,
-                  selectedReason === reason && styles.selectedReason,
+                  selectedReason === reason.value && styles.selectedReason,
                   { opacity: pressed ? 0.8 : 1 },
                 ]}
-                onPress={() => setSelectedReason(reason)}
+                onPress={() => setSelectedReason(reason.value)}
                 disabled={isSubmitting}
               >
                 <LinearGradient
                   colors={
-                    selectedReason === reason
-                      ? ["#9D00FF20", "#22222220"]
+                    selectedReason === reason.value
+                      ? ["#9D00FF20", "#6A0DAD20"]
                       : ["#22222220", "#22222220"]
                   }
                   style={styles.reasonGradient}
@@ -261,10 +306,11 @@ export default function ReportScreen() {
                   <Text
                     style={[
                       styles.reasonText,
-                      selectedReason === reason && styles.selectedReasonText,
+                      selectedReason === reason.value &&
+                        styles.selectedReasonText,
                     ]}
                   >
-                    {reason}
+                    {reason.label}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -316,7 +362,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 24,
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    paddingTop: Platform.OS === "ios" ? 30 : 20,
   },
   backButton: {
     flexDirection: "row",
@@ -368,7 +414,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
   },
   selectedReasonText: {
-    color: "#E6EFA",
+    color: "#FFF",
   },
   submitButton: {
     borderRadius: 12,
