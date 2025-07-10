@@ -135,11 +135,13 @@ const StartPage = () => {
 				if (!hasVotedToday || !data.voted) {
 					await userDoc.ref.update({ voted: false, messageCount: 100 });
 					setHasVoted(false);
+					setSelectedOption(null);
 				} else {
 					setHasVoted(true);
 				}
 			} else {
 				setHasVoted(false);
+				setSelectedOption(null);
 			}
 		} catch (e) {
 			console.error(e);
