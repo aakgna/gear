@@ -9,6 +9,7 @@ import {
 	Platform,
 	AppState,
 	Alert,
+	ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -318,9 +319,11 @@ const StartPage = () => {
 						colors={["#9D00FF20", "#6A0DAD20"]}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
-						style={styles.topicCard}
+						style={[styles.topicCard, { maxHeight: 200 }]}
 					>
-						<Text style={styles.topicText}>{question}</Text>
+						<ScrollView>
+							<Text style={styles.topicText}>{question}</Text>
+						</ScrollView>
 					</LinearGradient>
 
 					{hasVoted ? (
@@ -413,19 +416,24 @@ const StartPage = () => {
 					)}
 				</View>
 
-				<View style={styles.footer}>
-					<Text style={styles.footerText}>
-						Choose carefully – your response contributes to finding common
-						ground.
-					</Text>
-				</View>
+				{!hasVoted && (
+					<View style={styles.footer}>
+						<Text style={styles.footerText}>
+							Choose carefully – your response contributes to finding common
+							ground.
+						</Text>
+					</View>
+				)}
 			</Animated.View>
 		</View>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: "#121212" },
+	container: {
+		flex: 1,
+		backgroundColor: "#121212",
+	},
 	loadingContainer: {
 		flex: 1,
 		backgroundColor: "#121212",
@@ -480,7 +488,7 @@ const styles = StyleSheet.create({
 	topicCard: {
 		borderRadius: 16,
 		padding: 24,
-		marginTop: 90,
+		marginTop: 60,
 		marginBottom: 24,
 		borderWidth: 1,
 		borderColor: "#9D00FF40",
@@ -586,7 +594,7 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		marginTop: 4,
 	},
-	footer: { paddingBottom: 40, alignItems: "center" },
+	footer: { paddingBottom: 40, paddingTop: 40, alignItems: "center" },
 	footerText: {
 		color: "#999999",
 		textAlign: "center",
