@@ -10,6 +10,7 @@ import {
 	AppState,
 	Alert,
 	ScrollView,
+	Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -22,6 +23,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { LogOut } from "lucide-react-native";
+
+import DeviceInfo from "react-native-device-info";
 
 const StartPage = () => {
 	const router = useRouter();
@@ -58,6 +61,7 @@ const StartPage = () => {
 	const app = useAppState();
 	useEffect(() => {
 		if (app === "active") {
+			checkForUpdate();
 			checkUserVote();
 			fetchDailyQuestion();
 		}
@@ -69,6 +73,7 @@ const StartPage = () => {
 			router.replace("/");
 			return;
 		}
+		checkForUpdate();
 		fetchDailyQuestion();
 		checkUserVote();
 
@@ -86,6 +91,36 @@ const StartPage = () => {
 			});
 		return () => unsub();
 	}, []);
+
+	const checkForUpdate = async () => {
+		try {
+			const version = await firestore().collection("version").get();
+			const versionDoc = version.docs[0];
+			const latestVersion = versionDoc.data().number;
+			const currentVersion = DeviceInfo.getVersion();
+
+			if (currentVersion !== latestVersion) {
+				const storeURL =
+					Platform.OS === "ios"
+						? "https://apps.apple.com/us/app/the-common-ground/id6744280175"
+						: "https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME";
+
+				Alert.alert(
+					"Update Required",
+					"Please update the app to continue.",
+					[
+						{
+							text: "Update",
+							onPress: () => Linking.openURL(storeURL),
+						},
+					],
+					{ cancelable: false }
+				);
+			}
+		} catch (err) {
+			console.error("Remote Config version check failed:", err);
+		}
+	};
 
 	// fetch today's question
 	const fetchDailyQuestion = async () => {

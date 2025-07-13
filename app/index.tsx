@@ -8,11 +8,17 @@ import {
 	Pressable,
 	Image,
 	Alert,
+	Platform,
+	Linking,
+	AppState,
 } from "react-native";
 import { router, Link } from "expo-router";
 import auth from "@react-native-firebase/auth";
+import firestore from "@react-native-firebase/firestore";
 import Animated, { FadeIn, SlideInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+
+import DeviceInfo from "react-native-device-info";
 
 export default function SignInScreen() {
 	const [phoneNumber, setPhoneNumber] = useState("");
@@ -21,6 +27,7 @@ export default function SignInScreen() {
 
 	// If user is already signed in (and has a phoneNumber), jump to /start immediately
 	useEffect(() => {
+		checkForUpdate();
 		const subscriber = auth().onAuthStateChanged((user) => {
 			if (user && user.phoneNumber) {
 				router.replace("/(tabs)/start");
@@ -28,6 +35,51 @@ export default function SignInScreen() {
 		});
 		return subscriber; // unsubscribe on unmount
 	}, []);
+
+	function useAppState() {
+		const [state, setState] = useState(AppState.currentState);
+		useEffect(() => {
+			const sub = AppState.addEventListener("change", setState);
+			return () => sub.remove();
+		}, []);
+		return state;
+	}
+	const app = useAppState();
+	useEffect(() => {
+		if (app === "active") {
+			checkForUpdate();
+		}
+	}, [app]);
+
+	const checkForUpdate = async () => {
+		try {
+			const version = await firestore().collection("version").get();
+			const versionDoc = version.docs[0];
+			const latestVersion = versionDoc.data().number;
+			const currentVersion = DeviceInfo.getVersion();
+
+			if (currentVersion !== latestVersion) {
+				const storeURL =
+					Platform.OS === "ios"
+						? "https://apps.apple.com/us/app/the-common-ground/id6744280175"
+						: "https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME";
+
+				Alert.alert(
+					"Update Required",
+					"Please update the app to continue.",
+					[
+						{
+							text: "Update",
+							onPress: () => Linking.openURL(storeURL),
+						},
+					],
+					{ cancelable: false }
+				);
+			}
+		} catch (err) {
+			console.error("Remote Config version check failed:", err);
+		}
+	};
 
 	// As the user types, keep only digits and mark valid once ≥10 digits
 	const validatePhone = (text: string) => {
