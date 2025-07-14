@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "The Common Ground",
 		"slug": "commonground",
-		"version": "1.1.5",
+		"version": "1.1.6",
 		"orientation": "portrait",
 		"icon": "./assets/images/C.png",
 		"scheme": "myapp",
@@ -15,15 +15,15 @@
 		},
 		"android": {
 			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/C.png",
-				"backgroundColor": "#ffffff"
+				"foregroundImage": "./assets/images/CG2.png",
+				"backgroundColor": "#120318"
 			},
 			"package": "com.aakgna.commongroundquestions"
 		},
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/favicon.png"
+			"favicon": "./assets/images/CG2.png"
 		},
 		"plugins": [
 			"expo-router",
@@ -40,10 +40,10 @@
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/C.png",
+					"image": "./assets/images/CG2.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
-					"backgroundColor": "#ffffff"
+					"backgroundColor": "#120318"
 				}
 			]
 		],
