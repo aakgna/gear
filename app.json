@@ -4,7 +4,7 @@
 		"slug": "commonground",
 		"version": "1.1.6",
 		"orientation": "portrait",
-		"icon": "./assets/images/C.png",
+		"icon": "./assets/images/CG3.png",
 		"scheme": "myapp",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
@@ -15,7 +15,7 @@
 		},
 		"android": {
 			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/CG2.png",
+				"foregroundImage": "./assets/images/CG3.png",
 				"backgroundColor": "#120318"
 			},
 			"package": "com.aakgna.commongroundquestions"
@@ -23,7 +23,7 @@
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/CG2.png"
+			"favicon": "./assets/images/CG3.png"
 		},
 		"plugins": [
 			"expo-router",

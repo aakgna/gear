@@ -104,22 +104,47 @@ export default function ExpandedQuestionScreen() {
 					<Text style={[styles.tabTitle, { color }]}>{title}</Text>
 				</View>
 
-				{content.map((item, index) => (
-					<Animated.View
-						key={index}
-						entering={SlideInRight.delay(index * 100).duration(300)}
-						style={styles.pointContainer}
-					>
-						<LinearGradient
-							colors={["#22222280", "#1A1A1A80"]}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-							style={[styles.pointCard, { borderLeftColor: color }]}
+				{activeTab === "common" && content.length === 0 ? (
+					<>
+						<Text
+							style={{
+								color: "#aaa",
+								fontStyle: "italic",
+								textAlign: "center",
+								marginTop: 16,
+							}}
 						>
-							<Text style={styles.pointText}>{item}</Text>
-						</LinearGradient>
-					</Animated.View>
-				))}
+							No Common Ground has been met.
+						</Text>
+						<Text
+							style={{
+								color: "#aaa",
+								fontStyle: "italic",
+								textAlign: "center",
+								marginTop: 7,
+							}}
+						>
+							Better Luck Next Time.
+						</Text>
+					</>
+				) : (
+					content.map((item, index) => (
+						<Animated.View
+							key={index}
+							entering={SlideInRight.delay(index * 100).duration(300)}
+							style={styles.pointContainer}
+						>
+							<LinearGradient
+								colors={["#22222280", "#1A1A1A80"]}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 1 }}
+								style={[styles.pointCard, { borderLeftColor: color }]}
+							>
+								<Text style={styles.pointText}>{item}</Text>
+							</LinearGradient>
+						</Animated.View>
+					))
+				)}
 			</Animated.View>
 		);
 	};
