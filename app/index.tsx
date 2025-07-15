@@ -414,6 +414,7 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		lineHeight: 18,
 		fontFamily: "Inter-Regular",
+		textAlign: "center",
 	},
 	link: {
 		color: "#BF5FFF",
