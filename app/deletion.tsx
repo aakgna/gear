@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import firestore from "@react-native-firebase/firestore";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft } from "lucide-react-native";
+import { logScreenView } from "@/analytics/analyticsEvents";
 
 export default function DeleteAccountScreen() {
   const params = useLocalSearchParams();
@@ -20,6 +21,16 @@ export default function DeleteAccountScreen() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await logScreenView("Deletion");
+      } catch (error) {
+        console.error("Analytics error:", error);
+      }
+    })();
+  }, []);
 
   const handleConfirmDeletion = async () => {
     // 1) Must be exactly 6 digits
