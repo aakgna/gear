@@ -398,7 +398,7 @@ const StartPage = () => {
 	// Add this useLayoutEffect to set up the header with bell icon
 	useLayoutEffect(() => {
 		navigation.setOptions({
-			headerRight: () => (
+			headerLeft: () => (
 				<Pressable
 					onPress={() => setModalVisible(true)}
 					style={{ marginRight: 16 }}
@@ -416,12 +416,16 @@ const StartPage = () => {
 	// Add these missing functions
 	const optIn = async () => {
 		try {
+			// Register for remote messages (required on iOS, safe on Android)
+			await messaging().registerDeviceForRemoteMessages();
+
 			const authStatus = await messaging().requestPermission();
 			if (
 				authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
 				authStatus === messaging.AuthorizationStatus.PROVISIONAL
 			) {
 				const token = await messaging().getToken();
+				console.log("FCM Token:", token);
 				await registerTokenWithBackend(auth().currentUser?.uid, token);
 				setNotificationsEnabled(true);
 				Alert.alert("Notifications enabled!");
@@ -434,7 +438,8 @@ const StartPage = () => {
 			}
 		} catch (err) {
 			setNotificationsEnabled(false);
-			Alert.alert("Error", "Failed to enable notifications.");
+			console.error("Error getting FCM token:", err);
+			Alert.alert("Error", err?.message || String(err));
 		}
 	};
 
@@ -473,15 +478,28 @@ const StartPage = () => {
 
 			{/* Header */}
 			<View style={styles.header}>
+				{/* Bell icon on the left */}
+				<Pressable
+					onPress={() => setModalVisible(true)}
+					style={{ marginRight: 16 }}
+				>
+					{notificationsEnabled ? (
+						<Bell color="#9D00FF" size={24} />
+					) : (
+						<BellOff color="#777" size={24} />
+					)}
+				</Pressable>
+
+				<View style={styles.titleContainer}>
+					<Text style={styles.headerTitle}>Today's Topic</Text>
+				</View>
+
+				{/* Logout button on the right */}
 				<View style={styles.logoutContainer}>
 					<Pressable style={styles.logoutButton} onPress={handleLogout}>
 						<Text style={styles.logoutText}>Logout</Text>
 						<LogOut size={16} color="#E6E6FA" />
 					</Pressable>
-				</View>
-
-				<View style={styles.titleContainer}>
-					<Text style={styles.headerTitle}>Today's Topic</Text>
 				</View>
 			</View>
 
