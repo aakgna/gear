@@ -49,10 +49,7 @@ export async function logScreenView(
 	}
 }
 
-export async function logdeleted(
-	createdAt: string,
-	today: string
-): Promise<void> {
+export async function logdeleted(createdAt: any, today: any): Promise<void> {
 	try {
 		if (DEBUG_ANALYTICS) {
 			console.log("Analytics: logdeleted", {

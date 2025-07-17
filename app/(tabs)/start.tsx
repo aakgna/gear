@@ -17,6 +17,8 @@ import {
 	Alert,
 	ScrollView,
 	Linking,
+	Switch,
+	Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -30,9 +32,18 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import { LogOut } from "lucide-react-native";
 import DeviceInfo from "react-native-device-info";
+import { useLayoutEffect } from "react";
+import { useNavigation } from "expo-router";
+import { Bell, BellOff } from "lucide-react-native";
+import messaging from "@react-native-firebase/messaging";
+
+// Replace with your backend endpoints
+const REGISTER_TOKEN_URL = "https://your-backend.com/api/register-fcm-token";
+const REMOVE_TOKEN_URL = "https://your-backend.com/api/remove-fcm-token";
 
 const StartPage = () => {
 	const router = useRouter();
+	const navigation = useNavigation();
 	const [question, setQuestion] = useState("");
 	const [isLoading, setIsLoading] = useState(true);
 	const [hasVoted, setHasVoted] = useState(false);
@@ -43,6 +54,10 @@ const StartPage = () => {
 	const [top, settop] = useState("");
 	const [bottom, setbottom] = useState("");
 	const [messageCount, setMessageCount] = useState();
+
+	// Add these missing state variables
+	const [modalVisible, setModalVisible] = useState(false);
+	const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
 	// animation hooks
 	const topScale = useSharedValue(1);
@@ -359,6 +374,88 @@ const StartPage = () => {
 	const topPct = totalVotes > 0 ? (topCount / totalVotes) * 100 : 0;
 	const bottomPct = totalVotes > 0 ? (bottomCount / totalVotes) * 100 : 0;
 
+	// Add this useEffect to check notification permission on mount
+	useEffect(() => {
+		(async () => {
+			const authStatus = await messaging().hasPermission();
+			setNotificationsEnabled(
+				authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+					authStatus === messaging.AuthorizationStatus.PROVISIONAL
+			);
+		})();
+	}, []);
+
+	// Add this useEffect to listen for FCM token refresh
+	useEffect(() => {
+		const unsubscribe = messaging().onTokenRefresh(async (token) => {
+			if (notificationsEnabled) {
+				await registerTokenWithBackend(auth().currentUser?.uid, token);
+			}
+		});
+		return unsubscribe;
+	}, [notificationsEnabled]);
+
+	// Add this useLayoutEffect to set up the header with bell icon
+	useLayoutEffect(() => {
+		navigation.setOptions({
+			headerRight: () => (
+				<Pressable
+					onPress={() => setModalVisible(true)}
+					style={{ marginRight: 16 }}
+				>
+					{notificationsEnabled ? (
+						<Bell color="#9D00FF" size={24} />
+					) : (
+						<BellOff color="#777" size={24} />
+					)}
+				</Pressable>
+			),
+		});
+	}, [navigation, notificationsEnabled]);
+
+	// Add these missing functions
+	const optIn = async () => {
+		try {
+			const authStatus = await messaging().requestPermission();
+			if (
+				authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+				authStatus === messaging.AuthorizationStatus.PROVISIONAL
+			) {
+				const token = await messaging().getToken();
+				await registerTokenWithBackend(auth().currentUser?.uid, token);
+				setNotificationsEnabled(true);
+				Alert.alert("Notifications enabled!");
+			} else {
+				setNotificationsEnabled(false);
+				Alert.alert(
+					"Permission denied",
+					"Enable notifications in your device settings."
+				);
+			}
+		} catch (err) {
+			setNotificationsEnabled(false);
+			Alert.alert("Error", "Failed to enable notifications.");
+		}
+	};
+
+	const optOut = async () => {
+		try {
+			await removeTokenFromBackend(auth().currentUser?.uid);
+			setNotificationsEnabled(false);
+			Alert.alert("Notifications disabled!");
+		} catch (err) {
+			Alert.alert("Error", "Failed to disable notifications.");
+		}
+	};
+
+	const onToggle = (value: boolean) => {
+		if (value) {
+			optIn();
+		} else {
+			optOut();
+		}
+	};
+
 	if (isLoading) {
 		return (
 			<View style={styles.loadingContainer}>
@@ -501,6 +598,35 @@ const StartPage = () => {
 					</View>
 				)}
 			</Animated.View>
+
+			{/* Notification Toggle Modal */}
+			<Modal
+				visible={modalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setModalVisible(false)}
+			>
+				<Pressable
+					style={styles.modalOverlay}
+					onPress={() => setModalVisible(false)}
+				>
+					<View style={styles.modalContent}>
+						<Text style={styles.modalTitle}>Push Notifications</Text>
+						<Text style={styles.modalDesc}>
+							Get notified when your messages are liked or replied to.
+						</Text>
+						<View style={styles.toggleRow}>
+							<Text style={styles.toggleLabel}>Enable Notifications</Text>
+							<Switch
+								value={notificationsEnabled}
+								onValueChange={onToggle}
+								trackColor={{ false: "#767577", true: "#9D00FF" }}
+								thumbColor={notificationsEnabled ? "#FFFFFF" : "#f4f3f4"}
+							/>
+						</View>
+					</View>
+				</Pressable>
+			</Modal>
 		</View>
 	);
 };
@@ -677,6 +803,62 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontFamily: "Inter-Regular",
 	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.4)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	modalContent: {
+		width: 320,
+		backgroundColor: "#222",
+		borderRadius: 16,
+		padding: 24,
+		alignItems: "center",
+	},
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#fff",
+		marginBottom: 8,
+	},
+	modalDesc: {
+		fontSize: 14,
+		color: "#ccc",
+		marginBottom: 24,
+		textAlign: "center",
+	},
+	toggleRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		width: "100%",
+	},
+	toggleLabel: {
+		fontSize: 16,
+		color: "#fff",
+		marginRight: 12,
+	},
 });
 
 export default StartPage;
+
+// Helper: Register token with backend
+async function registerTokenWithBackend(userId, token) {
+	if (!userId) return;
+	await fetch(REGISTER_TOKEN_URL, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ userId, fcmToken: token }),
+	});
+}
+
+// Helper: Remove token from backend
+async function removeTokenFromBackend(userId) {
+	if (!userId) return;
+	await fetch(REMOVE_TOKEN_URL, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ userId }),
+	});
+}
