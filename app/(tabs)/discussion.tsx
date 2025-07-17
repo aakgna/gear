@@ -459,6 +459,19 @@ export default function DiscussionScreen() {
 					likedBy: firestore.FieldValue.arrayUnion(userId),
 					likeCount: firestore.FieldValue.increment(1),
 				});
+
+				await fetch(
+					"https://us-central1-thecommonground-6259d.cloudfunctions.net/discussion_liked",
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							messageID: msgId,
+							questionID: currentQuestionId,
+						}),
+					}
+				);
+
 				setLikeCounts((prev) => ({
 					...prev,
 					[msgId]: (prev[msgId] || 0) + 1,
@@ -836,6 +849,18 @@ function ThreadModal({
 				.doc(uid)
 				.update({ messageCount: firestore.FieldValue.increment(-1) });
 
+			await fetch(
+				"https://us-central1-thecommonground-6259d.cloudfunctions.net/analyze_toxicity",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						messageID: parentMessage.id,
+						questionID: currentQuestionId,
+					}),
+				}
+			);
+
 			setReplyText("");
 		} catch (e: any) {
 			console.error("Error sending reply:", e);
@@ -873,6 +898,19 @@ function ThreadModal({
 					likedBy: firestore.FieldValue.arrayUnion(userId),
 					likeCount: firestore.FieldValue.increment(1),
 				});
+
+				await fetch(
+					"https://us-central1-thecommonground-6259d.cloudfunctions.net/analyze_toxicity",
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							parentMessageID: parentMessage.id,
+							replyID: replyId,
+							questionID: currentQuestionId,
+						}),
+					}
+				);
 			}
 
 			// Fetch the latest value after update
