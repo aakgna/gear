@@ -11,6 +11,8 @@ import {
 	Platform,
 	Linking,
 	AppState,
+	Keyboard,
+	TouchableWithoutFeedback,
 } from "react-native";
 import { router, Link } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -186,122 +188,126 @@ export default function SignInScreen() {
 	};
 
 	return (
-		<View style={styles.container}>
-			{/* Full‐screen gradient background */}
-			<LinearGradient
-				colors={["#120318", "#1C0529"]}
-				style={StyleSheet.absoluteFill}
-			/>
+		<TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+			<View style={styles.container}>
+				{/* Full‐screen gradient background */}
+				<LinearGradient
+					colors={["#120318", "#1C0529"]}
+					style={StyleSheet.absoluteFill}
+				/>
 
-			<Animated.View entering={FadeIn.duration(800)} style={styles.content}>
-				<Animated.View
-					entering={SlideInUp.delay(200).duration(800)}
-					style={styles.logoContainer}
-				>
-					<Image
-						source={require("../assets/images/CG2.png")}
-						style={styles.logoImage}
-					/>
-
-					<Text style={styles.appTitle}>The Common Ground</Text>
-					<Text style={styles.subtitle}>
-						Find understanding in disagreement
-					</Text>
-				</Animated.View>
-
-				<Animated.View
-					entering={SlideInUp.delay(400).duration(800)}
-					style={styles.formContainer}
-				>
-					<View style={styles.inputContainer}>
-						<TextInput
-							style={styles.input}
-							placeholder="Enter your phone number"
-							placeholderTextColor="#A0A0A0"
-							keyboardType="phone-pad"
-							value={phoneNumber}
-							onChangeText={validatePhone}
-							editable={!isLoading}
+				<Animated.View entering={FadeIn.duration(800)} style={styles.content}>
+					<Animated.View
+						entering={SlideInUp.delay(200).duration(800)}
+						style={styles.logoContainer}
+					>
+						<Image
+							source={require("../assets/images/CG2.png")}
+							style={styles.logoImage}
 						/>
-						{phoneNumber.length > 0 && (
-							<Animated.View
-								entering={FadeIn}
-								style={[
-									styles.validationIcon,
-									{ backgroundColor: isValid ? "#9D00FF20" : "#33333320" },
-								]}
-							>
-								<Text
+
+						<Text style={styles.appTitle}>The Common Ground</Text>
+						<Text style={styles.subtitle}>
+							Find understanding in disagreement
+						</Text>
+					</Animated.View>
+
+					<Animated.View
+						entering={SlideInUp.delay(400).duration(800)}
+						style={styles.formContainer}
+					>
+						<View style={styles.inputContainer}>
+							<TextInput
+								style={styles.input}
+								placeholder="Enter your phone number"
+								placeholderTextColor="#A0A0A0"
+								keyboardType="phone-pad"
+								value={phoneNumber}
+								onChangeText={validatePhone}
+								editable={!isLoading}
+							/>
+							{phoneNumber.length > 0 && (
+								<Animated.View
+									entering={FadeIn}
 									style={[
-										styles.validationText,
-										{ color: isValid ? "#9D00FF" : "#666666" },
+										styles.validationIcon,
+										{ backgroundColor: isValid ? "#9D00FF20" : "#33333320" },
 									]}
 								>
-									{isValid ? "✓" : "!"}
-								</Text>
-							</Animated.View>
-						)}
-					</View>
+									<Text
+										style={[
+											styles.validationText,
+											{ color: isValid ? "#9D00FF" : "#666666" },
+										]}
+									>
+										{isValid ? "✓" : "!"}
+									</Text>
+								</Animated.View>
+							)}
+						</View>
 
-					<Pressable
-						style={({ pressed }) => [
-							styles.continueButton,
-							{ opacity: pressed ? 0.9 : 1 },
-							(!isValid || isLoading) && styles.disabledButton,
-						]}
-						onPress={handleContinue}
-						disabled={!isValid || isLoading}
-					>
-						<LinearGradient
-							colors={isValid ? ["#9D00FF", "#6A0DAD"] : ["#333333", "#222222"]}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-							style={styles.gradientButton}
+						<Pressable
+							style={({ pressed }) => [
+								styles.continueButton,
+								{ opacity: pressed ? 0.9 : 1 },
+								(!isValid || isLoading) && styles.disabledButton,
+							]}
+							onPress={handleContinue}
+							disabled={!isValid || isLoading}
 						>
-							<Text style={styles.buttonText}>
-								{isLoading ? "Sending..." : "Continue"}
-							</Text>
-						</LinearGradient>
-					</Pressable>
+							<LinearGradient
+								colors={
+									isValid ? ["#9D00FF", "#6A0DAD"] : ["#333333", "#222222"]
+								}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 1 }}
+								style={styles.gradientButton}
+							>
+								<Text style={styles.buttonText}>
+									{isLoading ? "Sending..." : "Continue"}
+								</Text>
+							</LinearGradient>
+						</Pressable>
 
-					<View style={styles.termsContainer}>
-						<Text style={styles.termsText}>
-							By continuing, you agree to our{" "}
-							<Link
-								href="https://v0-common-ground-three.vercel.app/privacy-policy"
-								style={styles.link}
-							>
-								Privacy Policy
-							</Link>{" "}
-							and{" "}
-							<Link
-								href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-								style={styles.link}
-							>
-								Apple's EULA
-							</Link>
-							.{"\n\n"}
-							Messages containing content related to profanity, derogatory
-							language, sexual topics, death or harm, violence, or public safety
-							concerns are not permitted. These actions may lead to account
-							suspension or ban. Contact{" "}
-							<Link
-								href="https://v0-common-ground-three.vercel.app/"
-								style={styles.link}
-							>
-								support
-							</Link>{" "}
-							for help.{"\n\n"}
-							Click{" "}
-							<Text onPress={handleDeleteAccount} style={styles.link}>
-								here
-							</Text>{" "}
-							to delete your account.
-						</Text>
-					</View>
+						<View style={styles.termsContainer}>
+							<Text style={styles.termsText}>
+								By continuing, you agree to our{" "}
+								<Link
+									href="https://v0-common-ground-three.vercel.app/privacy-policy"
+									style={styles.link}
+								>
+									Privacy Policy
+								</Link>{" "}
+								and{" "}
+								<Link
+									href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+									style={styles.link}
+								>
+									Apple's EULA
+								</Link>
+								.{"\n\n"}
+								Messages containing content related to profanity, derogatory
+								language, sexual topics, death or harm, violence, or public
+								safety concerns are not permitted. These actions may lead to
+								account suspension or ban. Contact{" "}
+								<Link
+									href="https://v0-common-ground-three.vercel.app/"
+									style={styles.link}
+								>
+									support
+								</Link>{" "}
+								for help.{"\n\n"}
+								Click{" "}
+								<Text onPress={handleDeleteAccount} style={styles.link}>
+									here
+								</Text>{" "}
+								to delete your account.
+							</Text>
+						</View>
+					</Animated.View>
 				</Animated.View>
-			</Animated.View>
-		</View>
+			</View>
+		</TouchableWithoutFeedback>
 	);
 }
 

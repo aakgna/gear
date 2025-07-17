@@ -6,6 +6,8 @@ import {
 	TextInput,
 	Pressable,
 	Alert,
+	Keyboard,
+	TouchableWithoutFeedback,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -94,70 +96,72 @@ export default function DeleteAccountScreen() {
 	};
 
 	return (
-		<View style={styles.container}>
-			{/* Background gradient unchanged */}
-			<LinearGradient
-				colors={["#120318", "#1C0529"]}
-				style={StyleSheet.absoluteFill}
-			/>
+		<TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+			<View style={styles.container}>
+				{/* Background gradient unchanged */}
+				<LinearGradient
+					colors={["#120318", "#1C0529"]}
+					style={StyleSheet.absoluteFill}
+				/>
 
-			{/* Back button (same as new UI) */}
-			<Pressable style={styles.backButton} onPress={() => router.back()}>
-				<ArrowLeft size={24} color="#FF1744" />
-				<Text style={styles.backText}>Back</Text>
-			</Pressable>
-
-			<Animated.View entering={FadeIn.duration(800)} style={styles.content}>
-				<Text style={styles.title}>Delete Your Account</Text>
-				<Text style={styles.subtitle}>
-					Please enter the verification code sent to your phone
-				</Text>
-
-				<View style={styles.inputContainer}>
-					<TextInput
-						style={styles.input}
-						placeholder="000000"
-						placeholderTextColor="#6666"
-						value={code}
-						onChangeText={(text) => {
-							setCode(text.replace(/[^0-9]/g, "").slice(0, 6));
-							setError("");
-						}}
-						keyboardType="number-pad"
-						maxLength={6}
-						editable={!isLoading}
-						textAlign="center"
-					/>
-					{error ? <Text style={styles.errorText}>{error}</Text> : null}
-				</View>
-
-				<Pressable
-					style={({ pressed }) => [
-						styles.deleteButton,
-						{ opacity: pressed ? 0.9 : 1 },
-						isLoading && { opacity: 0.6 },
-					]}
-					onPress={handleConfirmDeletion}
-					disabled={isLoading}
-				>
-					<LinearGradient
-						colors={["#FF1744", "#D50000"]}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-						style={styles.gradientButton}
-					>
-						<Text style={styles.buttonText}>
-							{isLoading ? "Deleting..." : "Confirm Deletion"}
-						</Text>
-					</LinearGradient>
+				{/* Back button (same as new UI) */}
+				<Pressable style={styles.backButton} onPress={() => router.back()}>
+					<ArrowLeft size={24} color="#FF1744" />
+					<Text style={styles.backText}>Back</Text>
 				</Pressable>
 
-				<Text style={styles.warningText}>
-					Warning: This action cannot be undone. All your data will be
-					permanently deleted.
-				</Text>
-			</Animated.View>
-		</View>
+				<Animated.View entering={FadeIn.duration(800)} style={styles.content}>
+					<Text style={styles.title}>Delete Your Account</Text>
+					<Text style={styles.subtitle}>
+						Please enter the verification code sent to your phone
+					</Text>
+
+					<View style={styles.inputContainer}>
+						<TextInput
+							style={styles.input}
+							placeholder="000000"
+							placeholderTextColor="#6666"
+							value={code}
+							onChangeText={(text) => {
+								setCode(text.replace(/[^0-9]/g, "").slice(0, 6));
+								setError("");
+							}}
+							keyboardType="number-pad"
+							maxLength={6}
+							editable={!isLoading}
+							textAlign="center"
+						/>
+						{error ? <Text style={styles.errorText}>{error}</Text> : null}
+					</View>
+
+					<Pressable
+						style={({ pressed }) => [
+							styles.deleteButton,
+							{ opacity: pressed ? 0.9 : 1 },
+							isLoading && { opacity: 0.6 },
+						]}
+						onPress={handleConfirmDeletion}
+						disabled={isLoading}
+					>
+						<LinearGradient
+							colors={["#FF1744", "#D50000"]}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={styles.gradientButton}
+						>
+							<Text style={styles.buttonText}>
+								{isLoading ? "Deleting..." : "Confirm Deletion"}
+							</Text>
+						</LinearGradient>
+					</Pressable>
+
+					<Text style={styles.warningText}>
+						Warning: This action cannot be undone. All your data will be
+						permanently deleted.
+					</Text>
+				</Animated.View>
+			</View>
+		</TouchableWithoutFeedback>
 	);
 }
 

@@ -5,6 +5,8 @@ import {
 	TextInput,
 	Pressable,
 	Alert,
+	TouchableWithoutFeedback,
+	Keyboard,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, useRef, useEffect } from "react";
@@ -149,82 +151,90 @@ export default function VerifyScreen() {
 	};
 
 	return (
-		<View style={styles.container}>
-			<LinearGradient
-				colors={["#120318", "#1C0529"]}
-				style={StyleSheet.absoluteFill}
-			/>
+		<TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+			<View style={styles.container}>
+				<LinearGradient
+					colors={["#120318", "#1C0529"]}
+					style={StyleSheet.absoluteFill}
+				/>
 
-			<Pressable style={styles.backButton} onPress={() => router.back()}>
-				<ArrowLeft size={24} color="#9D00FF" />
-				<Text style={styles.backText}>Back</Text>
-			</Pressable>
-
-			<Animated.View entering={SlideInUp.duration(800)} style={styles.content}>
-				<Text style={styles.title}>Verify Your Number</Text>
-
-				<Text style={styles.subtitle}>
-					Enter the verification code sent to your number.
-				</Text>
-
-				<Animated.View style={[styles.inputContainer, animatedStyle]}>
-					<TextInput
-						ref={inputRef}
-						style={styles.input}
-						placeholder="000000"
-						placeholderTextColor="#666"
-						keyboardType="number-pad"
-						maxLength={6}
-						value={code}
-						onChangeText={setCode}
-						autoFocus
-						editable={!isVerifying}
-					/>
-
-					<LinearGradient
-						colors={["#9D00FF20", "#6A0DAD20"]}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-						style={styles.codeUnderline}
-					/>
-				</Animated.View>
-
-				<Pressable
-					style={({ pressed }) => [
-						styles.verifyButton,
-						{ opacity: pressed ? 0.9 : 1 },
-					]}
-					onPress={handleVerify}
-					disabled={isVerifying}
-				>
-					<LinearGradient
-						colors={["#9D00FF", "#6A0DAD"]}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-						style={styles.gradientButton}
-					>
-						<Text style={styles.buttonText}>
-							{isVerifying ? "Verifying..." : "Verify Code"}
-						</Text>
-					</LinearGradient>
+				<Pressable style={styles.backButton} onPress={() => router.back()}>
+					<ArrowLeft size={24} color="#9D00FF" />
+					<Text style={styles.backText}>Back</Text>
 				</Pressable>
 
-				<Pressable
-					style={({ pressed }) => [
-						styles.resendButton,
-						{ opacity: pressed && countdown === 0 ? 0.8 : 1 },
-					]}
-					onPress={handleResend}
-					disabled={countdown > 0 || isVerifying}
+				<Animated.View
+					entering={SlideInUp.duration(800)}
+					style={styles.content}
 				>
-					<Text
-						style={[styles.resendText, countdown > 0 && styles.resendDisabled]}
-					>
-						Resend Code {countdown > 0 ? `(${countdown}s)` : ""}
+					<Text style={styles.title}>Verify Your Number</Text>
+
+					<Text style={styles.subtitle}>
+						Enter the verification code sent to your number.
 					</Text>
-				</Pressable>
-			</Animated.View>
-		</View>
+
+					<Animated.View style={[styles.inputContainer, animatedStyle]}>
+						<TextInput
+							ref={inputRef}
+							style={styles.input}
+							placeholder="000000"
+							placeholderTextColor="#666"
+							keyboardType="number-pad"
+							maxLength={6}
+							value={code}
+							onChangeText={setCode}
+							autoFocus
+							editable={!isVerifying}
+						/>
+
+						<LinearGradient
+							colors={["#9D00FF20", "#6A0DAD20"]}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={styles.codeUnderline}
+						/>
+					</Animated.View>
+
+					<Pressable
+						style={({ pressed }) => [
+							styles.verifyButton,
+							{ opacity: pressed ? 0.9 : 1 },
+						]}
+						onPress={handleVerify}
+						disabled={isVerifying}
+					>
+						<LinearGradient
+							colors={["#9D00FF", "#6A0DAD"]}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={styles.gradientButton}
+						>
+							<Text style={styles.buttonText}>
+								{isVerifying ? "Verifying..." : "Verify Code"}
+							</Text>
+						</LinearGradient>
+					</Pressable>
+
+					<Pressable
+						style={({ pressed }) => [
+							styles.resendButton,
+							{ opacity: pressed && countdown === 0 ? 0.8 : 1 },
+						]}
+						onPress={handleResend}
+						disabled={countdown > 0 || isVerifying}
+					>
+						<Text
+							style={[
+								styles.resendText,
+								countdown > 0 && styles.resendDisabled,
+							]}
+						>
+							Resend Code {countdown > 0 ? `(${countdown}s)` : ""}
+						</Text>
+					</Pressable>
+				</Animated.View>
+			</View>
+		</TouchableWithoutFeedback>
 	);
 }
 
