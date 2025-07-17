@@ -862,21 +862,16 @@ const styles = StyleSheet.create({
 export default StartPage;
 
 // Helper: Register token with backend
-async function registerTokenWithBackend(userId, token) {
+async function registerTokenWithBackend(userId: any, token: any) {
 	if (!userId) return;
-	await fetch(REGISTER_TOKEN_URL, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ userId, fcmToken: token }),
-	});
+	await firestore().collection("users").doc(userId).update({ fcmToken: token });
 }
 
 // Helper: Remove token from backend
-async function removeTokenFromBackend(userId) {
+async function removeTokenFromBackend(userId: any) {
 	if (!userId) return;
-	await fetch(REMOVE_TOKEN_URL, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ userId }),
-	});
+	await firestore()
+		.collection("users")
+		.doc(userId)
+		.update({ fcmToken: "null" });
 }
