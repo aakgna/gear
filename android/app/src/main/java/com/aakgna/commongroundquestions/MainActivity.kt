@@ -1,4 +1,4 @@
-package com.aakgna.commongroundquestionsquestions
+package com.aakgna.commongroundquestions
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

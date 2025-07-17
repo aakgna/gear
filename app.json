@@ -19,7 +19,8 @@
 				"foregroundImage": "./assets/images/CG3.png",
 				"backgroundColor": "#120318"
 			},
-			"package": "com.aakgna.commongroundquestions"
+			"package": "com.aakgna.commongroundquestions",
+			"googleServicesFile": "./google-services.json"
 		},
 		"web": {
 			"bundler": "metro",

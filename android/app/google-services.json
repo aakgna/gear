@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "899431350542",
+    "project_id": "thecommonground-6259d",
+    "storage_bucket": "thecommonground-6259d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899431350542:android:8bdb3e096441839dd5575f",
+        "android_client_info": {
+          "package_name": "com.aakgna.commongroundquestions"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "899431350542-9ffqv5tjhmio1s5ce2io6hhshd8pi3kh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aakgna.commongroundquestions",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "899431350542-igho9j6qlvujo8vi0vg2ikj07ec7b6fe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDknb24TMqIMuSEW6znecXXnUT7CUYzTw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "899431350542-igho9j6qlvujo8vi0vg2ikj07ec7b6fe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "899431350542-2urjvnr8d4si8mcbgcdp3vtdboeqnahv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aakgna.commongroundquestions"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899431350542:android:a437a3049600a0e2d5575f",
+        "android_client_info": {
+          "package_name": "com.aakgna.commongroundquestionsquestions"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "899431350542-l6b6vamgmms30t7npind1q8tca2d4chg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aakgna.commongroundquestionsquestions",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "899431350542-igho9j6qlvujo8vi0vg2ikj07ec7b6fe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDknb24TMqIMuSEW6znecXXnUT7CUYzTw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "899431350542-igho9j6qlvujo8vi0vg2ikj07ec7b6fe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "899431350542-2urjvnr8d4si8mcbgcdp3vtdboeqnahv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aakgna.commongroundquestions"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
