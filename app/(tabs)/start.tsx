@@ -124,6 +124,25 @@ const StartPage = () => {
     return () => unsub();
   }, []);
 
+  // Check backend token status on mount
+  useEffect(() => {
+    const checkBackendNotificationStatus = async () => {
+      const uid = auth().currentUser?.uid;
+      if (!uid) return;
+      try {
+        const userDoc = await firestore().collection("users").doc(uid).get();
+        const data = userDoc.data();
+        const token = data?.fcmToken;
+        console.log("🎯 [mount] read fcmToken from Firestore:", token);
+
+        setNotificationsEnabled(!!token && token !== "null");
+      } catch (error) {
+        console.error("Failed to check notification status:", error);
+      }
+    };
+    checkBackendNotificationStatus();
+  }, []);
+
   const checkForUpdate = async () => {
     try {
       const version = await firestore().collection("version").get();
@@ -374,26 +393,15 @@ const StartPage = () => {
   const topPct = totalVotes > 0 ? (topCount / totalVotes) * 100 : 0;
   const bottomPct = totalVotes > 0 ? (bottomCount / totalVotes) * 100 : 0;
 
-  // Add this useEffect to check notification permission on mount
-  useEffect(() => {
-    (async () => {
-      const authStatus = await messaging().hasPermission();
-      setNotificationsEnabled(
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL
-      );
-    })();
-  }, []);
-
   // Add this useEffect to listen for FCM token refresh
-  useEffect(() => {
-    const unsubscribe = messaging().onTokenRefresh(async (token) => {
-      if (notificationsEnabled) {
-        await registerTokenWithBackend(auth().currentUser?.uid, token);
-      }
-    });
-    return unsubscribe;
-  }, [notificationsEnabled]);
+  // useEffect(() => {
+  //   const unsubscribe = messaging().onTokenRefresh(async (token) => {
+  //     if (notificationsEnabled) {
+  //       await registerTokenWithBackend(auth().currentUser?.uid, token);
+  //     }
+  //   });
+  //   return unsubscribe;
+  // }, [notificationsEnabled]);
 
   // Add this useLayoutEffect to set up the header with bell icon
   useLayoutEffect(() => {
@@ -414,45 +422,63 @@ const StartPage = () => {
   }, [navigation, notificationsEnabled]);
 
   // Add these missing functions
+  // optIn now immediately re-checks backend token
   const optIn = async () => {
     try {
-      // Register for remote messages (required on iOS, safe on Android)
       await messaging().registerDeviceForRemoteMessages();
-
       const authStatus = await messaging().requestPermission();
       if (
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL
       ) {
         const token = await messaging().getToken();
-        console.log("FCM Token:", token);
         await registerTokenWithBackend(auth().currentUser?.uid, token);
-        setNotificationsEnabled(true);
         Alert.alert("Notifications enabled!");
+
+        // Minimal backend re-check
+        const uid = auth().currentUser?.uid;
+        if (uid) {
+          const userDoc = await firestore().collection("users").doc(uid).get();
+          const data = userDoc.data();
+          const fcmToken = data?.fcmToken;
+
+          console.log(
+            "🔄 [optIn] re‑read fcmToken after registering:",
+            fcmToken
+          );
+          setNotificationsEnabled(!!fcmToken && fcmToken !== "null");
+        }
       } else {
-        setNotificationsEnabled(false);
         Alert.alert(
           "Permission denied",
           "Enable notifications in your device settings."
         );
       }
     } catch (err) {
-      setNotificationsEnabled(false);
       console.error("Error getting FCM token:", err);
       Alert.alert("Error", err?.message || String(err));
     }
   };
-
+  // optOut now immediately re-checks backend token
   const optOut = async () => {
     try {
       await removeTokenFromBackend(auth().currentUser?.uid);
-      setNotificationsEnabled(false);
       Alert.alert("Notifications disabled!");
+
+      // Minimal backend re-check
+      const uid = auth().currentUser?.uid;
+      if (uid) {
+        const userDoc = await firestore().collection("users").doc(uid).get();
+        const data = userDoc.data();
+        const fcmToken = data?.fcmToken;
+
+        console.log("🔄 [optOut] re‑read fcmToken after removing:", fcmToken);
+        setNotificationsEnabled(!!fcmToken && fcmToken !== "null");
+      }
     } catch (err) {
       Alert.alert("Error", "Failed to disable notifications.");
     }
   };
-
   const onToggle = (value: boolean) => {
     if (value) {
       optIn();
@@ -481,7 +507,14 @@ const StartPage = () => {
         {/* Bell icon on the left */}
         <Pressable
           onPress={() => setModalVisible(true)}
-          style={{ marginRight: 16 }}
+          style={[
+            styles.bellContainer,
+            {
+              left: 24,
+              position: "absolute",
+              top: Platform.OS === "ios" ? 60 : 40,
+            },
+          ]}
         >
           {notificationsEnabled ? (
             <Bell color="#9D00FF" size={24} />
