@@ -143,6 +143,14 @@ export default function ReportScreen() {
 								.collection("comment")
 								.doc(messageId)
 								.update({ isToxic: true });
+							await firestore()
+								.collection("discussion")
+								.doc(question)
+								.collection("answers")
+								.doc(answerID)
+								.update({
+									replyCount: firestore.FieldValue.increment(-1),
+								});
 						}
 						await firestore()
 							.collection("users")
@@ -191,6 +199,14 @@ export default function ReportScreen() {
 							.collection("comment")
 							.doc(messageId)
 							.delete();
+						await firestore()
+							.collection("discussion")
+							.doc(question)
+							.collection("answers")
+							.doc(answerID)
+							.update({
+								replyCount: firestore.FieldValue.increment(-1),
+							});
 					}
 					await firestore()
 						.collection("users")
@@ -235,6 +251,14 @@ export default function ReportScreen() {
 							.collection("comment")
 							.doc(messageId)
 							.delete();
+						await firestore()
+							.collection("discussion")
+							.doc(question)
+							.collection("answers")
+							.doc(answerID)
+							.update({
+								replyCount: firestore.FieldValue.increment(-1),
+							});
 					}
 					await firestore()
 						.collection("users")
