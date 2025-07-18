@@ -9,6 +9,7 @@ import {
 	StyleSheet,
 	Alert,
 	Platform,
+	ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import firestore from "@react-native-firebase/firestore";
@@ -367,9 +368,18 @@ export default function ReportScreen() {
 						}
 						style={styles.submitGradient}
 					>
-						<Text style={styles.submitText}>
-							{isSubmitting ? "Loading…" : "Submit Report"}
-						</Text>
+						{isSubmitting ? (
+							<View style={{ flexDirection: "row", alignItems: "center" }}>
+								<Text style={styles.submitText}>Loading</Text>
+								<ActivityIndicator
+									size="small"
+									color="#fff"
+									style={{ marginLeft: 8 }}
+								/>
+							</View>
+						) : (
+							<Text style={styles.submitText}>Submit Report</Text>
+						)}
 					</LinearGradient>
 				</Pressable>
 
