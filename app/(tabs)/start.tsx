@@ -58,6 +58,7 @@ const StartPage = () => {
 	// Add these missing state variables
 	const [modalVisible, setModalVisible] = useState(false);
 	const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+	const [showNotifPrompt, setShowNotifPrompt] = useState(false);
 
 	// animation hooks
 	const topScale = useSharedValue(1);
@@ -120,6 +121,14 @@ const StartPage = () => {
 					setStrikes(data.strikes);
 					setMessageCount(data.messageCount);
 				}
+				if (data?.createdAt) {
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const todayStr = today.toISOString().substring(0, 10);
+					if (data.createdAt === todayStr && !data.fcmToken) {
+						setShowNotifPrompt(true);
+					}
+				}
 			});
 		return () => unsub();
 	}, []);
@@ -141,6 +150,31 @@ const StartPage = () => {
 		};
 		checkBackendNotificationStatus();
 	}, []);
+
+	useEffect(() => {
+		if (showNotifPrompt) {
+			Alert.alert(
+				"Enable Notifications?",
+				"Would you like to turn on notifications to stay updated?",
+				[
+					{
+						text: "No, thanks",
+						onPress: () => {
+							setShowNotifPrompt(false);
+							optOut();
+						},
+					},
+					{
+						text: "Yes",
+						onPress: () => {
+							setShowNotifPrompt(false);
+							optIn();
+						},
+					},
+				]
+			);
+		}
+	}, [showNotifPrompt]);
 
 	const checkForUpdate = async () => {
 		try {
