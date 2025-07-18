@@ -11,9 +11,6 @@ const DEBUG_ANALYTICS = __DEV__;
  */
 export async function logDailyOpen(): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: daily_open", { screen: "Home" });
-		}
 		await analytics().logEvent("daily_open", {
 			screen: "Home",
 		});
@@ -32,13 +29,6 @@ export async function logScreenView(
 	uID: any
 ): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: screen_view", {
-				screen_name: screenName,
-				screen_class: screenName,
-				uID: uID,
-			});
-		}
 		await analytics().logScreenView({
 			screen_name: screenName,
 			screen_class: screenName,
@@ -51,12 +41,6 @@ export async function logScreenView(
 
 export async function logdeleted(createdAt: any, today: any): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: logdeleted", {
-				createdAt: createdAt,
-				deletedOn: today,
-			});
-		}
 		await analytics().logEvent("deleted", {
 			createdAt: createdAt,
 			deletedOn: today,
@@ -74,11 +58,6 @@ export async function logdeleted(createdAt: any, today: any): Promise<void> {
  */
 export async function logVoted(questionId: string): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: voted", {
-				question_id: questionId,
-			});
-		}
 		await analytics().logEvent("voted", {
 			question_id: questionId,
 		});
@@ -100,13 +79,6 @@ export async function logCommentPosted(
 	uID: string
 ): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: comment_posted", {
-				question_id: questionId,
-				thread_type: threadType,
-				uID: uID,
-			});
-		}
 		await analytics().logEvent("comment_posted", {
 			question_id: questionId,
 			thread_type: threadType,
@@ -122,9 +94,6 @@ export async function logCommentPosted(
  */
 export async function logSignUp(method: string): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: sign_up", { method });
-		}
 		await analytics().logSignUp({ method });
 	} catch (error) {
 		console.error("Analytics error in logSignUp:", error);
@@ -133,9 +102,6 @@ export async function logSignUp(method: string): Promise<void> {
 
 export async function logLogin(method: string): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: login", { method });
-		}
 		await analytics().logLogin({ method });
 	} catch (error) {
 		console.error("Analytics error in logLogin:", error);
@@ -148,10 +114,6 @@ export async function logDropOff(
 	reason: "no_vote" | "no_comment" | "no_vote_no_comment"
 ): Promise<void> {
 	try {
-		if (DEBUG_ANALYTICS) {
-			console.log("Analytics: drop_off", { screen, reason });
-		}
-
 		await analytics().logEvent("drop_off", {
 			screen,
 			reason,

@@ -326,7 +326,6 @@ export default function DiscussionScreen() {
 			const tooToxic = Object.values(scores).some(
 				(s: any) => s.summaryScore.value > 0.7
 			);
-			console.log("resulting toxicity", tooToxic);
 			if (tooToxic) {
 				Alert.alert(
 					"Message Not Sent",
@@ -460,7 +459,7 @@ export default function DiscussionScreen() {
 					likeCount: firestore.FieldValue.increment(1),
 				});
 
-				await fetch(
+				fetch(
 					"https://us-central1-thecommonground-6259d.cloudfunctions.net/discussion_liked",
 					{
 						method: "POST",
@@ -849,7 +848,7 @@ function ThreadModal({
 				.doc(uid)
 				.update({ messageCount: firestore.FieldValue.increment(-1) });
 
-			await fetch(
+			fetch(
 				"https://us-central1-thecommonground-6259d.cloudfunctions.net/discussion_reply",
 				{
 					method: "POST",
@@ -899,7 +898,7 @@ function ThreadModal({
 					likeCount: firestore.FieldValue.increment(1),
 				});
 
-				await fetch(
+				fetch(
 					"https://us-central1-thecommonground-6259d.cloudfunctions.net/reply_like",
 					{
 						method: "POST",

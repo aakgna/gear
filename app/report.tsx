@@ -101,7 +101,6 @@ export default function ReportScreen() {
 					}
 				);
 				const data = await res.json();
-				console.log("data scores", data);
 				const scores = data.attributeScores;
 				for (const [cat, det] of Object.entries(scores) as [
 					string,
@@ -175,7 +174,6 @@ export default function ReportScreen() {
 					}
 				);
 				const is_doxxing = await res.json();
-				console.log("is_doxxing", is_doxxing);
 				if (is_doxxing["is_doxxing"]) {
 					await firestore()
 						.collection("users")
