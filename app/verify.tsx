@@ -78,7 +78,7 @@ export default function VerifyScreen() {
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 			const todayDate = today.toISOString().substring(0, 10);
-			if (!userDoc.exists) {
+			if (!userDoc.exists()) {
 				await firestore().collection("users").doc(userCredential.user.uid).set({
 					phoneNumber: phoneNumber,
 					strikes: 6,

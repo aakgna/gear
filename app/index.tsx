@@ -273,17 +273,24 @@ export default function SignInScreen() {
 							<Text style={styles.termsText}>
 								By continuing, you agree to our{" "}
 								<Link
-									href="https://v0-common-ground-three.vercel.app/privacy-policy"
+									href="https://v0-the-common-ground-website.vercel.app/privacy-policy"
 									style={styles.link}
 								>
 									Privacy Policy
 								</Link>{" "}
-								and{" "}
+								,{" "}
 								<Link
-									href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+									href="https://v0-the-common-ground-website.vercel.app/eula"
 									style={styles.link}
 								>
 									Apple's EULA
+								</Link>
+								, and{" "}
+								<Link
+									href="https://v0-the-common-ground-website.vercel.app/terms-of-service"
+									style={styles.link}
+								>
+									our Terms of Services
 								</Link>
 								.{"\n\n"}
 								Messages containing content related to profanity, derogatory
@@ -291,7 +298,7 @@ export default function SignInScreen() {
 								safety concerns are not permitted. These actions may lead to
 								account suspension or ban. Contact{" "}
 								<Link
-									href="https://v0-common-ground-three.vercel.app/"
+									href="https://v0-the-common-ground-website.vercel.app/#contact"
 									style={styles.link}
 								>
 									support
