@@ -1,5 +1,12 @@
 import { useRouter, Tabs } from "expo-router";
-import { View, StyleSheet, Pressable, Alert } from "react-native";
+import {
+	View,
+	StyleSheet,
+	Pressable,
+	Alert,
+	Keyboard,
+	Platform,
+} from "react-native";
 import {
 	MessageSquare,
 	History,
@@ -16,7 +23,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import auth from "@react-native-firebase/auth";
 import firestore from "@react-native-firebase/firestore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TabBarProps {
 	state: any;
@@ -29,10 +36,37 @@ function TabBar({ state, descriptors, navigation }: TabBarProps) {
 	const insets = useSafeAreaInsets();
 	const pathname = usePathname();
 	const [voted, setVoted] = useState(true);
+	const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+	useEffect(() => {
+		if (Platform.OS === "android") {
+			const subscription = Keyboard.addListener("keyboardDidShow", () => {
+				setIsKeyboardVisible(true);
+			});
+			const subscription2 = Keyboard.addListener("keyboardDidHide", () => {
+				setIsKeyboardVisible(false);
+			});
+
+			return () => {
+				subscription.remove();
+				subscription2.remove();
+			};
+		}
+	}, []);
 
 	return (
 		<View
-			style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
+			style={[
+				styles.tabBar,
+				{
+					paddingBottom: Math.max(insets.bottom, 8),
+					// Only apply keyboard hiding logic on Android
+					...(Platform.OS === "android" && {
+						display: isKeyboardVisible ? "none" : "flex",
+						height: isKeyboardVisible ? 0 : "auto",
+					}),
+				},
+			]}
 		>
 			<LinearGradient
 				colors={["#1A1A1A", "#121212"]}
