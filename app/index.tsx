@@ -350,9 +350,9 @@ const styles = StyleSheet.create({
 		borderRadius: 35,
 	},
 	appTitle: {
-		fontSize: 34,
-		fontFamily: "Inter-Bold",
-		fontWeight: "900",
+		fontSize: Platform.OS === "ios" ? 34 : 34, // Slightly larger on Android
+		fontFamily: Platform.OS === "ios" ? "Inter-Bold" : "Poppins-Black", // Black on Android
+		fontWeight: Platform.OS === "ios" ? "900" : "900", // Different weight for Android
 		color: "#FFFFFF",
 		textAlign: "center",
 		marginBottom: 8,

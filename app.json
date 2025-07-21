@@ -15,10 +15,7 @@
 			"buildNumber": "5"
 		},
 		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/CG3.png",
-				"backgroundColor": "#120318"
-			},
+			"versionCode": 8,
 			"package": "com.aakgna.commongroundquestions",
 			"googleServicesFile": "./google-services.json"
 		},
@@ -34,6 +31,11 @@
 			[
 				"expo-build-properties",
 				{
+					"android": {
+						"compileSdkVersion": 35,
+						"targetSdkVersion": 35,
+						"minSdkVersion": 35
+					},
 					"ios": {
 						"useFrameworks": "static"
 					}
