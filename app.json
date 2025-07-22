@@ -15,7 +15,7 @@
 			"buildNumber": "5"
 		},
 		"android": {
-			"versionCode": 12,
+			"versionCode": 13,
 			"package": "com.aakgna.commongroundquestions",
 			"googleServicesFile": "./google-services.json",
 			"permissions": ["INTERNET", "VIBRATE", "POST_NOTIFICATIONS", "WAKE_LOCK"]
