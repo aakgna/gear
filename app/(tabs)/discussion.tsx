@@ -26,7 +26,16 @@ import Animated, {
 	SlideInUp,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowLeft, Flag, Send, X, Heart, Reply } from "lucide-react-native";
+import {
+	ArrowLeft,
+	Flag,
+	Send,
+	X,
+	Heart,
+	Reply,
+	Bell,
+	MessageCircle,
+} from "lucide-react-native";
 import type { Dispatch, SetStateAction } from "react";
 
 export default function DiscussionScreen() {
@@ -72,8 +81,67 @@ export default function DiscussionScreen() {
 		Record<string, number>
 	>({});
 	const repliesScrollViewRef = useRef<ScrollView>(null);
-	const [blockedUsers, setBlockedUsers] = useState<string[]>([]); // Add this line
+	const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
 	const prevMessageCount = useRef(messages.length);
+
+	// Notification state
+	const [notifications, setNotifications] = useState<any[]>([]);
+	const [notificationsSeen, setNotificationsSeen] = useState(0);
+	const [unreadCount, setUnreadCount] = useState(0);
+
+	// Subscribe to user document for notifications
+	useEffect(() => {
+		let unsubscribeUser: () => void;
+		const uid = auth().currentUser?.uid;
+
+		if (uid) {
+			unsubscribeUser = firestore()
+				.collection("users")
+				.doc(uid)
+				.onSnapshot((docSnap) => {
+					if (docSnap.exists) {
+						const userData = docSnap.data();
+						const userNotifications = userData?.notifications || [];
+						const userNotificationsSeen = userData?.notifications_seen || 0;
+
+						setNotifications(userNotifications);
+						setNotificationsSeen(userNotificationsSeen);
+
+						// Calculate unread count
+						const unread = userNotifications.length - userNotificationsSeen;
+						setUnreadCount(Math.max(0, unread));
+					}
+				});
+		}
+
+		return () => {
+			if (unsubscribeUser) {
+				unsubscribeUser();
+			}
+		};
+	}, []);
+
+	// Handle notification button press
+	const handleNotificationPress = async () => {
+		const uid = auth().currentUser?.uid;
+		if (!uid) return;
+
+		try {
+			// Update notifications_seen to the current length of notifications
+			await firestore().collection("users").doc(uid).update({
+				notifications_seen: notifications.length,
+			});
+
+			// Reset unread count locally
+			setUnreadCount(0);
+			setNotificationsSeen(notifications.length);
+
+			// Navigate to notifications screen
+			router.push("/notifications");
+		} catch (error) {
+			console.error("Error updating notifications_seen:", error);
+		}
+	};
 
 	// FIX ME: Do we need this useEffect?
 	// Fetch daily question if not passed via params (e.g., from tab bar)
@@ -508,11 +576,26 @@ export default function DiscussionScreen() {
 				style={StyleSheet.absoluteFill}
 			/>
 
-			{/* Back Button */}
+			{/* Header with Back Button and Notification Button */}
 			<View style={styles.header}>
 				<Pressable style={styles.backButton} onPress={handleBack}>
 					<ArrowLeft size={24} color="#9D00FF" />
 					<Text style={styles.backText}>Back</Text>
+				</Pressable>
+
+				{/* Notification Button */}
+				<Pressable
+					style={styles.notificationButton}
+					onPress={handleNotificationPress}
+				>
+					<Bell size={24} color="#9D00FF" />
+					{unreadCount > 0 && (
+						<View style={styles.notificationBadge}>
+							<Text style={styles.notificationBadgeText}>
+								{unreadCount > 99 ? "99+" : unreadCount}
+							</Text>
+						</View>
+					)}
 				</Pressable>
 			</View>
 
@@ -1209,6 +1292,9 @@ const styles = StyleSheet.create({
 		paddingTop: Platform.OS === "ios" ? 60 : 30,
 		paddingHorizontal: 24,
 		marginBottom: 12,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
 	},
 	backButton: { flexDirection: "row", alignItems: "center" },
 	backText: {
@@ -1216,6 +1302,28 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		marginLeft: 8,
 		fontFamily: "Inter-Medium",
+	},
+	notificationButton: {
+		position: "relative",
+		padding: 4,
+	},
+	notificationBadge: {
+		position: "absolute",
+		top: -2,
+		right: -2,
+		backgroundColor: "#FF4444",
+		borderRadius: 10,
+		minWidth: 20,
+		height: 20,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 4,
+	},
+	notificationBadgeText: {
+		color: "#FFFFFF",
+		fontSize: 12,
+		fontFamily: "Inter-Bold",
+		textAlign: "center",
 	},
 	topicCard: {
 		borderRadius: Platform.OS == "android" ? 24 : 16,
