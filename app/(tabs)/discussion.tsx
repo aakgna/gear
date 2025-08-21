@@ -53,10 +53,14 @@ export default function DiscussionScreen() {
 
 	const router = useRouter();
 	const params = useLocalSearchParams();
-	const { question, questionId } = params as {
-		question: string;
-		questionId: string;
-	};
+	const { question, questionId, openThread, scrollToMessage, scrollToReply } =
+		params as {
+			question: string;
+			questionId: string;
+			openThread?: string;
+			scrollToMessage?: string;
+			scrollToReply?: string;
+		};
 
 	const [currentQuestion, setCurrentQuestion] = useState(question);
 	const [currentQuestionId, setCurrentQuestionId] = useState(questionId);
@@ -288,6 +292,46 @@ export default function DiscussionScreen() {
 		}
 		prevMessageCount.current = messages.length;
 	}, [messages.length]);
+
+	// Auto-scroll to specific message when scrollToMessage parameter is provided
+	useEffect(() => {
+		if (scrollToMessage && messages.length > 0) {
+			const targetMessageIndex = messages.findIndex(
+				(msg) => msg.id === scrollToMessage
+			);
+			if (targetMessageIndex !== -1) {
+				setTimeout(() => {
+					// More accurate height estimation based on your styles
+					const estimatedMessageHeight = 120; // Adjust based on your actual message height
+					const headerHeight = 60; // Account for any header spacing
+					const scrollPosition =
+						targetMessageIndex * estimatedMessageHeight - headerHeight;
+
+					scrollViewRef.current?.scrollTo({
+						y: Math.max(0, scrollPosition), // Ensure we don't scroll to negative position
+						animated: true,
+					});
+				}, 500);
+			}
+		}
+	}, [scrollToMessage, messages]);
+
+	// Auto-open thread modal if openThread parameter is provided
+	useEffect(() => {
+		if (openThread && messages.length > 0) {
+			// Find the message to open thread for
+			const targetMessage = messages.find((msg) => msg.id === openThread);
+			if (targetMessage) {
+				const parentMsg = {
+					id: targetMessage.id,
+					text: targetMessage.text || "",
+					user: targetMessage.user || "",
+				};
+				setThreadParentMessage(parentMsg);
+				setThreadModalVisible(true);
+			}
+		}
+	}, [openThread, messages]);
 
 	// -- Logic functions --
 
@@ -788,6 +832,29 @@ function ThreadModal({
 		Record<string, number>
 	>({});
 	const repliesScrollViewRef = useRef<ScrollView>(null);
+
+	const params = useLocalSearchParams();
+	const { scrollToReply } = params as { scrollToReply?: string };
+
+	// Auto-scroll to specific reply when scrollToReply parameter is provided
+	useEffect(() => {
+		if (scrollToReply && replies.length > 0 && visible) {
+			// Find the reply to scroll to
+			const targetReplyIndex = replies.findIndex(
+				(reply) => reply.id === scrollToReply
+			);
+			if (targetReplyIndex !== -1) {
+				// Scroll to the specific reply with a delay
+				setTimeout(() => {
+					const scrollPosition = targetReplyIndex * 80; // Approximate height per reply
+					repliesScrollViewRef.current?.scrollTo({
+						y: scrollPosition,
+						animated: true,
+					});
+				}, 500);
+			}
+		}
+	}, [scrollToReply, replies, visible]);
 
 	// Subscribe to replies for the parent message
 	useEffect(() => {

@@ -20,8 +20,9 @@ interface NotificationItem {
 	id: string;
 	type: "Discussion Reply" | "Thread Like" | "Discussion Like";
 	text: string;
-	timestamp?: any;
 	originalNotification: string;
+	answerId?: string;
+	replyId?: string;
 }
 
 export default function NotificationsScreen() {
@@ -110,6 +111,8 @@ export default function NotificationsScreen() {
 				type,
 				text: truncatedText,
 				originalNotification: notification,
+				answerId,
+				replyId,
 			};
 		} catch (error) {
 			return {
@@ -264,6 +267,40 @@ export default function NotificationsScreen() {
 		return words.slice(0, maxWords).join(" ") + "...";
 	};
 
+	const handleNotificationPress = async (notification: NotificationItem) => {
+		try {
+			if (notification.type === "Discussion Like") {
+				// Navigate to discussion and scroll to the specific message
+				router.push({
+					pathname: "/(tabs)/discussion",
+					params: {
+						scrollToMessage: notification.answerId,
+					},
+				});
+			} else if (notification.type === "Discussion Reply") {
+				// Navigate to discussion and open thread for that message
+				router.push({
+					pathname: "/(tabs)/discussion",
+					params: {
+						openThread: notification.answerId,
+					},
+				});
+			} else if (notification.type === "Thread Like") {
+				// Navigate to discussion, open thread, and scroll to specific reply
+				router.push({
+					pathname: "/(tabs)/discussion",
+					params: {
+						openThread: notification.answerId,
+						scrollToReply: notification.replyId,
+					},
+				});
+			}
+		} catch (error) {
+			console.error("Error navigating to discussion:", error);
+			Alert.alert("Error", "Failed to navigate to discussion");
+		}
+	};
+
 	const getNotificationIcon = (type: string) => {
 		switch (type) {
 			case "Discussion Like":
@@ -344,25 +381,35 @@ export default function NotificationsScreen() {
 								entering={FadeIn.delay(index * 50)}
 								style={styles.notificationCard}
 							>
-								<LinearGradient
-									colors={["#222222", "#1A1A1A"]}
-									start={{ x: 0, y: 0 }}
-									end={{ x: 1, y: 1 }}
-									style={styles.notificationGradient}
+								<Pressable
+									onPress={() => handleNotificationPress(notification)}
+									style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
 								>
-									<View style={styles.notificationHeader}>
-										<View style={styles.notificationIconContainer}>
-											{getNotificationIcon(notification.type)}
+									<LinearGradient
+										colors={["#222222", "#1A1A1A"]}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 1 }}
+										style={styles.notificationGradient}
+									>
+										<View style={styles.notificationHeader}>
+											<View style={styles.notificationIconContainer}>
+												{getNotificationIcon(notification.type)}
+											</View>
+											<Text style={styles.notificationType}>
+												{String(notification.type)}
+											</Text>
 										</View>
-										<Text style={styles.notificationType}>
-											{String(notification.type)}
-										</Text>
-									</View>
 
-									<Text style={styles.notificationText}>
-										{String(notification.text)}
-									</Text>
-								</LinearGradient>
+										<Text style={styles.notificationText}>
+											{String(notification.text)}
+										</Text>
+
+										{/* Add tap hint */}
+										<Text style={styles.tapHint}>
+											Tap to view in discussion
+										</Text>
+									</LinearGradient>
+								</Pressable>
 							</Animated.View>
 						);
 					})
@@ -473,5 +520,13 @@ const styles = StyleSheet.create({
 		fontFamily: "Inter-Regular",
 		lineHeight: 22,
 		marginLeft: 36,
+		marginBottom: 4,
+	},
+	tapHint: {
+		color: "#666",
+		fontSize: 12,
+		fontFamily: "Inter-Regular",
+		marginLeft: 36,
+		fontStyle: "italic",
 	},
 });
