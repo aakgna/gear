@@ -46,20 +46,24 @@ export default function NotificationsScreen() {
 			const userData = userDoc.data();
 			const rawNotifications = userData?.notifications || [];
 
-			// Process notifications from newest to oldest
-			const processedNotifications: NotificationItem[] = [];
-
-			for (let i = rawNotifications.length - 1; i >= 0; i--) {
-				const notification = rawNotifications[i];
-
-				// Ensure notification is a string
-				if (typeof notification === "string" && notification.trim() !== "") {
-					const processed = await processNotification(notification, i);
-					if (processed) {
-						processedNotifications.push(processed);
+			// Process all notifications in parallel
+			const processPromises = rawNotifications
+				.map((notification, index) => {
+					// Ensure notification is a string
+					if (typeof notification === "string" && notification.trim() !== "") {
+						return processNotification(
+							notification,
+							rawNotifications.length - 1 - index
+						);
 					}
-				}
-			}
+					return Promise.resolve(null);
+				})
+				.reverse(); // Reverse to maintain newest-to-oldest order
+
+			const results = await Promise.all(processPromises);
+			const processedNotifications = results.filter(
+				Boolean
+			) as NotificationItem[];
 
 			setNotifications(processedNotifications);
 		} catch (error) {
