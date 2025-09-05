@@ -20,6 +20,7 @@ import {
   Switch,
   Modal,
   PermissionsAndroid,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import auth from "@react-native-firebase/auth";
@@ -37,6 +38,7 @@ import { useLayoutEffect } from "react";
 import { useNavigation } from "expo-router";
 import { Bell, BellOff } from "lucide-react-native";
 import messaging from "@react-native-firebase/messaging";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Replace with your backend endpoints
 const REGISTER_TOKEN_URL = "https://your-backend.com/api/register-fcm-token";
@@ -45,6 +47,7 @@ const REMOVE_TOKEN_URL = "https://your-backend.com/api/remove-fcm-token";
 const StartPage = () => {
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [question, setQuestion] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasVoted, setHasVoted] = useState(false);
@@ -60,6 +63,8 @@ const StartPage = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   // animation hooks
   const topScale = useSharedValue(1);
@@ -204,6 +209,16 @@ const StartPage = () => {
       }
     } catch (err) {
       console.error("Remote Config version check failed:", err);
+    }
+  };
+
+  // ✨ ADDED: pull-to-refresh handler
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await Promise.all([fetchDailyQuestion(), checkUserVote()]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -574,119 +589,145 @@ const StartPage = () => {
         </View>
       </View>
 
-      {/* Content */}
-      <Animated.View entering={FadeIn.duration(800)} style={styles.content}>
-        <View style={styles.questionContainer}>
-          <LinearGradient
-            colors={["#9D00FF20", "#6A0DAD20"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.topicCard, { maxHeight: 200 }]}
-          >
-            <ScrollView>
-              <Text style={styles.topicText}>{question}</Text>
-            </ScrollView>
-          </LinearGradient>
+      {/* ✨ ADDED: Wrap content in ScrollView with RefreshControl */}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing} // tracks spinner
+            onRefresh={onRefresh} // calls pull-to-refresh handler
+            tintColor="#9D00FF" // iOS spinner color
+            colors={["#9D00FF"]} // Android spinner colors
+          />
+        }
+      >
+        {/* Content */}
+        <Animated.View entering={FadeIn.duration(800)} style={styles.content}>
+          <View style={styles.questionContainer}>
+            <LinearGradient
+              colors={["#9D00FF20", "#6A0DAD20"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.topicCard, { maxHeight: 200 }]}
+            >
+              <ScrollView>
+                <Text style={styles.topicText}>{question}</Text>
+              </ScrollView>
+            </LinearGradient>
 
-          {hasVoted ? (
-            <>
-              {/* Results */}
-              <View style={styles.resultsContainer}>
-                <Text style={styles.resultsTitle}>Results</Text>
-                <View style={styles.barContainer}>
-                  <View style={[styles.bar, { width: `${topPct}%` }]} />
+            {hasVoted ? (
+              <>
+                {/* Results */}
+                <View style={styles.resultsContainer}>
+                  <Text style={styles.resultsTitle}>Results</Text>
+                  <View style={styles.barContainer}>
+                    <View style={[styles.bar, { width: `${topPct}%` }]} />
+                  </View>
+                  <View style={styles.resultsTextContainer}>
+                    <Text style={styles.resultsText}>
+                      {top}: {topPct.toFixed(1)}% ({topCount})
+                    </Text>
+                    <Text style={styles.resultsText}>
+                      {bottom}: {bottomPct.toFixed(1)}% ({bottomCount})
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.resultsTextContainer}>
-                  <Text style={styles.resultsText}>
-                    {top}: {topPct.toFixed(1)}% ({topCount})
+
+                {/* Join Discussion */}
+                <Pressable
+                  style={styles.joinDiscussionButton}
+                  onPress={handleDiscussionNavigation}
+                >
+                  <Text style={styles.discussionButtonText}>
+                    Join Discussion
                   </Text>
-                  <Text style={styles.resultsText}>
-                    {bottom}: {bottomPct.toFixed(1)}% ({bottomCount})
+                  <Text style={styles.underDiscussionButtonText}>
+                    Messages Remaining: {messageCount}
                   </Text>
-                </View>
+                  <Text style={styles.strikesText}>
+                    Strikes Remaining: {strikes}
+                  </Text>
+                </Pressable>
+
+                {/* Need Info pill below Join Discussion */}
+                <Pressable
+                  onPress={() => router.push("/(tabs)/ai-bot")}
+                  style={styles.needInfoPill}
+                  hitSlop={8}
+                >
+                  <Text style={styles.needInfoText}>Need Info?</Text>
+                </Pressable>
+              </>
+            ) : (
+              /* Voting Options */
+              <View style={styles.optionsContainer}>
+                <Animated.View
+                  style={[styles.optionWrapper, agreeAnimatedStyle]}
+                >
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.optionButton,
+                      selectedOption === "top" && styles.selectedOption,
+                      { opacity: pressed ? 0.9 : 1 },
+                    ]}
+                    onPress={() => handleVote("top")}
+                    disabled={!!selectedOption}
+                  >
+                    <LinearGradient
+                      colors={
+                        selectedOption === "top"
+                          ? ["#9D00FF", "#6A0DAD"]
+                          : ["#333333", "#222222"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.optionGradient}
+                    >
+                      <Text style={styles.optionText}>{top}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Animated.View>
+
+                <Animated.View
+                  style={[styles.optionWrapper, disagreeAnimatedStyle]}
+                >
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.optionButton,
+                      selectedOption === "bottom" && styles.selectedOption,
+                      { opacity: pressed ? 0.9 : 1 },
+                    ]}
+                    onPress={() => handleVote("bottom")}
+                    disabled={!!selectedOption}
+                  >
+                    <LinearGradient
+                      colors={
+                        selectedOption === "bottom"
+                          ? ["#9D00FF", "#6A0DAD"]
+                          : ["#333333", "#222222"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.optionGradient}
+                    >
+                      <Text style={styles.optionText}>{bottom}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Animated.View>
               </View>
+            )}
+          </View>
 
-              {/* Join Discussion */}
-              <Pressable
-                style={styles.joinDiscussionButton}
-                onPress={handleDiscussionNavigation}
-              >
-                <Text style={styles.discussionButtonText}>Join Discussion</Text>
-                <Text style={styles.underDiscussionButtonText}>
-                  Messages Remaining: {messageCount}
-                </Text>
-                <Text style={styles.strikesText}>
-                  Strikes Remaining: {strikes}
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            /* Voting Options */
-            <View style={styles.optionsContainer}>
-              <Animated.View style={[styles.optionWrapper, agreeAnimatedStyle]}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.optionButton,
-                    selectedOption === "top" && styles.selectedOption,
-                    { opacity: pressed ? 0.9 : 1 },
-                  ]}
-                  onPress={() => handleVote("top")}
-                  disabled={!!selectedOption}
-                >
-                  <LinearGradient
-                    colors={
-                      selectedOption === "top"
-                        ? ["#9D00FF", "#6A0DAD"]
-                        : ["#333333", "#222222"]
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.optionGradient}
-                  >
-                    <Text style={styles.optionText}>{top}</Text>
-                  </LinearGradient>
-                </Pressable>
-              </Animated.View>
-
-              <Animated.View
-                style={[styles.optionWrapper, disagreeAnimatedStyle]}
-              >
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.optionButton,
-                    selectedOption === "bottom" && styles.selectedOption,
-                    { opacity: pressed ? 0.9 : 1 },
-                  ]}
-                  onPress={() => handleVote("bottom")}
-                  disabled={!!selectedOption}
-                >
-                  <LinearGradient
-                    colors={
-                      selectedOption === "bottom"
-                        ? ["#9D00FF", "#6A0DAD"]
-                        : ["#333333", "#222222"]
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.optionGradient}
-                  >
-                    <Text style={styles.optionText}>{bottom}</Text>
-                  </LinearGradient>
-                </Pressable>
-              </Animated.View>
+          {!hasVoted && (
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                Choose carefully – your response contributes to finding common
+                ground.
+              </Text>
             </View>
           )}
-        </View>
-
-        {!hasVoted && (
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Choose carefully – your response contributes to finding common
-              ground.
-            </Text>
-          </View>
-        )}
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
 
       {/* Notification Toggle Modal */}
       <Modal
@@ -929,6 +970,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fff",
     marginRight: 12,
+  },
+  chatBot: {
+    position: "absolute",
+    right: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  chatBotText: {
+    color: "#FFFFFF",
+    fontSize: 16, // Increased from 14 for better fit
+    fontWeight: "600",
+  },
+  needInfoPill: {
+    alignSelf: "center",
+    marginTop: 40,
+    marginBottom: 20,
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: 90,
+    borderRadius: 25,
+    backgroundColor: "#1A1A1A",
+    borderWidth: 1,
+    borderColor: "#BF5FFF",
+    alignItems: "center",
+    overflow: "hidden",
+    //zIndex: 1,
+  },
+  needInfoText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
