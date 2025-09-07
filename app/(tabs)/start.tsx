@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
 	topicCard: {
 		borderRadius: Platform.OS == "android" ? 24 : 16,
 		padding: 24,
-		marginTop: 30,
+		marginTop: 15,
 		marginBottom: 24,
 		borderWidth: 1,
 		borderColor: "#9D00FF40",
@@ -993,7 +993,7 @@ const styles = StyleSheet.create({
 		borderColor: "#9D00FF",
 	},
 	resultsContainer: {
-		marginTop: 20,
+		marginTop: 10,
 		width: "100%",
 		alignItems: "center",
 	},
