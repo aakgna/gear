@@ -1,6 +1,13 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import {
+	View,
+	Text,
+	StyleSheet,
+	Pressable,
+	ScrollView,
+	ActivityIndicator,
+} from "react-native";
 import { router } from "expo-router";
-import Animated, { FadeIn, SlideInRight } from "react-native-reanimated";
+import Animated, { SlideInRight } from "react-native-reanimated";
 import { logScreenView } from "@/analytics/analyticsEvents";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -11,7 +18,7 @@ import {
 	ArrowLeft,
 	ArrowRight,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 // Update Firebase imports to use new modular SDK
 import { getAuth } from "@react-native-firebase/auth";
 import {
@@ -20,11 +27,23 @@ import {
 	query,
 	where,
 	orderBy,
+	limit,
+	startAfter,
 	getDocs,
 } from "@react-native-firebase/firestore";
 
 export default function HistoryScreen() {
 	const [historicQuestions, setHistoricQuestions] = useState([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [currentPage, setCurrentPage] = useState(0);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
+	const [hasMoreData, setHasMoreData] = useState(true);
+	const [lastDoc, setLastDoc] = useState(null);
+
+	// Memoize processed questions to avoid unnecessary re-processing
+	const processedQuestions = useMemo(() => {
+		return historicQuestions;
+	}, [historicQuestions]);
 
 	useEffect(() => {
 		(async () => {
@@ -50,7 +69,8 @@ export default function HistoryScreen() {
 				const q = query(
 					questionsRef,
 					where("date", "<", today),
-					orderBy("date", "desc")
+					orderBy("date", "desc"),
+					limit(20)
 				);
 
 				const snapshot = await getDocs(q);
@@ -75,18 +95,83 @@ export default function HistoryScreen() {
 							data.commonGroundNotes.length > 0,
 						top: data.top,
 						bottom: data.bottom,
-						// You can add more fields as needed
 					};
 				});
 
+				// Update pagination state
 				setHistoricQuestions(questions);
+				setHasMoreData(snapshot.docs.length === 20);
+				if (snapshot.docs.length > 0) {
+					setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+				}
+				setCurrentPage(1);
 			} catch (error) {
 				console.error("Error fetching historic questions:", error);
+			} finally {
+				setIsLoading(false);
 			}
 		};
 
 		fetchHistoricQuestions();
 	}, []);
+
+	const loadMoreQuestions = async () => {
+		if (isLoadingMore || !hasMoreData || !lastDoc) return;
+
+		setIsLoadingMore(true);
+
+		try {
+			const firestore = getFirestore();
+			const questionsRef = collection(firestore, "dailyQuestions");
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const q = query(
+				questionsRef,
+				where("date", "<", today),
+				orderBy("date", "desc"),
+				startAfter(lastDoc),
+				limit(20)
+			);
+
+			const snapshot = await getDocs(q);
+
+			const newQuestions = snapshot.docs.map((doc) => {
+				const data = doc.data();
+				const totalResponses = (data.topCount || 0) + (data.bottomCount || 0);
+				const agreePercentage = totalResponses
+					? Math.round((data.topCount / totalResponses) * 100)
+					: 0;
+				const disagreePercentage = 100 - agreePercentage;
+
+				return {
+					id: doc.id,
+					text: data.question,
+					date: data.date?.toDate().toLocaleDateString() || "",
+					agreePercentage,
+					disagreePercentage,
+					totalResponses,
+					hasCommonGround:
+						Array.isArray(data.commonGroundNotes) &&
+						data.commonGroundNotes.length > 0,
+					top: data.top,
+					bottom: data.bottom,
+				};
+			});
+
+			// Update state with new questions
+			setHistoricQuestions((prev) => [...prev, ...newQuestions]);
+			setHasMoreData(snapshot.docs.length === 20);
+			if (snapshot.docs.length > 0) {
+				setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+			}
+			setCurrentPage((prev) => prev + 1);
+		} catch (error) {
+			console.error("Error loading more questions:", error);
+		} finally {
+			setIsLoadingMore(false);
+		}
+	};
 
 	const handleQuestionPress = (questionId: string) => {
 		router.push({
@@ -94,6 +179,19 @@ export default function HistoryScreen() {
 			params: { questionId },
 		});
 	};
+
+	if (isLoading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<LinearGradient
+					colors={["#120318", "#1C0529"]}
+					style={StyleSheet.absoluteFill}
+				/>
+				<ActivityIndicator size="large" color="#9D00FF" />
+				<Text style={styles.loadingText}>Loading history...</Text>
+			</View>
+		);
+	}
 
 	return (
 		<View style={styles.container}>
@@ -110,10 +208,10 @@ export default function HistoryScreen() {
 				contentContainerStyle={styles.contentContainer}
 				showsVerticalScrollIndicator={false}
 			>
-				{historicQuestions.map((question, index) => (
+				{processedQuestions.map((question, index) => (
 					<Animated.View
 						key={question.id}
-						entering={SlideInRight.delay(index * 100).duration(400)}
+						entering={SlideInRight.delay(index * 20).duration(200)}
 					>
 						<Pressable
 							style={({ pressed }) => [
@@ -194,6 +292,37 @@ export default function HistoryScreen() {
 						</Pressable>
 					</Animated.View>
 				))}
+				{/* Pagination UI */}
+				{!isLoading && processedQuestions.length > 0 && (
+					<View style={styles.paginationContainer}>
+						{isLoadingMore ? (
+							<View style={styles.loadingMoreContainer}>
+								<ActivityIndicator size="small" color="#9D00FF" />
+								<Text style={styles.loadingMoreText}>
+									Loading more questions...
+								</Text>
+							</View>
+						) : hasMoreData ? (
+							<Pressable
+								style={styles.loadMoreButton}
+								onPress={loadMoreQuestions}
+							>
+								<LinearGradient
+									colors={["#9D00FF", "#6A0DAD"]}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 1 }}
+									style={styles.loadMoreGradient}
+								>
+									<Text style={styles.loadMoreText}>Load More</Text>
+								</LinearGradient>
+							</Pressable>
+						) : (
+							<View style={styles.endContainer}>
+								<Text style={styles.endText}>You've reached the end</Text>
+							</View>
+						)}
+					</View>
+				)}
 			</ScrollView>
 		</View>
 	);
@@ -317,5 +446,64 @@ const styles = StyleSheet.create({
 		color: "#9D00FF",
 		marginRight: 4,
 		fontFamily: "Inter-Medium",
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "#121212",
+	},
+	loadingText: {
+		color: "#9D00FF",
+		fontSize: 16,
+		marginTop: 16,
+		fontFamily: "Inter-Medium",
+	},
+	paginationContainer: {
+		marginTop: 20,
+		marginBottom: 20,
+		alignItems: "center",
+	},
+	loadMoreButton: {
+		borderRadius: 25,
+		overflow: "hidden",
+		elevation: 3,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+	},
+	loadMoreGradient: {
+		paddingHorizontal: 30,
+		paddingVertical: 12,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	loadMoreText: {
+		color: "#ffffff",
+		fontSize: 16,
+		fontFamily: "Inter-Bold",
+		fontWeight: "bold",
+	},
+	loadingMoreContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 10,
+	},
+	loadingMoreText: {
+		color: "#9D00FF",
+		fontSize: 14,
+		fontFamily: "Inter-Medium",
+		marginLeft: 10,
+	},
+	endContainer: {
+		paddingVertical: 20,
+		alignItems: "center",
+	},
+	endText: {
+		color: "#666666",
+		fontSize: 14,
+		fontFamily: "Inter-Regular",
+		fontStyle: "italic",
 	},
 });
