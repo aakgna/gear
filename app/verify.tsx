@@ -20,8 +20,20 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft } from "lucide-react-native";
-import auth from "@react-native-firebase/auth";
-import firestore from "@react-native-firebase/firestore";
+// Updated Firebase imports to use new modular SDK
+import {
+	getAuth,
+	PhoneAuthProvider,
+	signInWithCredential,
+	signInWithPhoneNumber,
+} from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	doc,
+	getDoc,
+	setDoc,
+} from "@react-native-firebase/firestore";
 import { logLogin, logSignUp } from "@/analytics/analyticsEvents";
 
 export default function VerifyScreen() {
@@ -61,25 +73,26 @@ export default function VerifyScreen() {
 
 		setIsVerifying(true);
 		try {
+			const auth = getAuth();
+			const firestore = getFirestore();
+
 			// Create a credential with the verification ID and code
-			const credential = auth.PhoneAuthProvider.credential(
+			const credential = PhoneAuthProvider.credential(
 				verificationId as string,
 				code
 			);
 
 			// Sign in with the credential
-			const userCredential = await auth().signInWithCredential(credential);
+			const userCredential = await signInWithCredential(auth, credential);
 
-			const userDoc = await firestore()
-				.collection("users")
-				.doc(userCredential.user.uid)
-				.get();
+			const userDocRef = doc(firestore, "users", userCredential.user.uid);
+			const userDoc = await getDoc(userDocRef);
 
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 			const todayDate = today.toISOString().substring(0, 10);
 			if (!userDoc.exists()) {
-				await firestore().collection("users").doc(userCredential.user.uid).set({
+				await setDoc(userDocRef, {
 					phoneNumber: phoneNumber,
 					strikes: 6,
 					strikeCount: 0,
@@ -129,7 +142,9 @@ export default function VerifyScreen() {
 		if (countdown === 0) {
 			try {
 				setIsVerifying(true);
-				const confirmation = await auth().signInWithPhoneNumber(
+				const auth = getAuth();
+				const confirmation = await signInWithPhoneNumber(
+					auth,
 					phoneNumber as string
 				);
 				// Update the verificationId in the URL or state

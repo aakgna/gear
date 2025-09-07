@@ -1,6 +1,10 @@
 // src/analytics/analyticsEvents.ts
 
-import analytics from "@react-native-firebase/analytics";
+import {
+	getAnalytics,
+	logEvent,
+	setUserId,
+} from "@react-native-firebase/analytics";
 
 const DEBUG_ANALYTICS = __DEV__;
 
@@ -11,7 +15,8 @@ const DEBUG_ANALYTICS = __DEV__;
  */
 export async function logDailyOpen(): Promise<void> {
 	try {
-		await analytics().logEvent("daily_open", {
+		const analytics = getAnalytics();
+		await logEvent(analytics, "daily_open", {
 			screen: "Home",
 		});
 	} catch (error) {
@@ -29,11 +34,17 @@ export async function logScreenView(
 	uID: any
 ): Promise<void> {
 	try {
-		await analytics().logScreenView({
+		const analytics = getAnalytics();
+		// Use logEvent instead of deprecated logScreenView
+		await logEvent(analytics, "screen_view", {
 			screen_name: screenName,
 			screen_class: screenName,
 			uID: uID,
 		});
+		// Set user ID for this session
+		if (uID) {
+			await setUserId(analytics, uID);
+		}
 	} catch (error) {
 		console.error("Analytics error in logScreenView:", error);
 	}
@@ -41,7 +52,8 @@ export async function logScreenView(
 
 export async function logdeleted(createdAt: any, today: any): Promise<void> {
 	try {
-		await analytics().logEvent("deleted", {
+		const analytics = getAnalytics();
+		await logEvent(analytics, "deleted", {
 			createdAt: createdAt,
 			deletedOn: today,
 		});
@@ -58,10 +70,10 @@ export async function logdeleted(createdAt: any, today: any): Promise<void> {
  */
 export async function logVoted(questionId: string): Promise<void> {
 	try {
-		await analytics().logEvent("voted", {
+		const analytics = getAnalytics();
+		await logEvent(analytics, "voted", {
 			question_id: questionId,
 		});
-		await analytics().log;
 	} catch (error) {
 		console.error("Analytics error in logVoted:", error);
 	}
@@ -79,7 +91,8 @@ export async function logCommentPosted(
 	uID: string
 ): Promise<void> {
 	try {
-		await analytics().logEvent("comment_posted", {
+		const analytics = getAnalytics();
+		await logEvent(analytics, "comment_posted", {
 			question_id: questionId,
 			thread_type: threadType,
 			uID: uID,
@@ -94,7 +107,8 @@ export async function logCommentPosted(
  */
 export async function logSignUp(method: string): Promise<void> {
 	try {
-		await analytics().logSignUp({ method });
+		const analytics = getAnalytics();
+		await logEvent(analytics, "sign_up", { method });
 	} catch (error) {
 		console.error("Analytics error in logSignUp:", error);
 	}
@@ -102,7 +116,8 @@ export async function logSignUp(method: string): Promise<void> {
 
 export async function logLogin(method: string): Promise<void> {
 	try {
-		await analytics().logLogin({ method });
+		const analytics = getAnalytics();
+		await logEvent(analytics, "login", { method });
 	} catch (error) {
 		console.error("Analytics error in logLogin:", error);
 	}
@@ -114,7 +129,8 @@ export async function logDropOff(
 	reason: "no_vote" | "no_comment" | "no_vote_no_comment"
 ): Promise<void> {
 	try {
-		await analytics().logEvent("drop_off", {
+		const analytics = getAnalytics();
+		await logEvent(analytics, "drop_off", {
 			screen,
 			reason,
 		});

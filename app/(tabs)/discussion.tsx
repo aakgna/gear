@@ -17,8 +17,25 @@ import {
 	ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams, router } from "expo-router";
-import firestore from "@react-native-firebase/firestore";
-import auth from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	doc,
+	getDoc,
+	updateDoc,
+	collection,
+	addDoc,
+	onSnapshot,
+	query,
+	orderBy,
+	where,
+	increment,
+	serverTimestamp,
+	arrayUnion,
+	arrayRemove,
+	getDocs,
+	limit,
+} from "@react-native-firebase/firestore";
+import { getAuth } from "@react-native-firebase/auth";
 import Animated, {
 	FadeIn,
 	SlideInDown,
@@ -41,7 +58,8 @@ import type { Dispatch, SetStateAction } from "react";
 export default function DiscussionScreen() {
 	// log screen view
 	useEffect(() => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const uid = auth.currentUser?.uid;
 		(async () => {
 			try {
 				await logScreenView("Discussion", uid);
@@ -96,26 +114,27 @@ export default function DiscussionScreen() {
 	// Subscribe to user document for notifications
 	useEffect(() => {
 		let unsubscribeUser: () => void;
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 
 		if (uid) {
-			unsubscribeUser = firestore()
-				.collection("users")
-				.doc(uid)
-				.onSnapshot((docSnap) => {
-					if (docSnap.exists) {
-						const userData = docSnap.data();
-						const userNotifications = userData?.notifications || [];
-						const userNotificationsSeen = userData?.notifications_seen || 0;
+			const userDocRef = doc(firestore, "users", uid);
+			unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
+				if (docSnap.exists) {
+					const userData = docSnap.data();
+					const userNotifications = userData?.notifications || [];
+					const userNotificationsSeen = userData?.notifications_seen || 0;
 
-						setNotifications(userNotifications);
-						setNotificationsSeen(userNotificationsSeen);
+					setNotifications(userNotifications);
+					setNotificationsSeen(userNotificationsSeen);
 
-						// Calculate unread count
-						const unread = userNotifications.length - userNotificationsSeen;
-						setUnreadCount(Math.max(0, unread));
-					}
-				});
+					// Calculate unread count
+					const unread = userNotifications.length - userNotificationsSeen;
+					setUnreadCount(Math.max(0, unread));
+				}
+			});
 		}
 
 		return () => {
@@ -127,12 +146,16 @@ export default function DiscussionScreen() {
 
 	// Handle notification button press
 	const handleNotificationPress = async () => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 		if (!uid) return;
 
 		try {
 			// Update notifications_seen to the current length of notifications
-			await firestore().collection("users").doc(uid).update({
+			const userDocRef = doc(firestore, "users", uid);
+			await updateDoc(userDocRef, {
 				notifications_seen: notifications.length,
 			});
 
@@ -153,15 +176,21 @@ export default function DiscussionScreen() {
 		const fetchCurrentQuestion = async () => {
 			if (!question || !questionId) {
 				try {
+					const firestore = getFirestore();
 					const today = new Date();
 					today.setHours(0, 0, 0, 0); // Start of today
-					const questionDoc = await firestore()
-						.collection("dailyQuestions")
-						.where("date", ">=", today)
-						.where("date", "<", new Date(today.getTime() + 24 * 60 * 60 * 1000)) // End of today
-						.orderBy("date", "asc")
-						.limit(1)
-						.get();
+					const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000); // End of today
+
+					const questionsRef = collection(firestore, "dailyQuestions");
+					const q = query(
+						questionsRef,
+						where("date", ">=", today),
+						where("date", "<", endOfToday),
+						orderBy("date", "asc"),
+						limit(1)
+					);
+
+					const questionDoc = await getDocs(q);
 
 					if (!questionDoc.empty) {
 						const qData = questionDoc.docs[0].data();
@@ -202,7 +231,8 @@ export default function DiscussionScreen() {
 	// 1. Ensure user is still allowed here
 	useEffect(() => {
 		(async () => {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const uid = auth.currentUser?.uid;
 			if (!uid) {
 				router.replace("/");
 				return;
@@ -214,20 +244,21 @@ export default function DiscussionScreen() {
 	// New: Subscribe to current user's blocked list for real-time updates
 	useEffect(() => {
 		let unsubscribeBlocked: () => void;
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 
 		if (uid) {
-			unsubscribeBlocked = firestore()
-				.collection("users")
-				.doc(uid)
-				.onSnapshot((docSnap) => {
-					if (docSnap.exists) {
-						const userData = docSnap.data();
-						setBlockedUsers(userData?.blocked || []);
-					} else {
-						setBlockedUsers([]); // User document somehow not found
-					}
-				});
+			const userDocRef = doc(firestore, "users", uid);
+			unsubscribeBlocked = onSnapshot(userDocRef, (docSnap) => {
+				if (docSnap.exists) {
+					const userData = docSnap.data();
+					setBlockedUsers(userData?.blocked || []);
+				} else {
+					setBlockedUsers([]); // User document somehow not found
+				}
+			});
 		}
 
 		return () => {
@@ -244,36 +275,41 @@ export default function DiscussionScreen() {
 			// Only proceed if currentQuestionId is available
 			if (!currentQuestionId) return;
 
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (!uid) return router.replace("/");
 
 			// No longer need to fetch blocked here, it's handled by the new useEffect
 			// const userDoc = await firestore().collection("users").doc(uid).get();
 			// const blocked = userDoc.data()?.blocked || [];
 
-			unsubscribe = firestore()
-				.collection("discussion")
-				.doc(currentQuestionId) // Use currentQuestionId here
-				.collection("answers")
-				.orderBy("time", "asc")
-				.onSnapshot((snap) => {
-					if (!snap) return;
-					const fetched = snap.docs
-						.map((d) => ({
-							id: d.id,
-							...d.data(),
-							isToxic: d.data().isToxic,
-							user: d.data().userID,
-							text: d.data().message,
-							replyCount: d.data().replyCount || 0, // <-- Add this line
-						}))
-						.filter(
-							// 👇 Use the blockedUsers state here
-							(m) =>
-								m.isToxic !== true && !blockedUsers.includes(m.user as string)
-						);
-					setMessages(fetched);
-				});
+			const answersRef = collection(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"answers"
+			);
+			const q = query(answersRef, orderBy("time", "asc"));
+
+			unsubscribe = onSnapshot(q, (snap) => {
+				if (!snap) return;
+				const fetched = snap.docs
+					.map((d) => ({
+						id: d.id,
+						...d.data(),
+						isToxic: d.data().isToxic,
+						user: d.data().userID,
+						text: d.data().message,
+						replyCount: d.data().replyCount || 0, // <-- Add this line
+					}))
+					.filter(
+						// 👇 Use the blockedUsers state here
+						(m) =>
+							m.isToxic !== true && !blockedUsers.includes(m.user as string)
+					);
+				setMessages(fetched);
+			});
 		})();
 		// 👇 Add blockedUsers to the dependency array
 		return () => unsubscribe && unsubscribe();
@@ -337,10 +373,15 @@ export default function DiscussionScreen() {
 
 	// Check if user voted today & still allowed
 	const checkUserVote = async () => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 		if (!uid) return;
+
 		try {
-			const userDoc = await firestore().collection("users").doc(uid).get();
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const data = userDoc.data()!;
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
@@ -350,7 +391,7 @@ export default function DiscussionScreen() {
 				const todayStr = today.toISOString().substring(0, 10);
 				const hasVotedToday = last === todayStr;
 				if (!hasVotedToday || !data.voted) {
-					await userDoc.ref.update({ voted: false, messageCount: 100 });
+					await updateDoc(userDocRef, { voted: false, messageCount: 100 });
 					router.replace("/start");
 				}
 			} else {
@@ -363,19 +404,24 @@ export default function DiscussionScreen() {
 
 	const fetchDailyQuestion = async () => {
 		try {
+			const firestore = getFirestore();
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
-			const snap = await firestore()
-				.collection("dailyQuestions")
-				.where("date", ">=", today)
-				.where("date", "<", new Date(today.setUTCHours(24)))
-				.orderBy("date", "asc")
-				.limit(1)
-				.get();
 
-			if (!snap.empty) {
-				const questionId = snap.docs[0].id;
-				const data = snap.docs[0].data();
+			const questionsRef = collection(firestore, "dailyQuestions");
+			const q = query(
+				questionsRef,
+				where("date", ">=", today),
+				where("date", "<", new Date(today.setUTCHours(24))),
+				orderBy("date", "asc"),
+				limit(1)
+			);
+
+			const questionSnap = await getDocs(q);
+
+			if (!questionSnap.empty) {
+				const questionId = questionSnap.docs[0].id;
+				const data = questionSnap.docs[0].data();
 				setCurrentQuestion(data.question);
 				setCurrentQuestionId(questionId);
 			}
@@ -392,13 +438,18 @@ export default function DiscussionScreen() {
 		setIsSending(true);
 
 		try {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (!uid) {
 				Alert.alert("User not logged in");
 				return router.replace("/");
 			}
-			const userDoc = await firestore().collection("users").doc(uid).get();
+
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const userData = userDoc.data()!;
+
 			if (userData.strikes <= 0) {
 				Alert.alert(
 					"Access Denied",
@@ -448,31 +499,31 @@ export default function DiscussionScreen() {
 			}
 
 			// All good → write to Firestore
-			await firestore()
-				.collection("discussion")
-				.doc(currentQuestionId) // Use currentQuestionId here
-				.collection("answers")
-				.add({
-					message: newMessage,
-					time: firestore.FieldValue.serverTimestamp(),
-					isToxic: false,
-					userID: uid,
-					likeCount: 0,
-					replyCount: 0, // Initialize replyCount
-				});
+			const answersRef = collection(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"answers"
+			);
+			await addDoc(answersRef, {
+				message: newMessage,
+				time: serverTimestamp(),
+				isToxic: false,
+				userID: uid,
+				likeCount: 0,
+				replyCount: 0, // Initialize replyCount
+			});
+
 			setNewMessage("");
 			try {
-				const uid = auth().currentUser?.uid;
+				const uid = auth.currentUser?.uid;
 				await logCommentPosted(currentQuestionId, "top_level", uid);
 			} catch (error) {
 				console.error("Analytics error:", error);
 			}
 
 			// decrement user messages
-			await firestore()
-				.collection("users")
-				.doc(uid)
-				.update({ messageCount: firestore.FieldValue.increment(-1) });
+			await updateDoc(userDocRef, { messageCount: increment(-1) });
 
 			if (uid) {
 				if (userData && userData.voted && userData.messageCount == 98) {
@@ -491,26 +542,23 @@ export default function DiscussionScreen() {
 
 						if (daysDiff == 1) {
 							console.log("Add one");
-							await firestore()
-								.collection("users")
-								.doc(uid)
-								.update({
-									streakCount: firestore.FieldValue.increment(1),
-									lastStreakDate: firestore.FieldValue.serverTimestamp(),
-								});
+							await updateDoc(userDocRef, {
+								streakCount: increment(1),
+								lastStreakDate: serverTimestamp(),
+							});
 						} else if (daysDiff > 1) {
 							console.log("Reset Streak");
-							await firestore().collection("users").doc(uid).update({
+							await updateDoc(userDocRef, {
 								streakCount: 1,
-								lastStreakDate: firestore.FieldValue.serverTimestamp(),
+								lastStreakDate: serverTimestamp(),
 							});
 						}
 					} else {
 						console.log("Nigga 4");
 						// If lastStreakDate is not set, initialize it
-						await firestore().collection("users").doc(uid).update({
+						await updateDoc(userDocRef, {
 							streakCount: 1,
-							lastStreakDate: firestore.FieldValue.serverTimestamp(),
+							lastStreakDate: serverTimestamp(),
 						});
 					}
 				}
@@ -545,21 +593,25 @@ export default function DiscussionScreen() {
 	// Initialize likeCounts with placeholder logic
 	useEffect(() => {
 		const fetchLikeStates = async () => {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (!uid) return;
 
 			const liked: Record<string, boolean> = {};
 			const counts: Record<string, number> = {};
 
 			for (const msg of messages) {
-				const docRef = firestore()
-					.collection("discussion")
-					.doc(currentQuestionId)
-					.collection("answers")
-					.doc(msg.id);
-				const doc = await docRef.get();
-				if (doc.exists) {
-					const data = doc.data();
+				const docRef = doc(
+					firestore,
+					"discussion",
+					currentQuestionId,
+					"answers",
+					msg.id
+				);
+				const docSnap = await getDoc(docRef);
+				if (docSnap.exists) {
+					const data = docSnap.data();
 					const likeCount = data?.likeCount || 0;
 					const likedBy: string[] = data?.likedBy || [];
 					counts[msg.id] = likeCount;
@@ -578,23 +630,28 @@ export default function DiscussionScreen() {
 	// Like handler: increment likeCount in Firestore and update local state
 	const handleLike = async (msgId: string) => {
 		try {
-			const userId = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const userId = auth.currentUser?.uid;
 			if (!userId) return;
-			const docRef = firestore()
-				.collection("discussion")
-				.doc(currentQuestionId)
-				.collection("answers")
-				.doc(msgId);
 
-			const doc = await docRef.get();
-			const data = doc.data();
+			const docRef = doc(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"answers",
+				msgId
+			);
+			const docSnap = await getDoc(docRef);
+			const data = docSnap.data();
 			const likedBy: string[] = data?.likedBy || [];
 			const hasLiked = likedBy.includes(userId);
+
 			if (hasLiked) {
 				// Unlike: remove userId and decrement likeCount
-				await docRef.update({
-					likedBy: firestore.FieldValue.arrayRemove(userId),
-					likeCount: firestore.FieldValue.increment(-1),
+				await updateDoc(docRef, {
+					likedBy: arrayRemove(userId),
+					likeCount: increment(-1),
 				});
 				let val = await fetch(
 					"https://us-central1-thecommonground-6259d.cloudfunctions.net/discussion_unlike",
@@ -617,9 +674,9 @@ export default function DiscussionScreen() {
 				}));
 			} else {
 				// Like: add userId and increment likeCount
-				await docRef.update({
-					likedBy: firestore.FieldValue.arrayUnion(userId),
-					likeCount: firestore.FieldValue.increment(1),
+				await updateDoc(docRef, {
+					likedBy: arrayUnion(userId),
+					likeCount: increment(1),
 				});
 
 				fetch(
@@ -903,49 +960,55 @@ function ThreadModal({
 		(async () => {
 			if (!visible || !currentQuestionId || !parentMessage.id) return;
 
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (!uid) return router.push("/");
 
-			const userDoc = await firestore().collection("users").doc(uid).get();
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const blocked = userDoc.data()?.blocked || [];
 
-			unsubscribe = firestore()
-				.collection("discussion")
-				.doc(currentQuestionId)
-				.collection("comments")
-				.doc(parentMessage.id)
-				.collection("comment")
-				.orderBy("time", "asc")
-				.onSnapshot((snap) => {
-					if (!snap) return;
-					const fetched = snap.docs
-						.map((d) => ({
-							id: d.id,
-							...d.data(),
-							isToxic: d.data().isToxic,
-							user: d.data().userID,
-							text: d.data().message,
-							time: d.data().time,
-							likedBy: d.data().likedBy || [],
-							likeCount: d.data().likeCount || 0,
-							replyCount: d.data().replyCount || 0, // <-- Add this line
-						}))
-						.filter(
-							(m) => m.isToxic !== true && !blocked.includes(m.user as string)
-						);
+			const repliesRef = collection(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"comments",
+				parentMessage.id,
+				"comment"
+			);
+			const q = query(repliesRef, orderBy("time", "asc"));
 
-					setReplies(fetched);
+			unsubscribe = onSnapshot(q, (snap) => {
+				if (!snap) return;
+				const fetched = snap.docs
+					.map((d) => ({
+						id: d.id,
+						...d.data(),
+						isToxic: d.data().isToxic,
+						user: d.data().userID,
+						text: d.data().message,
+						time: d.data().time,
+						likedBy: d.data().likedBy || [],
+						likeCount: d.data().likeCount || 0,
+						replyCount: d.data().replyCount || 0, // <-- Add this line
+					}))
+					.filter(
+						(m) => m.isToxic !== true && !blocked.includes(m.user as string)
+					);
 
-					// Set likedReplies state
-					const liked: Record<string, boolean> = {};
-					const likeCounts: Record<string, number> = {};
-					fetched.forEach((reply) => {
-						liked[reply.id] = reply.likedBy.includes(uid);
-						likeCounts[reply.id] = reply.likeCount;
-					});
-					setLikedReplies(liked);
-					setReplyLikeCounts(likeCounts);
+				setReplies(fetched);
+
+				// Set likedReplies state
+				const liked: Record<string, boolean> = {};
+				const likeCounts: Record<string, number> = {};
+				fetched.forEach((reply) => {
+					liked[reply.id] = reply.likedBy.includes(uid);
+					likeCounts[reply.id] = reply.likeCount;
 				});
+				setLikedReplies(liked);
+				setReplyLikeCounts(likeCounts);
+			});
 		})();
 		return () => unsubscribe && unsubscribe();
 	}, [visible, currentQuestionId, parentMessage.id]); // Depend on currentQuestionId
@@ -955,13 +1018,17 @@ function ThreadModal({
 		setIsSendingReply(true);
 
 		try {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (!uid) {
 				Alert.alert("User not logged in");
 				onClose();
 				return;
 			}
-			const userDoc = await firestore().collection("users").doc(uid).get();
+
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const userData = userDoc.data()!;
 
 			// Check user message limits and strikes (adapt as needed for replies)
@@ -1012,42 +1079,44 @@ function ThreadModal({
 			}
 
 			// All good → write to Firestore
-			await firestore()
-				.collection("discussion")
-				.doc(currentQuestionId)
-				.collection("comments")
-				.doc(parentMessage.id)
-				.collection("comment")
-				.add({
-					message: replyText,
-					time: firestore.FieldValue.serverTimestamp(),
-					isToxic: false,
-					userID: uid,
-					likeCount: 0,
-					replyCount: 0, // Initialize replyCount for new replies
-				});
+			const repliesRef = collection(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"comments",
+				parentMessage.id,
+				"comment"
+			);
+			await addDoc(repliesRef, {
+				message: replyText,
+				time: serverTimestamp(),
+				isToxic: false,
+				userID: uid,
+				likeCount: 0,
+				replyCount: 0, // Initialize replyCount for new replies
+			});
+
 			try {
-				const uid = auth().currentUser?.uid;
+				const uid = auth.currentUser?.uid;
 				await logCommentPosted(currentQuestionId, "reply", uid);
 			} catch (error) {
 				console.error("Analytics error:", error);
 			}
 
 			// Increment replyCount for the parent message in the answers collection
-			await firestore()
-				.collection("discussion")
-				.doc(currentQuestionId)
-				.collection("answers")
-				.doc(parentMessage.id)
-				.update({
-					replyCount: firestore.FieldValue.increment(1),
-				});
+			const parentDocRef = doc(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"answers",
+				parentMessage.id
+			);
+			await updateDoc(parentDocRef, {
+				replyCount: increment(1),
+			});
 
 			// Decrement user messages (if applicable for replies)
-			await firestore()
-				.collection("users")
-				.doc(uid)
-				.update({ messageCount: firestore.FieldValue.increment(-1) });
+			await updateDoc(userDocRef, { messageCount: increment(-1) });
 
 			fetch(
 				"https://us-central1-thecommonground-6259d.cloudfunctions.net/discussion_reply",
@@ -1072,26 +1141,29 @@ function ThreadModal({
 
 	const handleLike = async (replyId: string) => {
 		try {
-			const userId = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+			const userId = auth.currentUser?.uid;
 			if (!userId) return;
 
-			const docRef = firestore()
-				.collection("discussion")
-				.doc(currentQuestionId)
-				.collection("comments")
-				.doc(parentMessage.id)
-				.collection("comment")
-				.doc(replyId);
-
-			const doc = await docRef.get();
-			const data = doc.data();
+			const replyDocRef = doc(
+				firestore,
+				"discussion",
+				currentQuestionId,
+				"comments",
+				parentMessage.id,
+				"comment",
+				replyId
+			);
+			const docSnap = await getDoc(replyDocRef);
+			const data = docSnap.data();
 			const likedBy: string[] = data?.likedBy || [];
 			const hasLiked = likedBy.includes(userId);
 
 			if (hasLiked) {
-				await docRef.update({
-					likedBy: firestore.FieldValue.arrayRemove(userId),
-					likeCount: firestore.FieldValue.increment(-1),
+				await updateDoc(replyDocRef, {
+					likedBy: arrayRemove(userId),
+					likeCount: increment(-1),
 				});
 				fetch(
 					"https://us-central1-thecommonground-6259d.cloudfunctions.net/reply_unlike",
@@ -1106,9 +1178,9 @@ function ThreadModal({
 					}
 				);
 			} else {
-				await docRef.update({
-					likedBy: firestore.FieldValue.arrayUnion(userId),
-					likeCount: firestore.FieldValue.increment(1),
+				await updateDoc(replyDocRef, {
+					likedBy: arrayUnion(userId),
+					likeCount: increment(1),
 				});
 
 				fetch(
@@ -1126,7 +1198,7 @@ function ThreadModal({
 			}
 
 			// Fetch the latest value after update
-			const updatedDoc = await docRef.get();
+			const updatedDoc = await getDoc(replyDocRef);
 			const updatedData = updatedDoc.data();
 			const updatedLikedBy: string[] = updatedData?.likedBy || [];
 			const updatedLikeCount: number = updatedData?.likeCount || 0;

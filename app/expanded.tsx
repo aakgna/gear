@@ -11,13 +11,20 @@ import {
 	MessageCircle,
 	ArrowRight,
 } from "lucide-react-native";
-import firestore from "@react-native-firebase/firestore"; // or your Firestore import
-import auth from "@react-native-firebase/auth";
+// Updated Firebase imports to use new modular SDK
+import { getAuth } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	doc,
+	getDoc,
+} from "@react-native-firebase/firestore";
 
 export default function ExpandedQuestionScreen() {
 	// log screen view
 	useEffect(() => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const uid = auth.currentUser?.uid;
 		(async () => {
 			try {
 				await logScreenView("Expanded", uid);
@@ -35,13 +42,12 @@ export default function ExpandedQuestionScreen() {
 	useEffect(() => {
 		const fetchQuestion = async () => {
 			try {
-				const doc = await firestore()
-					.collection("dailyQuestions")
-					.doc(questionId)
-					.get();
+				const firestore = getFirestore();
+				const docRef = doc(firestore, "dailyQuestions", questionId);
+				const docSnap = await getDoc(docRef);
 
-				if (doc.exists) {
-					const data = doc.data();
+				if (docSnap.exists()) {
+					const data = docSnap.data();
 					const topCount = data.topCount || 0;
 					const bottomCount = data.bottomCount || 0;
 					const totalResponses = topCount + bottomCount;
@@ -51,7 +57,7 @@ export default function ExpandedQuestionScreen() {
 					const disagreePercentage = 100 - agreePercentage;
 
 					setQuestion({
-						id: doc.id,
+						id: docSnap.id,
 						text: data.question,
 						date: data.date?.toDate().toLocaleDateString() || "",
 						agreePercentage,

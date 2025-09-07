@@ -15,8 +15,17 @@ import {
 	TouchableWithoutFeedback,
 } from "react-native";
 import { router, Link } from "expo-router";
-import auth from "@react-native-firebase/auth";
-import firestore from "@react-native-firebase/firestore";
+// Updated Firebase imports to use new modular SDK
+import {
+	getAuth,
+	onAuthStateChanged,
+	signInWithPhoneNumber,
+} from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	getDocs,
+} from "@react-native-firebase/firestore";
 import Animated, { FadeIn, SlideInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -30,7 +39,8 @@ export default function SignInScreen() {
 	// If user is already signed in (and has a phoneNumber), jump to /start immediately
 	useEffect(() => {
 		checkForUpdate();
-		const subscriber = auth().onAuthStateChanged((user) => {
+		const auth = getAuth();
+		const subscriber = onAuthStateChanged(auth, (user) => {
 			if (user && user.phoneNumber) {
 				router.replace("/(tabs)/start");
 			}
@@ -55,8 +65,10 @@ export default function SignInScreen() {
 
 	const checkForUpdate = async () => {
 		try {
-			const version = await firestore().collection("version").get();
-			const versionDoc = version.docs[0];
+			const firestore = getFirestore();
+			const versionQuery = collection(firestore, "version");
+			const versionSnapshot = await getDocs(versionQuery);
+			const versionDoc = versionSnapshot.docs[0];
 			const latestVersion = versionDoc.data().number;
 			const currentVersion = DeviceInfo.getVersion();
 
@@ -90,9 +102,9 @@ export default function SignInScreen() {
 		setIsValid(digitsOnly.length >= 10);
 	};
 
-	// When they tap “Continue”, do exactly what you had before:
-	//  • format into E.164 (“+1XXXXXXXXXX”)
-	//  • auth().signInWithPhoneNumber(...)
+	// When they tap "Continue", do exactly what you had before:
+	//  • format into E.164 ("+1XXXXXXXXXX")
+	//  • signInWithPhoneNumber(...)
 	//  • navigate to /verify with { verificationId, phoneNumber }
 	const handleContinue = async () => {
 		if (!isValid) {
@@ -103,8 +115,8 @@ export default function SignInScreen() {
 		try {
 			// Build the E.164–compliant string:
 			//   If they typed exactly 10 digits, prefix +1.
-			//   If they typed 11 digits starting with “1”, prefix “+”.
-			//   If they typed “+” + 10 digits, use as is.
+			//   If they typed 11 digits starting with "1", prefix "+".
+			//   If they typed "+" + 10 digits, use as is.
 			const digits = phoneNumber.replace(/\D/g, "");
 			let formattedNumber = "";
 
@@ -115,14 +127,15 @@ export default function SignInScreen() {
 			} else if (phoneNumber.startsWith("+") && digits.length >= 10) {
 				formattedNumber = phoneNumber;
 			} else {
-				// Fallback: if they already included a “+” or entered anything weird,
+				// Fallback: if they already included a "+" or entered anything weird,
 				// just make sure there's a leading "+" so Firebase doesn't blow up.
 				formattedNumber = phoneNumber.startsWith("+")
 					? phoneNumber
 					: "+" + phoneNumber.replace(/\D/g, "");
 			}
 
-			const confirmation = await auth().signInWithPhoneNumber(formattedNumber);
+			const auth = getAuth();
+			const confirmation = await signInWithPhoneNumber(auth, formattedNumber);
 
 			// Now navigate to /verify and pass both the phoneNumber and verificationId
 			router.push({
@@ -168,7 +181,8 @@ export default function SignInScreen() {
 					: "+" + digits;
 			}
 
-			const confirmation = await auth().signInWithPhoneNumber(formattedNumber);
+			const auth = getAuth();
+			const confirmation = await signInWithPhoneNumber(auth, formattedNumber);
 			router.push({
 				pathname: "/deletion",
 				params: {

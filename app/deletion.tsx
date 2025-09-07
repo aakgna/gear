@@ -10,8 +10,20 @@ import {
 	TouchableWithoutFeedback,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import auth from "@react-native-firebase/auth";
-import firestore from "@react-native-firebase/firestore";
+// Updated Firebase imports to use new modular SDK
+import {
+	getAuth,
+	PhoneAuthProvider,
+	signInWithCredential,
+	deleteUser,
+} from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	doc,
+	getDoc,
+	deleteDoc,
+} from "@react-native-firebase/firestore";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft } from "lucide-react-native";
@@ -34,41 +46,31 @@ export default function DeleteAccountScreen() {
 		try {
 			setIsLoading(true);
 
-			// 2) Create credential with old PhoneAuthProvider logic
-			const credential = auth.PhoneAuthProvider.credential(
+			// Get Firebase instances
+			const auth = getAuth();
+			const firestore = getFirestore();
+
+			// 2) Create credential with new PhoneAuthProvider logic
+			const credential = PhoneAuthProvider.credential(
 				verificationId as string,
 				code
 			);
 
 			// 3) Re-sign in:
-			const userCredential = await auth().signInWithCredential(credential);
+			const userCredential = await signInWithCredential(auth, credential);
 
 			// 4) Look up Firestore document
-			const userDoc = await firestore()
-				.collection("users")
-				.doc(userCredential.user.uid)
-				.get();
+			const userDocRef = doc(firestore, "users", userCredential.user.uid);
+			const userDoc = await getDoc(userDocRef);
 
-			if (!userDoc.exists) {
+			if (!userDoc.exists()) {
 				Alert.alert("Error", "No user is currently signed in.");
 				router.back();
 				return;
 			}
 
-			const createdAt = await firestore()
-				.collection("users")
-				.doc(userCredential.user.uid)
-				.get()
-				.then((doc) => {
-					if (doc.exists) {
-						return doc.data().createdAt;
-					} else {
-						console.log("No such document!");
-					}
-				})
-				.catch((error) => {
-					console.log("Error getting document:", error);
-				});
+			// 5) Get createdAt from the document
+			const createdAt = userDoc.data()?.createdAt;
 
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
@@ -76,14 +78,11 @@ export default function DeleteAccountScreen() {
 
 			await logdeleted(createdAt, todayDate);
 
-			// 5) Delete Firestore doc, then delete the user
-			await firestore()
-				.collection("users")
-				.doc(userCredential.user.uid)
-				.delete();
-			await userCredential.user.delete();
+			// 6) Delete Firestore doc, then delete the user
+			await deleteDoc(userDocRef);
+			await deleteUser(userCredential.user);
 
-			// 6) Success alert and navigate to "/"
+			// 7) Success alert and navigate to "/"
 			Alert.alert("Success", "Your account has been deleted successfully.");
 			router.replace("/"); // or router.navigate("/"), matching old code
 			return;

@@ -12,8 +12,16 @@ import {
 	ArrowRight,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import firestore from "@react-native-firebase/firestore";
-import auth from "@react-native-firebase/auth";
+// Update Firebase imports to use new modular SDK
+import { getAuth } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	query,
+	where,
+	orderBy,
+	getDocs,
+} from "@react-native-firebase/firestore";
 
 export default function HistoryScreen() {
 	const [historicQuestions, setHistoricQuestions] = useState([]);
@@ -21,7 +29,9 @@ export default function HistoryScreen() {
 	useEffect(() => {
 		(async () => {
 			try {
-				const uid = auth().currentUser?.uid;
+				// Use new modular SDK API
+				const auth = getAuth();
+				const uid = auth.currentUser?.uid;
 				await logScreenView("History", uid);
 			} catch (error) {
 				console.error("Analytics error:", error);
@@ -34,11 +44,16 @@ export default function HistoryScreen() {
 			today.setHours(0, 0, 0, 0);
 
 			try {
-				const snapshot = await firestore()
-					.collection("dailyQuestions")
-					.where("date", "<", today)
-					.orderBy("date", "desc")
-					.get();
+				// Use new modular SDK API
+				const firestore = getFirestore();
+				const questionsRef = collection(firestore, "dailyQuestions");
+				const q = query(
+					questionsRef,
+					where("date", "<", today),
+					orderBy("date", "desc")
+				);
+
+				const snapshot = await getDocs(q);
 
 				const questions = snapshot.docs.map((doc) => {
 					const data = doc.data();

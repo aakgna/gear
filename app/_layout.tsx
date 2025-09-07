@@ -50,11 +50,9 @@ export default function RootLayout() {
 			<Stack screenOptions={{ headerShown: false, gestureEnabled: false }}>
 				<Stack.Screen name="index" options={{ headerShown: false }} />
 				<Stack.Screen name="verify" options={{ headerShown: false }} />
-				<Stack.Screen
-					name="start"
-					options={{ headerShown: false, gestureEnabled: false }}
-				/>
-				<Stack.Screen name="discussion" options={{ headerShown: false }} />
+				<Stack.Screen name="expanded" options={{ headerShown: false }} />
+				<Stack.Screen name="notifications" options={{ headerShown: false }} />
+				<Stack.Screen name="report" options={{ headerShown: false }} />
 				<Stack.Screen name="deletion" options={{ headerShown: false }} />
 			</Stack>
 			<StatusBar style="auto" />

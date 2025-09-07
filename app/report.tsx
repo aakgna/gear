@@ -12,8 +12,17 @@ import {
 	ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import firestore from "@react-native-firebase/firestore";
-import auth from "@react-native-firebase/auth";
+// Updated Firebase imports to use new modular SDK
+import { getAuth } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	doc,
+	updateDoc,
+	deleteDoc,
+	arrayUnion,
+	increment,
+} from "@react-native-firebase/firestore";
 import Animated, { FadeIn, SlideInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, CircleCheck as CheckCircle2 } from "lucide-react-native";
@@ -52,7 +61,8 @@ export default function ReportScreen() {
 	const [isSubmitted, setIsSubmitted] = useState(false);
 
 	useEffect(() => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const uid = auth.currentUser?.uid;
 		(async () => {
 			try {
 				await logScreenView("Report", uid);
@@ -65,17 +75,17 @@ export default function ReportScreen() {
 	const handleBack = () => router.back();
 
 	const handleBlockUser = async () => {
-		const current = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+		const current = auth.currentUser?.uid;
 		if (!current || !user) {
 			router.navigate("/");
 			return;
 		}
-		await firestore()
-			.collection("users")
-			.doc(current)
-			.update({
-				blocked: firestore.FieldValue.arrayUnion(user),
-			});
+		const userDocRef = doc(firestore, "users", current);
+		await updateDoc(userDocRef, {
+			blocked: arrayUnion(user),
+		});
 		Alert.alert("User blocked. You will no longer see their messages.");
 		router.navigate("/start");
 	};
@@ -88,6 +98,8 @@ export default function ReportScreen() {
 		setIsSubmitting(true);
 
 		try {
+			const firestore = getFirestore();
+
 			// 1) Toxicity check for most reasons
 			if (
 				selectedReason !== "IDENTITY_ATTACK (Doxxing)" &&
@@ -117,47 +129,49 @@ export default function ReportScreen() {
 							? 5
 							: 0;
 						if (dec > 0) {
-							await firestore()
-								.collection("users")
-								.doc(user)
-								.update({
-									strikes: firestore.FieldValue.increment(-dec),
-								});
+							const userDocRef = doc(firestore, "users", user);
+							await updateDoc(userDocRef, {
+								strikes: increment(-dec),
+							});
 						}
 						// mark toxic + infractions
 						if (location === "answers") {
-							await firestore()
-								.collection("discussion")
-								.doc(question)
-								.collection(location)
-								.doc(messageId)
-								.update({
-									isToxic: true,
-								});
-						} else {
-							await firestore()
-								.collection("discussion")
-								.doc(question)
-								.collection(location)
-								.doc(answerID)
-								.collection("comment")
-								.doc(messageId)
-								.update({ isToxic: true });
-							await firestore()
-								.collection("discussion")
-								.doc(question)
-								.collection("answers")
-								.doc(answerID)
-								.update({
-									replyCount: firestore.FieldValue.increment(-1),
-								});
-						}
-						await firestore()
-							.collection("users")
-							.doc(user)
-							.update({
-								strikeCount: firestore.FieldValue.increment(1),
+							const messageDocRef = doc(
+								firestore,
+								"discussion",
+								question,
+								location,
+								messageId
+							);
+							await updateDoc(messageDocRef, {
+								isToxic: true,
 							});
+						} else {
+							const replyDocRef = doc(
+								firestore,
+								"discussion",
+								question,
+								location,
+								answerID,
+								"comment",
+								messageId
+							);
+							await updateDoc(replyDocRef, { isToxic: true });
+							const answerDocRef = doc(
+								firestore,
+								"discussion",
+								question,
+								"answers",
+								answerID
+							);
+							await updateDoc(answerDocRef, {
+								replyCount: increment(-1),
+							});
+						}
+						const userDocRef = doc(firestore, "users", user);
+						await updateDoc(userDocRef, {
+							strikeCount: increment(1),
+						});
 					}
 				}
 			}
@@ -176,43 +190,44 @@ export default function ReportScreen() {
 				);
 				const is_doxxing = await res.json();
 				if (is_doxxing["is_doxxing"]) {
-					await firestore()
-						.collection("users")
-						.doc(user)
-						.update({
-							strikes: firestore.FieldValue.increment(-5),
-						});
+					const userDocRef = doc(firestore, "users", user);
+					await updateDoc(userDocRef, {
+						strikes: increment(-5),
+					});
 					if (location === "answers") {
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection(location)
-							.doc(messageId)
-							.delete();
+						const messageDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							location,
+							messageId
+						);
+						await deleteDoc(messageDocRef);
 					} else {
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection(location)
-							.doc(answerID)
-							.collection("comment")
-							.doc(messageId)
-							.delete();
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection("answers")
-							.doc(answerID)
-							.update({
-								replyCount: firestore.FieldValue.increment(-1),
-							});
-					}
-					await firestore()
-						.collection("users")
-						.doc(user)
-						.update({
-							strikeCount: firestore.FieldValue.increment(1),
+						const replyDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							location,
+							answerID,
+							"comment",
+							messageId
+						);
+						await deleteDoc(replyDocRef);
+						const answerDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							"answers",
+							answerID
+						);
+						await updateDoc(answerDocRef, {
+							replyCount: increment(-1),
 						});
+					}
+					await updateDoc(userDocRef, {
+						strikeCount: increment(1),
+					});
 				}
 			}
 
@@ -228,43 +243,44 @@ export default function ReportScreen() {
 				);
 				const is_slur = await res.json();
 				if (is_slur["is_slur"]) {
-					await firestore()
-						.collection("users")
-						.doc(user)
-						.update({
-							strikes: firestore.FieldValue.increment(-3), // or whatever penalty you want
-						});
+					const userDocRef = doc(firestore, "users", user);
+					await updateDoc(userDocRef, {
+						strikes: increment(-3), // or whatever penalty you want
+					});
 					if (location === "answers") {
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection(location)
-							.doc(messageId)
-							.delete();
+						const messageDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							location,
+							messageId
+						);
+						await deleteDoc(messageDocRef);
 					} else {
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection(location)
-							.doc(answerID)
-							.collection("comment")
-							.doc(messageId)
-							.delete();
-						await firestore()
-							.collection("discussion")
-							.doc(question)
-							.collection("answers")
-							.doc(answerID)
-							.update({
-								replyCount: firestore.FieldValue.increment(-1),
-							});
-					}
-					await firestore()
-						.collection("users")
-						.doc(user)
-						.update({
-							strikeCount: firestore.FieldValue.increment(1),
+						const replyDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							location,
+							answerID,
+							"comment",
+							messageId
+						);
+						await deleteDoc(replyDocRef);
+						const answerDocRef = doc(
+							firestore,
+							"discussion",
+							question,
+							"answers",
+							answerID
+						);
+						await updateDoc(answerDocRef, {
+							replyCount: increment(-1),
 						});
+					}
+					await updateDoc(userDocRef, {
+						strikeCount: increment(1),
+					});
 				}
 			}
 		} catch (err) {

@@ -10,8 +10,18 @@ import {
 	Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import firestore from "@react-native-firebase/firestore";
-import auth from "@react-native-firebase/auth";
+// Updated Firebase imports to use new modular SDK
+import { getAuth } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	doc,
+	getDoc,
+	where,
+	orderBy,
+	limit,
+	getDocs,
+} from "@react-native-firebase/firestore";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, MessageCircle, Heart, Reply } from "lucide-react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -36,13 +46,16 @@ export default function NotificationsScreen() {
 
 	const fetchNotifications = async () => {
 		try {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const uid = auth.currentUser?.uid;
 			if (!uid) {
 				router.replace("/");
 				return;
 			}
 
-			const userDoc = await firestore().collection("users").doc(uid).get();
+			const firestore = getFirestore();
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const userData = userDoc.data();
 			const rawNotifications = userData?.notifications || [];
 
@@ -147,27 +160,32 @@ export default function NotificationsScreen() {
 				searchDates.push(date);
 			}
 
+			const firestore = getFirestore();
 			for (const searchDate of searchDates) {
 				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
 
-				const questionSnap = await firestore()
-					.collection("dailyQuestions")
-					.where("date", ">=", searchDate)
-					.where("date", "<", endDate)
-					.orderBy("date", "asc")
-					.limit(1)
-					.get();
+				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
+				const questionQuery = getDocs(
+					orderBy(
+						limit(where(dailyQuestionsRef, "date", ">=", searchDate), 1),
+						"date",
+						"asc"
+					)
+				);
+				const questionSnap = await questionQuery;
 
 				if (!questionSnap.empty) {
 					const questionId = questionSnap.docs[0].id;
-					const answerDoc = await firestore()
-						.collection("discussion")
-						.doc(questionId)
-						.collection("answers")
-						.doc(answerId)
-						.get();
+					const answerDocRef = doc(
+						firestore,
+						"discussion",
+						questionId,
+						"answers",
+						answerId
+					);
+					const answerDoc = await getDoc(answerDocRef);
 
-					if (answerDoc.exists) {
+					if (answerDoc.exists()) {
 						const data = answerDoc.data();
 						const message = data?.message;
 						if (message && typeof message === "string") {
@@ -210,29 +228,34 @@ export default function NotificationsScreen() {
 				searchDates.push(date);
 			}
 
+			const firestore = getFirestore();
 			for (const searchDate of searchDates) {
 				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
 
-				const questionSnap = await firestore()
-					.collection("dailyQuestions")
-					.where("date", ">=", searchDate)
-					.where("date", "<", endDate)
-					.orderBy("date", "asc")
-					.limit(1)
-					.get();
+				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
+				const questionQuery = getDocs(
+					orderBy(
+						limit(where(dailyQuestionsRef, "date", ">=", searchDate), 1),
+						"date",
+						"asc"
+					)
+				);
+				const questionSnap = await questionQuery;
 
 				if (!questionSnap.empty) {
 					const questionId = questionSnap.docs[0].id;
-					const replyDoc = await firestore()
-						.collection("discussion")
-						.doc(questionId)
-						.collection("comments")
-						.doc(answerId)
-						.collection("comment")
-						.doc(replyId)
-						.get();
+					const replyDocRef = doc(
+						firestore,
+						"discussion",
+						questionId,
+						"comments",
+						answerId,
+						"comment",
+						replyId
+					);
+					const replyDoc = await getDoc(replyDocRef);
 
-					if (replyDoc.exists) {
+					if (replyDoc.exists()) {
 						const data = replyDoc.data();
 						const message = data?.message;
 						if (message && typeof message === "string") {

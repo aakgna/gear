@@ -23,8 +23,25 @@ import {
 	RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
-import auth from "@react-native-firebase/auth";
-import firestore from "@react-native-firebase/firestore";
+// Updated Firebase imports to use new modular SDK
+import { getAuth, signOut } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	doc,
+	getDoc,
+	updateDoc,
+	collection,
+	query,
+	where,
+	orderBy,
+	limit,
+	getDocs,
+	onSnapshot,
+	writeBatch,
+	increment,
+	serverTimestamp,
+	setDoc,
+} from "@react-native-firebase/firestore";
 import Animated, {
 	FadeIn,
 	useAnimatedStyle,
@@ -110,10 +127,6 @@ const HeaderBadge = ({ streakCount }: { streakCount: number }) => {
 	);
 };
 
-// Replace with your backend endpoints
-const REGISTER_TOKEN_URL = "https://your-backend.com/api/register-fcm-token";
-const REMOVE_TOKEN_URL = "https://your-backend.com/api/remove-fcm-token";
-
 const StartPage = () => {
 	const router = useRouter();
 	const navigation = useNavigation();
@@ -140,6 +153,7 @@ const StartPage = () => {
 	// animation hooks
 	const topScale = useSharedValue(1);
 	const bottomScale = useSharedValue(1);
+
 	const agreeAnimatedStyle = useAnimatedStyle(() => ({
 		transform: [{ scale: topScale.value }],
 	}));
@@ -149,7 +163,8 @@ const StartPage = () => {
 
 	// log screen view
 	useEffect(() => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const uid = auth.currentUser?.uid;
 		(async () => {
 			try {
 				await logScreenView("Start", uid);
@@ -179,7 +194,8 @@ const StartPage = () => {
 
 	// initial load
 	useEffect(() => {
-		if (!auth().currentUser) {
+		const auth = getAuth();
+		if (!auth.currentUser) {
 			router.replace("/");
 			return;
 		}
@@ -187,36 +203,39 @@ const StartPage = () => {
 		fetchDailyQuestion();
 		checkUserVote();
 
-		const uid = auth().currentUser?.uid;
+		const firestore = getFirestore();
+		const uid = auth.currentUser?.uid;
 		if (!uid) return;
-		const unsub = firestore()
-			.collection("users")
-			.doc(uid)
-			.onSnapshot((doc) => {
-				const data = doc.data();
-				if (data?.strikes !== undefined) {
-					setStrikes(data.strikes);
-					setMessageCount(data.messageCount);
+		const userDocRef = doc(firestore, "users", uid);
+		const unsub = onSnapshot(userDocRef, (docSnap) => {
+			const data = docSnap.data();
+			if (data?.strikes !== undefined) {
+				setStrikes(data.strikes);
+				setMessageCount(data.messageCount);
+			}
+			if (data?.createdAt) {
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				const todayStr = today.toISOString().substring(0, 10);
+				if (data.createdAt === todayStr && !data.fcmToken) {
+					setShowNotifPrompt(true);
 				}
-				if (data?.createdAt) {
-					const today = new Date();
-					today.setHours(0, 0, 0, 0);
-					const todayStr = today.toISOString().substring(0, 10);
-					if (data.createdAt === todayStr && !data.fcmToken) {
-						setShowNotifPrompt(true);
-					}
-				}
-			});
+			}
+		});
 		return () => unsub();
 	}, []);
 
 	// Check backend token status on mount
 	useEffect(() => {
 		const checkBackendNotificationStatus = async () => {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+
+			const uid = auth.currentUser?.uid;
 			if (!uid) return;
 			try {
-				const userDoc = await firestore().collection("users").doc(uid).get();
+				const userDocRef = doc(firestore, "users", uid);
+				const userDoc = await getDoc(userDocRef);
 				const data = userDoc.data();
 				const token = data?.fcmToken;
 
@@ -255,8 +274,10 @@ const StartPage = () => {
 
 	const checkForUpdate = async () => {
 		try {
-			const version = await firestore().collection("version").get();
-			const versionDoc = version.docs[0];
+			const firestore = getFirestore();
+			const versionRef = collection(firestore, "version");
+			const versionSnap = await getDocs(versionRef);
+			const versionDoc = versionSnap.docs[0];
 			const latestVersion = versionDoc.data().number;
 			const currentVersion = DeviceInfo.getVersion();
 
@@ -296,28 +317,37 @@ const StartPage = () => {
 	// fetch today's question
 	const fetchDailyQuestion = async () => {
 		try {
+			const firestore = getFirestore();
 			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-			const snap = await firestore()
-				.collection("dailyQuestions")
-				.where("date", ">=", today)
-				.where("date", "<", new Date(today.setUTCHours(24)))
-				.orderBy("date", "asc")
-				.limit(1)
-				.get();
+			today.setHours(0, 0, 0, 0); // Start of today
+
+			// End of today (correct way)
+			const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+			const questionsRef = collection(firestore, "dailyQuestions");
+			const q = query(
+				questionsRef,
+				where("date", ">=", today),
+				where("date", "<", endOfToday),
+				orderBy("date", "asc"),
+				limit(1)
+			);
+
+			const snap = await getDocs(q);
 
 			if (!snap.empty) {
 				const data = snap.docs[0].data();
-				setQuestion(data.question);
+				setQuestion(data.question || "No question text available");
 				settopCount(data.topCount || 0);
 				setbottomCount(data.bottomCount || 0);
-				settop(data.top);
-				setbottom(data.bottom);
+				settop(data.top || "Option A");
+				setbottom(data.bottom || "Option B");
 			} else {
+				console.log("No question found for today"); // Debug log
 				setQuestion("No question available for today");
 			}
 		} catch (e) {
-			console.error(e);
+			console.error("Error fetching daily question:", e);
 			Alert.alert("Error", "Failed to load today's question");
 		} finally {
 			setIsLoading(false);
@@ -326,11 +356,15 @@ const StartPage = () => {
 
 	// check if user has voted today
 	const checkUserVote = async () => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 		if (!uid) return;
 
 		try {
-			const userDoc = await firestore().collection("users").doc(uid).get();
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const data = userDoc.data();
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
@@ -345,7 +379,8 @@ const StartPage = () => {
 				const todayStr = today.toISOString().substring(0, 10);
 				const hasVotedToday = lastDate === todayStr;
 				if (!hasVotedToday || !data.voted) {
-					await userDoc.ref.update({ voted: false, messageCount: 100 });
+					const todayDate = today.toISOString().substring(0, 10);
+					await updateDoc(userDocRef, { voted: false, messageCount: 100 });
 					if (data?.opened !== todayStr) {
 						(async () => {
 							try {
@@ -354,7 +389,7 @@ const StartPage = () => {
 								console.error("Analytics error:", error);
 							}
 						})();
-						await userDoc.ref.update({ opened: todayStr });
+						await updateDoc(userDocRef, { opened: todayStr });
 					}
 					setHasVoted(false);
 					setSelectedOption(null);
@@ -372,7 +407,10 @@ const StartPage = () => {
 
 	// handle vote press
 	const handleVote = async (choice: "top" | "bottom") => {
-		const uid = auth().currentUser?.uid;
+		const auth = getAuth();
+		const firestore = getFirestore();
+
+		const uid = auth.currentUser?.uid;
 		if (!uid) {
 			Alert.alert("Error", "You must be logged in to vote");
 			router.replace("/");
@@ -400,39 +438,40 @@ const StartPage = () => {
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
 
-			const qSnap = await firestore()
-				.collection("dailyQuestions")
-				.where("date", ">=", today)
-				.where("date", "<", new Date(today.setUTCHours(24)))
-				.orderBy("date", "asc")
-				.limit(1)
-				.get();
+			const questionsRef = collection(firestore, "dailyQuestions");
+			const q = query(
+				questionsRef,
+				where("date", ">=", today),
+				where("date", "<", new Date(today.setUTCHours(24))),
+				orderBy("date", "asc"),
+				limit(1)
+			);
+
+			const qSnap = await getDocs(q);
 
 			if (!qSnap.empty) {
 				const qDoc = qSnap.docs[0];
-				const batch = firestore().batch();
+				const batch = writeBatch(firestore);
 				const field = choice === "top" ? "topCount" : "bottomCount";
 
 				batch.update(qDoc.ref, {
-					[field]: firestore.FieldValue.increment(1),
+					[field]: increment(1),
 				});
-				const uRef = firestore().collection("users").doc(uid);
-				const today = new Date();
-				today.setHours(0, 0, 0, 0);
+				const uRef = doc(firestore, "users", uid);
 				const todayDate = today.toISOString().substring(0, 10);
 
-				batch.set(
+				await setDoc(
 					uRef,
 					{
 						voted: true,
-						updatedAt: todayDate,
+						updatedAt: serverTimestamp(),
 						messageCount: 100,
 					},
 					{ merge: true }
 				);
 				await batch.commit();
 
-				const updated = await qDoc.ref.get();
+				const updated = await getDoc(qDoc.ref);
 				const data = updated.data()!;
 				settopCount(data.topCount);
 				setbottomCount(data.bottomCount);
@@ -462,7 +501,8 @@ const StartPage = () => {
 				}
 			}
 
-			await auth().signOut();
+			const auth = getAuth();
+			await signOut(auth);
 			router.replace("/");
 		} catch (e) {
 			console.error(e);
@@ -473,9 +513,13 @@ const StartPage = () => {
 	// discussion nav
 	const handleDiscussionNavigation = async () => {
 		try {
-			const uid = auth().currentUser?.uid;
+			const auth = getAuth();
+			const firestore = getFirestore();
+
+			const uid = auth.currentUser?.uid;
 			if (!uid) return;
-			const userDoc = await firestore().collection("users").doc(uid).get();
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
 			const data = userDoc.data();
 			if (!data || data.strikes === undefined) {
 				Alert.alert("Error", "User data not found.");
@@ -484,23 +528,33 @@ const StartPage = () => {
 
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
-			const qSnap = await firestore()
-				.collection("dailyQuestions")
-				.where("date", ">=", today)
-				.where("date", "<", new Date(today.setUTCHours(24)))
-				.orderBy("date", "asc")
-				.limit(1)
-				.get();
+			// Fix: Use proper end of day calculation
+			const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+			const questionsRef = collection(firestore, "dailyQuestions");
+			const q = query(
+				questionsRef,
+				where("date", ">=", today),
+				where("date", "<", endOfToday),
+				orderBy("date", "asc"),
+				limit(1)
+			);
+
+			const qSnap = await getDocs(q);
 
 			if (qSnap.empty) {
 				Alert.alert("No question available for today");
 				return;
 			}
-			const doc = qSnap.docs[0];
+			// Fix: Rename variable to avoid conflict with imported doc function
+			const questionDoc = qSnap.docs[0];
 
 			router.push({
 				pathname: "/discussion",
-				params: { question: doc.data().question, questionId: doc.id },
+				params: {
+					question: questionDoc.data().question,
+					questionId: questionDoc.id,
+				},
 			});
 		} catch (e) {
 			console.error(e);
@@ -511,16 +565,6 @@ const StartPage = () => {
 	const totalVotes = topCount + bottomCount;
 	const topPct = totalVotes > 0 ? (topCount / totalVotes) * 100 : 0;
 	const bottomPct = totalVotes > 0 ? (bottomCount / totalVotes) * 100 : 0;
-
-	// Add this useEffect to listen for FCM token refresh
-	// useEffect(() => {
-	//   const unsubscribe = messaging().onTokenRefresh(async (token) => {
-	//     if (notificationsEnabled) {
-	//       await registerTokenWithBackend(auth().currentUser?.uid, token);
-	//     }
-	//   });
-	//   return unsubscribe;
-	// }, [notificationsEnabled]);
 
 	// Add this useLayoutEffect to set up the header with bell icon
 	useLayoutEffect(() => {
@@ -566,12 +610,15 @@ const StartPage = () => {
 				authStatus === messaging.AuthorizationStatus.PROVISIONAL
 			) {
 				const token = await messaging().getToken();
-				await registerTokenWithBackend(auth().currentUser?.uid, token);
+				const auth = getAuth();
+				await registerTokenWithBackend(auth.currentUser?.uid, token);
 
 				// Minimal backend re-check
-				const uid = auth().currentUser?.uid;
+				const firestore = getFirestore();
+				const uid = auth.currentUser?.uid;
 				if (uid) {
-					const userDoc = await firestore().collection("users").doc(uid).get();
+					const userDocRef = doc(firestore, "users", uid);
+					const userDoc = await getDoc(userDocRef);
 					const data = userDoc.data();
 					const fcmToken = data?.fcmToken;
 
@@ -591,12 +638,15 @@ const StartPage = () => {
 	// optOut now immediately re-checks backend token
 	const optOut = async () => {
 		try {
-			await removeTokenFromBackend(auth().currentUser?.uid);
+			const auth = getAuth();
+			await removeTokenFromBackend(auth.currentUser?.uid);
 
 			// Minimal backend re-check
-			const uid = auth().currentUser?.uid;
+			const firestore = getFirestore();
+			const uid = auth.currentUser?.uid;
 			if (uid) {
-				const userDoc = await firestore().collection("users").doc(uid).get();
+				const userDocRef = doc(firestore, "users", uid);
+				const userDoc = await getDoc(userDocRef);
 				const data = userDoc.data();
 				const fcmToken = data?.fcmToken;
 
@@ -943,7 +993,7 @@ const styles = StyleSheet.create({
 	topicCard: {
 		borderRadius: Platform.OS == "android" ? 24 : 16,
 		padding: 24,
-		marginTop: 15,
+		marginTop: 30,
 		marginBottom: 24,
 		borderWidth: 1,
 		borderColor: "#9D00FF40",
@@ -993,7 +1043,7 @@ const styles = StyleSheet.create({
 		borderColor: "#9D00FF",
 	},
 	resultsContainer: {
-		marginTop: 10,
+		marginTop: 20,
 		width: "100%",
 		alignItems: "center",
 	},
@@ -1149,14 +1199,15 @@ export default StartPage;
 // Helper: Register token with backend
 async function registerTokenWithBackend(userId: any, token: any) {
 	if (!userId) return;
-	await firestore().collection("users").doc(userId).update({ fcmToken: token });
+	const firestore = getFirestore();
+	const userDocRef = doc(firestore, "users", userId);
+	await updateDoc(userDocRef, { fcmToken: token });
 }
 
 // Helper: Remove token from backend
 async function removeTokenFromBackend(userId: any) {
 	if (!userId) return;
-	await firestore()
-		.collection("users")
-		.doc(userId)
-		.update({ fcmToken: "null" });
+	const firestore = getFirestore();
+	const userDocRef = doc(firestore, "users", userId);
+	await updateDoc(userDocRef, { fcmToken: "null" });
 }
