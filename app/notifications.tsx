@@ -21,6 +21,7 @@ import {
 	orderBy,
 	limit,
 	getDocs,
+	query,
 } from "@react-native-firebase/firestore";
 import { LinearGradient } from "expo-linear-gradient";
 import { ArrowLeft, MessageCircle, Heart, Reply } from "lucide-react-native";
@@ -165,14 +166,13 @@ export default function NotificationsScreen() {
 				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
 
 				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
-				const questionQuery = getDocs(
-					orderBy(
-						limit(where(dailyQuestionsRef, "date", ">=", searchDate), 1),
-						"date",
-						"asc"
-					)
+				const questionQuery = query(
+					dailyQuestionsRef,
+					where("date", ">=", searchDate),
+					orderBy("date", "asc"),
+					limit(1)
 				);
-				const questionSnap = await questionQuery;
+				const questionSnap = await getDocs(questionQuery);
 
 				if (!questionSnap.empty) {
 					const questionId = questionSnap.docs[0].id;
@@ -233,14 +233,13 @@ export default function NotificationsScreen() {
 				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
 
 				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
-				const questionQuery = getDocs(
-					orderBy(
-						limit(where(dailyQuestionsRef, "date", ">=", searchDate), 1),
-						"date",
-						"asc"
-					)
+				const questionQuery = query(
+					dailyQuestionsRef,
+					where("date", ">=", searchDate),
+					orderBy("date", "asc"),
+					limit(1)
 				);
-				const questionSnap = await questionQuery;
+				const questionSnap = await getDocs(questionQuery);
 
 				if (!questionSnap.empty) {
 					const questionId = questionSnap.docs[0].id;
