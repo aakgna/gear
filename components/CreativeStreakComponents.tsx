@@ -14,6 +14,10 @@ export const ProgressDots = ({ streakCount }: { streakCount: number }) => {
 	const pulseAnimation = useSharedValue(0);
 
 	useEffect(() => {
+		// Reset animation value first
+		pulseAnimation.value = 0;
+
+		// Start animation
 		pulseAnimation.value = withRepeat(
 			withSequence(
 				withTiming(1, { duration: 600 }),
@@ -21,12 +25,18 @@ export const ProgressDots = ({ streakCount }: { streakCount: number }) => {
 			),
 			-1
 		);
-	}, []);
+
+		// Cleanup function to stop animation when component unmounts
+		return () => {
+			pulseAnimation.value = 0;
+		};
+	}, [streakCount]); // Add streakCount as dependency to reset on change
 
 	// Move the animated style outside the loop - this is the key fix
 	const animatedDotStyle = useAnimatedStyle(() => ({
 		transform: [{ scale: interpolate(pulseAnimation.value, [0, 1], [1, 1.2]) }],
-		shadowOpacity: pulseAnimation.value,
+		// Only apply shadow opacity to active dots, and reset to 0 when not active
+		shadowOpacity: interpolate(pulseAnimation.value, [0, 1], [0.2, 0.6]),
 	}));
 
 	const renderDots = () => {
@@ -47,8 +57,10 @@ export const ProgressDots = ({ streakCount }: { streakCount: number }) => {
 						styles.progressDot,
 						{
 							backgroundColor: isActive ? "#8A2BE2" : "#333",
+							// Explicitly set shadowOpacity to 0 for inactive dots
+							shadowOpacity: isActive ? undefined : 0,
 						},
-						// Only apply animation to active dots, but don't call useAnimatedStyle in loop
+						// Only apply animation to active dots
 						isActive && animatedDotStyle,
 					]}
 				/>
@@ -85,6 +97,7 @@ const styles = StyleSheet.create({
 		shadowColor: "#8A2BE2",
 		shadowOffset: { width: 0, height: 1 },
 		shadowRadius: 2,
+		shadowOpacity: 0, // Default to no shadow, will be overridden by animation for active dots
 	},
 	dotsCounter: {
 		color: "#8A2BE2",
