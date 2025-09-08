@@ -114,7 +114,7 @@ function TabBar({ state, descriptors, navigation }: TabBarProps) {
 
 						// If updatedAt exists, compare only the date portion (YYYY-MM-DD)
 						if (userData?.updatedAt) {
-							const lastVoteDate = userData.updatedAt.substring(0, 10); // Get just YYYY-MM-DD
+							const lastVoteDate = userData.updatedAt; // Get just YYYY-MM-DD
 							const todayDate = today.toISOString().substring(0, 10); // Get just YYYY-MM-DD
 							const hasVotedToday = lastVoteDate === todayDate;
 							if (!hasVotedToday || !userData.voted) {

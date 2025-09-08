@@ -387,7 +387,7 @@ export default function DiscussionScreen() {
 			today.setHours(0, 0, 0, 0);
 
 			if (data.updatedAt) {
-				const last = data.updatedAt.substring(0, 10);
+				const last = data.updatedAt;
 				const todayStr = today.toISOString().substring(0, 10);
 				const hasVotedToday = last === todayStr;
 				if (!hasVotedToday || !data.voted) {

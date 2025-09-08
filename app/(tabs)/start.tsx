@@ -39,7 +39,6 @@ import {
 	onSnapshot,
 	writeBatch,
 	increment,
-	serverTimestamp,
 	setDoc,
 } from "@react-native-firebase/firestore";
 import Animated, {
@@ -375,7 +374,7 @@ const StartPage = () => {
 			}
 
 			if (data?.updatedAt) {
-				const lastDate = data.updatedAt.substring(0, 10);
+				const lastDate = data.updatedAt;
 				const todayStr = today.toISOString().substring(0, 10);
 				const hasVotedToday = lastDate === todayStr;
 				if (!hasVotedToday || !data.voted) {
@@ -436,13 +435,16 @@ const StartPage = () => {
 
 		try {
 			const today = new Date();
-			today.setHours(0, 0, 0, 0);
+			today.setHours(0, 0, 0, 0); // Start of today
+
+			// End of today (correct way)
+			const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
 			const questionsRef = collection(firestore, "dailyQuestions");
 			const q = query(
 				questionsRef,
 				where("date", ">=", today),
-				where("date", "<", new Date(today.setUTCHours(24))),
+				where("date", "<", endOfToday),
 				orderBy("date", "asc"),
 				limit(1)
 			);
@@ -453,7 +455,6 @@ const StartPage = () => {
 				const qDoc = qSnap.docs[0];
 				const batch = writeBatch(firestore);
 				const field = choice === "top" ? "topCount" : "bottomCount";
-
 				batch.update(qDoc.ref, {
 					[field]: increment(1),
 				});
@@ -464,7 +465,7 @@ const StartPage = () => {
 					uRef,
 					{
 						voted: true,
-						updatedAt: serverTimestamp(),
+						updatedAt: todayDate,
 						messageCount: 100,
 					},
 					{ merge: true }
