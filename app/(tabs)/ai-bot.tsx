@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -24,11 +24,17 @@ import {
 	orderBy,
 	limit,
 	getDocs,
+	doc,
+	updateDoc,
+	arrayUnion,
+	getDoc,
 } from "@react-native-firebase/firestore";
+import { useLocalSearchParams } from "expo-router";
 
 const AIBotPage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
+	const { question } = useLocalSearchParams();
 	const [messages, setMessages] = useState<
 		Array<{ id: string; text: string; isUser: boolean; timestamp: Date }>
 	>([
@@ -41,6 +47,29 @@ const AIBotPage = () => {
 	]);
 	const [inputText, setInputText] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+	const scrollViewRef = useRef<ScrollView>(null);
+
+	// Function to scroll to bottom
+	const scrollToBottom = () => {
+		setTimeout(() => {
+			scrollViewRef.current?.scrollToEnd({ animated: true });
+		}, 100);
+	};
+
+	// Scroll to bottom when component mounts (entering the page)
+	useEffect(() => {
+		scrollToBottom();
+	}, []);
+
+	// Scroll to bottom when messages change
+	useEffect(() => {
+		scrollToBottom();
+	}, [messages]);
+
+	// Scroll to bottom when loading state changes (for typing indicator)
+	useEffect(() => {
+		scrollToBottom();
+	}, [isLoading]);
 
 	// Check if user is authenticated
 	useEffect(() => {
@@ -49,6 +78,81 @@ const AIBotPage = () => {
 			router.replace("/");
 			return;
 		}
+	}, []);
+
+	// Load conversation history on component mount
+	useEffect(() => {
+		const loadConversationHistory = async () => {
+			try {
+				const auth = getAuth();
+				const userId = auth.currentUser?.uid;
+
+				if (!userId) return;
+
+				const firestore = getFirestore();
+				const userDocRef = doc(firestore, "users", userId);
+				const userDoc = await getDoc(userDocRef);
+
+				if (userDoc.exists()) {
+					const userData = userDoc.data();
+					const questionHistory = userData?.questionHistory || [];
+					const answerHistory = userData?.answerHistory || [];
+
+					// Create messages from history
+					const historyMessages: Array<{
+						id: string;
+						text: string;
+						isUser: boolean;
+						timestamp: Date;
+					}> = [];
+
+					// Add initial greeting
+					historyMessages.push({
+						id: "1",
+						text: "Hi! I'm your AI assistant. Ask me anything about today's topic or any other questions you have.",
+						isUser: false,
+						timestamp: new Date(),
+					});
+
+					// Add conversation history (questions and answers)
+					const maxLength = Math.max(
+						questionHistory.length,
+						answerHistory.length
+					);
+
+					for (let i = 0; i < maxLength; i++) {
+						// Add user question if it exists
+						if (questionHistory[i]) {
+							historyMessages.push({
+								id: `history-q-${i}`,
+								text: questionHistory[i],
+								isUser: true,
+								timestamp: new Date(Date.now() - (maxLength - i) * 60000), // Space them out by minutes
+							});
+						}
+
+						// Add AI answer if it exists
+						if (answerHistory[i]) {
+							historyMessages.push({
+								id: `history-a-${i}`,
+								text: answerHistory[i],
+								isUser: false,
+								timestamp: new Date(
+									Date.now() - (maxLength - i) * 60000 + 30000
+								), // 30 seconds after question
+							});
+						}
+					}
+
+					await setMessages(historyMessages);
+				}
+			} catch (error) {
+				console.error("Error loading conversation history:", error);
+				// Keep default messages if history loading fails
+			}
+		};
+
+		loadConversationHistory();
 	}, []);
 
 	const handleSend = async () => {
@@ -61,7 +165,11 @@ const AIBotPage = () => {
 			timestamp: new Date(),
 		};
 
-		setMessages((prev) => [...prev, userMessage]);
+		// Add user message and verify it's added
+		await setMessages((prev) => {
+			const newMessages = [...prev, userMessage];
+			return newMessages;
+		});
 		setInputText("");
 		setIsLoading(true);
 
@@ -76,72 +184,97 @@ const AIBotPage = () => {
 				return;
 			}
 
-			// Get today's topic from Firestore
-			const firestore = getFirestore();
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-
 			// Fetch today's question for context
-			let topic = "";
-			try {
-				const questionsRef = collection(firestore, "dailyQuestions");
-				const q = query(
-					questionsRef,
-					where("date", ">=", today),
-					where("date", "<", new Date(today.setUTCHours(24))),
-					orderBy("date", "asc"),
-					limit(1)
-				);
-				const snapshot = await getDocs(q);
+			let topic = question || "No topic provided";
 
-				if (!snapshot.empty) {
-					const questionData = snapshot.docs[0].data();
-					topic = questionData.question || "";
+			let input = [
+				{
+					role: "system",
+					content:
+						"You are a helpful research assistant for a debate app. This is the topic: " +
+						topic +
+						". Please do not output any special characters including Bold, Italic, Underline, endline, etc.",
+				},
+			];
+
+			// Build conversation history for context (including stored history)
+			const recentMessages = messages
+				.filter((msg) => msg.id !== "1") // Exclude the initial greeting
+				.slice(-10) // Get last 10 messages
+				.map((msg) => ({
+					role: msg.isUser ? "user" : "assistant",
+					content: msg.text,
+				}));
+			if (recentMessages.length === 0) {
+				input.push({
+					role: "user",
+					content: inputText.trim(),
+				});
+			} else {
+				for (let i = 0; i < recentMessages.length; i++) {
+					if (recentMessages[i].role === "user") {
+						input.push({
+							role: "user",
+							content: recentMessages[i].content,
+						});
+					} else {
+						input.push({
+							role: "assistant",
+							content: recentMessages[i].content,
+						});
+					}
 				}
-			} catch (error) {
-				console.error("Error fetching today's topic:", error);
-				// Continue without topic if error
+				input.push({
+					role: "user",
+					content: inputText.trim(),
+				});
 			}
 
-			// Build conversation history for context
-			const recentMessages = messages.slice(-10).map((msg) => ({
-				role: msg.isUser ? "user" : "assistant",
-				content: msg.text,
-			}));
+			console.log("input Nigga", input);
 
 			// Call Perplexity API through Firebase Cloud Function
-			console.log("topic", topic);
-			console.log("recentMessages", recentMessages);
-			console.log("inputText", inputText.trim());
-			console.log("userId", userId);
 			const response = await fetch(
 				"https://us-central1-thecommonground-6259d.cloudfunctions.net/perplexity_chat",
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
-						userId: userId,
-						userMessage: inputText.trim(),
-						topic: topic,
-						history: recentMessages,
+						input: input,
 					}),
 				}
 			);
-			console.log("response", response);
 			const data = await response.json();
 
+			// Check response status first
 			if (!response.ok) {
 				throw new Error(data.error || "Failed to get AI response");
 			}
 
+			// Validate that we have a reply
+			if (!data.reply) {
+				throw new Error("No reply received from AI service");
+			}
+
+			let responseData = data.reply;
+			// Remove citation patterns like [1], [2], etc.
+			responseData = responseData.replace(/\[\d+\]/g, "");
+
+			responseData = responseData.replace("*", "");
+
 			const aiResponse = {
 				id: (Date.now() + 1).toString(),
-				text: data.reply,
+				text: responseData, // ✅ Use cleaned data
 				isUser: false,
 				timestamp: new Date(),
 			};
 
 			setMessages((prev) => [...prev, aiResponse]);
+			const firestore = getFirestore();
+			const userDoc = doc(firestore, "users", userId);
+			await updateDoc(userDoc, {
+				answerHistory: arrayUnion(responseData),
+				questionHistory: arrayUnion(inputText.trim()),
+			});
 		} catch (error) {
 			console.error("Error calling AI API:", error);
 
@@ -201,6 +334,7 @@ const AIBotPage = () => {
 
 			{/* Messages */}
 			<ScrollView
+				ref={scrollViewRef}
 				style={styles.messagesContainer}
 				contentContainerStyle={{ paddingBottom: 20 }}
 				showsVerticalScrollIndicator={false}

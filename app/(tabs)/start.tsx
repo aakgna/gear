@@ -795,7 +795,12 @@ const StartPage = () => {
 
 								{/* Need Info pill below Join Discussion */}
 								<Pressable
-									onPress={() => router.push("/(tabs)/ai-bot")}
+									onPress={() =>
+										router.push({
+											pathname: "/(tabs)/ai-bot",
+											params: { question: question },
+										})
+									}
 									style={styles.needInfoPill}
 									hitSlop={8}
 								>
