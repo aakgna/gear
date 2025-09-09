@@ -16,6 +16,15 @@ import { Send, ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Updated Firebase import to use new modular SDK
 import { getAuth } from "@react-native-firebase/auth";
+import {
+	getFirestore,
+	collection,
+	query,
+	where,
+	orderBy,
+	limit,
+	getDocs,
+} from "@react-native-firebase/firestore";
 
 const AIBotPage = () => {
 	const router = useRouter();
@@ -56,18 +65,97 @@ const AIBotPage = () => {
 		setInputText("");
 		setIsLoading(true);
 
-		// TODO: Integrate with OpenAI API here
-		// For now, just show a placeholder response
-		setTimeout(() => {
+		try {
+			// Get current user
+			const auth = getAuth();
+			const userId = auth.currentUser?.uid;
+
+			if (!userId) {
+				Alert.alert("Error", "User not authenticated");
+				setIsLoading(false);
+				return;
+			}
+
+			// Get today's topic from Firestore
+			const firestore = getFirestore();
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			// Fetch today's question for context
+			let topic = "";
+			try {
+				const questionsRef = collection(firestore, "dailyQuestions");
+				const q = query(
+					questionsRef,
+					where("date", ">=", today),
+					where("date", "<", new Date(today.setUTCHours(24))),
+					orderBy("date", "asc"),
+					limit(1)
+				);
+				const snapshot = await getDocs(q);
+
+				if (!snapshot.empty) {
+					const questionData = snapshot.docs[0].data();
+					topic = questionData.question || "";
+				}
+			} catch (error) {
+				console.error("Error fetching today's topic:", error);
+				// Continue without topic if error
+			}
+
+			// Build conversation history for context
+			const recentMessages = messages.slice(-10).map((msg) => ({
+				role: msg.isUser ? "user" : "assistant",
+				content: msg.text,
+			}));
+
+			// Call Perplexity API through Firebase Cloud Function
+			console.log("topic", topic);
+			console.log("recentMessages", recentMessages);
+			console.log("inputText", inputText.trim());
+			console.log("userId", userId);
+			const response = await fetch(
+				"https://us-central1-thecommonground-6259d.cloudfunctions.net/perplexity_chat",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						userId: userId,
+						userMessage: inputText.trim(),
+						topic: topic,
+						history: recentMessages,
+					}),
+				}
+			);
+			console.log("response", response);
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to get AI response");
+			}
+
 			const aiResponse = {
 				id: (Date.now() + 1).toString(),
-				text: "This is a placeholder response. OpenAI integration coming soon!",
+				text: data.reply,
 				isUser: false,
 				timestamp: new Date(),
 			};
+
 			setMessages((prev) => [...prev, aiResponse]);
+		} catch (error) {
+			console.error("Error calling AI API:", error);
+
+			const errorResponse = {
+				id: (Date.now() + 1).toString(),
+				text: "Sorry, I'm having trouble connecting right now. Please try again later.",
+				isUser: false,
+				timestamp: new Date(),
+			};
+
+			setMessages((prev) => [...prev, errorResponse]);
+		} finally {
 			setIsLoading(false);
-		}, 1000);
+		}
 	};
 
 	const renderMessage = (message: any) => (

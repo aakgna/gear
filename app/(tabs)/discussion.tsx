@@ -527,7 +527,6 @@ export default function DiscussionScreen() {
 
 			if (uid) {
 				if (userData && userData.voted && userData.messageCount == 98) {
-					console.log("Nigga 2");
 					const lastStreakDate = userData.lastStreakDate?.toDate();
 					if (lastStreakDate) {
 						lastStreakDate.setHours(0, 0, 0, 0); // Set to midnight for consistent comparison
@@ -536,26 +535,21 @@ export default function DiscussionScreen() {
 					const oneDayInMillis = 24 * 60 * 60 * 1000;
 
 					if (lastStreakDate) {
-						console.log("Nigga 3");
 						const timeDiff = today.getTime() - lastStreakDate.getTime();
 						const daysDiff = Math.floor(timeDiff / oneDayInMillis);
 
 						if (daysDiff == 1) {
-							console.log("Add one");
 							await updateDoc(userDocRef, {
 								streakCount: increment(1),
 								lastStreakDate: serverTimestamp(),
 							});
 						} else if (daysDiff > 1) {
-							console.log("Reset Streak");
 							await updateDoc(userDocRef, {
 								streakCount: 1,
 								lastStreakDate: serverTimestamp(),
 							});
 						}
 					} else {
-						console.log("Nigga 4");
-						// If lastStreakDate is not set, initialize it
 						await updateDoc(userDocRef, {
 							streakCount: 1,
 							lastStreakDate: serverTimestamp(),

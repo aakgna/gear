@@ -13,12 +13,7 @@ import {
 } from "lucide-react-native";
 // Updated Firebase imports to use new modular SDK
 import { getAuth } from "@react-native-firebase/auth";
-import {
-	getFirestore,
-	collection,
-	doc,
-	getDoc,
-} from "@react-native-firebase/firestore";
+import { getFirestore, doc, getDoc } from "@react-native-firebase/firestore";
 
 export default function ExpandedQuestionScreen() {
 	// log screen view

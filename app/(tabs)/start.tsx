@@ -342,7 +342,6 @@ const StartPage = () => {
 				settop(data.top || "Option A");
 				setbottom(data.bottom || "Option B");
 			} else {
-				console.log("No question found for today"); // Debug log
 				setQuestion("No question available for today");
 			}
 		} catch (e) {
