@@ -40,6 +40,7 @@ import {
 	writeBatch,
 	increment,
 	setDoc,
+	serverTimestamp,
 } from "@react-native-firebase/firestore";
 import Animated, {
 	FadeIn,
@@ -201,6 +202,7 @@ const StartPage = () => {
 		checkForUpdate();
 		fetchDailyQuestion();
 		checkUserVote();
+		checkStreak();
 
 		const firestore = getFirestore();
 		const uid = auth.currentUser?.uid;
@@ -270,6 +272,39 @@ const StartPage = () => {
 			);
 		}
 	}, [showNotifPrompt]);
+
+	const checkStreak = async () => {
+		const auth = getAuth();
+		const firestore = getFirestore();
+		const uid = auth.currentUser?.uid;
+		if (!uid) return;
+		const userDocRef = doc(firestore, "users", uid);
+		const userDoc = await getDoc(userDocRef);
+		const data = userDoc.data();
+		if (data?.lastStreakDate) {
+			const lastDate = data.lastStreakDate.toDate();
+			lastDate.setHours(0, 0, 0, 0);
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const timeDiff = today.getTime() - lastDate.getTime();
+			const daysDiff = Math.floor(timeDiff / (24 * 60 * 60 * 1000));
+
+			if (daysDiff >= 2) {
+				await updateDoc(userDocRef, {
+					streakCount: 1,
+					lastStreakDate: serverTimestamp(),
+				});
+				setStreakCount(1);
+			}
+		} else {
+			await updateDoc(userDocRef, {
+				lastStreakDate: serverTimestamp(),
+				streakCount: 1,
+			});
+			setStreakCount(1);
+		}
+	};
 
 	const checkForUpdate = async () => {
 		try {

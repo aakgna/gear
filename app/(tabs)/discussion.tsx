@@ -532,6 +532,7 @@ export default function DiscussionScreen() {
 						lastStreakDate.setHours(0, 0, 0, 0); // Set to midnight for consistent comparison
 					}
 					const today = new Date();
+					today.setHours(0, 0, 0, 0);
 					const oneDayInMillis = 24 * 60 * 60 * 1000;
 
 					if (lastStreakDate) {
@@ -1125,6 +1126,40 @@ function ThreadModal({
 			);
 
 			setReplyText("");
+
+			if (uid) {
+				if (userData && userData.voted && userData.messageCount == 98) {
+					const lastStreakDate = userData.lastStreakDate?.toDate();
+					if (lastStreakDate) {
+						lastStreakDate.setHours(0, 0, 0, 0); // Set to midnight for consistent comparison
+					}
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const oneDayInMillis = 24 * 60 * 60 * 1000;
+
+					if (lastStreakDate) {
+						const timeDiff = today.getTime() - lastStreakDate.getTime();
+						const daysDiff = Math.floor(timeDiff / oneDayInMillis);
+
+						if (daysDiff == 1) {
+							await updateDoc(userDocRef, {
+								streakCount: increment(1),
+								lastStreakDate: serverTimestamp(),
+							});
+						} else if (daysDiff > 1) {
+							await updateDoc(userDocRef, {
+								streakCount: 1,
+								lastStreakDate: serverTimestamp(),
+							});
+						}
+					} else {
+						await updateDoc(userDocRef, {
+							streakCount: 1,
+							lastStreakDate: serverTimestamp(),
+						});
+					}
+				}
+			}
 		} catch (e: any) {
 			console.error("Error sending reply:", e);
 			Alert.alert("Error", "Failed to send reply.");
