@@ -4,7 +4,6 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	TextInput,
 	Pressable,
 	Image,
 	Alert,
@@ -19,29 +18,64 @@ import { router, Link } from "expo-router";
 import {
 	getAuth,
 	onAuthStateChanged,
-	signInWithPhoneNumber,
+	GoogleAuthProvider,
+	signInWithCredential,
 } from "@react-native-firebase/auth";
 import {
 	getFirestore,
 	collection,
 	getDocs,
+	doc,
+	setDoc,
+	getDoc,
 } from "@react-native-firebase/firestore";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import Animated, { FadeIn, SlideInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 
 import DeviceInfo from "react-native-device-info";
 
 export default function SignInScreen() {
-	const [phoneNumber, setPhoneNumber] = useState("");
-	const [isValid, setIsValid] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 
-	// If user is already signed in (and has a phoneNumber), jump to /start immediately
+	// If user is already signed in, jump to /start immediately
 	useEffect(() => {
 		checkForUpdate();
+
+		// Configure Google Sign-In
+		GoogleSignin.configure({
+			webClientId:
+				"899431350542-igho9j6qlvujo8vi0vg2ikj07ec7b6fe.apps.googleusercontent.com",
+		});
+
 		const auth = getAuth();
-		const subscriber = onAuthStateChanged(auth, (user) => {
-			if (user && user.phoneNumber) {
+		const subscriber = onAuthStateChanged(auth, async (user) => {
+			if (user) {
+				const firestore = getFirestore();
+				const userDocRef = doc(firestore, "users", user.uid);
+				const userDoc = await getDoc(userDocRef);
+				if (!userDoc.exists()) {
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const todayDate = today.toISOString().substring(0, 10);
+					let school = user.email?.split("@")[1];
+					school = school?.split(".")[0];
+					if (school == "ucr" || school == "scu") {
+						await setDoc(userDocRef, {
+							email: user.email,
+							school: school,
+							strikes: 6,
+							strikeCount: 0,
+							messageCount: 100,
+							voted: false,
+							updatedAt: todayDate,
+							createdAt: todayDate,
+						});
+					} else {
+						await user.delete();
+						return;
+					}
+				}
 				router.replace("/(tabs)/start");
 			}
 		});
@@ -95,110 +129,74 @@ export default function SignInScreen() {
 		}
 	};
 
-	// As the user types, keep only digits and mark valid once ≥10 digits
-	const validatePhone = (text: string) => {
-		const digitsOnly = text.replace(/\D/g, "");
-		setPhoneNumber(text);
-		setIsValid(digitsOnly.length >= 10);
-	};
-
-	// When they tap "Continue", do exactly what you had before:
-	//  • format into E.164 ("+1XXXXXXXXXX")
-	//  • signInWithPhoneNumber(...)
-	//  • navigate to /verify with { verificationId, phoneNumber }
-	const handleContinue = async () => {
-		if (!isValid) {
-			return;
-		}
-
+	// Google Sign-In handler
+	const handleGoogleSignIn = async () => {
 		setIsLoading(true);
 		try {
-			// Build the E.164–compliant string:
-			//   If they typed exactly 10 digits, prefix +1.
-			//   If they typed 11 digits starting with "1", prefix "+".
-			//   If they typed "+" + 10 digits, use as is.
-			const digits = phoneNumber.replace(/\D/g, "");
-			let formattedNumber = "";
+			// Check if device supports Google Play Services
+			const hasPlayServices = await GoogleSignin.hasPlayServices({
+				showPlayServicesUpdateDialog: true,
+			});
+			console.log("hasPlayServices", hasPlayServices);
+			// Get the user's ID token
+			const signInResult = await GoogleSignin.signIn();
+			console.log("signInResult", signInResult);
+			// Handle different versions of google-signin library
+			let idToken = signInResult.data?.idToken;
+			console.log("idToken", idToken);
+			if (!idToken) {
+				idToken = signInResult.idToken;
+			}
+			if (!idToken) {
+				throw new Error("No ID token found");
+			}
+			// Create a Google credential with the token
+			const googleCredential = GoogleAuthProvider.credential(idToken);
+			console.log("googleCredential", googleCredential);
+			// Sign-in the user with the credential
+			const auth = getAuth();
+			console.log("auth", auth);
+			await signInWithCredential(auth, googleCredential);
+			// Navigation will be handled by the onAuthStateChanged listener
+		} catch (error) {
+			console.error("Google Sign-In failed:", error);
 
-			if (digits.length === 10) {
-				formattedNumber = "+1" + digits;
-			} else if (digits.length === 11 && digits.startsWith("1")) {
-				formattedNumber = "+" + digits;
-			} else if (phoneNumber.startsWith("+") && digits.length >= 10) {
-				formattedNumber = phoneNumber;
-			} else {
-				// Fallback: if they already included a "+" or entered anything weird,
-				// just make sure there's a leading "+" so Firebase doesn't blow up.
-				formattedNumber = phoneNumber.startsWith("+")
-					? phoneNumber
-					: "+" + phoneNumber.replace(/\D/g, "");
+			// Handle user cancellation
+			if (error.code === "SIGN_IN_CANCELLED") {
+				// User cancelled the sign-in, don't show error
+				return;
 			}
 
-			const auth = getAuth();
-			const confirmation = await signInWithPhoneNumber(auth, formattedNumber);
-
-			// Now navigate to /verify and pass both the phoneNumber and verificationId
-			router.push({
-				pathname: "/verify",
-				params: {
-					phoneNumber: formattedNumber,
-					verificationId: confirmation.verificationId,
-				},
-			});
-		} catch (error) {
-			console.error("Failed to send verification code:", error);
 			Alert.alert(
-				"Failed to send verification code",
-				"Please try again with phone number in format: +11234567890"
+				"Sign-In Failed",
+				"Please try again or check your internet connection."
 			);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	// When they tap "Delete Account", we do the same signInWithPhoneNumber flow
-	// but route them to the delete‐account screen (instead of /verify).
+	// Handle account deletion - simplified since no phone verification needed
 	const handleDeleteAccount = async () => {
-		if (phoneNumber.trim().length === 0) {
-			Alert.alert("Error", "Phone number is required for verification.");
-			return;
-		}
-
-		setIsLoading(true);
-		try {
-			const digits = phoneNumber.replace(/\D/g, "");
-			let formattedNumber = "";
-
-			if (digits.length === 10) {
-				formattedNumber = "+1" + digits;
-			} else if (digits.length === 11 && digits.startsWith("1")) {
-				formattedNumber = "+" + digits;
-			} else if (phoneNumber.startsWith("+") && digits.length >= 10) {
-				formattedNumber = phoneNumber;
-			} else {
-				formattedNumber = phoneNumber.startsWith("+")
-					? phoneNumber
-					: "+" + digits;
-			}
-
-			const auth = getAuth();
-			const confirmation = await signInWithPhoneNumber(auth, formattedNumber);
-			router.push({
-				pathname: "/deletion",
-				params: {
-					phoneNumber: formattedNumber,
-					verificationId: confirmation.verificationId,
+		Alert.alert(
+			"Delete Account",
+			"Are you sure you want to delete your account? This action cannot be undone.",
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
 				},
-			});
-		} catch (error) {
-			console.error("Error initiating account deletion:", error);
-			Alert.alert(
-				"Error",
-				"Failed to initiate account deletion. Please format number like this +11234567890."
-			);
-		} finally {
-			setIsLoading(false);
-		}
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: () => {
+						// Navigate to deletion screen - you may need to modify this screen
+						// to handle Google-authenticated users instead of phone verification
+						router.push("/deletion");
+					},
+				},
+			]
+		);
 	};
 
 	return (
@@ -230,56 +228,32 @@ export default function SignInScreen() {
 						entering={SlideInUp.delay(400).duration(800)}
 						style={styles.formContainer}
 					>
-						<View style={styles.inputContainer}>
-							<TextInput
-								style={styles.input}
-								placeholder="Enter your phone number"
-								placeholderTextColor="#A0A0A0"
-								keyboardType="phone-pad"
-								value={phoneNumber}
-								onChangeText={validatePhone}
-								editable={!isLoading}
-							/>
-							{phoneNumber.length > 0 && (
-								<Animated.View
-									entering={FadeIn}
-									style={[
-										styles.validationIcon,
-										{ backgroundColor: isValid ? "#9D00FF20" : "#33333320" },
-									]}
-								>
-									<Text
-										style={[
-											styles.validationText,
-											{ color: isValid ? "#9D00FF" : "#666666" },
-										]}
-									>
-										{isValid ? "✓" : "!"}
-									</Text>
-								</Animated.View>
-							)}
-						</View>
-
 						<Pressable
 							style={({ pressed }) => [
-								styles.continueButton,
+								styles.googleButton,
 								{ opacity: pressed ? 0.9 : 1 },
-								(!isValid || isLoading) && styles.disabledButton,
+								isLoading && styles.disabledButton,
 							]}
-							onPress={handleContinue}
-							disabled={!isValid || isLoading}
+							onPress={handleGoogleSignIn}
+							disabled={isLoading}
 						>
 							<LinearGradient
-								colors={
-									isValid ? ["#9D00FF", "#6A0DAD"] : ["#333333", "#222222"]
-								}
+								colors={["#4285F4", "#34A853"]}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 								style={styles.gradientButton}
 							>
-								<Text style={styles.buttonText}>
-									{isLoading ? "Sending..." : "Continue"}
-								</Text>
+								<View style={styles.buttonContent}>
+									<Image
+										source={{
+											uri: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE3LjY0IDkuMjA0NTVDMTcuNjQgOC41NjY4MiAxNy41ODI3IDcuOTUyMjcgMTcuNDc2NCA3LjM2MzY0SDE5VjkuMjA0NTVIMTcuNjRaIiBmaWxsPSIjNDI4NUY0Ii8+CjxwYXRoIGQ9Ik05IDYuNTgxODJMMTMuOTA5MSA2LjU4MTgyQzE0LjQ1NDUgOS4yIDEzLjkwOTEgMTEuODE4MiA5IDExLjgxODJWMTMuNjM2NEMxNS4yIDEzLjYzNjQgMTggOS4yIDk5IDkuMjAwOThWNi41ODE4MloiIGZpbGw9IiMzNEE4NTMiLz4KPHBhdGggZD0iTTkgMTMuNjM2NEM2LjQ1IDEzLjYzNjQgNC4zNjM2NCAxMS41NSA0LjM2MzY0IDlTNi40NSA0LjM2MzY0IDkgNC4zNjM2NEM5Ljc1IDQuMzYzNjQgMTAuNDU0NSA0LjU5MDkxIDExLjA1NDUgNC45NDU0NUwxMy4wMzY0IDIuOTYzNjRDMTEuNDQgMS41ODgxOCA5LjI1NSAwIDkgMEM1LjE4MTgyIDAgMi4yNSAyLjkzMTgyIDIuMjUgNi43NVMtNS4xODE4MiAxMy41IDIuMjUgMTMuNSIgZmlsbD0iI0ZCQkMwNSIvPgo8L3N2Zz4K",
+										}}
+										style={styles.googleIcon}
+									/>
+									<Text style={styles.buttonText}>
+										{isLoading ? "Signing in..." : "Continue with Google"}
+									</Text>
+								</View>
 							</LinearGradient>
 						</Pressable>
 
@@ -364,9 +338,9 @@ const styles = StyleSheet.create({
 		borderRadius: 35,
 	},
 	appTitle: {
-		fontSize: Platform.OS === "ios" ? 34 : 34, // Slightly larger on Android
-		fontFamily: Platform.OS === "ios" ? "Inter-Bold" : "Poppins-Black", // Black on Android
-		fontWeight: Platform.OS === "ios" ? "900" : "900", // Different weight for Android
+		fontSize: Platform.OS === "ios" ? 34 : 34,
+		fontFamily: Platform.OS === "ios" ? "Inter-Bold" : "Poppins-Black",
+		fontWeight: Platform.OS === "ios" ? "900" : "900",
 		color: "#FFFFFF",
 		textAlign: "center",
 		marginBottom: 8,
@@ -385,37 +359,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: "rgba(255, 255, 255, 0.1)",
 	},
-	inputContainer: {
-		position: "relative",
-		marginBottom: 20,
-	},
-	input: {
-		backgroundColor: "rgba(255, 255, 255, 0.07)",
-		borderRadius: 16,
-		padding: 16,
-		fontSize: 16,
-		color: "#FFFFFF",
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
-		paddingRight: 50,
-		fontFamily: "Inter-Regular",
-		letterSpacing: 0.5,
-	},
-	validationIcon: {
-		position: "absolute",
-		right: 12,
-		top: 12,
-		width: 30,
-		height: 30,
-		borderRadius: 15,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	validationText: {
-		fontSize: 16,
-		fontFamily: "Inter-Bold",
-	},
-	continueButton: {
+	googleButton: {
 		marginTop: 10,
 		borderRadius: 16,
 		overflow: "hidden",
@@ -424,6 +368,16 @@ const styles = StyleSheet.create({
 		paddingVertical: 14,
 		borderRadius: 16,
 		alignItems: "center",
+	},
+	buttonContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	googleIcon: {
+		width: 20,
+		height: 20,
+		marginRight: 12,
 	},
 	buttonText: {
 		color: "#FFFFFF",
