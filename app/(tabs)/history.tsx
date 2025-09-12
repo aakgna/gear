@@ -30,10 +30,26 @@ import {
 	limit,
 	startAfter,
 	getDocs,
+	getDoc,
+	doc,
 } from "@react-native-firebase/firestore";
 
+interface HistoricQuestion {
+	id: string;
+	text: string;
+	date: string;
+	agreePercentage: number;
+	disagreePercentage: number;
+	totalResponses: number;
+	hasCommonGround: boolean;
+	top: string;
+	bottom: string;
+}
+
 export default function HistoryScreen() {
-	const [historicQuestions, setHistoricQuestions] = useState([]);
+	const [historicQuestions, setHistoricQuestions] = useState<
+		HistoricQuestion[]
+	>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [currentPage, setCurrentPage] = useState(0);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -65,6 +81,14 @@ export default function HistoryScreen() {
 			try {
 				// Use new modular SDK API
 				const firestore = getFirestore();
+				// get user school
+				const auth = getAuth();
+				const uid = auth.currentUser?.uid;
+				if (!uid) return;
+				const userDocRef = doc(firestore, "users", uid);
+				const userDoc = await getDoc(userDocRef);
+				const userData = userDoc.data();
+				const school = userData?.school;
 				const questionsRef = collection(firestore, "dailyQuestions");
 				const q = query(
 					questionsRef,
@@ -75,28 +99,55 @@ export default function HistoryScreen() {
 
 				const snapshot = await getDocs(q);
 
-				const questions = snapshot.docs.map((doc) => {
-					const data = doc.data();
-					const totalResponses = (data.topCount || 0) + (data.bottomCount || 0);
-					const agreePercentage = totalResponses
-						? Math.round((data.topCount / totalResponses) * 100)
-						: 0;
-					const disagreePercentage = 100 - agreePercentage;
+				const questions = snapshot.docs
+					.map((doc: any) => {
+						const data = doc.data();
+						if (data.school && data.school == school) {
+							const totalResponses =
+								(data.topCount || 0) + (data.bottomCount || 0);
+							const agreePercentage = totalResponses
+								? Math.round((data.topCount / totalResponses) * 100)
+								: 0;
+							const disagreePercentage = 100 - agreePercentage;
 
-					return {
-						id: doc.id,
-						text: data.question,
-						date: data.date?.toDate().toLocaleDateString() || "",
-						agreePercentage,
-						disagreePercentage,
-						totalResponses,
-						hasCommonGround:
-							Array.isArray(data.commonGroundNotes) &&
-							data.commonGroundNotes.length > 0,
-						top: data.top,
-						bottom: data.bottom,
-					};
-				});
+							return {
+								id: doc.id,
+								text: data.question,
+								date: data.date?.toDate().toLocaleDateString() || "",
+								agreePercentage,
+								disagreePercentage,
+								totalResponses,
+								hasCommonGround:
+									Array.isArray(data.commonGroundNotes) &&
+									data.commonGroundNotes.length > 0,
+								top: data.top,
+								bottom: data.bottom,
+							};
+						} else if (!data.school) {
+							const totalResponses =
+								(data.topCount || 0) + (data.bottomCount || 0);
+							const agreePercentage = totalResponses
+								? Math.round((data.topCount / totalResponses) * 100)
+								: 0;
+							const disagreePercentage = 100 - agreePercentage;
+
+							return {
+								id: doc.id,
+								text: data.question,
+								date: data.date?.toDate().toLocaleDateString() || "",
+								agreePercentage,
+								disagreePercentage,
+								totalResponses,
+								hasCommonGround:
+									Array.isArray(data.commonGroundNotes) &&
+									data.commonGroundNotes.length > 0,
+								top: data.top,
+								bottom: data.bottom,
+							};
+						}
+						return null; // Return null for questions that don't match the school
+					})
+					.filter((question: HistoricQuestion | null) => question !== null); // Filter out null values
 
 				// Update pagination state
 				setHistoricQuestions(questions);
@@ -122,6 +173,14 @@ export default function HistoryScreen() {
 
 		try {
 			const firestore = getFirestore();
+			const auth = getAuth();
+			const uid = auth.currentUser?.uid;
+			if (!uid) return;
+			const userDocRef = doc(firestore, "users", uid);
+			const userDoc = await getDoc(userDocRef);
+			const userData = userDoc.data();
+			const school = userData?.school;
+
 			const questionsRef = collection(firestore, "dailyQuestions");
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
@@ -136,28 +195,35 @@ export default function HistoryScreen() {
 
 			const snapshot = await getDocs(q);
 
-			const newQuestions = snapshot.docs.map((doc) => {
-				const data = doc.data();
-				const totalResponses = (data.topCount || 0) + (data.bottomCount || 0);
-				const agreePercentage = totalResponses
-					? Math.round((data.topCount / totalResponses) * 100)
-					: 0;
-				const disagreePercentage = 100 - agreePercentage;
+			const newQuestions = snapshot.docs
+				.map((doc: any) => {
+					const data = doc.data();
+					// Skip questions that don't match the user's school
+					if (!data.school || data.school !== school) {
+						return null;
+					}
 
-				return {
-					id: doc.id,
-					text: data.question,
-					date: data.date?.toDate().toLocaleDateString() || "",
-					agreePercentage,
-					disagreePercentage,
-					totalResponses,
-					hasCommonGround:
-						Array.isArray(data.commonGroundNotes) &&
-						data.commonGroundNotes.length > 0,
-					top: data.top,
-					bottom: data.bottom,
-				};
-			});
+					const totalResponses = (data.topCount || 0) + (data.bottomCount || 0);
+					const agreePercentage = totalResponses
+						? Math.round((data.topCount / totalResponses) * 100)
+						: 0;
+					const disagreePercentage = 100 - agreePercentage;
+
+					return {
+						id: doc.id,
+						text: data.question,
+						date: data.date?.toDate().toLocaleDateString() || "",
+						agreePercentage,
+						disagreePercentage,
+						totalResponses,
+						hasCommonGround:
+							Array.isArray(data.commonGroundNotes) &&
+							data.commonGroundNotes.length > 0,
+						top: data.top,
+						bottom: data.bottom,
+					};
+				})
+				.filter((question: HistoricQuestion | null) => question !== null); // Filter out null values
 
 			// Update state with new questions
 			setHistoricQuestions((prev) => [...prev, ...newQuestions]);

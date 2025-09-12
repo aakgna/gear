@@ -933,6 +933,18 @@ const StartPage = () => {
 								Choose carefully – your response contributes to finding common
 								ground.
 							</Text>
+							<Pressable
+								onPress={() =>
+									router.push({
+										pathname: "/(tabs)/ai-bot",
+										params: { question: question },
+									})
+								}
+								style={styles.needInfoPill}
+								hitSlop={8}
+							>
+								<Text style={styles.needInfoText}>Need Info?</Text>
+							</Pressable>
 						</View>
 					)}
 				</Animated.View>
