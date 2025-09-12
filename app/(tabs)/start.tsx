@@ -356,7 +356,7 @@ const StartPage = () => {
 			today.setHours(0, 0, 0, 0); // Start of today
 
 			// End of today (correct way)
-			const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+			const endOfToday = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
 
 			const questionsRef = collection(firestore, "dailyQuestions");
 			const q = query(
@@ -370,12 +370,37 @@ const StartPage = () => {
 			const snap = await getDocs(q);
 
 			if (!snap.empty) {
-				const data = snap.docs[0].data();
-				setQuestion(data.question || "No question text available");
-				settopCount(data.topCount || 0);
-				setbottomCount(data.bottomCount || 0);
-				settop(data.top || "Option A");
-				setbottom(data.bottom || "Option B");
+				if (snap.docs.length == 1) {
+					const data = snap.docs[0].data();
+					setQuestion(data.question || "No question text available");
+					settopCount(data.topCount || 0);
+					setbottomCount(data.bottomCount || 0);
+					settop(data.top || "Agree");
+					setbottom(data.bottom || "Disagree");
+				} else {
+					const auth = getAuth();
+					const uid = auth.currentUser?.uid;
+					if (!uid) return;
+					const userDocRef = doc(firestore, "users", uid);
+					const userDoc = await getDoc(userDocRef);
+					const user_data = userDoc.data();
+					const school = user_data?.school;
+					const data = snap.docs[0].data();
+					const data2 = snap.docs[1].data();
+					if (data.school === school) {
+						setQuestion(data.question || "No question text available");
+						settopCount(data.topCount || 0);
+						setbottomCount(data.bottomCount || 0);
+						settop(data.top || "Agree");
+						setbottom(data.bottom || "Disagree");
+					} else if (data2.school === school) {
+						setQuestion(data2.question || "No question text available");
+						settopCount(data2.topCount || 0);
+						setbottomCount(data2.bottomCount || 0);
+						settop(data2.top || "Agree");
+						setbottom(data2.bottom || "Disagree");
+					}
+				}
 			} else {
 				setQuestion("No question available for today");
 			}
