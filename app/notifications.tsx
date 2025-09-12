@@ -163,33 +163,83 @@ export default function NotificationsScreen() {
 
 			const firestore = getFirestore();
 			for (const searchDate of searchDates) {
-				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
+				const endDate = new Date(
+					searchDate.getTime() + 3 * 24 * 60 * 60 * 1000
+				);
 
 				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
 				const questionQuery = query(
 					dailyQuestionsRef,
 					where("date", ">=", searchDate),
+					where("date", "<", endDate),
 					orderBy("date", "asc"),
-					limit(1)
+					limit(2)
 				);
 				const questionSnap = await getDocs(questionQuery);
 
 				if (!questionSnap.empty) {
-					const questionId = questionSnap.docs[0].id;
-					const answerDocRef = doc(
-						firestore,
-						"discussion",
-						questionId,
-						"answers",
-						answerId
-					);
-					const answerDoc = await getDoc(answerDocRef);
+					if (questionSnap.docs.length == 1) {
+						const questionId = questionSnap.docs[0].id;
+						const answerDocRef = doc(
+							firestore,
+							"discussion",
+							questionId,
+							"answers",
+							answerId
+						);
+						const answerDoc = await getDoc(answerDocRef);
 
-					if (answerDoc.exists()) {
-						const data = answerDoc.data();
-						const message = data?.message;
-						if (message && typeof message === "string") {
-							return message;
+						if (answerDoc.exists()) {
+							const data = answerDoc.data();
+							const message = data?.message;
+							if (message && typeof message === "string") {
+								return message;
+							}
+						}
+					} else {
+						const auth = getAuth();
+						const uid = auth.currentUser?.uid;
+						if (!uid) return;
+						const userDocRef = doc(firestore, "users", uid);
+						const userDoc = await getDoc(userDocRef);
+						const userData = userDoc.data();
+						const school = userData?.school;
+						const questionId = questionSnap.docs[0].id;
+						const questionId2 = questionSnap.docs[1].id;
+						if (questionSnap.docs[0].data().school === school) {
+							const answerDocRef = doc(
+								firestore,
+								"discussion",
+								questionId,
+								"answers",
+								answerId
+							);
+							const answerDoc = await getDoc(answerDocRef);
+
+							if (answerDoc.exists()) {
+								const data = answerDoc.data();
+								const message = data?.message;
+								if (message && typeof message === "string") {
+									return message;
+								}
+							}
+						} else if (questionSnap.docs[1].data().school === school) {
+							const answerDocRef = doc(
+								firestore,
+								"discussion",
+								questionId2,
+								"answers",
+								answerId
+							);
+							const answerDoc = await getDoc(answerDocRef);
+
+							if (answerDoc.exists()) {
+								const data = answerDoc.data();
+								const message = data?.message;
+								if (message && typeof message === "string") {
+									return message;
+								}
+							}
 						}
 					}
 				}
@@ -230,35 +280,89 @@ export default function NotificationsScreen() {
 
 			const firestore = getFirestore();
 			for (const searchDate of searchDates) {
-				const endDate = new Date(searchDate.getTime() + 24 * 60 * 60 * 1000);
+				const endDate = new Date(
+					searchDate.getTime() + 3 * 24 * 60 * 60 * 1000
+				);
 
 				const dailyQuestionsRef = collection(firestore, "dailyQuestions");
 				const questionQuery = query(
 					dailyQuestionsRef,
 					where("date", ">=", searchDate),
+					where("date", "<", endDate),
 					orderBy("date", "asc"),
-					limit(1)
+					limit(2)
 				);
 				const questionSnap = await getDocs(questionQuery);
 
 				if (!questionSnap.empty) {
-					const questionId = questionSnap.docs[0].id;
-					const replyDocRef = doc(
-						firestore,
-						"discussion",
-						questionId,
-						"comments",
-						answerId,
-						"comment",
-						replyId
-					);
-					const replyDoc = await getDoc(replyDocRef);
+					if (questionSnap.docs.length == 1) {
+						const questionId = questionSnap.docs[0].id;
+						const replyDocRef = doc(
+							firestore,
+							"discussion",
+							questionId,
+							"comments",
+							answerId,
+							"comment",
+							replyId
+						);
+						const replyDoc = await getDoc(replyDocRef);
 
-					if (replyDoc.exists()) {
-						const data = replyDoc.data();
-						const message = data?.message;
-						if (message && typeof message === "string") {
-							return message;
+						if (replyDoc.exists()) {
+							const data = replyDoc.data();
+							const message = data?.message;
+							if (message && typeof message === "string") {
+								return message;
+							}
+						}
+					} else {
+						const auth = getAuth();
+						const uid = auth.currentUser?.uid;
+						if (!uid) return;
+						const userDocRef = doc(firestore, "users", uid);
+						const userDoc = await getDoc(userDocRef);
+						const userData = userDoc.data();
+						const school = userData?.school;
+						const questionId = questionSnap.docs[0].id;
+						const questionId2 = questionSnap.docs[1].id;
+						if (questionSnap.docs[0].data().school === school) {
+							const replyDocRef = doc(
+								firestore,
+								"discussion",
+								questionId,
+								"comments",
+								answerId,
+								"comment",
+								replyId
+							);
+							const replyDoc = await getDoc(replyDocRef);
+
+							if (replyDoc.exists()) {
+								const data = replyDoc.data();
+								const message = data?.message;
+								if (message && typeof message === "string") {
+									return message;
+								}
+							}
+						} else if (questionSnap.docs[1].data().school === school) {
+							const replyDocRef = doc(
+								firestore,
+								"discussion",
+								questionId2,
+								"comments",
+								answerId,
+								"comment",
+								replyId
+							);
+							const replyDoc = await getDoc(replyDocRef);
+
+							if (replyDoc.exists()) {
+								const data = replyDoc.data();
+								const message = data?.message;
+								if (message && typeof message === "string") {
+									return message;
+								}
+							}
 						}
 					}
 				}

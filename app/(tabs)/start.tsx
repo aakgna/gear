@@ -142,6 +142,8 @@ const StartPage = () => {
 	const [bottom, setbottom] = useState("");
 	const [messageCount, setMessageCount] = useState();
 	const [streakCount, setStreakCount] = useState(0);
+	const [questionId, setQuestionId] = useState("");
+	const [school_question, setSchoolQuestion] = useState("");
 
 	// Add these missing state variables
 	const [modalVisible, setModalVisible] = useState(false);
@@ -364,7 +366,7 @@ const StartPage = () => {
 				where("date", ">=", today),
 				where("date", "<", endOfToday),
 				orderBy("date", "asc"),
-				limit(1)
+				limit(2)
 			);
 
 			const snap = await getDocs(q);
@@ -377,6 +379,8 @@ const StartPage = () => {
 					setbottomCount(data.bottomCount || 0);
 					settop(data.top || "Agree");
 					setbottom(data.bottom || "Disagree");
+					setQuestionId(snap.docs[0].id);
+					setSchoolQuestion(data.school);
 				} else {
 					const auth = getAuth();
 					const uid = auth.currentUser?.uid;
@@ -393,12 +397,16 @@ const StartPage = () => {
 						setbottomCount(data.bottomCount || 0);
 						settop(data.top || "Agree");
 						setbottom(data.bottom || "Disagree");
+						setQuestionId(snap.docs[0].id);
+						setSchoolQuestion(data.school);
 					} else if (data2.school === school) {
 						setQuestion(data2.question || "No question text available");
 						settopCount(data2.topCount || 0);
 						setbottomCount(data2.bottomCount || 0);
 						settop(data2.top || "Agree");
 						setbottom(data2.bottom || "Disagree");
+						setQuestionId(snap.docs[1].id);
+						setSchoolQuestion(data2.school);
 					}
 				}
 			} else {
@@ -591,23 +599,15 @@ const StartPage = () => {
 			// Fix: Use proper end of day calculation
 			const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
-			const questionsRef = collection(firestore, "dailyQuestions");
-			const q = query(
-				questionsRef,
-				where("date", ">=", today),
-				where("date", "<", endOfToday),
-				orderBy("date", "asc"),
-				limit(1)
-			);
-
-			const qSnap = await getDocs(q);
-
-			if (qSnap.empty) {
+			const questionDocRef = doc(firestore, "dailyQuestions", questionId);
+			const qSnap = await getDoc(questionDocRef);
+			console.log("qSnap", qSnap.data());
+			if (!qSnap.exists()) {
 				Alert.alert("No question available for today");
 				return;
 			}
-			// Fix: Rename variable to avoid conflict with imported doc function
-			const questionDoc = qSnap.docs[0];
+			// Fix: Use the document snapshot directly since qSnap is already the document
+			const questionDoc = qSnap;
 
 			router.push({
 				pathname: "/discussion",

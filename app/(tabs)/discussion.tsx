@@ -174,12 +174,14 @@ export default function DiscussionScreen() {
 	// Fetch daily question if not passed via params (e.g., from tab bar)
 	useEffect(() => {
 		const fetchCurrentQuestion = async () => {
-			if (!question || !questionId) {
+			if (question == undefined || questionId == undefined) {
 				try {
 					const firestore = getFirestore();
 					const today = new Date();
 					today.setHours(0, 0, 0, 0); // Start of today
-					const endOfToday = new Date(today.getTime() + 24 * 60 * 60 * 1000); // End of today
+					const endOfToday = new Date(
+						today.getTime() + 3 * 24 * 60 * 60 * 1000
+					);
 
 					const questionsRef = collection(firestore, "dailyQuestions");
 					const q = query(
@@ -187,15 +189,33 @@ export default function DiscussionScreen() {
 						where("date", ">=", today),
 						where("date", "<", endOfToday),
 						orderBy("date", "asc"),
-						limit(1)
+						limit(2)
 					);
 
 					const questionDoc = await getDocs(q);
-
 					if (!questionDoc.empty) {
-						const qData = questionDoc.docs[0].data();
-						setCurrentQuestion(qData.question);
-						setCurrentQuestionId(questionDoc.docs[0].id);
+						if (questionDoc.docs.length == 1) {
+							const qData = questionDoc.docs[0].data();
+							setCurrentQuestion(qData.question);
+							setCurrentQuestionId(questionDoc.docs[0].id);
+						} else {
+							const auth = getAuth();
+							const uid = auth.currentUser?.uid;
+							if (!uid) return;
+							const userDocRef = doc(firestore, "users", uid);
+							const userDoc = await getDoc(userDocRef);
+							const userData = userDoc.data();
+							const school = userData?.school;
+							const qData1 = questionDoc.docs[0].data();
+							const qData2 = questionDoc.docs[1].data();
+							if (qData1.school === school) {
+								setCurrentQuestion(qData1.question);
+								setCurrentQuestionId(questionDoc.docs[0].id);
+							} else if (qData2.school === school) {
+								setCurrentQuestion(qData2.question);
+								setCurrentQuestionId(questionDoc.docs[1].id);
+							}
+						}
 					} else {
 						Alert.alert("No question available", "Please try again later.");
 						router.replace("/start"); // Redirect if no question found
@@ -407,23 +427,45 @@ export default function DiscussionScreen() {
 			const firestore = getFirestore();
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);
+			const endOfToday = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
 
 			const questionsRef = collection(firestore, "dailyQuestions");
 			const q = query(
 				questionsRef,
 				where("date", ">=", today),
-				where("date", "<", new Date(today.setUTCHours(24))),
+				where("date", "<", endOfToday),
 				orderBy("date", "asc"),
-				limit(1)
+				limit(2)
 			);
 
 			const questionSnap = await getDocs(q);
 
 			if (!questionSnap.empty) {
-				const questionId = questionSnap.docs[0].id;
-				const data = questionSnap.docs[0].data();
-				setCurrentQuestion(data.question);
-				setCurrentQuestionId(questionId);
+				if (questionSnap.docs.length == 1) {
+					const questionId = questionSnap.docs[0].id;
+					const data = questionSnap.docs[0].data();
+					setCurrentQuestion(data.question);
+					setCurrentQuestionId(questionId);
+				} else {
+					const auth = getAuth();
+					const uid = auth.currentUser?.uid;
+					if (!uid) return;
+					const userDocRef = doc(firestore, "users", uid);
+					const userDoc = await getDoc(userDocRef);
+					const userData = userDoc.data();
+					const school = userData?.school;
+					const questionId1 = questionSnap.docs[0].id;
+					const questionId2 = questionSnap.docs[1].id;
+					const data1 = questionSnap.docs[0].data();
+					const data2 = questionSnap.docs[1].data();
+					if (data1.school === school) {
+						setCurrentQuestion(data1.question);
+						setCurrentQuestionId(questionId1);
+					} else if (data2.school === school) {
+						setCurrentQuestion(data2.question);
+						setCurrentQuestionId(questionId2);
+					}
+				}
 			}
 		} catch (e) {
 			router.navigate("/(tabs)/start");
