@@ -61,10 +61,24 @@ export default function SignInScreen() {
 					const todayDate = today.toISOString().substring(0, 10);
 					let school = user.email?.split("@")[1];
 					school = school?.split(".")[0];
-					if (school == "ucr" || school == "scu") {
+					if (school == "ucr" || school == "berkeley") {
 						await setDoc(userDocRef, {
 							email: user.email,
 							school: school,
+							strikes: 6,
+							strikeCount: 0,
+							messageCount: 100,
+							voted: false,
+							updatedAt: todayDate,
+							createdAt: todayDate,
+						});
+					} else if (user.email?.split("@")[0] == "thecommonground366") {
+						const today = new Date();
+						today.setHours(0, 0, 0, 0);
+						const todayDate = today.toISOString().substring(0, 10);
+						await setDoc(userDocRef, {
+							email: user.email,
+							school: "berkeley",
 							strikes: 6,
 							strikeCount: 0,
 							messageCount: 100,
