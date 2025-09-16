@@ -102,7 +102,7 @@ export default function HistoryScreen() {
 				const questions = snapshot.docs
 					.map((doc: any) => {
 						const data = doc.data();
-						if (data.school && data.school == school) {
+						if (data.school !== undefined || data.school == school) {
 							const totalResponses =
 								(data.topCount || 0) + (data.bottomCount || 0);
 							const agreePercentage = totalResponses
@@ -123,7 +123,7 @@ export default function HistoryScreen() {
 								top: data.top,
 								bottom: data.bottom,
 							};
-						} else if (!data.school) {
+						} else if (data.school == undefined) {
 							const totalResponses =
 								(data.topCount || 0) + (data.bottomCount || 0);
 							const agreePercentage = totalResponses
@@ -199,7 +199,7 @@ export default function HistoryScreen() {
 				.map((doc: any) => {
 					const data = doc.data();
 					// Skip questions that don't match the user's school
-					if (!data.school || data.school !== school) {
+					if (data.school !== undefined && data.school !== school) {
 						return null;
 					}
 
