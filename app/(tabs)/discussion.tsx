@@ -369,6 +369,7 @@ export default function DiscussionScreen() {
 					});
 				}, 500);
 			}
+			router.setParams({ scrollToMessage: undefined });
 		}
 	}, [scrollToMessage, messages]);
 
@@ -386,6 +387,7 @@ export default function DiscussionScreen() {
 				setThreadParentMessage(parentMsg);
 				setThreadModalVisible(true);
 			}
+			router.setParams({ openThread: undefined });
 		}
 	}, [openThread, messages]);
 
@@ -967,14 +969,13 @@ function ThreadModal({
 		Record<string, number>
 	>({});
 	const repliesScrollViewRef = useRef<ScrollView>(null);
-	const [hasScrolledToReply, setHasScrolledToReply] = useState(false);
 
 	const params = useLocalSearchParams();
 	const { scrollToReply } = params as { scrollToReply?: string };
 
 	// Auto-scroll to specific reply when scrollToReply parameter is provided
 	useEffect(() => {
-		if (scrollToReply && replies.length > 0 && visible && !hasScrolledToReply) {
+		if (scrollToReply && replies.length > 0 && visible) {
 			// Find the reply to scroll to
 			const targetReplyIndex = replies.findIndex(
 				(reply) => reply.id === scrollToReply
@@ -987,11 +988,11 @@ function ThreadModal({
 						y: scrollPosition,
 						animated: true,
 					});
-					setHasScrolledToReply(true); // Mark as completed
 				}, 500);
 			}
+			router.setParams({ scrollToReply: undefined });
 		}
-	}, [scrollToReply, replies, visible, hasScrolledToReply]);
+	}, [scrollToReply, replies, visible]);
 
 	// Subscribe to replies for the parent message
 	useEffect(() => {
