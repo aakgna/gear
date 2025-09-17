@@ -1319,12 +1319,17 @@ function ThreadModal({
 		});
 	};
 
+	const handleClose = () => {
+		setReplies([]); // Clear replies
+		onClose(); // Call the original onClose function
+	};
+
 	return (
 		<Modal
 			visible={visible}
 			animationType="slide"
 			transparent={true}
-			onRequestClose={onClose}
+			onRequestClose={handleClose} // Changed from onClose
 		>
 			<View style={threadStyles.modalOverlay}>
 				<KeyboardAvoidingView
@@ -1337,7 +1342,7 @@ function ThreadModal({
 						<View style={threadStyles.modalHeader}>
 							<Text style={threadStyles.modalTitle}>Thread</Text>
 							<TouchableOpacity
-								onPress={onClose}
+								onPress={handleClose} // Changed from onClose
 								style={threadStyles.closeButton}
 							>
 								<X size={24} color="#9D00FF" />
