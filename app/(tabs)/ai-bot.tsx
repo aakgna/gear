@@ -393,7 +393,6 @@ const AIBotPage = () => {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#9D00FF" />
-          <Text style={styles.backText}>Back</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Agora AI</Text>
         <View style={styles.placeholder} />
@@ -473,15 +472,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingRight: 10,
   },
-  backText: {
-    color: "#9D00FF",
-    fontSize: 18,
-    marginLeft: 8,
-    fontFamily: "Inter-Medium",
-  },
+
   headerTitle: {
     fontSize: 30,
-    paddingRight: 25,
     fontWeight: "bold",
     color: "#FFFFFF",
     fontFamily: "Inter-Bold",

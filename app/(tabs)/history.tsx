@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 30,
     color: "#ffffff",
     fontFamily: "Inter-Bold",
     fontWeight: "bold",

@@ -346,7 +346,6 @@ export default function DiscussionScreen() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   };
   useEffect(() => {
-    console.log(scrollToMessage);
     if (
       messages.length > prevMessageCount.current &&
       scrollToMessage == undefined
@@ -772,7 +771,6 @@ export default function DiscussionScreen() {
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={handleBack}>
           <ArrowLeft size={24} color="#9D00FF" />
-          <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         {/* Notification Button */}
@@ -1614,12 +1612,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backButton: { flexDirection: "row", alignItems: "center" },
-  backText: {
-    color: "#9D00FF",
-    fontSize: 18,
-    marginLeft: 8,
-    fontFamily: "Inter-Medium",
-  },
+
   notificationButton: {
     position: "relative",
     padding: 4,
