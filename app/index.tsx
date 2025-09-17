@@ -152,13 +152,10 @@ export default function SignInScreen() {
 			const hasPlayServices = await GoogleSignin.hasPlayServices({
 				showPlayServicesUpdateDialog: true,
 			});
-			console.log("hasPlayServices", hasPlayServices);
 			// Get the user's ID token
 			const signInResult = await GoogleSignin.signIn();
-			console.log("signInResult", signInResult);
 			// Handle different versions of google-signin library
 			let idToken = signInResult.data?.idToken;
-			console.log("idToken", idToken);
 			if (!idToken) {
 				idToken = signInResult.idToken;
 			}
@@ -167,10 +164,8 @@ export default function SignInScreen() {
 			}
 			// Create a Google credential with the token
 			const googleCredential = GoogleAuthProvider.credential(idToken);
-			console.log("googleCredential", googleCredential);
 			// Sign-in the user with the credential
 			const auth = getAuth();
-			console.log("auth", auth);
 			await signInWithCredential(auth, googleCredential);
 			// Navigation will be handled by the onAuthStateChanged listener
 		} catch (error) {
