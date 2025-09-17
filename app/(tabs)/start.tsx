@@ -191,6 +191,7 @@ const StartPage = () => {
       checkForUpdate();
       checkUserVote();
       fetchDailyQuestion();
+      checkStreak();
     }
   }, [app]);
 
@@ -215,6 +216,10 @@ const StartPage = () => {
       if (data?.strikes !== undefined) {
         setStrikes(data.strikes);
         setMessageCount(data.messageCount);
+      }
+      // {{ edit_1 }}
+      if (data?.streakCount !== undefined) {
+        setStreakCount(data.streakCount); // ✨ ADDED: Update streakCount from snapshot
       }
       if (data?.createdAt) {
         const today = new Date();
