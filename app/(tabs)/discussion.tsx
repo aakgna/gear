@@ -967,13 +967,14 @@ function ThreadModal({
 		Record<string, number>
 	>({});
 	const repliesScrollViewRef = useRef<ScrollView>(null);
+	const [hasScrolledToReply, setHasScrolledToReply] = useState(false);
 
 	const params = useLocalSearchParams();
 	const { scrollToReply } = params as { scrollToReply?: string };
 
 	// Auto-scroll to specific reply when scrollToReply parameter is provided
 	useEffect(() => {
-		if (scrollToReply && replies.length > 0 && visible) {
+		if (scrollToReply && replies.length > 0 && visible && !hasScrolledToReply) {
 			// Find the reply to scroll to
 			const targetReplyIndex = replies.findIndex(
 				(reply) => reply.id === scrollToReply
@@ -986,10 +987,11 @@ function ThreadModal({
 						y: scrollPosition,
 						animated: true,
 					});
+					setHasScrolledToReply(true); // Mark as completed
 				}, 500);
 			}
 		}
-	}, [scrollToReply, replies, visible]);
+	}, [scrollToReply, replies, visible, hasScrolledToReply]);
 
 	// Subscribe to replies for the parent message
 	useEffect(() => {
