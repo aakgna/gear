@@ -106,6 +106,12 @@ export default function DiscussionScreen() {
 	const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
 	const prevMessageCount = useRef(messages.length);
 
+	// Add to your component state
+	const [messageHeights, setMessageHeights] = useState<Record<string, number>>(
+		{}
+	);
+	const [cumulativeHeights, setCumulativeHeights] = useState<number[]>([]);
+
 	// Notification state
 	const [notifications, setNotifications] = useState<any[]>([]);
 	const [notificationsSeen, setNotificationsSeen] = useState(0);
@@ -349,29 +355,30 @@ export default function DiscussionScreen() {
 		prevMessageCount.current = messages.length;
 	}, [messages.length]);
 
-	// Auto-scroll to specific message when scrollToMessage parameter is provided
+	// Replace your scroll-to-message useEffect with this perfect version
 	useEffect(() => {
-		if (scrollToMessage && messages.length > 0) {
+		if (
+			scrollToMessage &&
+			messages.length > 0 &&
+			cumulativeHeights.length > 0
+		) {
 			const targetMessageIndex = messages.findIndex(
 				(msg) => msg.id === scrollToMessage
 			);
 			if (targetMessageIndex !== -1) {
 				setTimeout(() => {
-					// More accurate height estimation based on your styles
-					const estimatedMessageHeight = 120; // Adjust based on your actual message height
-					const headerHeight = 60; // Account for any header spacing
-					const scrollPosition =
-						targetMessageIndex * estimatedMessageHeight - headerHeight;
+					const scrollPosition = cumulativeHeights[targetMessageIndex];
+					const headerHeight = 60;
 
 					scrollViewRef.current?.scrollTo({
-						y: Math.max(0, scrollPosition), // Ensure we don't scroll to negative position
+						y: Math.max(0, scrollPosition - headerHeight),
 						animated: true,
 					});
 				}, 500);
 			}
 			router.setParams({ scrollToMessage: undefined });
 		}
-	}, [scrollToMessage, messages]);
+	}, [scrollToMessage, messages, cumulativeHeights]);
 
 	// Auto-open thread modal if openThread parameter is provided
 	useEffect(() => {
@@ -819,6 +826,23 @@ export default function DiscussionScreen() {
 								key={msg.id}
 								// entering={SlideInDown.delay(i * 60).duration(180)}
 								style={styles.messageWrapper}
+								onLayout={(event) => {
+									const { height } = event.nativeEvent.layout;
+									setMessageHeights((prev) => {
+										const updated = { ...prev, [msg.id]: height };
+
+										// Recalculate cumulative heights when a message height changes
+										const newCumulativeHeights: number[] = [];
+										let runningTotal = 0;
+										messages.forEach((message, index) => {
+											newCumulativeHeights.push(runningTotal);
+											runningTotal += updated[message.id] || 120; // fallback to estimate
+										});
+										setCumulativeHeights(newCumulativeHeights);
+
+										return updated;
+									});
+								}}
 							>
 								<LinearGradient
 									colors={["#222222", "#1A1A1A"]}
@@ -970,12 +994,23 @@ function ThreadModal({
 	>({});
 	const repliesScrollViewRef = useRef<ScrollView>(null);
 
+	// Add height tracking for replies
+	const [replyHeights, setReplyHeights] = useState<Record<string, number>>({});
+	const [replyCumulativeHeights, setReplyCumulativeHeights] = useState<
+		number[]
+	>([]);
+
 	const params = useLocalSearchParams();
 	const { scrollToReply } = params as { scrollToReply?: string };
 
-	// Auto-scroll to specific reply when scrollToReply parameter is provided
+	// Replace your scroll-to-reply useEffect with this perfect version
 	useEffect(() => {
-		if (scrollToReply && replies.length > 0 && visible) {
+		if (
+			scrollToReply &&
+			replies.length > 0 &&
+			visible &&
+			replyCumulativeHeights.length > 0
+		) {
 			// Find the reply to scroll to
 			const targetReplyIndex = replies.findIndex(
 				(reply) => reply.id === scrollToReply
@@ -983,16 +1018,18 @@ function ThreadModal({
 			if (targetReplyIndex !== -1) {
 				// Scroll to the specific reply with a delay
 				setTimeout(() => {
-					const scrollPosition = targetReplyIndex * 80; // Approximate height per reply
+					const scrollPosition = replyCumulativeHeights[targetReplyIndex];
+					const headerHeight = 60;
+
 					repliesScrollViewRef.current?.scrollTo({
-						y: scrollPosition,
+						y: Math.max(0, scrollPosition - headerHeight),
 						animated: true,
 					});
 				}, 500);
 			}
 			router.setParams({ scrollToReply: undefined });
 		}
-	}, [scrollToReply, replies, visible]);
+	}, [scrollToReply, replies, visible, replyCumulativeHeights]);
 
 	// Subscribe to replies for the parent message
 	useEffect(() => {
@@ -1366,6 +1403,23 @@ function ThreadModal({
 									key={reply.id}
 									style={threadStyles.replyCard}
 									entering={FadeIn}
+									onLayout={(event) => {
+										const { height } = event.nativeEvent.layout;
+										setReplyHeights((prev) => {
+											const updated = { ...prev, [reply.id]: height };
+
+											// Recalculate cumulative heights when a reply height changes
+											const newCumulativeHeights: number[] = [];
+											let runningTotal = 0;
+											replies.forEach((replyItem, index) => {
+												newCumulativeHeights.push(runningTotal);
+												runningTotal += updated[replyItem.id] || 80; // fallback to estimate
+											});
+											setReplyCumulativeHeights(newCumulativeHeights);
+
+											return updated;
+										});
+									}}
 								>
 									<Text style={threadStyles.replyText}>{reply.text}</Text>
 									<Text style={threadStyles.timestampText}>
