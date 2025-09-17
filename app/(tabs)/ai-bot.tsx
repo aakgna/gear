@@ -31,6 +31,35 @@ import {
 } from "@react-native-firebase/firestore";
 import { useLocalSearchParams } from "expo-router";
 
+// NEW: daily limit helpers
+const DAILY_LIMIT = 6;
+const todayKey = () => new Date().toISOString().substring(0, 10);
+const LIMIT_FIELDS = { count: "aiMsgCount", day: "aiMsgDay" } as const;
+
+// NEW: ensure the counter exists and is for today; reset if not
+async function ensureDailyCounter(firestore: any, userId: string) {
+  const userDocRef = doc(firestore, "users", userId);
+  const snap = await getDoc(userDocRef);
+  const data = snap.exists() ? (snap.data() as any) : {};
+  const today = todayKey();
+
+  if (data?.[LIMIT_FIELDS.day] !== today) {
+    await updateDoc(userDocRef, {
+      [LIMIT_FIELDS.day]: today,
+      [LIMIT_FIELDS.count]: 0,
+    });
+    return { count: 0, day: today, ref: userDocRef };
+  }
+  return {
+    count:
+      typeof data?.[LIMIT_FIELDS.count] === "number"
+        ? data[LIMIT_FIELDS.count]
+        : 0,
+    day: data?.[LIMIT_FIELDS.day] || today,
+    ref: userDocRef,
+  };
+}
+
 const AIBotPage = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -80,6 +109,21 @@ const AIBotPage = () => {
     }
   }, []);
 
+  // NEW: on mount, normalize/initialize the daily counter
+  useEffect(() => {
+    (async () => {
+      try {
+        const auth = getAuth();
+        const userId = auth.currentUser?.uid;
+        if (!userId) return;
+        const firestore = getFirestore();
+        await ensureDailyCounter(firestore, userId);
+      } catch (e) {
+        // ignore; limit will be enforced again on send
+      }
+    })();
+  }, []);
+
   // Load conversation history on component mount
   useEffect(() => {
     const loadConversationHistory = async () => {
@@ -121,17 +165,14 @@ const AIBotPage = () => {
           );
 
           for (let i = 0; i < maxLength; i++) {
-            // Add user question if it exists
             if (questionHistory[i]) {
               historyMessages.push({
                 id: `history-q-${i}`,
                 text: questionHistory[i],
                 isUser: true,
-                timestamp: new Date(Date.now() - (maxLength - i) * 60000), // Space them out by minutes
+                timestamp: new Date(Date.now() - (maxLength - i) * 60000),
               });
             }
-
-            // Add AI answer if it exists
             if (answerHistory[i]) {
               historyMessages.push({
                 id: `history-a-${i}`,
@@ -139,7 +180,7 @@ const AIBotPage = () => {
                 isUser: false,
                 timestamp: new Date(
                   Date.now() - (maxLength - i) * 60000 + 30000
-                ), // 30 seconds after question
+                ),
               });
             }
           }
@@ -148,7 +189,6 @@ const AIBotPage = () => {
         }
       } catch (error) {
         console.error("Error loading conversation history:", error);
-        // Keep default messages if history loading fails
       }
     };
 
@@ -158,20 +198,7 @@ const AIBotPage = () => {
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const userMessage = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      isUser: true,
-      timestamp: new Date(),
-    };
-
-    // Add user message and verify it's added
-    await setMessages((prev) => {
-      const newMessages = [...prev, userMessage];
-      return newMessages;
-    });
-    setInputText("");
-    setIsLoading(true);
+    setIsLoading(true); // set early so UI shows typing if allowed
 
     try {
       // Get current user
@@ -184,6 +211,28 @@ const AIBotPage = () => {
         return;
       }
 
+      // NEW: enforce daily limit *before* sending
+      const firestore = getFirestore();
+      const { count, ref } = await ensureDailyCounter(firestore, userId);
+      if (count >= DAILY_LIMIT) {
+        setIsLoading(false);
+        Alert.alert(
+          "Daily limit reached",
+          "You’ve used your 6 messages for today. Come back tomorrow for the new discussion."
+        );
+        return;
+      }
+
+      const userMessage = {
+        id: Date.now().toString(),
+        text: inputText.trim(),
+        isUser: true,
+        timestamp: new Date(),
+      };
+
+      await setMessages((prev) => [...prev, userMessage]);
+      setInputText("");
+
       // Fetch today's question for context
       let topic = question || "No topic provided";
 
@@ -191,16 +240,29 @@ const AIBotPage = () => {
         {
           role: "system",
           content:
-            "You are a helpful research assistant for a debate app. This is the topic: " +
+            "You are a concise and helpful research assistant for a debate app." +
+            "This is the topic: " +
             topic +
-            ". Please do not output any special characters including Bold, Italic, Underline, endline, etc.",
+            "Please give your response in under 500 characters." +
+            "Make sure to finish off the sentence and not to leave any unfinished sentences or words" +
+            "For simple questions, give a short direct answer with one sentence or at most 80 charcters. " +
+            "For more complex questions, use the limit of 500 characters but try to answer within 300 characters when possible." +
+            "Please do not output any special characters including Bold, Italic, Underline, endline, etc." +
+            "This is especially important -Answer only the users question without adding unnecessary information." +
+            "Example:" +
+            "Q: What is the captial of France" +
+            "A: The captial of France is Paris" +
+            "Q: How many pints in a gallon?" +
+            "A: There are 8 pints in a gallon" +
+            "Q: What are the pros and cons of universal income" +
+            "A: It can reduce poverty and simplify welfare; critics cite cost, inflation risk, and reduced work incentives",
         },
       ];
 
       // Build conversation history for context (including stored history)
       const recentMessages = messages
-        .filter((msg) => msg.id !== "1") // Exclude the initial greeting
-        .slice(-10) // Get last 10 messages
+        .filter((msg) => msg.id !== "1")
+        .slice(-10)
         .map((msg) => ({
           role: msg.isUser ? "user" : "assistant",
           content: msg.text,
@@ -230,7 +292,8 @@ const AIBotPage = () => {
         });
       }
 
-      console.log("input Nigga", input);
+      // NOTE: consider renaming this console to something neutral
+      console.log("input payload", input);
 
       // Call Perplexity API through Firebase Cloud Function
       const response = await fetch(
@@ -245,35 +308,40 @@ const AIBotPage = () => {
       );
       const data = await response.json();
 
-      // Check response status first
       if (!response.ok) {
         throw new Error(data.error || "Failed to get AI response");
       }
-
-      // Validate that we have a reply
       if (!data.reply) {
         throw new Error("No reply received from AI service");
       }
 
       let responseData = data.reply;
-      // Remove citation patterns like [1], [2], etc.
       responseData = responseData.replace(/\[\d+\]/g, "");
-
       responseData = responseData.replace("*", "");
 
       const aiResponse = {
         id: (Date.now() + 1).toString(),
-        text: responseData, // ✅ Use cleaned data
+        text: responseData,
         isUser: false,
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, aiResponse]);
-      const firestore = getFirestore();
-      const userDoc = doc(firestore, "users", userId);
-      await updateDoc(userDoc, {
+
+      // Persist histories
+      await updateDoc(ref, {
         answerHistory: arrayUnion(responseData),
-        questionHistory: arrayUnion(inputText.trim()),
+        questionHistory: arrayUnion(userMessage.text),
+      });
+
+      // NEW: increment the daily counter AFTER successful response
+      const fresh = await getDoc(ref);
+      const cur = fresh.exists()
+        ? (fresh.data() as any)[LIMIT_FIELDS.count] || 0
+        : count;
+      await updateDoc(ref, {
+        [LIMIT_FIELDS.day]: todayKey(),
+        [LIMIT_FIELDS.count]: cur + 1,
       });
     } catch (error) {
       console.error("Error calling AI API:", error);
@@ -326,7 +394,8 @@ const AIBotPage = () => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={24} color="#FFFFFF" />
+          <ArrowLeft size={24} color="#9D00FF" />
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Agora AI</Text>
         <View style={styles.placeholder} />
@@ -401,10 +470,20 @@ const styles = StyleSheet.create({
     borderBottomColor: "#333333",
   },
   backButton: {
-    padding: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingRight: 10,
+  },
+  backText: {
+    color: "#9D00FF",
+    fontSize: 18,
+    marginLeft: 8,
+    fontFamily: "Inter-Medium",
   },
   headerTitle: {
     fontSize: 30,
+    paddingRight: 25,
     fontWeight: "bold",
     color: "#FFFFFF",
     fontFamily: "Inter-Bold",
