@@ -50,8 +50,7 @@ import {
   X,
   Heart,
   Reply,
-  Bell,
-  MessageCircle,
+  Mailbox,
 } from "lucide-react-native";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -778,7 +777,7 @@ export default function DiscussionScreen() {
           style={styles.notificationButton}
           onPress={handleNotificationPress}
         >
-          <Bell size={24} color="#9D00FF" />
+          <Mailbox size={24} color="#9D00FF" />
           {unreadCount > 0 && (
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>
@@ -1377,7 +1376,8 @@ function ThreadModal({
           keyboardVerticalOffset={0}
         >
           <View style={threadStyles.modalContainer}>
-            {/* Header with X button */}
+            {/* 
+			 with X button */}
             <View style={threadStyles.modalHeader}>
               <Text style={threadStyles.modalTitle}>Thread</Text>
               <TouchableOpacity
@@ -1611,7 +1611,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  backButton: { flexDirection: "row", alignItems: "center" },
+  backButton: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
 
   notificationButton: {
     position: "relative",
@@ -1621,7 +1621,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -2,
     right: -2,
-    backgroundColor: "#FF4444",
+    backgroundColor: "#800080",
     borderRadius: 10,
     minWidth: 20,
     height: 20,

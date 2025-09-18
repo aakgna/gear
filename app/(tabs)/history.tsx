@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import Animated, { SlideInRight } from "react-native-reanimated";
@@ -266,7 +267,9 @@ export default function HistoryScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Previous Questions</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#9D00FF" />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -400,16 +403,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
   header: {
-    paddingTop: 60,
+    paddingTop: Platform.OS === "ios" ? 60 : 30, // Adjusted padding for consistency
     paddingHorizontal: 24,
-    marginBottom: 20,
+    marginBottom: 12,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
-  headerTitle: {
-    fontSize: 30,
-    color: "#ffffff",
-    fontFamily: "Inter-Bold",
-    fontWeight: "bold",
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
   },
   content: {
     flex: 1,

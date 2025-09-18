@@ -167,9 +167,9 @@ export default function ExpandedQuestionScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={{ color: "#fff", textAlign: "center", marginTop: 40 }}>
+        {/* <Text style={{ color: "#fff", textAlign: "center", marginTop: 40 }}>
           Loading...
-        </Text>
+        </Text> */}
       </View>
     );
   }
@@ -177,9 +177,9 @@ export default function ExpandedQuestionScreen() {
   if (!question) {
     return (
       <View style={styles.container}>
-        <Text style={{ color: "#fff", textAlign: "center", marginTop: 40 }}>
+        {/* <Text style={{ color: "#fff", textAlign: "center", marginTop: 40 }}>
           Question not found.
-        </Text>
+        </Text> */}
       </View>
     );
   }
