@@ -70,7 +70,7 @@ const AIBotPage = () => {
 	>([
 		{
 			id: "1",
-			text: "Hi! I'm Agora, your AI assistant. Ask me anything about today's topic or any other questions you have.",
+			text: "Hi! I'm Agora, your AI assistant. You have 6 messages per day, so ask the right questions about today's topic or anything else you're curious about!",
 			isUser: false,
 			timestamp: new Date(),
 		},
@@ -154,7 +154,7 @@ const AIBotPage = () => {
 					// Add initial greeting
 					historyMessages.push({
 						id: "1",
-						text: "Hi! I'm Agora, your AI assistant. Ask me anything about today's topic or any other questions you have.",
+						text: "Hi! I'm Agora, your AI assistant. You have 6 messages per day, so ask the right questions about today's topic or anything else you're curious about!",
 						isUser: false,
 						timestamp: new Date(),
 					});

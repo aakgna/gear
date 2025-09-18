@@ -12,7 +12,7 @@
 			"supportsTablet": true,
 			"bundleIdentifier": "com.aakgna.commongroundquestions",
 			"googleServicesFile": "./GoogleService-Info.plist",
-			"buildNumber": "5"
+			"buildNumber": "6"
 		},
 		"android": {
 			"versionCode": 13,
