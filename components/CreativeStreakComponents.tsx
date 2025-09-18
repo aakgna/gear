@@ -74,7 +74,9 @@ export const ProgressDots = ({ streakCount }: { streakCount: number }) => {
 	return (
 		<View style={styles.dotsContainer}>
 			<View style={styles.dotsRow}>{renderDots()}</View>
-			<Text style={styles.dotsCounter}>{streakCount} days</Text>
+			<Text style={styles.dotsCounter}>
+				{streakCount.toLocaleString()} {streakCount === 1 ? "day" : "days"}
+			</Text>
 		</View>
 	);
 };

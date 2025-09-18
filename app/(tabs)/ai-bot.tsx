@@ -468,18 +468,19 @@ const styles = StyleSheet.create({
 		backgroundColor: "#121212",
 	},
 	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "flex-start",
 		paddingTop: Platform.OS === "ios" ? 60 : 30,
 		paddingHorizontal: 24,
 		marginBottom: 12,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
 	},
 	backButton: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginTop: 2,
+		marginBottom: 4,
 	},
+
 	backText: {
 		color: "#9D00FF",
 		fontSize: 18,

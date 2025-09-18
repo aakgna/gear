@@ -148,7 +148,9 @@ export default function SignInScreen() {
 					[
 						{
 							text: "Update",
-							onPress: () => Linking.openURL(storeURL),
+							onPress: async () => {
+								Linking.openURL(storeURL);
+							},
 						},
 					],
 					{ cancelable: false }

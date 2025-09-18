@@ -886,9 +886,6 @@ const StartPage = () => {
 									<Text style={styles.underDiscussionButtonText}>
 										Messages Remaining: {messageCount}
 									</Text>
-									<Text style={styles.strikesText}>
-										Strikes Remaining: {strikes}
-									</Text>
 								</Pressable>
 
 								{/* Need Info pill below Join Discussion */}
