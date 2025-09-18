@@ -88,6 +88,21 @@ export default function SignInScreen() {
 						});
 					} else {
 						await user.delete();
+						Alert.alert(
+							"School Not Found",
+							"It looks like your school is not in our system yet. Please fill out this form to request it be added.",
+							[
+								{
+									text: "Submit Form",
+									onPress: () =>
+										Linking.openURL(
+											"https://docs.google.com/forms/d/e/1FAIpQLSc3rHKJ0B5pST33mAB79_JGxoGXHieGp_XmNiAssqm5dZQN2A/viewform?usp=header"
+										),
+								},
+							],
+							{ cancelable: false }
+						);
+
 						return;
 					}
 				}
@@ -335,7 +350,9 @@ export default function SignInScreen() {
 										style={styles.googleIcon}
 									/>
 									<Text style={styles.buttonText}>
-										{isLoading ? "Signing in..." : "Continue with Google"}
+										{isLoading
+											? "Signing in..."
+											: "Continue with your school email"}
 									</Text>
 								</View>
 							</LinearGradient>
