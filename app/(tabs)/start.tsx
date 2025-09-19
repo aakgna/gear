@@ -83,29 +83,29 @@ const getBadgeForStreak = (streakCount: number) => {
 	if (streakCount >= 360) {
 		return { icon: Atom, color: "#FFD700", name: "Legend" }; // Pure Gold
 	} else if (streakCount >= 320) {
-		return { icon: Rocket, color: "#FFA500", name: "Trailblazer" }; // Orange Gold
+		return { icon: Rocket, color: "#F4C430", name: "Trailblazer" }; // Saffron Gold
 	} else if (streakCount >= 280) {
-		return { icon: Earth, color: "#FF8C00", name: "Pioneer" }; // Dark Orange
+		return { icon: Earth, color: "#DAA520", name: "Pioneer" }; // Goldenrod
 	} else if (streakCount >= 240) {
-		return { icon: Sun, color: "#FF6347", name: "Luminary" }; // Orange Red
+		return { icon: Sun, color: "#B8860B", name: "Luminary" }; // Dark Goldenrod
 	} else if (streakCount >= 200) {
-		return { icon: Biohazard, color: "#FF4500", name: "Sage" }; // Red Orange
+		return { icon: Biohazard, color: "#CD853F", name: "Sage" }; // Peru (warm brown-gold)
 	} else if (streakCount >= 160) {
-		return { icon: Cloudy, color: "#DC143C", name: "Visionary" }; // Crimson
+		return { icon: Cloudy, color: "#D2691E", name: "Visionary" }; // Chocolate (warm brown)
 	} else if (streakCount >= 120) {
-		return { icon: PersonStanding, color: "#B22222", name: "Mentor" }; // Fire Brick
+		return { icon: PersonStanding, color: "#A0522D", name: "Mentor" }; // Sienna (warm brown)
 	} else if (streakCount >= 80) {
-		return { icon: BrainCircuit, color: "#8B008B", name: "Thought Leader" }; // Dark Magenta
+		return { icon: BrainCircuit, color: "#8B4513", name: "Thought Leader" }; // Saddle Brown
 	} else if (streakCount >= 40) {
-		return { icon: Sparkles, color: "#9932CC", name: "Insightful" }; // Dark Orchid
+		return { icon: Sparkles, color: "#6B4423", name: "Insightful" }; // Dark brown
 	} else if (streakCount >= 20) {
-		return { icon: Mic, color: "#9370DB", name: "Debater" }; // Medium Slate Blue
+		return { icon: Mic, color: "#5D4E75", name: "Debater" }; // Purple-brown transition
 	} else if (streakCount >= 10) {
-		return { icon: Speech, color: "#8A2BE2", name: "Conversationalist" }; // Blue Violet
+		return { icon: Speech, color: "#6A5ACD", name: "Conversationalist" }; // Slate Blue
 	} else if (streakCount >= 5) {
 		return { icon: Hand, color: "#9D00FF", name: "Participant" }; // Your brand purple
 	} else if (streakCount >= 0) {
-		return { icon: Baby, color: "#7B68EE", name: "Newcomer" }; // Medium Slate Blue
+		return { icon: Baby, color: "#8A2BE2", name: "Newcomer" }; // Blue Violet
 	}
 	return null;
 };
@@ -113,28 +113,28 @@ const getBadgeForStreak = (streakCount: number) => {
 // Update the badge tiers to match
 const getNextBadgeForStreak = (streakCount: number) => {
 	const badgeTiers = [
-		{ threshold: 0, icon: Baby, color: "#7B68EE", name: "Newcomer" },
+		{ threshold: 0, icon: Baby, color: "#8A2BE2", name: "Newcomer" },
 		{ threshold: 5, icon: Hand, color: "#9D00FF", name: "Participant" },
 		{
 			threshold: 10,
 			icon: Speech,
-			color: "#8A2BE2",
+			color: "#6A5ACD",
 			name: "Conversationalist",
 		},
-		{ threshold: 20, icon: Mic, color: "#9370DB", name: "Debater" },
-		{ threshold: 40, icon: Sparkles, color: "#9932CC", name: "Insightful" },
+		{ threshold: 20, icon: Mic, color: "#5D4E75", name: "Debater" },
+		{ threshold: 40, icon: Sparkles, color: "#6B4423", name: "Insightful" },
 		{
 			threshold: 80,
 			icon: BrainCircuit,
-			color: "#8B008B",
+			color: "#8B4513",
 			name: "Thought Leader",
 		},
-		{ threshold: 120, icon: PersonStanding, color: "#B22222", name: "Mentor" },
-		{ threshold: 160, icon: Cloudy, color: "#DC143C", name: "Visionary" },
-		{ threshold: 200, icon: Biohazard, color: "#FF4500", name: "Sage" },
-		{ threshold: 240, icon: Sun, color: "#FF6347", name: "Luminary" },
-		{ threshold: 280, icon: Earth, color: "#FF8C00", name: "Pioneer" },
-		{ threshold: 320, icon: Rocket, color: "#FFA500", name: "Trailblazer" },
+		{ threshold: 120, icon: PersonStanding, color: "#A0522D", name: "Mentor" },
+		{ threshold: 160, icon: Cloudy, color: "#D2691E", name: "Visionary" },
+		{ threshold: 200, icon: Biohazard, color: "#CD853F", name: "Sage" },
+		{ threshold: 240, icon: Sun, color: "#B8860B", name: "Luminary" },
+		{ threshold: 280, icon: Earth, color: "#DAA520", name: "Pioneer" },
+		{ threshold: 320, icon: Rocket, color: "#F4C430", name: "Trailblazer" },
 		{ threshold: 360, icon: Atom, color: "#FFD700", name: "Legend" },
 	];
 
