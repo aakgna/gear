@@ -1,4 +1,5 @@
 // StartPage.tsx
+// StartPage.tsx
 import React, { useState, useEffect, useRef } from "react";
 import {
 	logDailyOpen,
@@ -55,9 +56,21 @@ import {
 	BellOff,
 	Star,
 	Trophy,
-	Award,
+	Biohazard,
 	Crown,
 	Gem,
+	Baby,
+	Hand,
+	Speech,
+	Mic,
+	Sparkles,
+	Atom,
+	BrainCircuit,
+	PersonStanding,
+	Cloudy,
+	Sun,
+	Earth,
+	Rocket,
 } from "lucide-react-native";
 import DeviceInfo from "react-native-device-info";
 import { useLayoutEffect } from "react";
@@ -68,62 +81,226 @@ import { ProgressDots } from "@/components/CreativeStreakComponents";
 
 const getBadgeForStreak = (streakCount: number) => {
 	if (streakCount >= 360) {
-		return { icon: Award, color: "#9370DB", name: "Legendary" }; // Lavender
+		return { icon: Atom, color: "#FFD700", name: "Legend" }; // Pure Gold
 	} else if (streakCount >= 320) {
-		return { icon: Trophy, color: "#9370DB", name: "Plum" }; // Plum
+		return { icon: Rocket, color: "#FFA500", name: "Trailblazer" }; // Orange Gold
 	} else if (streakCount >= 280) {
-		return { icon: Crown, color: "#6A5ACD", name: "Orchid" }; // Orchid
+		return { icon: Earth, color: "#FF8C00", name: "Pioneer" }; // Dark Orange
 	} else if (streakCount >= 240) {
-		return { icon: Gem, color: "#6A5ACD", name: "Medium Orchid" }; // Medium Orchid
+		return { icon: Sun, color: "#FF6347", name: "Luminary" }; // Orange Red
 	} else if (streakCount >= 200) {
-		return { icon: Star, color: "#6A5ACD", name: "Dark Orchid" }; // Dark Orchid
+		return { icon: Biohazard, color: "#FF4500", name: "Sage" }; // Red Orange
 	} else if (streakCount >= 160) {
-		return { icon: Award, color: "#6A5ACD", name: "Medium Purple" }; // Medium Purple Good
+		return { icon: Cloudy, color: "#DC143C", name: "Visionary" }; // Crimson
 	} else if (streakCount >= 120) {
-		return { icon: Trophy, color: "#6A5ACD", name: "Blue Violet" }; // Blue Violet
+		return { icon: PersonStanding, color: "#B22222", name: "Mentor" }; // Fire Brick
 	} else if (streakCount >= 80) {
-		return { icon: Crown, color: "#9D00FF", name: "Medium Slate Blue" }; // Medium Slate Blue
+		return { icon: BrainCircuit, color: "#8B008B", name: "Thought Leader" }; // Dark Magenta
 	} else if (streakCount >= 40) {
-		return { icon: Gem, color: "#9D00FF", name: "Slate Blue" }; // Slate Blue Good
+		return { icon: Sparkles, color: "#9932CC", name: "Insightful" }; // Dark Orchid
 	} else if (streakCount >= 20) {
-		return { icon: Star, color: "#9D00FF", name: "Rebecca Purple" }; // Rebecca Purple
+		return { icon: Mic, color: "#9370DB", name: "Debater" }; // Medium Slate Blue
 	} else if (streakCount >= 10) {
-		return { icon: Award, color: "#9D00FF", name: "Indigo" }; // Indigo
+		return { icon: Speech, color: "#8A2BE2", name: "Conversationalist" }; // Blue Violet
 	} else if (streakCount >= 5) {
-		return { icon: Trophy, color: "#9D00FF", name: "Electric Purple" }; // Electric Purple (matches your theme) Good
+		return { icon: Hand, color: "#9D00FF", name: "Participant" }; // Your brand purple
+	} else if (streakCount >= 0) {
+		return { icon: Baby, color: "#7B68EE", name: "Newcomer" }; // Medium Slate Blue
 	}
 	return null;
 };
 
+// Update the badge tiers to match
+const getNextBadgeForStreak = (streakCount: number) => {
+	const badgeTiers = [
+		{ threshold: 0, icon: Baby, color: "#7B68EE", name: "Newcomer" },
+		{ threshold: 5, icon: Hand, color: "#9D00FF", name: "Participant" },
+		{
+			threshold: 10,
+			icon: Speech,
+			color: "#8A2BE2",
+			name: "Conversationalist",
+		},
+		{ threshold: 20, icon: Mic, color: "#9370DB", name: "Debater" },
+		{ threshold: 40, icon: Sparkles, color: "#9932CC", name: "Insightful" },
+		{
+			threshold: 80,
+			icon: BrainCircuit,
+			color: "#8B008B",
+			name: "Thought Leader",
+		},
+		{ threshold: 120, icon: PersonStanding, color: "#B22222", name: "Mentor" },
+		{ threshold: 160, icon: Cloudy, color: "#DC143C", name: "Visionary" },
+		{ threshold: 200, icon: Biohazard, color: "#FF4500", name: "Sage" },
+		{ threshold: 240, icon: Sun, color: "#FF6347", name: "Luminary" },
+		{ threshold: 280, icon: Earth, color: "#FF8C00", name: "Pioneer" },
+		{ threshold: 320, icon: Rocket, color: "#FFA500", name: "Trailblazer" },
+		{ threshold: 360, icon: Atom, color: "#FFD700", name: "Legend" },
+	];
+
+	// Find the next badge tier
+	for (const tier of badgeTiers) {
+		if (streakCount < tier.threshold) {
+			return {
+				...tier,
+				daysNeeded: tier.threshold - streakCount,
+			};
+		}
+	}
+
+	// If already at max level
+	return null;
+};
+
 // Header badge component
-const HeaderBadge = ({ streakCount }: { streakCount: number }) => {
+const HeaderBadge = ({
+	streakCount,
+	onPress,
+}: {
+	streakCount: number;
+	onPress: () => void;
+}) => {
 	const badge = getBadgeForStreak(streakCount);
 
-	if (!badge) return null;
+	if (!badge) {
+		console.log("No badge found for streak count:", streakCount);
+		return null;
+	}
 
 	const { icon: IconComponent, color, name } = badge;
 
 	return (
-		<Animated.View
-			entering={FadeIn.duration(800)}
-			style={[
-				styles.headerBadgeContainer,
-				{
-					shadowColor: color,
-					shadowOffset: { width: 0, height: 2 },
-					shadowOpacity: 0.4,
-					shadowRadius: 4,
-					elevation: 6,
-				},
-			]}
+		<Pressable
+			onPress={() => {
+				onPress();
+			}}
+			hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }} // Increase hit area
 		>
-			<LinearGradient
-				colors={[`${color}30`, `${color}15`]}
-				style={styles.headerBadgeGradient}
+			<Animated.View
+				entering={FadeIn.duration(800)}
+				style={[
+					styles.headerBadgeContainer,
+					{
+						shadowColor: color,
+						shadowOffset: { width: 0, height: 2 },
+						shadowOpacity: 0.4,
+						shadowRadius: 4,
+						elevation: 6,
+					},
+				]}
 			>
-				<IconComponent size={20} color={color} />
-			</LinearGradient>
-		</Animated.View>
+				<LinearGradient
+					colors={[`${color}30`, `${color}15`]}
+					style={styles.headerBadgeGradient}
+				>
+					<IconComponent size={20} color={color} />
+				</LinearGradient>
+			</Animated.View>
+		</Pressable>
+	);
+};
+
+// Badge Popup Modal Component - Fix the destructuring syntax
+const BadgePopupModal = ({
+	visible,
+	onClose,
+	streakCount,
+}: {
+	visible: boolean;
+	onClose: () => void;
+	streakCount: number;
+}) => {
+	const currentBadge = getBadgeForStreak(streakCount);
+	const nextBadge = getNextBadgeForStreak(streakCount);
+
+	return (
+		<Modal
+			animationType="fade"
+			transparent={true}
+			visible={visible}
+			onRequestClose={onClose}
+		>
+			<View style={styles.modalOverlay}>
+				<Pressable style={styles.modalOverlay} onPress={onClose}>
+					<View style={styles.badgePopupContainer}>
+						<LinearGradient
+							colors={["#1C0529", "#2A0A3D"]}
+							style={styles.badgePopupGradient}
+						>
+							{/* Current Badge Section */}
+							{currentBadge && (
+								<View style={styles.currentBadgeSection}>
+									<Text style={styles.popupTitle}>Current Badge</Text>
+									<View style={styles.badgeDisplay}>
+										<View
+											style={[
+												styles.badgeIcon,
+												{ backgroundColor: `${currentBadge.color}20` },
+											]}
+										>
+											<currentBadge.icon size={32} color={currentBadge.color} />
+										</View>
+										<Text
+											style={[styles.badgeName, { color: currentBadge.color }]}
+										>
+											{currentBadge.name}
+										</Text>
+									</View>
+									<Text style={styles.streakText}>
+										{streakCount} day{streakCount !== 1 ? "s" : ""} streak
+									</Text>
+								</View>
+							)}
+
+							{/* Next Badge Section - Fix the ternary operator */}
+							{nextBadge ? (
+								<View style={styles.nextBadgeSection}>
+									<Text style={styles.popupTitle}>Next Badge</Text>
+									<View style={styles.badgeDisplay}>
+										<View
+											style={[
+												styles.badgeIcon,
+												{ backgroundColor: `${nextBadge.color}20` },
+											]}
+										>
+											<nextBadge.icon size={32} color={nextBadge.color} />
+										</View>
+										<Text
+											style={[styles.badgeName, { color: nextBadge.color }]}
+										>
+											{nextBadge.name}
+										</Text>
+									</View>
+									<Text style={styles.daysNeededText}>
+										{nextBadge.daysNeeded} more day
+										{nextBadge.daysNeeded !== 1 ? "s" : ""} needed
+									</Text>
+									<Text style={styles.requirementText}>
+										Vote and contribute to discussions 3x daily to increase your
+										streak
+									</Text>
+								</View>
+							) : (
+								<View style={styles.nextBadgeSection}>
+									<Text style={styles.popupTitle}>
+										🎉 Maximum Level Reached!
+									</Text>
+									<Text style={styles.requirementText}>
+										You've achieved the highest badge level. Keep contributing
+										to maintain your legendary status!
+									</Text>
+								</View>
+							)}
+
+							{/* Close Button */}
+							<Pressable style={styles.closeButton} onPress={onClose}>
+								<Text style={styles.closeButtonText}>Close</Text>
+							</Pressable>
+						</LinearGradient>
+					</View>
+				</Pressable>
+			</View>
+		</Modal>
 	);
 };
 
@@ -149,6 +326,7 @@ const StartPage = () => {
 	const [modalVisible, setModalVisible] = useState(false);
 	const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 	const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+	const [badgePopupVisible, setBadgePopupVisible] = useState(false);
 
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -806,7 +984,12 @@ const StartPage = () => {
 
 				{/* Badge in the center - aligned with other header elements */}
 				<View style={styles.headerCenterContainer}>
-					<HeaderBadge streakCount={streakCount} />
+					<HeaderBadge
+						streakCount={streakCount}
+						onPress={() => {
+							setBadgePopupVisible(true);
+						}}
+					/>
 				</View>
 
 				{/* Logout button on the right - aligned with other header elements */}
@@ -1013,6 +1196,13 @@ const StartPage = () => {
 					</View>
 				</Pressable>
 			</Modal>
+
+			{/* Badge Popup Modal */}
+			<BadgePopupModal
+				visible={badgePopupVisible}
+				onClose={() => setBadgePopupVisible(false)}
+				streakCount={streakCount}
+			/>
 		</View>
 	);
 };
@@ -1039,7 +1229,7 @@ const styles = StyleSheet.create({
 		top: Platform.OS === "ios" ? 60 : 40,
 		left: 0,
 		right: 0,
-		zIndex: 1,
+		zIndex: 15, // Increase this from 1 to 15
 		height: 40,
 		justifyContent: "center",
 		alignItems: "center",
@@ -1222,7 +1412,7 @@ const styles = StyleSheet.create({
 	},
 	modalOverlay: {
 		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.4)",
+		backgroundColor: "rgba(0, 0, 0, 0.7)",
 		justifyContent: "center",
 		alignItems: "center",
 	},
@@ -1303,6 +1493,81 @@ const styles = StyleSheet.create({
 		borderRadius: 20,
 		borderWidth: 1.5,
 		borderColor: "rgba(255,255,255,0.2)",
+	},
+	badgePopupContainer: {
+		width: "85%",
+		maxWidth: 350,
+		borderRadius: 20,
+		overflow: "hidden",
+	},
+	badgePopupGradient: {
+		padding: 24,
+		alignItems: "center",
+	},
+	currentBadgeSection: {
+		alignItems: "center",
+		marginBottom: 24,
+		paddingBottom: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(157, 0, 255, 0.2)",
+	},
+	nextBadgeSection: {
+		alignItems: "center",
+		marginBottom: 20,
+	},
+	popupTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		color: "#E6E6FA",
+		marginBottom: 16,
+	},
+	badgeDisplay: {
+		alignItems: "center",
+		marginBottom: 12,
+	},
+	badgeIcon: {
+		width: 60,
+		height: 60,
+		borderRadius: 30,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 8,
+	},
+	badgeName: {
+		fontSize: 20,
+		fontWeight: "bold",
+		textAlign: "center",
+	},
+	streakText: {
+		fontSize: 16,
+		color: "#B8B8FF",
+		textAlign: "center",
+	},
+	daysNeededText: {
+		fontSize: 16,
+		color: "#FFD700",
+		fontWeight: "600",
+		textAlign: "center",
+		marginBottom: 8,
+	},
+	requirementText: {
+		fontSize: 14,
+		color: "#C8C8FF",
+		textAlign: "center",
+		lineHeight: 20,
+		paddingHorizontal: 16,
+	},
+	closeButton: {
+		backgroundColor: "#9D00FF",
+		paddingHorizontal: 24,
+		paddingVertical: 12,
+		borderRadius: 25,
+		marginTop: 8,
+	},
+	closeButtonText: {
+		color: "white",
+		fontSize: 16,
+		fontWeight: "600",
 	},
 });
 
