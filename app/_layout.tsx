@@ -12,6 +12,9 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -19,6 +22,17 @@ export default function RootLayout() {
 	const colorScheme = useColorScheme();
 	const [loaded] = useFonts({
 		SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+	});
+
+	useEffect(() => {
+		if (Platform.OS === "android") {
+			Notifications.setNotificationChannelAsync("default", {
+				name: "Default",
+				importance: Notifications.AndroidImportance.HIGH,
+				sound: "default", // or your custom sound file in /assets
+				vibrationPattern: [0, 250, 250, 250], // optional
+			});
+		}
 	});
 
 	useEffect(() => {
@@ -33,17 +47,13 @@ export default function RootLayout() {
 
 	return (
 		<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-			<Stack screenOptions={{ headerShown: false }}>
+			<Stack screenOptions={{ headerShown: false, gestureEnabled: false }}>
 				<Stack.Screen name="index" options={{ headerShown: false }} />
 				<Stack.Screen name="verify" options={{ headerShown: false }} />
-				<Stack.Screen
-					name="start"
-					options={{ headerShown: false, gestureEnabled: false }}
-				/>
-				<Stack.Screen name="discussion" options={{ headerShown: false }} />
+				<Stack.Screen name="expanded" options={{ headerShown: false }} />
+				<Stack.Screen name="notifications" options={{ headerShown: false }} />
+				<Stack.Screen name="report" options={{ headerShown: false }} />
 				<Stack.Screen name="deletion" options={{ headerShown: false }} />
-				{/* <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" /> */}
 			</Stack>
 			<StatusBar style="auto" />
 		</ThemeProvider>

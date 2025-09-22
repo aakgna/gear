@@ -1,4 +1,4 @@
-package com.aakgna.commongroundquestionsquestions
+package com.aakgna.commongroundquestions
 
 import android.app.Application
 import android.content.res.Configuration

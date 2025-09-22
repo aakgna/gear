@@ -2,28 +2,28 @@
 	"expo": {
 		"name": "The Common Ground",
 		"slug": "commonground",
-		"version": "1.0.12",
+		"version": "1.2.0",
 		"orientation": "portrait",
-		"icon": "./assets/images/C.png",
+		"icon": "./assets/images/CG3.png",
 		"scheme": "myapp",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "com.aakgna.commongroundquestions",
-			"googleServicesFile": "./GoogleService-Info.plist"
+			"googleServicesFile": "./GoogleService-Info.plist",
+			"buildNumber": "7"
 		},
 		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/C.png",
-				"backgroundColor": "#ffffff"
-			},
-			"package": "com.aakgna.commongroundquestions"
+			"versionCode": 13,
+			"package": "com.aakgna.commongroundquestions",
+			"googleServicesFile": "./google-services.json",
+			"permissions": ["INTERNET", "VIBRATE", "POST_NOTIFICATIONS", "WAKE_LOCK"]
 		},
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/favicon.png"
+			"favicon": "./assets/images/CG3.png"
 		},
 		"plugins": [
 			"expo-router",
@@ -32,6 +32,11 @@
 			[
 				"expo-build-properties",
 				{
+					"android": {
+						"compileSdkVersion": 35,
+						"targetSdkVersion": 35,
+						"minSdkVersion": 35
+					},
 					"ios": {
 						"useFrameworks": "static"
 					}
@@ -40,10 +45,10 @@
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/C.png",
+					"image": "./assets/images/CG2.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
-					"backgroundColor": "#ffffff"
+					"backgroundColor": "#120318"
 				}
 			]
 		],
