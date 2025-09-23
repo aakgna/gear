@@ -967,7 +967,7 @@ const StartPage = () => {
 							position: "absolute",
 							top: Platform.OS === "ios" ? 60 : 40,
 							left: 24,
-							zIndex: 10, // Increase zIndex significantly
+							// zIndex: 10, // Increase zIndex significantly
 						},
 					]}
 					hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }} // Increase hitSlop
@@ -1226,7 +1226,7 @@ const styles = StyleSheet.create({
 		top: Platform.OS === "ios" ? 60 : 40,
 		left: 0,
 		right: 0,
-		zIndex: 15, // Increase this from 1 to 15
+		// zIndex: 1, // Increase this from 1 to 15
 		height: 40,
 		justifyContent: "center",
 		alignItems: "center",
@@ -1246,7 +1246,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		top: Platform.OS === "ios" ? 60 : 40,
 		right: 24,
-		zIndex: 1,
+		// zIndex: 1,
 		height: 40,
 		justifyContent: "center",
 	},
@@ -1254,7 +1254,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		top: Platform.OS === "ios" ? 60 : 40,
 		right: 24,
-		zIndex: 1,
+		// zIndex: 1,
 	},
 	logoutButton: {
 		flexDirection: "row",
