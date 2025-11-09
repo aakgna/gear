@@ -17,7 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import {
 	Puzzle,
 	GameResult,
-	PuzzleFilter,
 	QuickMathData,
 	WordleData,
 	RiddleData,
@@ -33,9 +32,7 @@ const FeedScreen = () => {
 	const router = useRouter();
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
-	const [filter, setFilter] = useState<PuzzleFilter>("all");
 	const [headerHeight, setHeaderHeight] = useState(0);
-	const [footerHeight, setFooterHeight] = useState(0);
 	const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [userData, setUserData] = useState<UserData | null>(null);
@@ -153,31 +150,12 @@ const FeedScreen = () => {
 		}
 	};
 
-	// Filter puzzles based on selected filter and exclude completed games
+	// Simplify filteredPuzzles - only exclude completed games
 	const filteredPuzzles = puzzles.filter((puzzle) => {
-		// First check if puzzle matches the selected filter
-		let matchesFilter = false;
-		switch (filter) {
-			case "words":
-				matchesFilter = puzzle.type === "wordle" || puzzle.type === "riddle";
-				break;
-			case "numbers":
-				matchesFilter = puzzle.type === "quickMath";
-				break;
-			case "logic":
-				matchesFilter = puzzle.type === "riddle";
-				break;
-			default:
-				matchesFilter = true;
-		}
-
-		if (!matchesFilter) return false;
-
-		// Then exclude completed games
+		// Exclude completed games
 		if (userData?.completedGames.includes(puzzle.id)) {
 			return false;
 		}
-
 		return true;
 	});
 
@@ -260,7 +238,6 @@ const FeedScreen = () => {
 	}, [
 		currentIndex,
 		puzzles,
-		filter,
 		userData,
 		currentPuzzleId,
 		previousPuzzleId,
@@ -285,7 +262,7 @@ const FeedScreen = () => {
 		setCurrentIndex(index);
 	};
 
-	const itemHeight = Math.max(0, SCREEN_HEIGHT - headerHeight - footerHeight);
+	const itemHeight = Math.max(0, SCREEN_HEIGHT - headerHeight);
 
 	const renderPuzzleCard = ({
 		item,
@@ -324,80 +301,6 @@ const FeedScreen = () => {
 					onPress={() => router.push("/profile")}
 				>
 					<Ionicons name="person-circle" size={32} color="#1e88e5" />
-				</TouchableOpacity>
-			</View>
-		);
-	};
-
-	const renderFooter = () => {
-		return (
-			<View
-				style={styles.footer}
-				onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
-			>
-				<TouchableOpacity
-					style={[styles.filterButton, filter === "all" && styles.activeFilter]}
-					onPress={() => setFilter("all")}
-				>
-					<Text
-						style={[
-							styles.filterText,
-							filter === "all" && styles.activeFilterText,
-						]}
-					>
-						All
-					</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						filter === "words" && styles.activeFilter,
-					]}
-					onPress={() => setFilter("words")}
-				>
-					<Text
-						style={[
-							styles.filterText,
-							filter === "words" && styles.activeFilterText,
-						]}
-					>
-						Words
-					</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						filter === "numbers" && styles.activeFilter,
-					]}
-					onPress={() => setFilter("numbers")}
-				>
-					<Text
-						style={[
-							styles.filterText,
-							filter === "numbers" && styles.activeFilterText,
-						]}
-					>
-						Numbers
-					</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					style={[
-						styles.filterButton,
-						filter === "logic" && styles.activeFilter,
-					]}
-					onPress={() => setFilter("logic")}
-				>
-					<Text
-						style={[
-							styles.filterText,
-							filter === "logic" && styles.activeFilterText,
-						]}
-					>
-						Logic
-					</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -444,8 +347,7 @@ const FeedScreen = () => {
 						)}
 					</KeyboardAvoidingView>
 
-					{/* Footer */}
-					{renderFooter()}
+					{/* Remove footer rendering */}
 				</>
 			)}
 		</View>
@@ -483,33 +385,6 @@ const styles = StyleSheet.create({
 	},
 	puzzleCard: {
 		width: SCREEN_WIDTH,
-	},
-	footer: {
-		flexDirection: "row",
-		justifyContent: "space-around",
-		alignItems: "center",
-		paddingVertical: 15,
-		paddingHorizontal: 20,
-		backgroundColor: "#ffffff",
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	filterButton: {
-		paddingHorizontal: 20,
-		paddingVertical: 8,
-		borderRadius: 20,
-		backgroundColor: "#f5f5f5",
-	},
-	activeFilter: {
-		backgroundColor: "#1e88e5",
-	},
-	filterText: {
-		fontSize: 14,
-		color: "#666",
-		fontWeight: "500",
-	},
-	activeFilterText: {
-		color: "#ffffff",
 	},
 	loadingContainer: {
 		flex: 1,
