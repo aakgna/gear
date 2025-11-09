@@ -10,10 +10,19 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
+	Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import {
+	Colors,
+	Typography,
+	Spacing,
+	BorderRadius,
+	Shadows,
+	Layout,
+} from "../constants/DesignSystem";
 import {
 	Puzzle,
 	GameResult,
@@ -40,7 +49,6 @@ const FeedScreen = () => {
 		Record<string, number>
 	>({});
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
-	const [previousPuzzleId, setPreviousPuzzleId] = useState<string>("");
 
 	const { addCompletedPuzzle } = useGameStore();
 
@@ -208,26 +216,29 @@ const FeedScreen = () => {
 	// Reset timer when current puzzle changes and handle puzzle skipping
 	useEffect(() => {
 		if (filteredPuzzles.length > 0 && filteredPuzzles[currentIndex]) {
+			console.log("filtered");
 			const puzzleId = filteredPuzzles[currentIndex].id;
 			if (puzzleId !== currentPuzzleId) {
-				// Check if user skipped previous puzzle (viewed >= 15 seconds without completing)
-				if (previousPuzzleId && previousPuzzleId !== puzzleId) {
-					const previousStartTime = puzzleStartTimes[previousPuzzleId];
+				// Check if user skipped the puzzle they just left (currentPuzzleId)
+				console.log("checking puzzle we just left:", currentPuzzleId);
+				if (currentPuzzleId) {
+					const previousStartTime = puzzleStartTimes[currentPuzzleId];
 					if (previousStartTime) {
 						const elapsedSeconds = Math.floor(
 							(Date.now() - previousStartTime) / 1000
 						);
 						const wasCompleted =
-							userData?.completedGames.includes(previousPuzzleId) || false;
+							userData?.completedGames.includes(currentPuzzleId) || false;
 
-						// If viewed >= 15 seconds and not completed, move puzzle
-						if (elapsedSeconds >= 15 && !wasCompleted) {
-							movePuzzleAhead(previousPuzzleId, filteredPuzzles);
+						// If viewed >= 2 seconds and not completed, move puzzle
+						console.log("elapsedSeconds", elapsedSeconds);
+						if (elapsedSeconds >= 2 && !wasCompleted) {
+							console.log("moving puzzle ahead:", currentPuzzleId);
+							movePuzzleAhead(currentPuzzleId, filteredPuzzles);
 						}
 					}
 				}
 
-				setPreviousPuzzleId(currentPuzzleId || "");
 				setCurrentPuzzleId(puzzleId);
 				setPuzzleStartTimes((prev) => ({
 					...prev,
@@ -240,7 +251,6 @@ const FeedScreen = () => {
 		puzzles,
 		userData,
 		currentPuzzleId,
-		previousPuzzleId,
 		puzzleStartTimes,
 		filteredPuzzles,
 		movePuzzleAhead,
@@ -299,8 +309,9 @@ const FeedScreen = () => {
 				<TouchableOpacity
 					style={styles.profileButton}
 					onPress={() => router.push("/profile")}
+					activeOpacity={0.7}
 				>
-					<Ionicons name="person-circle" size={32} color="#1e88e5" />
+					<Ionicons name="person-circle" size={32} color={Colors.accent} />
 				</TouchableOpacity>
 			</View>
 		);
@@ -316,7 +327,7 @@ const FeedScreen = () => {
 			{/* Loading state */}
 			{loading ? (
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#1e88e5" />
+					<ActivityIndicator size="large" color={Colors.accent} />
 					<Text style={styles.loadingText}>Loading puzzles...</Text>
 				</View>
 			) : (
@@ -357,50 +368,63 @@ const FeedScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#f5f7fa",
+		backgroundColor: Colors.background.secondary,
 	},
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
-		paddingHorizontal: 20,
+		paddingHorizontal: Layout.margin,
 		paddingTop: 50,
-		paddingBottom: 10,
-		backgroundColor: "#ffffff",
+		paddingBottom: Spacing.sm,
+		backgroundColor: Colors.background.primary,
 		zIndex: 10,
+		shadowColor: Shadows.light.shadowColor,
+		shadowOffset: Shadows.light.shadowOffset,
+		shadowOpacity: Shadows.light.shadowOpacity,
+		shadowRadius: Shadows.light.shadowRadius,
+		elevation: Shadows.light.elevation,
 	},
 	logoContainer: {
 		flex: 1,
 	},
 	logoText: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#1e88e5",
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.primary,
+		letterSpacing: -0.5,
 	},
 	profileButton: {
-		padding: 5,
+		padding: Spacing.xs,
+		minWidth: Layout.tapTarget,
+		minHeight: Layout.tapTarget,
+		justifyContent: "center",
+		alignItems: "center",
 	},
 	feed: {
 		flex: 1,
 	},
 	puzzleCard: {
 		width: SCREEN_WIDTH,
+		backgroundColor: Colors.background.primary,
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "#f5f7fa",
+		backgroundColor: Colors.background.secondary,
 	},
 	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: "#666",
+		marginTop: Spacing.md,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	emptyText: {
-		fontSize: 16,
-		color: "#666",
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 		textAlign: "center",
+		fontWeight: Typography.fontWeight.medium,
 	},
 });
 

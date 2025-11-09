@@ -5,8 +5,19 @@ import {
 	StyleSheet,
 	TextInput,
 	TouchableOpacity,
+	Animated,
 } from "react-native";
 import { GameResult, QuickMathData } from "../../config/types";
+import {
+	Colors,
+	Typography,
+	Spacing,
+	BorderRadius,
+	Shadows,
+	Animation,
+	ComponentStyles,
+	Layout,
+} from "../../constants/DesignSystem";
 
 interface QuickMathProps {
 	inputData: QuickMathData;
@@ -40,6 +51,8 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
+	const shakeAnimation = useRef(new Animated.Value(0)).current;
+	const successScale = useRef(new Animated.Value(1)).current;
 
 	// Use answers from Firestore instead of evaluating expressions
 	const correctAnswers = useMemo(
@@ -162,6 +175,19 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 			setElapsedTime(timeTaken);
+			// Success animation
+			Animated.sequence([
+				Animated.timing(successScale, {
+					toValue: 1.05,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+				Animated.timing(successScale, {
+					toValue: 1,
+					duration: Animation.duration.normal,
+					useNativeDriver: true,
+				}),
+			]).start();
 			onComplete({
 				puzzleId: `quickmath_${Date.now()}`,
 				completed: true,
@@ -174,6 +200,24 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			setFeedback(
 				`Not all answers are correct. ${correct}/${problems.length} correct. Try again!`
 			);
+			// Shake animation for incorrect
+			Animated.sequence([
+				Animated.timing(shakeAnimation, {
+					toValue: 5,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+				Animated.timing(shakeAnimation, {
+					toValue: -5,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+				Animated.timing(shakeAnimation, {
+					toValue: 0,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+			]).start();
 		}
 	};
 
@@ -183,7 +227,14 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				<Text style={styles.title}>Quick Math</Text>
 				<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
 			</View>
-			<View style={styles.boardContainer}>
+			<Animated.View
+				style={[
+					styles.boardContainer,
+					{
+						transform: [{ translateX: shakeAnimation }],
+					},
+				]}
+			>
 				<View style={styles.problemList}>
 					{problems.map((p, idx) => (
 						<View key={idx} style={styles.problemRow}>
@@ -196,26 +247,35 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 								}
 								keyboardType="numbers-and-punctuation"
 								returnKeyType="done"
+								placeholderTextColor={Colors.text.disabled}
 							/>
 						</View>
 					))}
 				</View>
-			</View>
+			</Animated.View>
 			<TouchableOpacity
 				style={[styles.submit, submitted && styles.submitDisabled]}
 				onPress={handleSubmit}
 				disabled={submitted}
+				activeOpacity={0.7}
 			>
 				<Text style={styles.submitText}>Submit</Text>
 			</TouchableOpacity>
 			{feedback && <Text style={styles.feedback}>{feedback}</Text>}
 			{submitted && (
-				<View style={styles.completionContainer}>
+				<Animated.View
+					style={[
+						styles.completionContainer,
+						{
+							transform: [{ scale: successScale }],
+						},
+					]}
+				>
 					<Text style={styles.completionText}>🎉 Completed!</Text>
 					<Text style={styles.completionSubtext}>
 						Time: {formatTime(elapsedTime)} • Accuracy: 100%
 					</Text>
-				</View>
+				</Animated.View>
 			)}
 		</View>
 	);
@@ -224,28 +284,30 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingHorizontal: 20,
-		paddingTop: 16,
-		paddingBottom: 8,
+		paddingHorizontal: Spacing.md,
+		paddingTop: Spacing.md,
+		paddingBottom: Spacing.sm,
 		alignItems: "center",
+		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
 		width: "100%",
-		marginBottom: 12,
+		marginBottom: Spacing.md,
 	},
 	title: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#212121",
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.primary,
+		letterSpacing: -0.5,
 	},
 	timer: {
-		fontSize: 20,
-		fontWeight: "600",
-		color: "#1e88e5",
-		fontFamily: "monospace",
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.accent,
+		fontFamily: Typography.fontFamily.monospace,
 	},
 	boardContainer: {
 		flex: 1,
@@ -255,77 +317,94 @@ const styles = StyleSheet.create({
 	},
 	problemList: {
 		width: "100%",
-		gap: 10,
+		gap: Spacing.sm,
 	},
 	problemRow: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		paddingVertical: 6,
-		paddingHorizontal: 10,
-		backgroundColor: "#fff",
-		borderRadius: 8,
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.md,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.md,
 		borderWidth: 1,
-		borderColor: "#e0e0e0",
+		borderColor: Colors.text.disabled,
+		shadowColor: Shadows.light.shadowColor,
+		shadowOffset: Shadows.light.shadowOffset,
+		shadowOpacity: Shadows.light.shadowOpacity,
+		shadowRadius: Shadows.light.shadowRadius,
+		elevation: Shadows.light.elevation,
 	},
 	problemText: {
-		fontSize: 18,
-		color: "#212121",
-		marginRight: 8,
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.primary,
+		marginRight: Spacing.sm,
 		flexShrink: 1,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	answerInput: {
 		width: 90,
-		paddingVertical: 8,
-		paddingHorizontal: 12,
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.md,
 		borderWidth: 1,
-		borderColor: "#d3d6da",
-		borderRadius: 6,
-		backgroundColor: "#fff",
+		borderColor: Colors.text.disabled,
+		borderRadius: BorderRadius.md,
+		backgroundColor: Colors.background.primary,
 		textAlign: "center",
-		fontSize: 18,
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.semiBold,
+		minHeight: Layout.tapTarget,
 	},
 	submit: {
-		marginTop: 12,
-		backgroundColor: "#1e88e5",
-		paddingVertical: 12,
-		paddingHorizontal: 24,
-		borderRadius: 8,
+		marginTop: Spacing.md,
+		backgroundColor: ComponentStyles.button.backgroundColor,
+		borderRadius: ComponentStyles.button.borderRadius,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.lg,
+		minHeight: ComponentStyles.button.minHeight,
+		alignItems: ComponentStyles.button.alignItems,
+		justifyContent: ComponentStyles.button.justifyContent,
 	},
 	submitText: {
-		color: "#fff",
-		fontSize: 16,
-		fontWeight: "bold",
+		color: Colors.text.white,
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
 	},
 	submitDisabled: {
 		opacity: 0.5,
 	},
 	feedback: {
-		marginTop: 12,
-		fontSize: 14,
-		color: "#d32f2f",
+		marginTop: Spacing.md,
+		fontSize: Typography.fontSize.caption,
+		color: Colors.error,
 		textAlign: "center",
-		fontWeight: "500",
+		fontWeight: Typography.fontWeight.medium,
 	},
 	completionContainer: {
-		marginTop: 20,
-		padding: 20,
-		backgroundColor: "#e8f5e9",
-		borderRadius: 12,
+		marginTop: Spacing.lg,
+		padding: Spacing.lg,
+		backgroundColor: Colors.accent + "15",
+		borderRadius: BorderRadius.md,
 		alignItems: "center",
 		borderWidth: 2,
-		borderColor: "#4caf50",
+		borderColor: Colors.accent,
+		shadowColor: Shadows.light.shadowColor,
+		shadowOffset: Shadows.light.shadowOffset,
+		shadowOpacity: Shadows.light.shadowOpacity,
+		shadowRadius: Shadows.light.shadowRadius,
+		elevation: Shadows.light.elevation,
 	},
 	completionText: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#2e7d32",
-		marginBottom: 8,
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		marginBottom: Spacing.sm,
 	},
 	completionSubtext: {
-		fontSize: 16,
-		color: "#388e3c",
-		fontWeight: "500",
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		fontWeight: Typography.fontWeight.medium,
 	},
 });
 

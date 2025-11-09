@@ -16,6 +16,7 @@ import {
 	addSeenGame,
 	addCompletedGame,
 } from "../../config/auth";
+import { Colors } from "../../constants/DesignSystem";
 
 interface GameWrapperProps {
 	puzzle: Puzzle;
@@ -102,16 +103,17 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
-		backgroundColor: "#f5f7fa",
+		backgroundColor: Colors.background.secondary,
 	},
 	container: {
 		flex: 1,
-		backgroundColor: "#f5f7fa",
+		backgroundColor: Colors.background.secondary,
 	},
 	error: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
+		backgroundColor: Colors.background.secondary,
 	},
 });
 

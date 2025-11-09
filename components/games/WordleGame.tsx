@@ -5,8 +5,18 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	Dimensions,
+	Animated,
 } from "react-native";
 import { WordleData, GameResult } from "../../config/types";
+import {
+	Colors,
+	Typography,
+	Spacing,
+	BorderRadius,
+	Shadows,
+	Animation,
+	Layout,
+} from "../../constants/DesignSystem";
 
 const { width } = Dimensions.get("window");
 const TILE_SIZE_FALLBACK = (width - 60) / 5;
@@ -58,6 +68,8 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 	const [board, setBoard] = useState<TileState[][]>(initializeBoard);
 	const [tileSize, setTileSize] = useState(TILE_SIZE_FALLBACK);
+	const shakeAnimation = useRef(new Animated.Value(0)).current;
+	const successScale = useRef(new Animated.Value(1)).current;
 
 	// Reset timer when puzzle changes or startTime prop changes
 	useEffect(() => {
@@ -184,6 +196,19 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					}
 					setElapsedTime(timeTaken);
 					setGameWon(true);
+					// Success animation - blue glow + scale
+					Animated.sequence([
+						Animated.timing(successScale, {
+							toValue: 1.1,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(successScale, {
+							toValue: 1,
+							duration: Animation.duration.normal,
+							useNativeDriver: true,
+						}),
+					]).start();
 					onComplete({
 						puzzleId: `wordle_${Date.now()}`,
 						completed: true,
@@ -199,6 +224,29 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					}
 					setElapsedTime(timeTaken);
 					setGameLost(true);
+					// Shake animation for incorrect
+					Animated.sequence([
+						Animated.timing(shakeAnimation, {
+							toValue: 10,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(shakeAnimation, {
+							toValue: -10,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(shakeAnimation, {
+							toValue: 10,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(shakeAnimation, {
+							toValue: 0,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+					]).start();
 					onComplete({
 						puzzleId: `wordle_${Date.now()}`,
 						completed: false,
@@ -206,6 +254,25 @@ const WordleGame: React.FC<WordleGameProps> = ({
 						attempts: newAttempts,
 						completedAt: new Date().toISOString(),
 					});
+				} else {
+					// Shake animation for incorrect guess
+					Animated.sequence([
+						Animated.timing(shakeAnimation, {
+							toValue: 5,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(shakeAnimation, {
+							toValue: -5,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+						Animated.timing(shakeAnimation, {
+							toValue: 0,
+							duration: Animation.duration.fast,
+							useNativeDriver: true,
+						}),
+					]).start();
 				}
 
 				setCurrentGuess("");
@@ -280,14 +347,24 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					const availableHeight = e.nativeEvent.layout.height;
 					if (!availableHeight || !validWordLength) return;
 					// 6 rows -> 5 gaps of 8px between rows + tile margins (2px each side)
-					const verticalGaps = 5 * 8;
+					const verticalGaps = 5 * Spacing.sm;
 					const maxByHeight = (availableHeight - verticalGaps) / 6;
 					const maxByWidth = (width - 60) / wordLength;
 					const nextSize = Math.floor(Math.min(maxByWidth, maxByHeight));
 					if (nextSize > 0 && nextSize !== tileSize) setTileSize(nextSize);
 				}}
 			>
-				<View style={styles.board}>
+				<Animated.View
+					style={[
+						styles.board,
+						{
+							transform: [
+								{ translateX: shakeAnimation },
+								{ scale: successScale },
+							],
+						},
+					]}
+				>
 					{board.map((row, rowIndex) => (
 						<View key={rowIndex} style={styles.row}>
 							{row.map((tile, colIndex) => (
@@ -308,7 +385,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 							))}
 						</View>
 					))}
-				</View>
+				</Animated.View>
 			</View>
 
 			{/* Virtual Keyboard */}
@@ -325,6 +402,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 										: styles.regularKey,
 								]}
 								onPress={() => handleKeyPress(key)}
+								activeOpacity={0.7}
 							>
 								<Text style={styles.keyText}>{key}</Text>
 							</TouchableOpacity>
@@ -335,16 +413,24 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 			{/* Game Status */}
 			{gameWon && (
-				<View style={styles.status}>
+				<Animated.View
+					style={[
+						styles.status,
+						styles.statusSuccess,
+						{
+							transform: [{ scale: successScale }],
+						},
+					]}
+				>
 					<Text style={styles.statusText}>🎉 Correct! Well done!</Text>
 					<Text style={styles.statusSubtext}>
 						Time: {formatTime(elapsedTime)} • Attempts: {attempts}
 					</Text>
-				</View>
+				</Animated.View>
 			)}
 
 			{gameLost && (
-				<View style={styles.status}>
+				<View style={[styles.status, styles.statusError]}>
 					<Text style={styles.statusText}>😔 The word was: {answer}</Text>
 					<Text style={styles.statusSubtext}>
 						Time: {formatTime(elapsedTime)} • Attempts: {attempts}
@@ -358,87 +444,92 @@ const WordleGame: React.FC<WordleGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingHorizontal: 20,
-		paddingTop: 16,
-		paddingBottom: 8,
+		paddingHorizontal: Spacing.md,
+		paddingTop: Spacing.md,
+		paddingBottom: Spacing.sm,
 		alignItems: "center",
+		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
 		width: "100%",
-		marginBottom: 12,
+		marginBottom: Spacing.md,
 	},
 	title: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#212121",
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.primary,
+		letterSpacing: -0.5,
 	},
 	timer: {
-		fontSize: 20,
-		fontWeight: "600",
-		color: "#1e88e5",
-		fontFamily: "monospace",
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.accent,
+		fontFamily: Typography.fontFamily.monospace,
 	},
 	boardContainer: {
 		flex: 1,
 		width: "100%",
 		justifyContent: "center",
 		alignItems: "center",
-		marginBottom: 8,
+		marginBottom: Spacing.sm,
 	},
 	board: {
 		marginBottom: 0,
 	},
 	row: {
 		flexDirection: "row",
-		marginBottom: 8,
+		marginBottom: Spacing.sm,
 	},
 	tile: {
 		borderWidth: 2,
-		borderColor: "#d3d6da",
+		borderColor: Colors.text.disabled,
 		margin: 2,
 		alignItems: "center",
 		justifyContent: "center",
-		borderRadius: 4,
+		borderRadius: BorderRadius.sm,
 	},
 	empty: {
-		backgroundColor: "#ffffff",
+		backgroundColor: Colors.background.primary,
+		borderColor: Colors.text.disabled,
 	},
 	correct: {
-		backgroundColor: "#6aaa64",
-		borderColor: "#6aaa64",
+		backgroundColor: Colors.game.correct,
+		borderColor: Colors.game.correct,
 	},
 	present: {
-		backgroundColor: "#c9b458",
-		borderColor: "#c9b458",
+		backgroundColor: Colors.game.present,
+		borderColor: Colors.game.present,
 	},
 	absent: {
-		backgroundColor: "#787c7e",
-		borderColor: "#787c7e",
+		backgroundColor: Colors.game.absent,
+		borderColor: Colors.game.absent,
 	},
 	tileText: {
-		fontSize: 24,
-		fontWeight: "bold",
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
 	},
-	lightText: { color: "#ffffff" },
-	darkText: { color: "#212121" },
+	lightText: { color: Colors.text.white },
+	darkText: { color: Colors.text.primary },
 	keyboard: {
-		marginTop: 12,
+		marginTop: Spacing.md,
 	},
 	keyboardRow: {
 		flexDirection: "row",
 		justifyContent: "center",
-		marginBottom: 8,
+		marginBottom: Spacing.sm,
 	},
 	key: {
-		backgroundColor: "#d3d6da",
-		padding: 10,
+		backgroundColor: Colors.text.disabled,
+		padding: Spacing.sm,
 		margin: 2,
-		borderRadius: 4,
+		borderRadius: BorderRadius.sm,
 		alignItems: "center",
 		justifyContent: "center",
+		minHeight: Layout.tapTarget,
+		minWidth: Layout.tapTarget,
 	},
 	regularKey: {
 		minWidth: 30,
@@ -447,33 +538,48 @@ const styles = StyleSheet.create({
 		minWidth: 50,
 	},
 	keyText: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#212121",
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
 	},
 	status: {
-		marginTop: 20,
-		padding: 15,
-		backgroundColor: "#f5f7fa",
-		borderRadius: 8,
+		marginTop: Spacing.lg,
+		padding: Spacing.md,
+		borderRadius: BorderRadius.md,
 		alignItems: "center",
+		shadowColor: Shadows.light.shadowColor,
+		shadowOffset: Shadows.light.shadowOffset,
+		shadowOpacity: Shadows.light.shadowOpacity,
+		shadowRadius: Shadows.light.shadowRadius,
+		elevation: Shadows.light.elevation,
+	},
+	statusSuccess: {
+		backgroundColor: Colors.accent + "15", // 15% opacity
+		borderWidth: 2,
+		borderColor: Colors.accent,
+	},
+	statusError: {
+		backgroundColor: Colors.error + "15",
+		borderWidth: 2,
+		borderColor: Colors.error,
 	},
 	statusText: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#212121",
-		marginBottom: 8,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
 	},
 	statusSubtext: {
-		fontSize: 14,
-		color: "#666",
-		marginTop: 4,
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		marginTop: Spacing.xs,
 	},
 	errorText: {
-		fontSize: 16,
-		color: "#d32f2f",
-		marginBottom: 12,
+		fontSize: Typography.fontSize.body,
+		color: Colors.error,
+		marginBottom: Spacing.md,
 		textAlign: "center",
+		fontWeight: Typography.fontWeight.medium,
 	},
 });
 
