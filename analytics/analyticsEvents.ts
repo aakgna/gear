@@ -1,140 +1,115 @@
-// src/analytics/analyticsEvents.ts
+// Analytics events for Gear app
 
-import {
-	getAnalytics,
-	logEvent,
-	setUserId,
-} from "@react-native-firebase/analytics";
+// Temporarily disable Firebase analytics until import issues are resolved
+// import { getAnalytics, logEvent, setUserId } from "@react-native-firebase/analytics";
+
+// Mock analytics for MVP
+const mockGetAnalytics = () => ({});
+const mockLogEvent = () => Promise.resolve();
+const mockSetUserId = () => Promise.resolve();
 
 const DEBUG_ANALYTICS = __DEV__;
 
 /**
- * 1. Daily Active User (DAU)
- *    Call on cold start and whenever the app
- *    returns to the foreground (e.g. in App.tsx).
+ * Log app open
  */
-export async function logDailyOpen(): Promise<void> {
+export async function logAppOpen(): Promise<void> {
 	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "daily_open", {
-			screen: "Home",
-		});
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "app_open");
 	} catch (error) {
-		console.error("Analytics error in logDailyOpen:", error);
+		console.error("Analytics error in logAppOpen:", error);
 	}
 }
 
 /**
- * 2. Generic Screen View
- *    Call from NavigationContainer's onReady/onStateChange
- *    and also from individual screens if desired.
+ * Log screen view
  */
 export async function logScreenView(
 	screenName: string,
-	uID: any
+	userId?: string
 ): Promise<void> {
 	try {
-		const analytics = getAnalytics();
-		// Use logEvent instead of deprecated logScreenView
-		await logEvent(analytics, "screen_view", {
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "screen_view", {
 			screen_name: screenName,
 			screen_class: screenName,
-			uID: uID,
 		});
-		// Set user ID for this session
-		if (uID) {
-			await setUserId(analytics, uID);
+
+		if (userId) {
+			await mockSetUserId(analytics, userId);
 		}
 	} catch (error) {
 		console.error("Analytics error in logScreenView:", error);
 	}
 }
 
-export async function logdeleted(createdAt: any, today: any): Promise<void> {
-	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "deleted", {
-			createdAt: createdAt,
-			deletedOn: today,
-		});
-	} catch (error) {
-		console.error("Analytics error in logdeleted:", error);
-	}
-}
-
 /**
- * 3. User voted on the daily question
- *
- * @param questionId  unique ID of the question
- * @param choice      'agree' or 'disagree'
+ * Log puzzle started
  */
-export async function logVoted(questionId: string): Promise<void> {
-	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "voted", {
-			question_id: questionId,
-		});
-	} catch (error) {
-		console.error("Analytics error in logVoted:", error);
-	}
-}
-
-/**
- * 4. User posted a top‑level comment or a reply
- *
- * @param questionId  ID of the question being discussed
- * @param threadType  'top_level' or 'reply'
- */
-export async function logCommentPosted(
-	questionId: string,
-	threadType: "top_level" | "reply",
-	uID: string
+export async function logPuzzleStarted(
+	puzzleId: string,
+	type: string,
+	difficulty: number
 ): Promise<void> {
 	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "comment_posted", {
-			question_id: questionId,
-			thread_type: threadType,
-			uID: uID,
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "puzzle_started", {
+			puzzle_id: puzzleId,
+			puzzle_type: type,
+			difficulty: difficulty,
 		});
 	} catch (error) {
-		console.error("Analytics error in logCommentPosted:", error);
+		console.error("Analytics error in logPuzzleStarted:", error);
 	}
 }
 
 /**
- * 5. Authentication Events
+ * Log puzzle completed
  */
-export async function logSignUp(method: string): Promise<void> {
-	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "sign_up", { method });
-	} catch (error) {
-		console.error("Analytics error in logSignUp:", error);
-	}
-}
-
-export async function logLogin(method: string): Promise<void> {
-	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "login", { method });
-	} catch (error) {
-		console.error("Analytics error in logLogin:", error);
-	}
-}
-
-/** 6. Drop-off Event */
-export async function logDropOff(
-	screen: string,
-	reason: "no_vote" | "no_comment" | "no_vote_no_comment"
+export async function logPuzzleCompleted(
+	puzzleId: string,
+	type: string,
+	timeTaken: number,
+	attempts?: number,
+	completed: boolean
 ): Promise<void> {
 	try {
-		const analytics = getAnalytics();
-		await logEvent(analytics, "drop_off", {
-			screen,
-			reason,
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "puzzle_completed", {
+			puzzle_id: puzzleId,
+			puzzle_type: type,
+			time_taken: timeTaken,
+			attempts: attempts || 0,
+			completed: completed,
 		});
 	} catch (error) {
-		console.error("Analytics error in logDropOff:", error);
+		console.error("Analytics error in logPuzzleCompleted:", error);
+	}
+}
+
+/**
+ * Log filter changed
+ */
+export async function logFilterChanged(filter: string): Promise<void> {
+	try {
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "filter_changed", {
+			filter_type: filter,
+		});
+	} catch (error) {
+		console.error("Analytics error in logFilterChanged:", error);
+	}
+}
+
+/**
+ * Log profile viewed
+ */
+export async function logProfileViewed(): Promise<void> {
+	try {
+		const analytics = mockGetAnalytics();
+		await mockLogEvent(analytics, "profile_viewed");
+	} catch (error) {
+		console.error("Analytics error in logProfileViewed:", error);
 	}
 }
