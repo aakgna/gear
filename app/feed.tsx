@@ -49,6 +49,8 @@ const FeedScreen = () => {
 		Record<string, number>
 	>({});
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
+	const isResettingRef = useRef(false);
+	const [scrollEnabled, setScrollEnabled] = useState(true);
 
 	const { addCompletedPuzzle } = useGameStore();
 
@@ -63,6 +65,12 @@ const FeedScreen = () => {
 		if (user) {
 			const data = await getUserData(user.uid);
 			setUserData(data);
+			// Route to username page if:
+			// 1. User document doesn't exist (!data)
+			// 2. User document exists but doesn't have username field (!data.username)
+			if (!data || !data.username) {
+				router.replace("/username");
+			}
 		}
 	};
 
@@ -167,78 +175,60 @@ const FeedScreen = () => {
 		return true;
 	});
 
-	// Function to move a puzzle at least 15 positions ahead or to the end
+	// Function to move a skipped puzzle to a random position between index 4 and the end
 	const movePuzzleAhead = useCallback(
 		(puzzleIdToMove: string, currentFilteredPuzzles: Puzzle[]) => {
-			setPuzzles((prevPuzzles) => {
-				// Find the puzzle's position in the filtered list
-				const filteredIndex = currentFilteredPuzzles.findIndex(
-					(p) => p.id === puzzleIdToMove
-				);
-				if (filteredIndex === -1) return prevPuzzles;
+			isResettingRef.current = true;
 
+			setPuzzles((prevPuzzles) => {
 				const puzzleIndex = prevPuzzles.findIndex(
 					(p) => p.id === puzzleIdToMove
 				);
-				if (puzzleIndex === -1) return prevPuzzles;
+				if (puzzleIndex === -1) {
+					isResettingRef.current = false;
+					return prevPuzzles;
+				}
 
 				const puzzle = prevPuzzles[puzzleIndex];
 				const newPuzzles = [...prevPuzzles];
 				newPuzzles.splice(puzzleIndex, 1); // Remove from current position
 
-				// Calculate target position (at least 15 ahead in filtered list, or end)
-				const targetFilteredIndex = filteredIndex + 15;
+				// Calculate random position between index 4 and end
+				// If there are less than 5 puzzles, move to end
+				const minIndex = Math.min(4, newPuzzles.length);
+				const maxIndex = newPuzzles.length;
+				const randomIndex = Math.floor(
+					Math.random() * (maxIndex - minIndex) + minIndex
+				);
 
-				if (targetFilteredIndex >= currentFilteredPuzzles.length) {
-					// Move to end of the full puzzles array
-					newPuzzles.push(puzzle);
-				} else {
-					// Find the puzzle at the target filtered position and insert after it
-					const targetPuzzleId = currentFilteredPuzzles[targetFilteredIndex].id;
-					const targetPuzzleIndex = newPuzzles.findIndex(
-						(p) => p.id === targetPuzzleId
-					);
-					if (targetPuzzleIndex !== -1) {
-						// Insert after the target puzzle
-						newPuzzles.splice(targetPuzzleIndex + 1, 0, puzzle);
-					} else {
-						// Fallback: add to end
-						newPuzzles.push(puzzle);
-					}
-				}
+				// Insert at random position
+				newPuzzles.splice(randomIndex, 0, puzzle);
+
+				// Reset flag after state update
+				setTimeout(() => {
+					isResettingRef.current = false;
+				}, 0);
 
 				return newPuzzles;
+			});
+
+			// Ensure scroll stays at 0
+			requestAnimationFrame(() => {
+				flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
 			});
 		},
 		[]
 	);
 
-	// Reset timer when current puzzle changes and handle puzzle skipping
+	// Reset timer when current puzzle changes
 	useEffect(() => {
-		if (filteredPuzzles.length > 0 && filteredPuzzles[currentIndex]) {
-			console.log("filtered");
+		if (
+			filteredPuzzles.length > 0 &&
+			filteredPuzzles[currentIndex] &&
+			!isResettingRef.current
+		) {
 			const puzzleId = filteredPuzzles[currentIndex].id;
 			if (puzzleId !== currentPuzzleId) {
-				// Check if user skipped the puzzle they just left (currentPuzzleId)
-				console.log("checking puzzle we just left:", currentPuzzleId);
-				if (currentPuzzleId) {
-					const previousStartTime = puzzleStartTimes[currentPuzzleId];
-					if (previousStartTime) {
-						const elapsedSeconds = Math.floor(
-							(Date.now() - previousStartTime) / 1000
-						);
-						const wasCompleted =
-							userData?.completedGames.includes(currentPuzzleId) || false;
-
-						// If viewed >= 2 seconds and not completed, move puzzle
-						console.log("elapsedSeconds", elapsedSeconds);
-						if (elapsedSeconds >= 2 && !wasCompleted) {
-							console.log("moving puzzle ahead:", currentPuzzleId);
-							movePuzzleAhead(currentPuzzleId, filteredPuzzles);
-						}
-					}
-				}
-
 				setCurrentPuzzleId(puzzleId);
 				setPuzzleStartTimes((prev) => ({
 					...prev,
@@ -253,7 +243,6 @@ const FeedScreen = () => {
 		currentPuzzleId,
 		puzzleStartTimes,
 		filteredPuzzles,
-		movePuzzleAhead,
 	]);
 
 	const handleGameComplete = async (result: GameResult) => {
@@ -266,10 +255,41 @@ const FeedScreen = () => {
 		// and manually swipe to next game
 	};
 
+	const handleScrollBeginDrag = (event: any) => {
+		// When user starts dragging down from index 0, they're skipping
+		if (currentIndex === 0 && !isResettingRef.current) {
+			const skippedPuzzleId = filteredPuzzles[0]?.id;
+			if (skippedPuzzleId && skippedPuzzleId === currentPuzzleId) {
+				const wasCompleted =
+					userData?.completedGames.includes(skippedPuzzleId) || false;
+
+				// If not completed, move puzzle immediately and prevent scroll
+				if (!wasCompleted) {
+					setScrollEnabled(false);
+					movePuzzleAhead(skippedPuzzleId, filteredPuzzles);
+					// Re-enable scrolling after puzzle moves
+					setTimeout(() => {
+						setScrollEnabled(true);
+					}, 50);
+				}
+			}
+		}
+	};
+
 	const handleScroll = (event: any) => {
+		// Don't allow scrolling if we're resetting or scroll is disabled
+		if (isResettingRef.current || !scrollEnabled) {
+			// Keep scroll locked at 0
+			flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+			return;
+		}
+
 		const offsetY = event.nativeEvent.contentOffset.y;
-		const index = Math.round(offsetY / SCREEN_HEIGHT);
-		setCurrentIndex(index);
+
+		// Always keep scroll at 0 - immediately reset any scroll
+		if (offsetY > 0) {
+			flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+		}
 	};
 
 	const itemHeight = Math.max(0, SCREEN_HEIGHT - headerHeight);
@@ -311,7 +331,7 @@ const FeedScreen = () => {
 					onPress={() => router.push("/profile")}
 					activeOpacity={0.7}
 				>
-					<Ionicons name="person-circle" size={32} color={Colors.accent} />
+					<Ionicons name="person-circle" size={28} color={Colors.accent} />
 				</TouchableOpacity>
 			</View>
 		);
@@ -319,7 +339,7 @@ const FeedScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="dark" />
+			<StatusBar style="light" />
 
 			{/* Header */}
 			{renderHeader()}
@@ -346,10 +366,12 @@ const FeedScreen = () => {
 								pagingEnabled
 								showsVerticalScrollIndicator={false}
 								onScroll={handleScroll}
+								onScrollBeginDrag={handleScrollBeginDrag}
 								scrollEventThrottle={16}
 								style={styles.feed}
 								keyboardDismissMode="on-drag"
 								keyboardShouldPersistTaps="handled"
+								scrollEnabled={scrollEnabled}
 							/>
 						) : (
 							<View style={styles.loadingContainer}>
@@ -368,7 +390,7 @@ const FeedScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
@@ -376,14 +398,12 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingHorizontal: Layout.margin,
 		paddingTop: 50,
-		paddingBottom: Spacing.sm,
-		backgroundColor: Colors.background.primary,
+		paddingBottom: Spacing.md,
+		backgroundColor: Colors.background.secondary,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
 		zIndex: 10,
-		shadowColor: Shadows.light.shadowColor,
-		shadowOffset: Shadows.light.shadowOffset,
-		shadowOpacity: Shadows.light.shadowOpacity,
-		shadowRadius: Shadows.light.shadowRadius,
-		elevation: Shadows.light.elevation,
+		...Shadows.medium,
 	},
 	logoContainer: {
 		flex: 1,
@@ -391,8 +411,11 @@ const styles = StyleSheet.create({
 	logoText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.primary,
+		color: Colors.text.primary,
 		letterSpacing: -0.5,
+		textShadowColor: Colors.accent,
+		textShadowOffset: { width: 0, height: 0 },
+		textShadowRadius: 8,
 	},
 	profileButton: {
 		padding: Spacing.xs,
@@ -400,9 +423,14 @@ const styles = StyleSheet.create({
 		minHeight: Layout.tapTarget,
 		justifyContent: "center",
 		alignItems: "center",
+		borderRadius: BorderRadius.md,
+		backgroundColor: Colors.background.tertiary,
+		borderWidth: 1,
+		borderColor: "rgba(124, 77, 255, 0.3)",
 	},
 	feed: {
 		flex: 1,
+		backgroundColor: Colors.background.primary,
 	},
 	puzzleCard: {
 		width: SCREEN_WIDTH,
@@ -412,7 +440,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 	},
 	loadingText: {
 		marginTop: Spacing.md,

@@ -48,8 +48,13 @@ export const fetchGamesFromFirestore = async (
 		});
 
 		return games;
-	} catch (error) {
+	} catch (error: any) {
 		console.error(`Error fetching ${gameType} games:`, error);
+		if (error?.code === "firestore/permission-denied") {
+			console.warn(
+				"Firestore permission denied. Please check your Firestore security rules."
+			);
+		}
 		return [];
 	}
 };

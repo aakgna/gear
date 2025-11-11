@@ -49,10 +49,10 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 	const answer = inputData.answer.toUpperCase();
 	const wordLength = answer.length;
-	const maxGuesses = 6;
+	const maxGuesses = 5;
 
-	// Validate word length (3-10 letters)
-	const validWordLength = wordLength >= 3 && wordLength <= 10;
+	// Validate word length (3-8 letters)
+	const validWordLength = wordLength >= 3 && wordLength <= 8;
 
 	// Initialize board based on word length
 	const initializeBoard = () => {
@@ -332,12 +332,16 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		<View style={styles.container}>
 			<View style={styles.header}>
 				<Text style={styles.title}>Wordle</Text>
-				<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+				<View style={styles.timerBadge}>
+					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+				</View>
 			</View>
 			{!validWordLength && (
-				<Text style={styles.errorText}>
-					Invalid word length. Must be 3-10 letters.
-				</Text>
+				<View style={styles.errorContainer}>
+					<Text style={styles.errorText}>
+						Invalid word length. Must be 3-8 letters.
+					</Text>
+				</View>
 			)}
 
 			{/* Game Board */}
@@ -346,11 +350,11 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				onLayout={(e) => {
 					const availableHeight = e.nativeEvent.layout.height;
 					if (!availableHeight || !validWordLength) return;
-					// 6 rows -> 5 gaps of 8px between rows + tile margins (2px each side)
-					const verticalGaps = 5 * Spacing.sm;
-					const maxByHeight = (availableHeight - verticalGaps) / 6;
-					const maxByWidth = (width - 60) / wordLength;
-					const nextSize = Math.floor(Math.min(maxByWidth, maxByHeight));
+					// 5 rows -> 4 gaps + tile margins
+					const verticalGaps = 4 * 16;
+					const maxByHeight = (availableHeight - verticalGaps) / 5;
+					const maxByWidth = (width - Spacing.xl * 2 - 24) / wordLength;
+					const nextSize = Math.floor(Math.min(maxByWidth, maxByHeight, 80));
 					if (nextSize > 0 && nextSize !== tileSize) setTileSize(nextSize);
 				}}
 			>
@@ -415,26 +419,44 @@ const WordleGame: React.FC<WordleGameProps> = ({
 			{gameWon && (
 				<Animated.View
 					style={[
-						styles.status,
-						styles.statusSuccess,
+						styles.statusContainer,
 						{
 							transform: [{ scale: successScale }],
 						},
 					]}
 				>
-					<Text style={styles.statusText}>🎉 Correct! Well done!</Text>
-					<Text style={styles.statusSubtext}>
-						Time: {formatTime(elapsedTime)} • Attempts: {attempts}
-					</Text>
+					<Text style={styles.statusEmoji}>🎉</Text>
+					<Text style={styles.statusTitle}>Perfect!</Text>
+					<View style={styles.statsRow}>
+						<View style={styles.statItem}>
+							<Text style={styles.statLabel}>Time</Text>
+							<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
+						</View>
+						<View style={styles.statDivider} />
+						<View style={styles.statItem}>
+							<Text style={styles.statLabel}>Attempts</Text>
+							<Text style={styles.statValue}>{attempts}</Text>
+						</View>
+					</View>
 				</Animated.View>
 			)}
 
 			{gameLost && (
-				<View style={[styles.status, styles.statusError]}>
-					<Text style={styles.statusText}>😔 The word was: {answer}</Text>
-					<Text style={styles.statusSubtext}>
-						Time: {formatTime(elapsedTime)} • Attempts: {attempts}
-					</Text>
+				<View style={styles.statusContainer}>
+					<Text style={styles.statusEmoji}>😔</Text>
+					<Text style={styles.statusTitle}>The word was:</Text>
+					<Text style={styles.answerText}>{answer}</Text>
+					<View style={styles.statsRow}>
+						<View style={styles.statItem}>
+							<Text style={styles.statLabel}>Time</Text>
+							<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
+						</View>
+						<View style={styles.statDivider} />
+						<View style={styles.statItem}>
+							<Text style={styles.statLabel}>Attempts</Text>
+							<Text style={styles.statValue}>{attempts}</Text>
+						</View>
+					</View>
 				</View>
 			)}
 		</View>
@@ -444,9 +466,9 @@ const WordleGame: React.FC<WordleGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingHorizontal: Spacing.md,
-		paddingTop: Spacing.md,
-		paddingBottom: Spacing.sm,
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.lg,
+		paddingBottom: Spacing.lg,
 		alignItems: "center",
 		backgroundColor: Colors.background.primary,
 	},
@@ -455,45 +477,68 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "center",
 		width: "100%",
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
-		fontSize: Typography.fontSize.h2,
+		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.primary,
 		letterSpacing: -0.5,
 	},
+	timerBadge: {
+		backgroundColor: Colors.accent + "20",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
+	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.accent,
 		fontFamily: Typography.fontFamily.monospace,
+	},
+	errorContainer: {
+		marginBottom: Spacing.lg,
+		padding: Spacing.md,
+		backgroundColor: Colors.error + "15",
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.error + "40",
+	},
+	errorText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.error,
+		textAlign: "center",
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	boardContainer: {
 		flex: 1,
 		width: "100%",
 		justifyContent: "center",
 		alignItems: "center",
-		marginBottom: Spacing.sm,
+		marginBottom: Spacing.lg,
 	},
 	board: {
-		marginBottom: 0,
+		alignItems: "center",
 	},
 	row: {
 		flexDirection: "row",
-		marginBottom: Spacing.sm,
+		marginBottom: 16,
+		gap: 6,
 	},
 	tile: {
 		borderWidth: 2,
 		borderColor: Colors.text.disabled,
-		margin: 2,
 		alignItems: "center",
 		justifyContent: "center",
-		borderRadius: BorderRadius.sm,
+		borderRadius: BorderRadius.md,
+		...Shadows.light,
 	},
 	empty: {
-		backgroundColor: Colors.background.primary,
-		borderColor: Colors.text.disabled,
+		backgroundColor: Colors.background.tertiary,
+		borderColor: "rgba(255, 255, 255, 0.2)",
 	},
 	correct: {
 		backgroundColor: Colors.game.correct,
@@ -508,78 +553,100 @@ const styles = StyleSheet.create({
 		borderColor: Colors.game.absent,
 	},
 	tileText: {
-		fontSize: Typography.fontSize.h2,
+		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 	},
 	lightText: { color: Colors.text.white },
 	darkText: { color: Colors.text.primary },
 	keyboard: {
-		marginTop: Spacing.md,
+		width: "100%",
+		paddingTop: Spacing.md,
 	},
 	keyboardRow: {
 		flexDirection: "row",
 		justifyContent: "center",
 		marginBottom: Spacing.sm,
+		gap: 4,
 	},
 	key: {
-		backgroundColor: Colors.text.disabled,
-		padding: Spacing.sm,
-		margin: 2,
-		borderRadius: BorderRadius.sm,
+		backgroundColor: Colors.background.tertiary,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.15)",
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.sm,
+		borderRadius: BorderRadius.md,
 		alignItems: "center",
 		justifyContent: "center",
-		minHeight: Layout.tapTarget,
-		minWidth: Layout.tapTarget,
+		minHeight: 44,
+		...Shadows.light,
 	},
 	regularKey: {
-		minWidth: 30,
+		minWidth: 32,
 	},
 	wideKey: {
-		minWidth: 50,
+		minWidth: 56,
+		paddingHorizontal: Spacing.md,
 	},
 	keyText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
 	},
-	status: {
-		marginTop: Spacing.lg,
-		padding: Spacing.md,
-		borderRadius: BorderRadius.md,
+	statusContainer: {
+		marginTop: Spacing.xl,
+		padding: Spacing.xxl,
+		backgroundColor: Colors.accent + "10",
+		borderRadius: BorderRadius.xl,
 		alignItems: "center",
-		shadowColor: Shadows.light.shadowColor,
-		shadowOffset: Shadows.light.shadowOffset,
-		shadowOpacity: Shadows.light.shadowOpacity,
-		shadowRadius: Shadows.light.shadowRadius,
-		elevation: Shadows.light.elevation,
-	},
-	statusSuccess: {
-		backgroundColor: Colors.accent + "15", // 15% opacity
 		borderWidth: 2,
 		borderColor: Colors.accent,
+		...Shadows.large,
+		width: "100%",
 	},
-	statusError: {
-		backgroundColor: Colors.error + "15",
-		borderWidth: 2,
-		borderColor: Colors.error,
-	},
-	statusText: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
+	statusEmoji: {
+		fontSize: 48,
 		marginBottom: Spacing.sm,
 	},
-	statusSubtext: {
+	statusTitle: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		marginBottom: Spacing.md,
+		letterSpacing: -0.5,
+	},
+	answerText: {
+		fontSize: Typography.fontSize.h1,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.lg,
+		letterSpacing: 2,
+	},
+	statsRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.xl,
+	},
+	statItem: {
+		alignItems: "center",
+		gap: Spacing.xs,
+	},
+	statLabel: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-		marginTop: Spacing.xs,
-	},
-	errorText: {
-		fontSize: Typography.fontSize.body,
-		color: Colors.error,
-		marginBottom: Spacing.md,
-		textAlign: "center",
 		fontWeight: Typography.fontWeight.medium,
+		textTransform: "uppercase",
+		letterSpacing: 0.5,
+	},
+	statValue: {
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.bold,
+		fontFamily: Typography.fontFamily.monospace,
+	},
+	statDivider: {
+		width: 1,
+		height: 32,
+		backgroundColor: "rgba(255, 255, 255, 0.2)",
 	},
 });
 

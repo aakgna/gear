@@ -11,7 +11,19 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { signInWithGoogle, configureGoogleSignIn } from "../config/auth";
+import {
+	signInWithGoogle,
+	configureGoogleSignIn,
+	getUserData,
+	getCurrentUser,
+} from "../config/auth";
+import {
+	Colors,
+	Typography,
+	Spacing,
+	BorderRadius,
+	Shadows,
+} from "../constants/DesignSystem";
 
 const SignInScreen = () => {
 	const router = useRouter();
@@ -25,9 +37,26 @@ const SignInScreen = () => {
 	const handleGoogleSignIn = async () => {
 		setLoading(true);
 		try {
-			await signInWithGoogle();
-			// Navigation will happen automatically via auth state listener
-			router.replace("/feed");
+			const user = await signInWithGoogle();
+			if (user) {
+				// Check if user document exists and has username
+				const userData = await getUserData(user.uid);
+
+				// Route to username page if:
+				// 1. User document doesn't exist (!userData)
+				// 2. User document exists but doesn't have username field (!userData.username)
+				if (!userData || !userData.username) {
+					// User needs to set username, go to username screen
+					setLoading(false);
+					router.replace("/username");
+				} else {
+					// User has username, go to feed
+					setLoading(false);
+					router.replace("/feed");
+				}
+			} else {
+				setLoading(false);
+			}
 		} catch (error: any) {
 			setLoading(false);
 			if (error.message === "Sign in was cancelled") {
@@ -45,7 +74,7 @@ const SignInScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="light" />
 			<LinearGradient
-				colors={["#1e88e5", "#1565c0"]}
+				colors={Colors.background.gradient as [string, string]}
 				style={StyleSheet.absoluteFill}
 			/>
 
@@ -70,10 +99,14 @@ const SignInScreen = () => {
 						disabled={loading}
 					>
 						{loading ? (
-							<ActivityIndicator color="#fff" />
+							<ActivityIndicator color={Colors.text.primary} />
 						) : (
 							<>
-								<Ionicons name="logo-google" size={24} color="#fff" />
+								<Ionicons
+									name="logo-google"
+									size={24}
+									color={Colors.text.primary}
+								/>
 								<Text style={styles.googleButtonText}>
 									Continue with Google
 								</Text>
@@ -93,26 +126,30 @@ const SignInScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: Colors.background.primary,
 	},
 	content: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		paddingHorizontal: 30,
+		paddingHorizontal: Spacing.xl,
 	},
 	logoContainer: {
 		alignItems: "center",
-		marginBottom: 60,
+		marginBottom: Spacing.xxl,
 	},
 	logo: {
-		fontSize: 56,
-		fontWeight: "bold",
-		color: "#ffffff",
-		marginBottom: 16,
+		fontSize: 64,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
+		textShadowColor: Colors.accent,
+		textShadowOffset: { width: 0, height: 0 },
+		textShadowRadius: 12,
 	},
 	subtitle: {
-		fontSize: 18,
-		color: "#e3f2fd",
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.secondary,
 		textAlign: "center",
 	},
 	signInContainer: {
@@ -120,47 +157,43 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	welcomeText: {
-		fontSize: 28,
-		fontWeight: "bold",
-		color: "#ffffff",
-		marginBottom: 12,
+		fontSize: Typography.fontSize.h1,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
 		textAlign: "center",
 	},
 	descriptionText: {
-		fontSize: 16,
-		color: "#e3f2fd",
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 		textAlign: "center",
-		marginBottom: 40,
-		lineHeight: 24,
+		marginBottom: Spacing.xl,
+		lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.body,
 	},
 	googleButton: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "#ffffff",
-		paddingVertical: 16,
-		paddingHorizontal: 32,
-		borderRadius: 12,
+		backgroundColor: Colors.accent,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
+		borderRadius: BorderRadius.lg,
 		width: "100%",
-		marginBottom: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 8,
+		marginBottom: Spacing.lg,
+		...Shadows.heavy,
 	},
 	buttonDisabled: {
 		opacity: 0.7,
 	},
 	googleButtonText: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#1e88e5",
-		marginLeft: 12,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
+		marginLeft: Spacing.md,
 	},
 	privacyText: {
-		fontSize: 12,
-		color: "#e3f2fd",
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
 		textAlign: "center",
 		opacity: 0.8,
 	},

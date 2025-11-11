@@ -15,17 +15,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useGameStore } from "../stores/gameStore";
 import { getCurrentUser, getUserData, signOut, UserData } from "../config/auth";
 import { Puzzle } from "../config/types";
+import {
+	Colors,
+	Typography,
+	Spacing,
+	BorderRadius,
+	Shadows,
+	Layout,
+} from "../constants/DesignSystem";
 
 const ProfileScreen = () => {
 	const router = useRouter();
-	const {
-		userProfile,
-		isAuthenticated,
-		getTotalPuzzlesSolved,
-		getAverageSolveTime,
-		getCurrentStreak,
-		resetProgress,
-	} = useGameStore();
+	const { userProfile, isAuthenticated, resetProgress } = useGameStore();
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [showHistory, setShowHistory] = useState(false);
@@ -98,7 +99,7 @@ const ProfileScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="dark" />
+			<StatusBar style="light" />
 
 			{/* Header */}
 			<View style={styles.header}>
@@ -106,7 +107,7 @@ const ProfileScreen = () => {
 					style={styles.backButton}
 					onPress={() => router.back()}
 				>
-					<Ionicons name="arrow-back" size={24} color="#1e88e5" />
+					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
 				</TouchableOpacity>
 				<Text style={styles.headerTitle}>Profile</Text>
 				<View style={{ width: 24 }} /> {/* Spacer for centering */}
@@ -116,34 +117,32 @@ const ProfileScreen = () => {
 				{/* User Info */}
 				<View style={styles.userSection}>
 					<View style={styles.avatarContainer}>
-						<Ionicons name="person-circle" size={80} color="#1e88e5" />
+						<Ionicons name="person-circle" size={80} color={Colors.accent} />
 					</View>
 
 					<Text style={styles.username}>
-						{userProfile?.username || "Anonymous User"}
+						{userData?.username || userProfile?.username || "Username"}
 					</Text>
-
-					{isAuthenticated && userProfile?.email && (
-						<Text style={styles.email}>{userProfile.email}</Text>
-					)}
 				</View>
 
 				{/* Stats Grid */}
 				<View style={styles.statsGrid}>
 					<View style={styles.statCard}>
-						<Text style={styles.statNumber}>{getTotalPuzzlesSolved()}</Text>
-						<Text style={styles.statLabel}>Puzzles Solved</Text>
+						<Text style={styles.statNumber}>
+							{userData?.totalGamesPlayed || 0}
+						</Text>
+						<Text style={styles.statLabel}>Games Played</Text>
 					</View>
 
 					<View style={styles.statCard}>
 						<Text style={styles.statNumber}>
-							{formatTime(getAverageSolveTime())}
+							{formatTime(userData?.averageTimePerGame || 0)}
 						</Text>
 						<Text style={styles.statLabel}>Avg Time</Text>
 					</View>
 
 					<View style={styles.statCard}>
-						<Text style={styles.statNumber}>{getCurrentStreak()}</Text>
+						<Text style={styles.statNumber}>{userData?.streakCount || 0}</Text>
 						<Text style={styles.statLabel}>Current Streak</Text>
 					</View>
 				</View>
@@ -153,28 +152,28 @@ const ProfileScreen = () => {
 					<Text style={styles.sectionTitle}>Achievements</Text>
 
 					<View style={styles.badgesContainer}>
-						{getTotalPuzzlesSolved() >= 1 && (
+						{(userData?.totalGamesPlayed || 0) >= 1 && (
 							<View style={styles.badge}>
 								<Text style={styles.badgeEmoji}>🎯</Text>
-								<Text style={styles.badgeText}>First Puzzle</Text>
+								<Text style={styles.badgeText}>First Game</Text>
 							</View>
 						)}
 
-						{getTotalPuzzlesSolved() >= 5 && (
+						{(userData?.totalGamesPlayed || 0) >= 5 && (
 							<View style={styles.badge}>
 								<Text style={styles.badgeEmoji}>🔥</Text>
-								<Text style={styles.badgeText}>Puzzle Master</Text>
+								<Text style={styles.badgeText}>Game Master</Text>
 							</View>
 						)}
 
-						{getCurrentStreak() >= 3 && (
+						{(userData?.streakCount || 0) >= 3 && (
 							<View style={styles.badge}>
 								<Text style={styles.badgeEmoji}>⚡</Text>
 								<Text style={styles.badgeText}>Speed Demon</Text>
 							</View>
 						)}
 
-						{getTotalPuzzlesSolved() >= 10 && (
+						{(userData?.totalGamesPlayed || 0) >= 10 && (
 							<View style={styles.badge}>
 								<Text style={styles.badgeEmoji}>🧠</Text>
 								<Text style={styles.badgeText}>Brain Trainer</Text>
@@ -190,7 +189,7 @@ const ProfileScreen = () => {
 							Completed Games ({String(userData?.completedGames?.length || 0)})
 						</Text>
 						{loading ? (
-							<ActivityIndicator size="small" color="#1e88e5" />
+							<ActivityIndicator size="small" color={Colors.accent} />
 						) : historyPuzzles.length > 0 ? (
 							<FlatList
 								data={historyPuzzles}
@@ -221,7 +220,7 @@ const ProfileScreen = () => {
 						<Ionicons
 							name={showHistory ? "chevron-up" : "time-outline"}
 							size={24}
-							color="#1e88e5"
+							color={Colors.accent}
 						/>
 						<Text style={styles.actionButtonText}>
 							{showHistory ? "Hide History" : "View History"}
@@ -229,7 +228,7 @@ const ProfileScreen = () => {
 					</TouchableOpacity>
 
 					<TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-						<Ionicons name="log-out-outline" size={24} color="#f44336" />
+						<Ionicons name="log-out-outline" size={24} color={Colors.error} />
 						<Text style={[styles.actionButtonText, styles.logoutText]}>
 							Logout
 						</Text>
@@ -251,89 +250,95 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#f5f7fa",
+		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		paddingHorizontal: 20,
+		paddingHorizontal: Layout.margin,
 		paddingTop: 50,
-		paddingBottom: 15,
-		backgroundColor: "#ffffff",
+		paddingBottom: Spacing.md,
+		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.medium,
 	},
 	backButton: {
-		padding: 5,
+		padding: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		backgroundColor: Colors.background.tertiary,
+		borderWidth: 1,
+		borderColor: "rgba(124, 77, 255, 0.3)",
 	},
 	headerTitle: {
-		fontSize: 20,
-		fontWeight: "bold",
-		color: "#212121",
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
 	},
 	content: {
 		flex: 1,
-		paddingHorizontal: 20,
+		paddingHorizontal: Layout.margin,
 	},
 	userSection: {
 		alignItems: "center",
-		paddingVertical: 30,
-		backgroundColor: "#ffffff",
-		borderRadius: 20,
-		marginTop: 20,
-		marginBottom: 20,
+		paddingVertical: Spacing.xl,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.xl,
+		marginTop: Spacing.lg,
+		marginBottom: Spacing.lg,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.medium,
 	},
 	avatarContainer: {
-		marginBottom: 15,
+		marginBottom: Spacing.md,
 	},
 	username: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#212121",
-		marginBottom: 5,
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xs,
 	},
 	email: {
-		fontSize: 16,
-		color: "#666",
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 	},
 	statsGrid: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		marginBottom: 30,
+		marginBottom: Spacing.xl,
 	},
 	statCard: {
 		flex: 1,
-		backgroundColor: "#ffffff",
-		borderRadius: 15,
-		padding: 20,
-		marginHorizontal: 5,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.lg,
+		marginHorizontal: Spacing.xs,
 		alignItems: "center",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		borderWidth: 1,
+		borderColor: "rgba(124, 77, 255, 0.2)",
+		...Shadows.light,
 	},
 	statNumber: {
-		fontSize: 28,
-		fontWeight: "bold",
-		color: "#1e88e5",
-		marginBottom: 5,
+		fontSize: 32,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		marginBottom: Spacing.xs,
 	},
 	statLabel: {
-		fontSize: 14,
-		color: "#666",
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
 		textAlign: "center",
 	},
 	achievementsSection: {
-		marginBottom: 30,
+		marginBottom: Spacing.xl,
 	},
 	sectionTitle: {
-		fontSize: 20,
-		fontWeight: "bold",
-		color: "#212121",
-		marginBottom: 15,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
 	},
 	badgesContainer: {
 		flexDirection: "row",
@@ -341,95 +346,89 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	badge: {
-		backgroundColor: "#ffffff",
-		borderRadius: 15,
-		padding: 15,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.md,
 		width: "48%",
 		alignItems: "center",
-		marginBottom: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		marginBottom: Spacing.sm,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.light,
 	},
 	badgeEmoji: {
-		fontSize: 30,
-		marginBottom: 8,
+		fontSize: 32,
+		marginBottom: Spacing.xs,
 	},
 	badgeText: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#212121",
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
 		textAlign: "center",
 	},
 	actionsSection: {
-		marginBottom: 30,
+		marginBottom: Spacing.xl,
 	},
 	actionButton: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: "#ffffff",
-		borderRadius: 15,
-		padding: 20,
-		marginBottom: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.lg,
+		marginBottom: Spacing.sm,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.light,
 	},
 	actionButtonText: {
-		fontSize: 16,
-		fontWeight: "500",
-		color: "#1e88e5",
-		marginLeft: 15,
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.accent,
+		marginLeft: Spacing.md,
 	},
 	logoutText: {
-		color: "#f44336",
+		color: Colors.error,
 	},
 	appInfoSection: {
 		alignItems: "center",
-		paddingVertical: 30,
-		marginBottom: 50,
+		paddingVertical: Spacing.xl,
+		marginBottom: Spacing.xxl,
 	},
 	appVersion: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#212121",
-		marginBottom: 5,
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xs,
 	},
 	appDescription: {
-		fontSize: 14,
-		color: "#666",
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
 		textAlign: "center",
 	},
 	historySection: {
-		marginBottom: 30,
-		backgroundColor: "#ffffff",
-		borderRadius: 15,
-		padding: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		marginBottom: Spacing.xl,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.lg,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.light,
 	},
 	historyItem: {
-		paddingVertical: 12,
-		paddingHorizontal: 16,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.md,
 		borderBottomWidth: 1,
-		borderBottomColor: "#e0e0e0",
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
 	},
 	historyItemText: {
-		fontSize: 14,
-		color: "#212121",
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.primary,
 	},
 	emptyHistoryText: {
-		fontSize: 14,
-		color: "#666",
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
 		textAlign: "center",
-		paddingVertical: 20,
+		paddingVertical: Spacing.lg,
 	},
 });
 

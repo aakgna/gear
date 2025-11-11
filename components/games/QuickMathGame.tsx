@@ -6,6 +6,7 @@ import {
 	TextInput,
 	TouchableOpacity,
 	Animated,
+	ScrollView,
 } from "react-native";
 import { GameResult, QuickMathData } from "../../config/types";
 import {
@@ -225,58 +226,91 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		<View style={styles.container}>
 			<View style={styles.header}>
 				<Text style={styles.title}>Quick Math</Text>
-				<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-			</View>
-			<Animated.View
-				style={[
-					styles.boardContainer,
-					{
-						transform: [{ translateX: shakeAnimation }],
-					},
-				]}
-			>
-				<View style={styles.problemList}>
-					{problems.map((p, idx) => (
-						<View key={idx} style={styles.problemRow}>
-							<Text style={styles.problemText}>{p} =</Text>
-							<TextInput
-								style={styles.answerInput}
-								value={answers[idx]}
-								onChangeText={(t) =>
-									handleChange(idx, t.replace(/[^0-9\-+.]/g, ""))
-								}
-								keyboardType="numbers-and-punctuation"
-								returnKeyType="done"
-								placeholderTextColor={Colors.text.disabled}
-							/>
-						</View>
-					))}
+				<View style={styles.timerBadge}>
+					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
 				</View>
-			</Animated.View>
-			<TouchableOpacity
-				style={[styles.submit, submitted && styles.submitDisabled]}
-				onPress={handleSubmit}
-				disabled={submitted}
-				activeOpacity={0.7}
+			</View>
+
+			<ScrollView
+				style={styles.scrollView}
+				contentContainerStyle={styles.scrollContent}
+				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
 			>
-				<Text style={styles.submitText}>Submit</Text>
-			</TouchableOpacity>
-			{feedback && <Text style={styles.feedback}>{feedback}</Text>}
-			{submitted && (
 				<Animated.View
 					style={[
-						styles.completionContainer,
+						styles.boardContainer,
 						{
-							transform: [{ scale: successScale }],
+							transform: [{ translateX: shakeAnimation }],
 						},
 					]}
 				>
-					<Text style={styles.completionText}>🎉 Completed!</Text>
-					<Text style={styles.completionSubtext}>
-						Time: {formatTime(elapsedTime)} • Accuracy: 100%
-					</Text>
+					<View style={styles.problemList}>
+						{problems.map((p, idx) => (
+							<View key={idx} style={styles.problemRow}>
+								<View style={styles.problemNumberBadge}>
+									<Text style={styles.problemNumber}>{idx + 1}</Text>
+								</View>
+								<Text style={styles.problemText}>{p}</Text>
+								<Text style={styles.equalSign}>=</Text>
+								<TextInput
+									style={styles.answerInput}
+									value={answers[idx]}
+									onChangeText={(t) =>
+										handleChange(idx, t.replace(/[^0-9\-+.]/g, ""))
+									}
+									keyboardType="numbers-and-punctuation"
+									returnKeyType="done"
+									placeholderTextColor={Colors.text.disabled}
+									placeholder="?"
+								/>
+							</View>
+						))}
+					</View>
 				</Animated.View>
-			)}
+
+				<TouchableOpacity
+					style={[styles.submit, submitted && styles.submitDisabled]}
+					onPress={handleSubmit}
+					disabled={submitted}
+					activeOpacity={0.7}
+				>
+					<Text style={styles.submitText}>
+						{submitted ? "✓ Submitted" : "Submit Answers"}
+					</Text>
+				</TouchableOpacity>
+
+				{feedback && (
+					<View style={styles.feedbackContainer}>
+						<Text style={styles.feedback}>{feedback}</Text>
+					</View>
+				)}
+
+				{submitted && (
+					<Animated.View
+						style={[
+							styles.completionContainer,
+							{
+								transform: [{ scale: successScale }],
+							},
+						]}
+					>
+						<Text style={styles.completionEmoji}>🎉</Text>
+						<Text style={styles.completionText}>Perfect Score!</Text>
+						<View style={styles.statsRow}>
+							<View style={styles.statItem}>
+								<Text style={styles.statLabel}>Time</Text>
+								<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
+							</View>
+							<View style={styles.statDivider} />
+							<View style={styles.statItem}>
+								<Text style={styles.statLabel}>Accuracy</Text>
+								<Text style={styles.statValue}>100%</Text>
+							</View>
+						</View>
+					</Animated.View>
+				)}
+			</ScrollView>
 		</View>
 	);
 };
@@ -284,10 +318,6 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingHorizontal: Spacing.md,
-		paddingTop: Spacing.md,
-		paddingBottom: Spacing.sm,
-		alignItems: "center",
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
@@ -295,116 +325,181 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "center",
 		width: "100%",
-		marginBottom: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.lg,
+		paddingBottom: Spacing.lg,
 	},
 	title: {
-		fontSize: Typography.fontSize.h2,
+		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.primary,
 		letterSpacing: -0.5,
 	},
+	timerBadge: {
+		backgroundColor: Colors.accent + "20",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
+	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.accent,
 		fontFamily: Typography.fontFamily.monospace,
 	},
-	boardContainer: {
+	scrollView: {
 		flex: 1,
+	},
+	scrollContent: {
+		paddingHorizontal: Spacing.xl,
+		paddingBottom: Spacing.xxl,
+	},
+	boardContainer: {
 		width: "100%",
-		justifyContent: "center",
 		alignItems: "center",
 	},
 	problemList: {
 		width: "100%",
-		gap: Spacing.sm,
+		gap: Spacing.md,
 	},
 	problemRow: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.md,
-		backgroundColor: Colors.background.primary,
-		borderRadius: BorderRadius.md,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.lg,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
 		borderWidth: 1,
-		borderColor: Colors.text.disabled,
-		shadowColor: Shadows.light.shadowColor,
-		shadowOffset: Shadows.light.shadowOffset,
-		shadowOpacity: Shadows.light.shadowOpacity,
-		shadowRadius: Shadows.light.shadowRadius,
-		elevation: Shadows.light.elevation,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		...Shadows.light,
+		gap: Spacing.sm,
+	},
+	problemNumberBadge: {
+		width: 32,
+		height: 32,
+		borderRadius: BorderRadius.full,
+		backgroundColor: Colors.accent + "20",
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	problemNumber: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
 	},
 	problemText: {
 		fontSize: Typography.fontSize.h3,
 		color: Colors.text.primary,
-		marginRight: Spacing.sm,
-		flexShrink: 1,
+		flex: 1,
+		fontWeight: Typography.fontWeight.semiBold,
+	},
+	equalSign: {
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.secondary,
 		fontWeight: Typography.fontWeight.medium,
+		marginHorizontal: Spacing.xs,
 	},
 	answerInput: {
 		width: 90,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.md,
-		borderWidth: 1,
-		borderColor: Colors.text.disabled,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.sm,
+		borderWidth: 2,
+		borderColor: "rgba(124, 77, 255, 0.3)",
 		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		textAlign: "center",
 		fontSize: Typography.fontSize.h3,
 		color: Colors.text.primary,
-		fontWeight: Typography.fontWeight.semiBold,
-		minHeight: Layout.tapTarget,
+		fontWeight: Typography.fontWeight.bold,
+		minHeight: 48,
 	},
 	submit: {
-		marginTop: Spacing.md,
+		marginTop: Spacing.xl,
 		backgroundColor: ComponentStyles.button.backgroundColor,
 		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.lg,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
 		minHeight: ComponentStyles.button.minHeight,
 		alignItems: ComponentStyles.button.alignItems,
 		justifyContent: ComponentStyles.button.justifyContent,
+		width: "100%",
+		...Shadows.medium,
 	},
 	submitText: {
 		color: Colors.text.white,
-		fontSize: Typography.fontSize.body,
+		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
+		letterSpacing: 0.5,
 	},
 	submitDisabled: {
-		opacity: 0.5,
+		opacity: 0.6,
 	},
-	feedback: {
-		marginTop: Spacing.md,
-		fontSize: Typography.fontSize.caption,
-		color: Colors.error,
-		textAlign: "center",
-		fontWeight: Typography.fontWeight.medium,
-	},
-	completionContainer: {
+	feedbackContainer: {
 		marginTop: Spacing.lg,
 		padding: Spacing.lg,
-		backgroundColor: Colors.accent + "15",
+		backgroundColor: Colors.error + "15",
 		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.error + "40",
+	},
+	feedback: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.error,
+		textAlign: "center",
+		fontWeight: Typography.fontWeight.semiBold,
+	},
+	completionContainer: {
+		marginTop: Spacing.xl,
+		padding: Spacing.xxl,
+		backgroundColor: Colors.accent + "10",
+		borderRadius: BorderRadius.xl,
 		alignItems: "center",
 		borderWidth: 2,
 		borderColor: Colors.accent,
-		shadowColor: Shadows.light.shadowColor,
-		shadowOffset: Shadows.light.shadowOffset,
-		shadowOpacity: Shadows.light.shadowOpacity,
-		shadowRadius: Shadows.light.shadowRadius,
-		elevation: Shadows.light.elevation,
+		...Shadows.large,
+	},
+	completionEmoji: {
+		fontSize: 48,
+		marginBottom: Spacing.sm,
 	},
 	completionText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.accent,
-		marginBottom: Spacing.sm,
+		marginBottom: Spacing.lg,
+		letterSpacing: -0.5,
 	},
-	completionSubtext: {
-		fontSize: Typography.fontSize.body,
+	statsRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.xl,
+	},
+	statItem: {
+		alignItems: "center",
+		gap: Spacing.xs,
+	},
+	statLabel: {
+		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
 		fontWeight: Typography.fontWeight.medium,
+		textTransform: "uppercase",
+		letterSpacing: 0.5,
+	},
+	statValue: {
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.bold,
+		fontFamily: Typography.fontFamily.monospace,
+	},
+	statDivider: {
+		width: 1,
+		height: 32,
+		backgroundColor: "rgba(255, 255, 255, 0.2)",
 	},
 });
 

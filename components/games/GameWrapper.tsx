@@ -46,7 +46,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const handleComplete = async (result: GameResult) => {
 		const user = getCurrentUser();
 		if (user) {
-			await addCompletedGame(user.uid, puzzle.id);
+			// Pass timeTaken to update stats
+			await addCompletedGame(user.uid, puzzle.id, result.timeTaken);
 		}
 		onComplete(result);
 	};
@@ -89,7 +90,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	};
 
 	return (
-		<SafeAreaView style={styles.safeArea} edges={["top"]}>
+		<SafeAreaView style={styles.safeArea} edges={[]}>
 			<KeyboardAvoidingView
 				style={styles.container}
 				behavior={Platform.OS === "ios" ? "padding" : undefined}

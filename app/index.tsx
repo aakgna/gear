@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { onAuthStateChanged, getCurrentUser } from "../config/auth";
+import {
+	onAuthStateChanged,
+	getCurrentUser,
+	getUserData,
+} from "../config/auth";
+import { Colors, Typography, Spacing } from "../constants/DesignSystem";
 
 export default function SplashScreen() {
 	const router = useRouter();
@@ -19,7 +24,7 @@ export default function SplashScreen() {
 
 		let unsubscribe: (() => void) | null = null;
 
-		const navigate = (path: "/feed" | "/signin") => {
+		const navigate = async (path: "/feed" | "/signin" | "/username") => {
 			// Use requestAnimationFrame to ensure router is ready
 			requestAnimationFrame(() => {
 				try {
@@ -33,14 +38,35 @@ export default function SplashScreen() {
 			});
 		};
 
+		const checkUsernameAndNavigate = async (userId: string) => {
+			try {
+				const userData = await getUserData(userId);
+
+				// Route to username page if:
+				// 1. User document doesn't exist (!userData)
+				// 2. User document exists but doesn't have username field (!userData.username)
+				if (!userData || !userData.username) {
+					// User needs to set username, go to username screen
+					navigate("/username");
+				} else {
+					// User has username, go to feed
+					navigate("/feed");
+				}
+			} catch (error) {
+				console.error("Error checking username:", error);
+				// On error, go to feed (will check again there)
+				navigate("/feed");
+			}
+		};
+
 		// Small delay to ensure navigation is ready
 		const timer = setTimeout(() => {
 			// Check auth state
-			unsubscribe = onAuthStateChanged((user) => {
+			unsubscribe = onAuthStateChanged(async (user) => {
 				setCheckingAuth(false);
 				if (user) {
-					// User is signed in, go to feed
-					navigate("/feed");
+					// User is signed in, check if they have username
+					await checkUsernameAndNavigate(user.uid);
 				} else {
 					// User is not signed in, go to sign in screen
 					navigate("/signin");
@@ -51,7 +77,7 @@ export default function SplashScreen() {
 			const currentUser = getCurrentUser();
 			if (currentUser) {
 				setCheckingAuth(false);
-				navigate("/feed");
+				checkUsernameAndNavigate(currentUser.uid);
 			}
 		}, 200);
 
@@ -66,7 +92,7 @@ export default function SplashScreen() {
 	return (
 		<View style={styles.container}>
 			<LinearGradient
-				colors={["#1e88e5", "#1565c0"]}
+				colors={Colors.background.gradient as [string, string]}
 				style={StyleSheet.absoluteFill}
 			/>
 
@@ -78,8 +104,8 @@ export default function SplashScreen() {
 				{checkingAuth && (
 					<ActivityIndicator
 						size="large"
-						color="#ffffff"
-						style={{ marginTop: 20 }}
+						color={Colors.text.primary}
+						style={{ marginTop: Spacing.lg }}
 					/>
 				)}
 			</View>
@@ -90,6 +116,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: Colors.background.primary,
 	},
 	content: {
 		flex: 1,
@@ -97,14 +124,17 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	logo: {
-		fontSize: 48,
-		fontWeight: "bold",
-		color: "#ffffff",
-		marginBottom: 16,
+		fontSize: 56,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
+		textShadowColor: Colors.accent,
+		textShadowOffset: { width: 0, height: 0 },
+		textShadowRadius: 12,
 	},
 	subtitle: {
-		fontSize: 18,
-		color: "#e3f2fd",
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.secondary,
 		textAlign: "center",
 	},
 });
