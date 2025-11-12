@@ -45,26 +45,33 @@ const FeedScreen = () => {
 	const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [userData, setUserData] = useState<UserData | null>(null);
-	const [puzzleStartTimes, setPuzzleStartTimes] = useState<
-		Record<string, number>
-	>({});
+	// Track elapsed time for each puzzle (in seconds) - initialized to 0 for all puzzles
+	const puzzleElapsedTimesRef = useRef<Record<string, number>>({});
+	// Track when each puzzle became visible (for calculating elapsed time)
+	const puzzleVisibleTimesRef = useRef<Record<string, number>>({});
+	// Track the startTime for each puzzle (calculated when it becomes visible)
+	const puzzleStartTimesRef = useRef<Record<string, number>>({});
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
-	const isResettingRef = useRef(false);
-	const [scrollEnabled, setScrollEnabled] = useState(true);
+	// Track initial completed games to filter on load only
+	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
 
 	const { addCompletedPuzzle } = useGameStore();
 
 	// Load user data and puzzles from Firestore
 	useEffect(() => {
-		loadUserData();
+		loadUserData(true); // Pass true to indicate initial load
 		loadPuzzlesFromFirestore();
 	}, []);
 
-	const loadUserData = async () => {
+	const loadUserData = async (isInitialLoad = false) => {
 		const user = getCurrentUser();
 		if (user) {
 			const data = await getUserData(user.uid);
 			setUserData(data);
+			// Store initial completed games for filtering on load only (only on initial load)
+			if (isInitialLoad && data?.completedGames) {
+				initialCompletedGamesRef.current = new Set(data.completedGames);
+			}
 			// Route to username page if:
 			// 1. User document doesn't exist (!data)
 			// 2. User document exists but doesn't have username field (!data.username)
@@ -125,36 +132,32 @@ const FeedScreen = () => {
 					}
 				});
 
-				// Fetch Riddle (only easy and hard based on Firestore structure)
-				if (difficulty !== "medium") {
-					const riddleGames = await fetchGamesFromFirestore(
-						"riddle",
-						difficulty
-					);
-					riddleGames.forEach((game) => {
-						if (game.question && game.answer) {
-							allPuzzles.push({
-								id: `riddle_${difficulty}_${game.id}`,
-								type: "riddle",
-								data: {
-									prompt: game.question,
-									answer: game.answer,
-								} as RiddleData,
-								difficulty: difficulty === "easy" ? 1 : 3,
-								createdAt: new Date().toISOString(),
-							});
-						}
-					});
-				}
+				// Fetch Riddle
+				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
+				riddleGames.forEach((game) => {
+					if (game.question && game.answer) {
+						allPuzzles.push({
+							id: `riddle_${difficulty}_${game.id}`,
+							type: "riddle",
+							data: {
+								prompt: game.question,
+								answer: game.answer,
+							} as RiddleData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
 			}
 
 			setPuzzles(allPuzzles);
-			// Initialize timer for first puzzle
-			if (allPuzzles.length > 0) {
-				const firstPuzzleId = allPuzzles[0].id;
-				setCurrentPuzzleId(firstPuzzleId);
-				setPuzzleStartTimes({ [firstPuzzleId]: Date.now() });
-			}
+			// Initialize elapsed times for all puzzles to 0
+			const initialElapsedTimes: Record<string, number> = {};
+			allPuzzles.forEach((puzzle) => {
+				initialElapsedTimes[puzzle.id] = 0;
+			});
+			puzzleElapsedTimesRef.current = initialElapsedTimes;
 		} catch (error) {
 			console.error("Error loading puzzles from Firestore:", error);
 			Alert.alert(
@@ -166,130 +169,82 @@ const FeedScreen = () => {
 		}
 	};
 
-	// Simplify filteredPuzzles - only exclude completed games
+	// Filter puzzles: only exclude completed games that were completed before app start
+	// This allows completed games to show during the session
 	const filteredPuzzles = puzzles.filter((puzzle) => {
-		// Exclude completed games
-		if (userData?.completedGames.includes(puzzle.id)) {
+		// Only exclude if it was in the initial completed games list
+		if (initialCompletedGamesRef.current.has(puzzle.id)) {
 			return false;
 		}
 		return true;
 	});
 
-	// Function to move a skipped puzzle to a random position between index 4 and the end
-	const movePuzzleAhead = useCallback(
-		(puzzleIdToMove: string, currentFilteredPuzzles: Puzzle[]) => {
-			isResettingRef.current = true;
+	// Handle viewable items changed (TikTok-like scrolling)
+	const onViewableItemsChanged = useCallback(
+		({ viewableItems }: { viewableItems: any[] }) => {
+			if (viewableItems.length > 0) {
+				const newIndex = viewableItems[0].index ?? 0;
+				const newPuzzleId = viewableItems[0].item?.id;
 
-			setPuzzles((prevPuzzles) => {
-				const puzzleIndex = prevPuzzles.findIndex(
-					(p) => p.id === puzzleIdToMove
-				);
-				if (puzzleIndex === -1) {
-					isResettingRef.current = false;
-					return prevPuzzles;
+				if (newPuzzleId && newPuzzleId !== currentPuzzleId) {
+					// Save elapsed time for current puzzle before switching away
+					if (
+						currentPuzzleId &&
+						puzzleVisibleTimesRef.current[currentPuzzleId]
+					) {
+						const timeVisible =
+							Date.now() - puzzleVisibleTimesRef.current[currentPuzzleId];
+						const additionalElapsed = Math.floor(timeVisible / 1000);
+						// Add to existing elapsed time
+						puzzleElapsedTimesRef.current[currentPuzzleId] =
+							(puzzleElapsedTimesRef.current[currentPuzzleId] || 0) +
+							additionalElapsed;
+					}
+
+					// Update current puzzle
+					setCurrentPuzzleId(newPuzzleId);
+					setCurrentIndex(newIndex);
+
+					// Calculate startTime for new puzzle based on its elapsed time
+					const elapsedTime = puzzleElapsedTimesRef.current[newPuzzleId] || 0;
+					const startTime = Date.now() - elapsedTime * 1000;
+					puzzleStartTimesRef.current[newPuzzleId] = startTime;
+
+					// Mark when this puzzle became visible (for calculating elapsed time)
+					puzzleVisibleTimesRef.current[newPuzzleId] = Date.now();
 				}
-
-				const puzzle = prevPuzzles[puzzleIndex];
-				const newPuzzles = [...prevPuzzles];
-				newPuzzles.splice(puzzleIndex, 1); // Remove from current position
-
-				// Calculate random position between index 4 and end
-				// If there are less than 5 puzzles, move to end
-				const minIndex = Math.min(4, newPuzzles.length);
-				const maxIndex = newPuzzles.length;
-				const randomIndex = Math.floor(
-					Math.random() * (maxIndex - minIndex) + minIndex
-				);
-
-				// Insert at random position
-				newPuzzles.splice(randomIndex, 0, puzzle);
-
-				// Reset flag after state update
-				setTimeout(() => {
-					isResettingRef.current = false;
-				}, 0);
-
-				return newPuzzles;
-			});
-
-			// Ensure scroll stays at 0
-			requestAnimationFrame(() => {
-				flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-			});
+			}
 		},
-		[]
+		[currentPuzzleId, currentIndex]
 	);
 
-	// Reset timer when current puzzle changes
+	const viewabilityConfig = useRef({
+		itemVisiblePercentThreshold: 50,
+	}).current;
+
+	// Initialize first puzzle timer
 	useEffect(() => {
-		if (
-			filteredPuzzles.length > 0 &&
-			filteredPuzzles[currentIndex] &&
-			!isResettingRef.current
-		) {
-			const puzzleId = filteredPuzzles[currentIndex].id;
-			if (puzzleId !== currentPuzzleId) {
-				setCurrentPuzzleId(puzzleId);
-				setPuzzleStartTimes((prev) => ({
-					...prev,
-					[puzzleId]: Date.now(),
-				}));
-			}
+		if (filteredPuzzles.length > 0 && !currentPuzzleId) {
+			const firstPuzzleId = filteredPuzzles[0].id;
+			setCurrentPuzzleId(firstPuzzleId);
+			setCurrentIndex(0);
+			// Calculate startTime for first puzzle (elapsed time is 0, so startTime is now)
+			const elapsedTime = puzzleElapsedTimesRef.current[firstPuzzleId] || 0;
+			const startTime = Date.now() - elapsedTime * 1000;
+			puzzleStartTimesRef.current[firstPuzzleId] = startTime;
+			// Mark when first puzzle became visible
+			puzzleVisibleTimesRef.current[firstPuzzleId] = Date.now();
 		}
-	}, [
-		currentIndex,
-		puzzles,
-		userData,
-		currentPuzzleId,
-		puzzleStartTimes,
-		filteredPuzzles,
-	]);
+	}, [filteredPuzzles, currentPuzzleId]);
 
 	const handleGameComplete = async (result: GameResult) => {
 		addCompletedPuzzle(result);
 
-		// Reload user data to get updated completed games list
+		// Update user data but don't filter out completed games during session
 		await loadUserData();
 
 		// Don't show alert or auto-navigate - let user stay on completed game
 		// and manually swipe to next game
-	};
-
-	const handleScrollBeginDrag = (event: any) => {
-		// When user starts dragging down from index 0, they're skipping
-		if (currentIndex === 0 && !isResettingRef.current) {
-			const skippedPuzzleId = filteredPuzzles[0]?.id;
-			if (skippedPuzzleId && skippedPuzzleId === currentPuzzleId) {
-				const wasCompleted =
-					userData?.completedGames.includes(skippedPuzzleId) || false;
-
-				// If not completed, move puzzle immediately and prevent scroll
-				if (!wasCompleted) {
-					setScrollEnabled(false);
-					movePuzzleAhead(skippedPuzzleId, filteredPuzzles);
-					// Re-enable scrolling after puzzle moves
-					setTimeout(() => {
-						setScrollEnabled(true);
-					}, 50);
-				}
-			}
-		}
-	};
-
-	const handleScroll = (event: any) => {
-		// Don't allow scrolling if we're resetting or scroll is disabled
-		if (isResettingRef.current || !scrollEnabled) {
-			// Keep scroll locked at 0
-			flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-			return;
-		}
-
-		const offsetY = event.nativeEvent.contentOffset.y;
-
-		// Always keep scroll at 0 - immediately reset any scroll
-		if (offsetY > 0) {
-			flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-		}
 	};
 
 	const itemHeight = Math.max(0, SCREEN_HEIGHT - headerHeight);
@@ -301,8 +256,15 @@ const FeedScreen = () => {
 		item: Puzzle;
 		index: number;
 	}) => {
-		// Get or create start time for this puzzle
-		const puzzleStartTime = puzzleStartTimes[item.id] || Date.now();
+		// Use stored startTime if available, otherwise calculate it
+		// This ensures consistent startTime across renders
+		let puzzleStartTime = puzzleStartTimesRef.current[item.id];
+		if (!puzzleStartTime) {
+			// If not set yet, calculate based on elapsed time
+			const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+			puzzleStartTime = Date.now() - elapsedTime * 1000;
+			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+		}
 
 		return (
 			<View key={item.id} style={[styles.puzzleCard, { height: itemHeight }]}>
@@ -365,13 +327,12 @@ const FeedScreen = () => {
 								keyExtractor={(item) => item.id}
 								pagingEnabled
 								showsVerticalScrollIndicator={false}
-								onScroll={handleScroll}
-								onScrollBeginDrag={handleScrollBeginDrag}
+								onViewableItemsChanged={onViewableItemsChanged}
+								viewabilityConfig={viewabilityConfig}
 								scrollEventThrottle={16}
 								style={styles.feed}
 								keyboardDismissMode="on-drag"
 								keyboardShouldPersistTaps="handled"
-								scrollEnabled={scrollEnabled}
 							/>
 						) : (
 							<View style={styles.loadingContainer}>
