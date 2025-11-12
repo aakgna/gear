@@ -10,13 +10,13 @@
 		"newArchEnabled": true,
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "com.gear.app",
+			"bundleIdentifier": "com.aakgna.gear",
 			"googleServicesFile": "./GoogleService-Info.plist",
 			"buildNumber": "1"
 		},
 		"android": {
 			"versionCode": 1,
-			"package": "com.gear.app",
+			"package": "com.aakgna.gear",
 			"googleServicesFile": "./google-services.json",
 			"permissions": ["INTERNET"]
 		},
@@ -60,8 +60,9 @@
 				"origin": false
 			},
 			"eas": {
-				"projectId": "21c39cb8-72ed-4767-9578-30a94f165ba9"
+				"projectId": "9c855445-1918-4f3a-a2d7-bc0852040e63"
 			}
-		}
+		},
+		"owner": "aakgna"
 	}
 }

@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>gear</string>
-          <string>com.gear.app</string>
+          <string>com.aakgna.gear</string>
         </array>
       </dict>
       <dict>

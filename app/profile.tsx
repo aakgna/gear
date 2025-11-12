@@ -186,7 +186,7 @@ const ProfileScreen = () => {
 				{showHistory && (
 					<View style={styles.historySection}>
 						<Text style={styles.sectionTitle}>
-							Completed Games ({String(userData?.completedGames?.length || 0)})
+							Completed Games ({userData?.completedGames?.length || 0})
 						</Text>
 						{loading ? (
 							<ActivityIndicator size="small" color={Colors.accent} />
