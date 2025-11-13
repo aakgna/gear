@@ -85,7 +85,7 @@ const SignInScreen = () => {
 						source={require("../assets/images/logo2.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.logo}>Think Tok</Text>
+					<Text style={styles.logo}>ThinkTok</Text>
 					<Text style={styles.subtitle}>
 						Brain training, one puzzle at a time
 					</Text>

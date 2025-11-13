@@ -237,7 +237,7 @@ const ProfileScreen = () => {
 
 				{/* App Info */}
 				<View style={styles.appInfoSection}>
-					<Text style={styles.appVersion}>Gear v1.0.0</Text>
+					<Text style={styles.appVersion}>ThinkTok v1.0.0</Text>
 					<Text style={styles.appDescription}>
 						Short-form brain training for logic puzzles
 					</Text>

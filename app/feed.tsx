@@ -290,7 +290,7 @@ const FeedScreen = () => {
 						source={require("../assets/images/logo2.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.logoText}>Think Tok</Text>
+					<Text style={styles.logoText}>ThinkTok</Text>
 				</View>
 
 				<TouchableOpacity
