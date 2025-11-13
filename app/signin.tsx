@@ -6,6 +6,7 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	Alert,
+	Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -80,7 +81,11 @@ const SignInScreen = () => {
 
 			<View style={styles.content}>
 				<View style={styles.logoContainer}>
-					<Text style={styles.logo}>⚙️ GEAR</Text>
+					<Image
+						source={require("../assets/images/logo2.png")}
+						style={styles.logoImage}
+					/>
+					<Text style={styles.logo}>Think Tok</Text>
 					<Text style={styles.subtitle}>
 						Brain training, one puzzle at a time
 					</Text>
@@ -136,13 +141,20 @@ const styles = StyleSheet.create({
 	},
 	logoContainer: {
 		alignItems: "center",
+		justifyContent: "center",
 		marginBottom: Spacing.xxl,
 	},
+	logoImage: {
+		width: 180,
+		height: 180,
+		resizeMode: "contain",
+		marginBottom: Spacing.md,
+	},
 	logo: {
-		fontSize: 64,
+		fontSize: 48,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.sm,
 		textShadowColor: Colors.accent,
 		textShadowOffset: { width: 0, height: 0 },
 		textShadowRadius: 12,

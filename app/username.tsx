@@ -9,6 +9,7 @@ import {
 	Alert,
 	KeyboardAvoidingView,
 	Platform,
+	Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -136,12 +137,16 @@ const UsernameScreen = () => {
 			>
 				<View style={styles.content}>
 					<View style={styles.logoContainer}>
-						<Text style={styles.logo}>⚙️ GEAR</Text>
+						<Image
+							source={require("../assets/images/logo2.png")}
+							style={styles.logoImage}
+						/>
+						<Text style={styles.logo}>Think Tok</Text>
 						<Text style={styles.subtitle}>Choose your username</Text>
 					</View>
 
 					<View style={styles.formContainer}>
-						<Text style={styles.welcomeText}>Welcome!</Text>
+						{/* <Text style={styles.welcomeText}>Welcome!</Text> */}
 						<Text style={styles.descriptionText}>
 							Pick a unique username to get started. You can use letters,
 							numbers, and underscores.
@@ -221,13 +226,20 @@ const styles = StyleSheet.create({
 	},
 	logoContainer: {
 		alignItems: "center",
-		marginBottom: Spacing.xxl,
+		justifyContent: "center",
+		marginBottom: Spacing.md,
+	},
+	logoImage: {
+		width: 180,
+		height: 180,
+		resizeMode: "contain",
+		marginBottom: Spacing.md,
 	},
 	logo: {
-		fontSize: 64,
+		fontSize: 48,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.sm,
 		textShadowColor: Colors.accent,
 		textShadowOffset: { width: 0, height: 0 },
 		textShadowRadius: 12,

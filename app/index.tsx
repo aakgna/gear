@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import {
 	onAuthStateChanged,
 	getCurrentUser,
@@ -91,16 +90,17 @@ export default function SplashScreen() {
 
 	return (
 		<View style={styles.container}>
-			<LinearGradient
-				colors={Colors.background.gradient as [string, string]}
-				style={StyleSheet.absoluteFill}
-			/>
-
 			<View style={styles.content}>
-				<Text style={styles.logo}>⚙️ GEAR</Text>
-				<Text style={styles.subtitle}>
-					Brain training, one puzzle at a time
-				</Text>
+				<View style={styles.logoContainer}>
+					<Image
+						source={require("../assets/images/logo2.png")}
+						style={styles.logoImage}
+					/>
+					<Text style={styles.logo}>Think Tok</Text>
+					<Text style={styles.subtitle}>
+						Brain training, one puzzle at a time
+					</Text>
+				</View>
 				{checkingAuth && (
 					<ActivityIndicator
 						size="large"
@@ -116,18 +116,29 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: "#1a1b31",
 	},
 	content: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
 	},
+	logoContainer: {
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: Spacing.xxl,
+	},
+	logoImage: {
+		width: 180,
+		height: 180,
+		resizeMode: "contain",
+		marginBottom: Spacing.md,
+	},
 	logo: {
-		fontSize: 56,
+		fontSize: 48,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.sm,
 		textShadowColor: Colors.accent,
 		textShadowOffset: { width: 0, height: 0 },
 		textShadowRadius: 12,

@@ -11,6 +11,7 @@ import {
 	Platform,
 	ActivityIndicator,
 	Animated,
+	Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -285,7 +286,11 @@ const FeedScreen = () => {
 				onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
 			>
 				<View style={styles.logoContainer}>
-					<Text style={styles.logoText}>⚙️ GEAR</Text>
+					<Image
+						source={require("../assets/images/logo2.png")}
+						style={styles.logoImage}
+					/>
+					<Text style={styles.logoText}>Think Tok</Text>
 				</View>
 
 				<TouchableOpacity
@@ -368,6 +373,14 @@ const styles = StyleSheet.create({
 	},
 	logoContainer: {
 		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	logoImage: {
+		width: 36,
+		height: 36,
+		resizeMode: "contain",
+		marginRight: Spacing.sm,
 	},
 	logoText: {
 		fontSize: Typography.fontSize.h2,
