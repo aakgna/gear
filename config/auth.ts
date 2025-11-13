@@ -506,3 +506,62 @@ export const saveUsername = async (
 		throw new Error("Failed to save username");
 	}
 };
+
+// Delete user account (iOS App Store requirement)
+export const deleteAccount = async (
+	userId: string,
+	username?: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// 1. Get current user FIRST (to ensure we have valid reference before any deletions)
+		const currentUser = auth().currentUser;
+		if (!currentUser) {
+			throw new Error("No user currently signed in");
+		}
+
+		// 2. Delete user document from Firestore
+		const userRef = db.collection("users").doc(userId);
+		await userRef.delete();
+
+		// 3. Remove username from usernames collection if it exists
+		if (username) {
+			const lowerUsername = username.toLowerCase();
+			const usernamesRef = db.collection("usernames");
+			const snapshot = await usernamesRef.get();
+
+			for (const doc of snapshot.docs) {
+				const data = doc.data();
+				if (data.names && Array.isArray(data.names)) {
+					if (data.names.includes(lowerUsername)) {
+						await doc.ref.update({
+							names: firestore.FieldValue.arrayRemove(lowerUsername),
+							count: firestore.FieldValue.increment(-1),
+							updatedAt: firestore.FieldValue.serverTimestamp(),
+						});
+						break; // Username found and removed, exit loop
+					}
+				}
+			}
+		}
+
+		// 4. Delete Firebase Auth account (this automatically signs out the user)
+		await currentUser.delete();
+
+		// Note: No need to call signOut() - delete() already signs out the user
+	} catch (error: any) {
+		console.error("Error deleting account:", error);
+		if (error?.code === "auth/requires-recent-login") {
+			throw new Error("Please sign in again before deleting your account");
+		}
+		if (error?.code === "auth/no-current-user") {
+			// User was already deleted/signed out, which means deletion succeeded
+			// This can happen if delete() completed but signOut() was called after
+			return; // Success - user is deleted
+		}
+		throw new Error(
+			error.message || "Failed to delete account. Please try again."
+		);
+	}
+};

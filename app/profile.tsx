@@ -13,7 +13,13 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useGameStore } from "../stores/gameStore";
-import { getCurrentUser, getUserData, signOut, UserData } from "../config/auth";
+import {
+	getCurrentUser,
+	getUserData,
+	signOut,
+	deleteAccount,
+	UserData,
+} from "../config/auth";
 import { Puzzle } from "../config/types";
 import {
 	Colors,
@@ -29,8 +35,9 @@ const ProfileScreen = () => {
 	const { userProfile, isAuthenticated, resetProgress } = useGameStore();
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [showHistory, setShowHistory] = useState(false);
+	const [showStats, setShowStats] = useState(false);
 	const [historyPuzzles, setHistoryPuzzles] = useState<Puzzle[]>([]);
+	const [deletingAccount, setDeletingAccount] = useState(false);
 
 	useEffect(() => {
 		loadUserData();
@@ -86,8 +93,71 @@ const ProfileScreen = () => {
 		]);
 	};
 
-	const handleViewHistory = () => {
-		setShowHistory(!showHistory);
+	const handleViewStats = () => {
+		setShowStats(!showStats);
+	};
+
+	const handleDeleteAccount = () => {
+		Alert.alert(
+			"Delete Account",
+			"Are you sure you want to delete your account? This action cannot be undone. All your data, including game history and statistics, will be permanently deleted.",
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: async () => {
+						// Double confirmation
+						Alert.alert(
+							"Final Confirmation",
+							"This will permanently delete your account and all data. Are you absolutely sure?",
+							[
+								{ text: "Cancel", style: "cancel" },
+								{
+									text: "Yes, Delete",
+									style: "destructive",
+									onPress: async () => {
+										setDeletingAccount(true);
+										try {
+											const user = getCurrentUser();
+											if (!user) {
+												Alert.alert(
+													"Error",
+													"No user found. Please sign in again."
+												);
+												return;
+											}
+
+											await deleteAccount(user.uid, userData?.username);
+											resetProgress();
+											Alert.alert(
+												"Account Deleted",
+												"Your account has been successfully deleted.",
+												[
+													{
+														text: "OK",
+														onPress: () => router.replace("/signin"),
+													},
+												]
+											);
+										} catch (error: any) {
+											console.error("Error deleting account:", error);
+											Alert.alert(
+												"Error",
+												error.message ||
+													"Failed to delete account. Please try again."
+											);
+										} finally {
+											setDeletingAccount(false);
+										}
+									},
+								},
+							]
+						);
+					},
+				},
+			]
+		);
 	};
 
 	const formatTime = (seconds: number) => {
@@ -129,7 +199,7 @@ const ProfileScreen = () => {
 				<View style={styles.statsGrid}>
 					<View style={styles.statCard}>
 						<Text style={styles.statNumber}>
-							{userData?.totalGamesPlayed || 0}
+							{String(userData?.totalGamesPlayed || 0)}
 						</Text>
 						<Text style={styles.statLabel}>Games Played</Text>
 					</View>
@@ -142,7 +212,9 @@ const ProfileScreen = () => {
 					</View>
 
 					<View style={styles.statCard}>
-						<Text style={styles.statNumber}>{userData?.streakCount || 0}</Text>
+						<Text style={styles.statNumber}>
+							{String(userData?.streakCount || 0)}
+						</Text>
 						<Text style={styles.statLabel}>Current Streak</Text>
 					</View>
 				</View>
@@ -182,32 +254,98 @@ const ProfileScreen = () => {
 					</View>
 				</View>
 
-				{/* History Section */}
-				{showHistory && (
-					<View style={styles.historySection}>
-						<Text style={styles.sectionTitle}>
-							Completed Games ({userData?.completedGames?.length || 0})
-						</Text>
-						{loading ? (
-							<ActivityIndicator size="small" color={Colors.accent} />
-						) : historyPuzzles.length > 0 ? (
-							<FlatList
-								data={historyPuzzles}
-								keyExtractor={(item) => item.id}
-								renderItem={({ item }) => (
-									<View style={styles.historyItem}>
-										<Text style={styles.historyItemText}>
-											{item.type} - {item.id}
+				{/* Gaming Stats Section */}
+				{showStats && (
+					<View style={styles.statsSection}>
+						<Text style={styles.sectionTitle}>Gaming Statistics</Text>
+
+						{/* Category Stats */}
+						{userData?.statsByCategory &&
+						Object.keys(userData.statsByCategory).length > 0 ? (
+							<View style={styles.statsSubsection}>
+								<Text style={styles.subsectionTitle}>By Category</Text>
+								{userData.statsByCategory.wordle && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Wordle:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByCategory.wordle.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByCategory.wordle.avgTime)} avg
 										</Text>
 									</View>
 								)}
-								scrollEnabled={false}
-							/>
-						) : (
-							<Text style={styles.emptyHistoryText}>
-								No completed games yet. Start playing to see your history!
+								{userData.statsByCategory.riddle && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Riddle:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByCategory.riddle.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByCategory.riddle.avgTime)} avg
+										</Text>
+									</View>
+								)}
+								{userData.statsByCategory.quickMath && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Quick Math:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByCategory.quickMath.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByCategory.quickMath.avgTime)}{" "}
+											avg
+										</Text>
+									</View>
+								)}
+							</View>
+						) : null}
+
+						{/* Difficulty Stats */}
+						{userData?.statsByDifficulty &&
+						Object.keys(userData.statsByDifficulty).length > 0 ? (
+							<View style={styles.statsSubsection}>
+								<Text style={styles.subsectionTitle}>By Difficulty</Text>
+								{userData.statsByDifficulty.easy && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Easy:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByDifficulty.easy.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByDifficulty.easy.avgTime)} avg
+										</Text>
+									</View>
+								)}
+								{userData.statsByDifficulty.medium && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Medium:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByDifficulty.medium.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByDifficulty.medium.avgTime)}{" "}
+											avg
+										</Text>
+									</View>
+								)}
+								{userData.statsByDifficulty.hard && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Hard:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByDifficulty.hard.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByDifficulty.hard.avgTime)} avg
+										</Text>
+									</View>
+								)}
+							</View>
+						) : null}
+
+						{(!userData?.statsByCategory ||
+							Object.keys(userData.statsByCategory).length === 0) &&
+						(!userData?.statsByDifficulty ||
+							Object.keys(userData.statsByDifficulty).length === 0) ? (
+							<Text style={styles.emptyStatsText}>
+								No detailed statistics yet. Complete more games to see your
+								stats!
 							</Text>
-						)}
+						) : null}
 					</View>
 				)}
 
@@ -215,15 +353,15 @@ const ProfileScreen = () => {
 				<View style={styles.actionsSection}>
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={handleViewHistory}
+						onPress={handleViewStats}
 					>
 						<Ionicons
-							name={showHistory ? "chevron-up" : "time-outline"}
+							name={showStats ? "chevron-up" : "stats-chart-outline"}
 							size={24}
 							color={Colors.accent}
 						/>
 						<Text style={styles.actionButtonText}>
-							{showHistory ? "Hide History" : "View History"}
+							{showStats ? "Hide Gaming Stats" : "View Gaming Stats"}
 						</Text>
 					</TouchableOpacity>
 
@@ -231,6 +369,21 @@ const ProfileScreen = () => {
 						<Ionicons name="log-out-outline" size={24} color={Colors.error} />
 						<Text style={[styles.actionButtonText, styles.logoutText]}>
 							Logout
+						</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[styles.actionButton, styles.deleteButton]}
+						onPress={handleDeleteAccount}
+						disabled={deletingAccount}
+					>
+						{deletingAccount ? (
+							<ActivityIndicator size="small" color={Colors.error} />
+						) : (
+							<Ionicons name="trash-outline" size={24} color={Colors.error} />
+						)}
+						<Text style={[styles.actionButtonText, styles.deleteText]}>
+							{deletingAccount ? "Deleting..." : "Delete Account"}
 						</Text>
 					</TouchableOpacity>
 				</View>
@@ -405,7 +558,7 @@ const styles = StyleSheet.create({
 		color: Colors.text.secondary,
 		textAlign: "center",
 	},
-	historySection: {
+	statsSection: {
 		marginBottom: Spacing.xl,
 		backgroundColor: Colors.background.tertiary,
 		borderRadius: BorderRadius.lg,
@@ -414,21 +567,46 @@ const styles = StyleSheet.create({
 		borderColor: "rgba(255, 255, 255, 0.1)",
 		...Shadows.light,
 	},
-	historyItem: {
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.md,
-		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+	statsSubsection: {
+		marginBottom: Spacing.lg,
 	},
-	historyItemText: {
-		fontSize: Typography.fontSize.caption,
+	subsectionTitle: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
 	},
-	emptyHistoryText: {
+	statRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: Spacing.sm,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255, 255, 255, 0.05)",
+	},
+	statRowLabel: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.secondary,
+		flex: 1,
+	},
+	statRowValue: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		flex: 2,
+		textAlign: "right",
+	},
+	emptyStatsText: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
 		textAlign: "center",
 		paddingVertical: Spacing.lg,
+	},
+	deleteButton: {
+		opacity: 0.9,
+	},
+	deleteText: {
+		color: Colors.error,
 	},
 });
 

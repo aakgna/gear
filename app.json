@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "ThinkTok",
 		"slug": "gear",
-		"version": "1.0.1",
+		"version": "1.0.2",
 		"orientation": "portrait",
 		"icon": "./assets/images/logo.png",
 		"scheme": "thinktok",
@@ -12,7 +12,7 @@
 			"supportsTablet": true,
 			"bundleIdentifier": "com.aakgna.gear",
 			"googleServicesFile": "./GoogleService-Info.plist",
-			"buildNumber": "2"
+			"buildNumber": "1"
 		},
 		"android": {
 			"versionCode": 1,
