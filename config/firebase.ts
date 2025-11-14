@@ -75,3 +75,115 @@ export const fetchAllGamesForType = async (
 	);
 	return results;
 };
+
+// Save a user-created game to Firestore
+export const saveGameToFirestore = async (
+	gameType: "quickMath" | "wordle" | "riddle",
+	difficulty: "easy" | "medium" | "hard",
+	gameData: {
+		questions?: string[];
+		answers?: string[];
+		qna?: string;
+		question?: string;
+		answer?: string;
+	},
+	userId: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Save to games/{gameType}/{difficulty}/{gameId}
+		// Structure: games (collection) -> gameType (doc) -> difficulty (subcollection) -> gameId (doc)
+		// This matches the structure of regular games, so user-created games appear in the same place
+		const userGamesRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty);
+
+		// Add metadata including difficulty
+		const gameDoc = {
+			...gameData,
+			difficulty,
+			createdBy: userId,
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			approved: false, // Games need approval before appearing in main feed
+		};
+
+		console.log("Attempting to save game:", {
+			gameType,
+			difficulty,
+			userId,
+			gameData,
+			path: `games/${gameType}/${difficulty}`,
+		});
+
+		const docRef = await userGamesRef.add(gameDoc);
+
+		console.log(`Game saved successfully: ${gameType} - ${difficulty}`, {
+			documentId: docRef.id,
+			path: docRef.path,
+		});
+	} catch (error: any) {
+		console.error("Error saving game to Firestore:", error);
+		console.error("Error details:", {
+			code: error?.code,
+			message: error?.message,
+			stack: error?.stack,
+		});
+		if (error?.code === "firestore/permission-denied") {
+			throw new Error(
+				"Permission denied. Please check your Firestore security rules."
+			);
+		}
+		throw new Error(error.message || "Failed to save game. Please try again.");
+	}
+};
+
+// Save a user-submitted game idea to Firestore
+export const saveGameIdeaToFirestore = async (
+	idea: string,
+	userId: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Save to gameAddition collection: gameAddition/{ideaId}
+		const gameIdeasRef = db.collection("gameAddition");
+
+		// Add metadata
+		const ideaDoc = {
+			idea: idea.trim(),
+			createdBy: userId,
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			status: "pending", // pending, reviewed, approved, rejected
+		};
+
+		console.log("Attempting to save game idea:", {
+			userId,
+			ideaLength: idea.trim().length,
+			path: "gameAddition",
+		});
+
+		const docRef = await gameIdeasRef.add(ideaDoc);
+
+		console.log(`Game idea saved successfully:`, {
+			documentId: docRef.id,
+			path: docRef.path,
+		});
+	} catch (error: any) {
+		console.error("Error saving game idea to Firestore:", error);
+		console.error("Error details:", {
+			code: error?.code,
+			message: error?.message,
+			stack: error?.stack,
+		});
+		if (error?.code === "firestore/permission-denied") {
+			throw new Error(
+				"Permission denied. Please check your Firestore security rules."
+			);
+		}
+		throw new Error(
+			error.message || "Failed to save game idea. Please try again."
+		);
+	}
+};

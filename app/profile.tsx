@@ -365,6 +365,18 @@ const ProfileScreen = () => {
 						</Text>
 					</TouchableOpacity>
 
+					<TouchableOpacity
+						style={styles.actionButton}
+						onPress={() => router.push("/create-game")}
+					>
+						<Ionicons
+							name="add-circle-outline"
+							size={24}
+							color={Colors.accent}
+						/>
+						<Text style={styles.actionButtonText}>Create Game</Text>
+					</TouchableOpacity>
+
 					<TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
 						<Ionicons name="log-out-outline" size={24} color={Colors.error} />
 						<Text style={[styles.actionButtonText, styles.logoutText]}>

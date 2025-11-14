@@ -39,6 +39,7 @@ export default function RootLayout() {
 				<Stack.Screen name="username" options={{ headerShown: false }} />
 				<Stack.Screen name="feed" options={{ headerShown: false }} />
 				<Stack.Screen name="profile" options={{ headerShown: false }} />
+				<Stack.Screen name="create-game" options={{ headerShown: false }} />
 			</Stack>
 			<StatusBar style="auto" />
 		</ThemeProvider>
