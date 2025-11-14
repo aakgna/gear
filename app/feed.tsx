@@ -287,7 +287,7 @@ const FeedScreen = () => {
 			>
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo2.png")}
+						source={require("../assets/images/logo_transparent.png")}
 						style={styles.logoImage}
 					/>
 					<Text style={styles.logoText}>ThinkTok</Text>

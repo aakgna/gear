@@ -93,7 +93,7 @@ export default function SplashScreen() {
 			<View style={styles.content}>
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo.png")}
+						source={require("../assets/images/logo_transparent.png")}
 						style={styles.logoImage}
 					/>
 					<Text style={styles.logo}>ThinkTok</Text>

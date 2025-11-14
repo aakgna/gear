@@ -82,7 +82,7 @@ const SignInScreen = () => {
 			<View style={styles.content}>
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo3.png")}
+						source={require("../assets/images/logo_transparent.png")}
 						style={styles.logoImage}
 					/>
 					<Text style={styles.subtitle}>

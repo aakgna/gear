@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "ThinkTok",
 		"slug": "gear",
-		"version": "1.0.3",
+		"version": "1.0.5",
 		"orientation": "portrait",
 		"icon": "./assets/images/logo.png",
 		"scheme": "thinktok",
@@ -23,7 +23,7 @@
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/logo.png"
+			"favicon": "./_transparent.png"
 		},
 		"plugins": [
 			"expo-router",
@@ -45,10 +45,10 @@
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/logo.png",
+					"image": "./assets/images/logo_transparent.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
-					"backgroundColor": "#1e88e5"
+					"backgroundColor": "#1a1b32"
 				}
 			]
 		],
