@@ -82,10 +82,9 @@ const SignInScreen = () => {
 			<View style={styles.content}>
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo2.png")}
+						source={require("../assets/images/logo3.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.logo}>ThinkTok</Text>
 					<Text style={styles.subtitle}>
 						Brain training, one puzzle at a time
 					</Text>

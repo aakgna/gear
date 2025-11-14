@@ -10,13 +10,13 @@
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
+		3957EF016A0C4BADABD30834 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 201CD37884954651B115011B /* GoogleService-Info.plist */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4B9B11129783435E93B18061 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3728F34655E1490B989BE847 /* GoogleService-Info.plist */; };
-		8E3E9A8D9553DFECA6942B30 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 141F2B48F4D921C3377C9951 /* PrivacyInfo.xcprivacy */; };
+		6AE98F632C7EE76A2A31F64B /* Pods_ThinkTok.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B6A41A2A1D6F2A16782EEC74 /* Pods_ThinkTok.framework */; };
+		8CD20F56B713409DB0ACEC0E /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D074100BBA44838595A4BA /* noop-file.swift */; };
 		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		E8C67E4CEA8B4C8150F56169 /* Pods_ThinkTok.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21D411A5A0E1FFCEFEA0C3D1 /* Pods_ThinkTok.framework */; };
-		FC22D977AE53460A97D06C98 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC041746020E4617A0DDF758 /* noop-file.swift */; };
+		E99DE466841847473ABA9CD7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1DF4BC774B10A1D9CC78D6AC /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,15 +26,15 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = ThinkTok/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ThinkTok/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = ThinkTok/main.m; sourceTree = "<group>"; };
-		141F2B48F4D921C3377C9951 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ThinkTok/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		21D411A5A0E1FFCEFEA0C3D1 /* Pods_ThinkTok.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ThinkTok.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		3728F34655E1490B989BE847 /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "ThinkTok/GoogleService-Info.plist"; sourceTree = "<group>"; };
-		511C5C272141453995659B72 /* ThinkTok-Bridging-Header.h */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.h; name = "ThinkTok-Bridging-Header.h"; path = "ThinkTok/ThinkTok-Bridging-Header.h"; sourceTree = "<group>"; };
+		1DF4BC774B10A1D9CC78D6AC /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ThinkTok/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		201CD37884954651B115011B /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "ThinkTok/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		635F5A3490F54AD99D2BFDFC /* ThinkTok-Bridging-Header.h */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.h; name = "ThinkTok-Bridging-Header.h"; path = "ThinkTok/ThinkTok-Bridging-Header.h"; sourceTree = "<group>"; };
 		6C2E3173556A471DD304B334 /* Pods-ThinkTok.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ThinkTok.debug.xcconfig"; path = "Target Support Files/Pods-ThinkTok/Pods-ThinkTok.debug.xcconfig"; sourceTree = "<group>"; };
 		7A4D352CD337FB3A3BF06240 /* Pods-ThinkTok.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ThinkTok.release.xcconfig"; path = "Target Support Files/Pods-ThinkTok/Pods-ThinkTok.release.xcconfig"; sourceTree = "<group>"; };
+		A6D074100BBA44838595A4BA /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "ThinkTok/noop-file.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = ThinkTok/SplashScreen.storyboard; sourceTree = "<group>"; };
+		B6A41A2A1D6F2A16782EEC74 /* Pods_ThinkTok.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ThinkTok.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		EC041746020E4617A0DDF758 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "ThinkTok/noop-file.swift"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-ThinkTok/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -44,7 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E8C67E4CEA8B4C8150F56169 /* Pods_ThinkTok.framework in Frameworks */,
+				6AE98F632C7EE76A2A31F64B /* Pods_ThinkTok.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -61,10 +61,10 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				13B07FB71A68108700A75B9A /* main.m */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				3728F34655E1490B989BE847 /* GoogleService-Info.plist */,
-				EC041746020E4617A0DDF758 /* noop-file.swift */,
-				511C5C272141453995659B72 /* ThinkTok-Bridging-Header.h */,
-				141F2B48F4D921C3377C9951 /* PrivacyInfo.xcprivacy */,
+				201CD37884954651B115011B /* GoogleService-Info.plist */,
+				A6D074100BBA44838595A4BA /* noop-file.swift */,
+				635F5A3490F54AD99D2BFDFC /* ThinkTok-Bridging-Header.h */,
+				1DF4BC774B10A1D9CC78D6AC /* PrivacyInfo.xcprivacy */,
 			);
 			name = ThinkTok;
 			sourceTree = "<group>";
@@ -73,7 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				21D411A5A0E1FFCEFEA0C3D1 /* Pods_ThinkTok.framework */,
+				B6A41A2A1D6F2A16782EEC74 /* Pods_ThinkTok.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -150,14 +150,14 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "ThinkTok" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				646D3D27A24C513BC3A55928 /* [Expo] Configure project */,
+				27160EF46216BA7A540D0968 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				A5F01A595C05025E12C1464C /* [CP] Embed Pods Frameworks */,
-				D30BC572BA0CFF1E9E2F63BA /* [CP-User] [RNFB] Core Configuration */,
+				2C401776A066B6FC0DA4781C /* [CP] Embed Pods Frameworks */,
+				F80CE8C54F261966DDC1E0C4 /* [CP-User] [RNFB] Core Configuration */,
 			);
 			buildRules = (
 			);
@@ -207,8 +207,8 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				4B9B11129783435E93B18061 /* GoogleService-Info.plist in Resources */,
-				8E3E9A8D9553DFECA6942B30 /* PrivacyInfo.xcprivacy in Resources */,
+				3957EF016A0C4BADABD30834 /* GoogleService-Info.plist in Resources */,
+				E99DE466841847473ABA9CD7 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,7 +252,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		646D3D27A24C513BC3A55928 /* [Expo] Configure project */ = {
+		27160EF46216BA7A540D0968 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -270,6 +270,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-ThinkTok/expo-configure-project.sh\"\n";
+		};
+		2C401776A066B6FC0DA4781C /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-ThinkTok/Pods-ThinkTok-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ThinkTok/Pods-ThinkTok-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -345,25 +363,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ThinkTok/Pods-ThinkTok-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		A5F01A595C05025E12C1464C /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-ThinkTok/Pods-ThinkTok-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ThinkTok/Pods-ThinkTok-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		D30BC572BA0CFF1E9E2F63BA /* [CP-User] [RNFB] Core Configuration */ = {
+		F80CE8C54F261966DDC1E0C4 /* [CP-User] [RNFB] Core Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -386,7 +386,7 @@
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 				B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */,
-				FC22D977AE53460A97D06C98 /* noop-file.swift in Sources */,
+				8CD20F56B713409DB0ACEC0E /* noop-file.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -417,7 +417,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aakgna.gear;
-				PRODUCT_NAME = "ThinkTok";
+				PRODUCT_NAME = ThinkTok;
 				SWIFT_OBJC_BRIDGING_HEADER = "ThinkTok/ThinkTok-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -445,7 +445,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aakgna.gear;
-				PRODUCT_NAME = "ThinkTok";
+				PRODUCT_NAME = ThinkTok;
 				SWIFT_OBJC_BRIDGING_HEADER = "ThinkTok/ThinkTok-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
