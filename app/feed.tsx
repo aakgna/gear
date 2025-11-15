@@ -7,11 +7,10 @@ import {
 	TouchableOpacity,
 	Text,
 	Alert,
-	KeyboardAvoidingView,
-	Platform,
 	ActivityIndicator,
 	Animated,
 	Image,
+	Keyboard,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -55,8 +54,41 @@ const FeedScreen = () => {
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
 	// Track initial completed games to filter on load only
 	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
+	// Track keyboard state to disable FlatList scrolling when keyboard is visible
+	const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+	const keyboardHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	const { addCompletedPuzzle } = useGameStore();
+
+	// Listen to keyboard events to disable FlatList scrolling
+	useEffect(() => {
+		const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+			// Clear any pending hide timeout
+			if (keyboardHideTimeoutRef.current) {
+				clearTimeout(keyboardHideTimeoutRef.current);
+				keyboardHideTimeoutRef.current = null;
+			}
+			setIsKeyboardVisible(true);
+		});
+		const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+			// Delay re-enabling scrolling to prevent stuck state during keyboard animation
+			if (keyboardHideTimeoutRef.current) {
+				clearTimeout(keyboardHideTimeoutRef.current);
+			}
+			keyboardHideTimeoutRef.current = setTimeout(() => {
+				setIsKeyboardVisible(false);
+				keyboardHideTimeoutRef.current = null;
+			}, 300); // Wait for keyboard animation to complete
+		});
+
+		return () => {
+			showSubscription.remove();
+			hideSubscription.remove();
+			if (keyboardHideTimeoutRef.current) {
+				clearTimeout(keyboardHideTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	// Load user data and puzzles from Firestore
 	useEffect(() => {
@@ -326,31 +358,27 @@ const FeedScreen = () => {
 			) : (
 				<>
 					{/* Puzzle Feed */}
-					<KeyboardAvoidingView
-						behavior={Platform.OS === "ios" ? "padding" : undefined}
-						style={{ flex: 1 }}
-					>
-						{filteredPuzzles.length > 0 ? (
-							<FlatList
-								ref={flatListRef}
-								data={filteredPuzzles}
-								renderItem={renderPuzzleCard}
-								keyExtractor={(item) => item.id}
-								pagingEnabled
-								showsVerticalScrollIndicator={false}
-								onViewableItemsChanged={onViewableItemsChanged}
-								viewabilityConfig={viewabilityConfig}
-								scrollEventThrottle={16}
-								style={styles.feed}
-								keyboardDismissMode="on-drag"
-								keyboardShouldPersistTaps="handled"
-							/>
-						) : (
-							<View style={styles.loadingContainer}>
-								<Text style={styles.emptyText}>No puzzles available</Text>
-							</View>
-						)}
-					</KeyboardAvoidingView>
+					{filteredPuzzles.length > 0 ? (
+						<FlatList
+							ref={flatListRef}
+							data={filteredPuzzles}
+							renderItem={renderPuzzleCard}
+							keyExtractor={(item) => item.id}
+							pagingEnabled
+							showsVerticalScrollIndicator={false}
+							onViewableItemsChanged={onViewableItemsChanged}
+							viewabilityConfig={viewabilityConfig}
+							scrollEventThrottle={16}
+							style={styles.feed}
+							keyboardDismissMode="on-drag"
+							keyboardShouldPersistTaps="handled"
+							scrollEnabled={!isKeyboardVisible}
+						/>
+					) : (
+						<View style={styles.loadingContainer}>
+							<Text style={styles.emptyText}>No puzzles available</Text>
+						</View>
+					)}
 
 					{/* Remove footer rendering */}
 				</>

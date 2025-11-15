@@ -91,12 +91,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={[]}>
-			<KeyboardAvoidingView
-				style={styles.container}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
-				{renderGame()}
-			</KeyboardAvoidingView>
+			{renderGame()}
 		</SafeAreaView>
 	);
 };

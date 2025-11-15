@@ -7,6 +7,9 @@ import {
 	TouchableOpacity,
 	Animated,
 	ScrollView,
+	KeyboardAvoidingView,
+	Platform,
+	Keyboard,
 } from "react-native";
 import { GameResult, RiddleData } from "../../config/types";
 import {
@@ -169,8 +172,41 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		}
 	};
 
+	const inputRef = useRef<TextInput>(null);
+	const scrollViewRef = useRef<ScrollView>(null);
+	const inputContainerRef = useRef<View>(null);
+	const [keyboardHeight, setKeyboardHeight] = useState(0);
+	const inputYPositionRef = useRef<number>(0);
+
+	useEffect(() => {
+		const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
+			setKeyboardHeight(e.endCoordinates.height);
+			// Scroll to input when keyboard appears
+			setTimeout(() => {
+				if (scrollViewRef.current && inputYPositionRef.current > 0) {
+					scrollViewRef.current.scrollTo({
+						y: Math.max(0, inputYPositionRef.current - 150),
+						animated: true,
+					});
+				}
+			}, 300);
+		});
+		const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+			setKeyboardHeight(0);
+		});
+
+		return () => {
+			showSubscription.remove();
+			hideSubscription.remove();
+		};
+	}, []);
+
 	return (
-		<View style={styles.container}>
+		<KeyboardAvoidingView
+			style={styles.container}
+			behavior={Platform.OS === "ios" ? "padding" : undefined}
+			keyboardVerticalOffset={0}
+		>
 			<View style={styles.header}>
 				<Text style={styles.title}>Riddle</Text>
 				<View style={styles.timerBadge}>
@@ -179,10 +215,19 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 			</View>
 
 			<ScrollView
+				ref={scrollViewRef}
 				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{
+						paddingBottom:
+							keyboardHeight > 0 ? keyboardHeight + 100 : Spacing.xl,
+					},
+				]}
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
+				keyboardDismissMode="interactive"
+				scrollEnabled={true}
 			>
 				<Animated.View
 					style={[
@@ -205,8 +250,16 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					</View>
 				)}
 
-				<View style={styles.inputContainer}>
+				<View
+					ref={inputContainerRef}
+					style={styles.inputContainer}
+					onLayout={(e) => {
+						// Store the Y position of the input container
+						inputYPositionRef.current = e.nativeEvent.layout.y;
+					}}
+				>
 					<TextInput
+						ref={inputRef}
 						style={styles.input}
 						value={guess}
 						onChangeText={setGuess}
@@ -217,6 +270,17 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 						returnKeyType="done"
 						onSubmitEditing={submit}
 						editable={!completed}
+						onFocus={() => {
+							// Scroll to input when focused
+							setTimeout(() => {
+								if (scrollViewRef.current && inputYPositionRef.current > 0) {
+									scrollViewRef.current.scrollTo({
+										y: Math.max(0, inputYPositionRef.current - 150),
+										animated: true,
+									});
+								}
+							}, 300);
+						}}
 					/>
 				</View>
 
@@ -262,7 +326,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					</Animated.View>
 				)}
 			</ScrollView>
-		</View>
+		</KeyboardAvoidingView>
 	);
 };
 

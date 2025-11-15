@@ -7,6 +7,9 @@ import {
 	TouchableOpacity,
 	Animated,
 	ScrollView,
+	KeyboardAvoidingView,
+	Platform,
+	Keyboard,
 } from "react-native";
 import { GameResult, QuickMathData } from "../../config/types";
 import {
@@ -222,8 +225,32 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		}
 	};
 
+	const inputRefs = useRef<(TextInput | null)[]>([]);
+	const scrollViewRef = useRef<ScrollView>(null);
+	const inputRowRefs = useRef<(View | null)[]>([]);
+	const inputRowYPositionsRef = useRef<number[]>([]);
+	const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+	useEffect(() => {
+		const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
+			setKeyboardHeight(e.endCoordinates.height);
+		});
+		const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+			setKeyboardHeight(0);
+		});
+
+		return () => {
+			showSubscription.remove();
+			hideSubscription.remove();
+		};
+	}, []);
+
 	return (
-		<View style={styles.container}>
+		<KeyboardAvoidingView
+			style={styles.container}
+			behavior={Platform.OS === "ios" ? "padding" : undefined}
+			keyboardVerticalOffset={0}
+		>
 			<View style={styles.header}>
 				<Text style={styles.title}>Quick Math</Text>
 				<View style={styles.timerBadge}>
@@ -232,10 +259,19 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			</View>
 
 			<ScrollView
+				ref={scrollViewRef}
 				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{
+						paddingBottom:
+							keyboardHeight > 0 ? keyboardHeight + 100 : Spacing.xl,
+					},
+				]}
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
+				keyboardDismissMode="interactive"
+				scrollEnabled={true}
 			>
 				<Animated.View
 					style={[
@@ -247,13 +283,22 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				>
 					<View style={styles.problemList}>
 						{problems.map((p, idx) => (
-							<View key={idx} style={styles.problemRow}>
+							<View
+								key={idx}
+								ref={(ref) => (inputRowRefs.current[idx] = ref)}
+								style={styles.problemRow}
+								onLayout={(e) => {
+									// Store the Y position of each input row
+									inputRowYPositionsRef.current[idx] = e.nativeEvent.layout.y;
+								}}
+							>
 								<View style={styles.problemNumberBadge}>
 									<Text style={styles.problemNumber}>{idx + 1}</Text>
 								</View>
 								<Text style={styles.problemText}>{p}</Text>
 								<Text style={styles.equalSign}>=</Text>
 								<TextInput
+									ref={(ref) => (inputRefs.current[idx] = ref)}
 									style={styles.answerInput}
 									value={answers[idx]}
 									onChangeText={(t) =>
@@ -263,6 +308,23 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 									returnKeyType="done"
 									placeholderTextColor={Colors.text.disabled}
 									placeholder="?"
+									onFocus={() => {
+										// Scroll to input when focused
+										setTimeout(() => {
+											if (
+												scrollViewRef.current &&
+												inputRowYPositionsRef.current[idx] !== undefined
+											) {
+												scrollViewRef.current.scrollTo({
+													y: Math.max(
+														0,
+														inputRowYPositionsRef.current[idx] - 150
+													),
+													animated: true,
+												});
+											}
+										}, 300);
+									}}
 								/>
 							</View>
 						))}
@@ -311,7 +373,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 					</Animated.View>
 				)}
 			</ScrollView>
-		</View>
+		</KeyboardAvoidingView>
 	);
 };
 
