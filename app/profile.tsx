@@ -179,7 +179,14 @@ const ProfileScreen = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Profile</Text>
+				<TouchableOpacity
+					style={styles.createGameButton}
+					onPress={() => router.push("/create-game")}
+					activeOpacity={0.7}
+				>
+					<Ionicons name="add-circle" size={20} color={Colors.accent} />
+					<Text style={styles.createGameButtonText}>Create Game</Text>
+				</TouchableOpacity>
 				<View style={{ width: 24 }} /> {/* Spacer for centering */}
 			</View>
 
@@ -365,18 +372,6 @@ const ProfileScreen = () => {
 						</Text>
 					</TouchableOpacity>
 
-					<TouchableOpacity
-						style={styles.actionButton}
-						onPress={() => router.push("/create-game")}
-					>
-						<Ionicons
-							name="add-circle-outline"
-							size={24}
-							color={Colors.accent}
-						/>
-						<Text style={styles.actionButtonText}>Create Game</Text>
-					</TouchableOpacity>
-
 					<TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
 						<Ionicons name="log-out-outline" size={24} color={Colors.error} />
 						<Text style={[styles.actionButtonText, styles.logoutText]}>
@@ -440,6 +435,22 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
+	},
+	createGameButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: Colors.background.tertiary,
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: "rgba(124, 77, 255, 0.3)",
+	},
+	createGameButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.accent,
+		marginLeft: Spacing.xs,
 	},
 	content: {
 		flex: 1,

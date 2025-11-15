@@ -285,13 +285,19 @@ const FeedScreen = () => {
 				style={styles.header}
 				onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
 			>
-				<View style={styles.logoContainer}>
-					<Image
-						source={require("../assets/images/logo_transparent.png")}
-						style={styles.logoImage}
-					/>
-					<Text style={styles.logoText}>ThinkTok</Text>
-				</View>
+				<Image
+					source={require("../assets/images/logo_transparent.png")}
+					style={styles.logoImage}
+				/>
+
+				<TouchableOpacity
+					style={styles.createGameButton}
+					onPress={() => router.push("/create-game")}
+					activeOpacity={0.7}
+				>
+					<Ionicons name="add-circle" size={24} color={Colors.accent} />
+					<Text style={styles.createGameButtonText}>Create Game</Text>
+				</TouchableOpacity>
 
 				<TouchableOpacity
 					style={styles.profileButton}
@@ -363,7 +369,7 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "center",
 		paddingHorizontal: Layout.margin,
-		paddingTop: 50,
+		paddingTop: 60,
 		paddingBottom: Spacing.md,
 		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 1,
@@ -371,25 +377,26 @@ const styles = StyleSheet.create({
 		zIndex: 10,
 		...Shadows.medium,
 	},
-	logoContainer: {
-		flex: 1,
+	logoImage: {
+		width: 50,
+		height: 50,
+		resizeMode: "contain",
+	},
+	createGameButton: {
 		flexDirection: "row",
 		alignItems: "center",
+		backgroundColor: Colors.background.tertiary,
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: "rgba(124, 77, 255, 0.3)",
 	},
-	logoImage: {
-		width: 36,
-		height: 36,
-		resizeMode: "contain",
-		marginRight: Spacing.sm,
-	},
-	logoText: {
-		fontSize: Typography.fontSize.h2,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		letterSpacing: -0.5,
-		textShadowColor: Colors.accent,
-		textShadowOffset: { width: 0, height: 0 },
-		textShadowRadius: 8,
+	createGameButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.accent,
+		marginLeft: Spacing.xs,
 	},
 	profileButton: {
 		padding: Spacing.xs,
