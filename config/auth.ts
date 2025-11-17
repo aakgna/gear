@@ -5,14 +5,16 @@ import { db } from "./firebase";
 
 export interface CategoryStats {
 	completed: number;
+	attempted: number; // User started interacting with the game
+	skipped: number; // User skipped without interacting
 	avgTime: number;
-	skipped?: number;
 }
 
 export interface DifficultyStats {
 	completed: number;
+	attempted: number; // User started interacting with the game
+	skipped: number; // User skipped without interacting
 	avgTime: number;
-	skipped?: number;
 }
 
 export interface UserData {
@@ -302,6 +304,8 @@ export const updateUserStats = async (
 		if (category) {
 			const currentCatStats = currentCategoryStats[category] || {
 				completed: 0,
+				attempted: 0,
+				skipped: 0,
 				avgTime: 0,
 			};
 			const catCompleted = currentCatStats.completed + 1;
@@ -309,8 +313,22 @@ export const updateUserStats = async (
 				currentCatStats.completed * currentCatStats.avgTime + timeTaken;
 			const catAvgTime = Math.round(catTotalTime / catCompleted);
 
+			// Sanitize attempted and skipped to avoid NaN
+			const attempted =
+				typeof currentCatStats.attempted === "number" &&
+				isFinite(currentCatStats.attempted)
+					? currentCatStats.attempted
+					: 0;
+			const skipped =
+				typeof currentCatStats.skipped === "number" &&
+				isFinite(currentCatStats.skipped)
+					? currentCatStats.skipped
+					: 0;
+
 			categoryStatsUpdate[category] = {
 				completed: catCompleted,
+				attempted: attempted, // Preserve attempted value
+				skipped: skipped, // Preserve skipped value
 				avgTime: catAvgTime,
 			};
 		}
@@ -322,6 +340,8 @@ export const updateUserStats = async (
 		if (difficulty) {
 			const currentDiffStats = currentDifficultyStats[difficulty] || {
 				completed: 0,
+				attempted: 0,
+				skipped: 0,
 				avgTime: 0,
 			};
 			const diffCompleted = currentDiffStats.completed + 1;
@@ -329,8 +349,22 @@ export const updateUserStats = async (
 				currentDiffStats.completed * currentDiffStats.avgTime + timeTaken;
 			const diffAvgTime = Math.round(diffTotalTime / diffCompleted);
 
+			// Sanitize attempted and skipped to avoid NaN
+			const attempted =
+				typeof currentDiffStats.attempted === "number" &&
+				isFinite(currentDiffStats.attempted)
+					? currentDiffStats.attempted
+					: 0;
+			const skipped =
+				typeof currentDiffStats.skipped === "number" &&
+				isFinite(currentDiffStats.skipped)
+					? currentDiffStats.skipped
+					: 0;
+
 			difficultyStatsUpdate[difficulty] = {
 				completed: diffCompleted,
+				attempted: attempted, // Preserve attempted value
+				skipped: skipped, // Preserve skipped value
 				avgTime: diffAvgTime,
 			};
 		}
@@ -415,14 +449,39 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 		if (category) {
 			const currentCatStats = currentCategoryStats[category] || {
 				completed: 0,
-				avgTime: 0,
+				attempted: 0,
 				skipped: 0,
+				avgTime: 0,
 			};
-			const catSkipped = (currentCatStats.skipped || 0) + 1;
+
+			// Sanitize values to avoid NaN
+			const completed =
+				typeof currentCatStats.completed === "number" &&
+				isFinite(currentCatStats.completed)
+					? currentCatStats.completed
+					: 0;
+			const attempted =
+				typeof currentCatStats.attempted === "number" &&
+				isFinite(currentCatStats.attempted)
+					? currentCatStats.attempted
+					: 0;
+			const avgTime =
+				typeof currentCatStats.avgTime === "number" &&
+				isFinite(currentCatStats.avgTime)
+					? currentCatStats.avgTime
+					: 0;
+			const skipped =
+				typeof currentCatStats.skipped === "number" &&
+				isFinite(currentCatStats.skipped)
+					? currentCatStats.skipped
+					: 0;
+			const catSkipped = skipped + 1;
 
 			categoryStatsUpdate[category] = {
-				...currentCatStats,
+				completed,
+				attempted, // Preserve attempted value
 				skipped: catSkipped,
+				avgTime,
 			};
 		}
 
@@ -433,14 +492,39 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 		if (difficulty) {
 			const currentDiffStats = currentDifficultyStats[difficulty] || {
 				completed: 0,
-				avgTime: 0,
+				attempted: 0,
 				skipped: 0,
+				avgTime: 0,
 			};
-			const diffSkipped = (currentDiffStats.skipped || 0) + 1;
+
+			// Sanitize values to avoid NaN
+			const completed =
+				typeof currentDiffStats.completed === "number" &&
+				isFinite(currentDiffStats.completed)
+					? currentDiffStats.completed
+					: 0;
+			const attempted =
+				typeof currentDiffStats.attempted === "number" &&
+				isFinite(currentDiffStats.attempted)
+					? currentDiffStats.attempted
+					: 0;
+			const avgTime =
+				typeof currentDiffStats.avgTime === "number" &&
+				isFinite(currentDiffStats.avgTime)
+					? currentDiffStats.avgTime
+					: 0;
+			const skipped =
+				typeof currentDiffStats.skipped === "number" &&
+				isFinite(currentDiffStats.skipped)
+					? currentDiffStats.skipped
+					: 0;
+			const diffSkipped = skipped + 1;
 
 			difficultyStatsUpdate[difficulty] = {
-				...currentDiffStats,
+				completed,
+				attempted, // Preserve attempted value
 				skipped: diffSkipped,
+				avgTime,
 			};
 		}
 
@@ -486,6 +570,279 @@ export const addSkippedGame = async (userId: string, gameId: string) => {
 		await updateSkippedStats(userId, gameId);
 	} catch (error) {
 		console.error("Error adding skipped game:", error);
+	}
+};
+
+// Move a game from skipped to attempted (when user comes back and attempts a previously skipped game)
+export const moveFromSkippedToAttempted = async (
+	userId: string,
+	gameId: string
+): Promise<boolean> => {
+	try {
+		console.log(
+			`[moveFromSkippedToAttempted] Checking if ${gameId} was previously skipped`
+		);
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		const userDoc = await userRef.get();
+
+		if (!userDoc.exists()) {
+			console.error(
+				"[moveFromSkippedToAttempted] User document does not exist"
+			);
+			return false;
+		}
+
+		const userData = userDoc.data() as UserData;
+		const skippedGames = userData.skippedGames || [];
+
+		// Check if this game was previously skipped
+		if (!skippedGames.includes(gameId)) {
+			console.log(
+				`[moveFromSkippedToAttempted] Game ${gameId} was not previously skipped`
+			);
+			return false;
+		}
+
+		console.log(
+			`[moveFromSkippedToAttempted] Game ${gameId} was previously skipped, moving to attempted`
+		);
+
+		// Remove from skippedGames array
+		await userRef.update({
+			skippedGames: firestore.FieldValue.arrayRemove(gameId),
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		// Decrement skipped stats
+		const { category, difficulty } = parseGameId(gameId);
+		const currentCategoryStats = userData.statsByCategory || {};
+		const currentDifficultyStats = userData.statsByDifficulty || {};
+
+		const updateData: any = {
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		};
+
+		// Decrement category skipped count
+		if (category) {
+			const currentCatStats = currentCategoryStats[category] || {
+				completed: 0,
+				attempted: 0,
+				skipped: 0,
+				avgTime: 0,
+			};
+
+			const skipped =
+				typeof currentCatStats.skipped === "number" &&
+				isFinite(currentCatStats.skipped)
+					? Math.max(0, currentCatStats.skipped - 1) // Decrement but don't go below 0
+					: 0;
+
+			updateData[`statsByCategory.${category}`] = {
+				...currentCatStats,
+				skipped,
+			};
+
+			console.log(
+				`[moveFromSkippedToAttempted] Decremented category ${category} skipped from ${currentCatStats.skipped} to ${skipped}`
+			);
+		}
+
+		// Decrement difficulty skipped count
+		if (difficulty) {
+			const currentDiffStats = currentDifficultyStats[difficulty] || {
+				completed: 0,
+				attempted: 0,
+				skipped: 0,
+				avgTime: 0,
+			};
+
+			const skipped =
+				typeof currentDiffStats.skipped === "number" &&
+				isFinite(currentDiffStats.skipped)
+					? Math.max(0, currentDiffStats.skipped - 1) // Decrement but don't go below 0
+					: 0;
+
+			updateData[`statsByDifficulty.${difficulty}`] = {
+				...currentDiffStats,
+				skipped,
+			};
+
+			console.log(
+				`[moveFromSkippedToAttempted] Decremented difficulty ${difficulty} skipped from ${currentDiffStats.skipped} to ${skipped}`
+			);
+		}
+
+		// Update Firestore
+		await userRef.update(updateData);
+		console.log(
+			`[moveFromSkippedToAttempted] Successfully moved ${gameId} from skipped to attempted`
+		);
+
+		return true;
+	} catch (error) {
+		console.error("[moveFromSkippedToAttempted] Error:", error);
+		return false;
+	}
+};
+
+// Update attempted stats when user first interacts with a game
+const updateAttemptedStats = async (userId: string, gameId: string) => {
+	try {
+		console.log(`[updateAttemptedStats] Starting for gameId: ${gameId}`);
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		const userDoc = await userRef.get();
+
+		if (!userDoc.exists()) {
+			console.error("User document does not exist");
+			return;
+		}
+
+		const userData = userDoc.data() as UserData;
+		const { category, difficulty } = parseGameId(gameId);
+		console.log(
+			`[updateAttemptedStats] Parsed gameId - category: ${category}, difficulty: ${difficulty}`
+		);
+
+		// Update attempted stats by category
+		const currentCategoryStats = userData.statsByCategory || {};
+		let categoryStatsUpdate: any = {};
+
+		if (category) {
+			const currentCatStats = currentCategoryStats[category] || {
+				completed: 0,
+				attempted: 0,
+				skipped: 0,
+				avgTime: 0,
+			};
+
+			// Sanitize values to avoid NaN
+			const completed =
+				typeof currentCatStats.completed === "number" &&
+				isFinite(currentCatStats.completed)
+					? currentCatStats.completed
+					: 0;
+			const attempted =
+				typeof currentCatStats.attempted === "number" &&
+				isFinite(currentCatStats.attempted)
+					? currentCatStats.attempted
+					: 0;
+			const skipped =
+				typeof currentCatStats.skipped === "number" &&
+				isFinite(currentCatStats.skipped)
+					? currentCatStats.skipped
+					: 0;
+			const avgTime =
+				typeof currentCatStats.avgTime === "number" &&
+				isFinite(currentCatStats.avgTime)
+					? currentCatStats.avgTime
+					: 0;
+			const catAttempted = attempted + 1;
+
+			categoryStatsUpdate[category] = {
+				completed,
+				attempted: catAttempted,
+				skipped,
+				avgTime,
+			};
+		}
+
+		// Update attempted stats by difficulty
+		const currentDifficultyStats = userData.statsByDifficulty || {};
+		let difficultyStatsUpdate: any = {};
+
+		if (difficulty) {
+			const currentDiffStats = currentDifficultyStats[difficulty] || {
+				completed: 0,
+				attempted: 0,
+				skipped: 0,
+				avgTime: 0,
+			};
+
+			// Sanitize values to avoid NaN
+			const completed =
+				typeof currentDiffStats.completed === "number" &&
+				isFinite(currentDiffStats.completed)
+					? currentDiffStats.completed
+					: 0;
+			const attempted =
+				typeof currentDiffStats.attempted === "number" &&
+				isFinite(currentDiffStats.attempted)
+					? currentDiffStats.attempted
+					: 0;
+			const skipped =
+				typeof currentDiffStats.skipped === "number" &&
+				isFinite(currentDiffStats.skipped)
+					? currentDiffStats.skipped
+					: 0;
+			const avgTime =
+				typeof currentDiffStats.avgTime === "number" &&
+				isFinite(currentDiffStats.avgTime)
+					? currentDiffStats.avgTime
+					: 0;
+			const diffAttempted = attempted + 1;
+
+			difficultyStatsUpdate[difficulty] = {
+				completed,
+				attempted: diffAttempted,
+				skipped,
+				avgTime,
+			};
+		}
+
+		// Prepare update object
+		const updateData: any = {
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		};
+
+		// Merge category stats
+		if (Object.keys(categoryStatsUpdate).length > 0) {
+			updateData["statsByCategory"] = {
+				...(currentCategoryStats || {}),
+				...categoryStatsUpdate,
+			};
+			console.log(
+				`[updateAttemptedStats] Category stats update:`,
+				JSON.stringify(updateData["statsByCategory"], null, 2)
+			);
+		}
+
+		// Merge difficulty stats
+		if (Object.keys(difficultyStatsUpdate).length > 0) {
+			updateData["statsByDifficulty"] = {
+				...(currentDifficultyStats || {}),
+				...difficultyStatsUpdate,
+			};
+			console.log(
+				`[updateAttemptedStats] Difficulty stats update:`,
+				JSON.stringify(updateData["statsByDifficulty"], null, 2)
+			);
+		}
+
+		console.log(
+			`[updateAttemptedStats] Updating Firestore with data:`,
+			JSON.stringify(updateData, null, 2)
+		);
+
+		// Update Firestore
+		await userRef.update(updateData);
+		console.log(`[updateAttemptedStats] Successfully updated Firestore`);
+	} catch (error) {
+		console.error(
+			"[updateAttemptedStats] Error updating attempted stats:",
+			error
+		);
+	}
+};
+
+// Track when user first interacts with a game (types/clicks)
+export const addAttemptedGame = async (userId: string, gameId: string) => {
+	try {
+		// Update attempted stats by category and difficulty
+		await updateAttemptedStats(userId, gameId);
+	} catch (error) {
+		console.error("Error adding attempted game:", error);
 	}
 };
 

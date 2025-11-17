@@ -27,6 +27,7 @@ import { Colors, Shadows } from "../../constants/DesignSystem";
 interface GameWrapperProps {
 	puzzle: Puzzle;
 	onComplete: (result: GameResult) => void;
+	onAttempt?: (puzzleId: string) => void;
 	onSkipped?: () => void;
 	startTime?: number;
 }
@@ -34,6 +35,7 @@ interface GameWrapperProps {
 const GameWrapper: React.FC<GameWrapperProps> = ({
 	puzzle,
 	onComplete,
+	onAttempt,
 	onSkipped,
 	startTime,
 }) => {
@@ -63,17 +65,17 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				puzzleId: puzzle.id,
 			};
 
-			// Save to user's completed games
-			await addCompletedGame(user.uid, puzzle.id, result.timeTaken);
+		// Save to user's completed games
+		await addCompletedGame(user.uid, puzzle.id, result.timeTaken);
 
-			// Save puzzle completion to Firestore for stats
-			await savePuzzleCompletion(
-				puzzle.id,
-				user.uid,
-				result.timeTaken,
-				result.attempts,
-				result.mistakes
-			);
+		// Save puzzle completion to Firestore for stats
+		await savePuzzleCompletion(
+			puzzle.id,
+			user.uid,
+			result.timeTaken,
+			result.attempts,
+			result.mistakes
+		);
 
 			// Store result for stats display (but don't show yet)
 			setCompletedResult(updatedResult);
@@ -101,6 +103,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
+						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
@@ -112,6 +115,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
+						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
@@ -123,6 +127,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
+						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
@@ -134,6 +139,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
+						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
@@ -178,14 +184,13 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 							contentContainerStyle={styles.statsContent}
 							showsVerticalScrollIndicator={true}
 						>
-							<PuzzleStats
-								stats={puzzleStats}
-								puzzleType={puzzle.type}
-								loading={loadingStats}
-								userTime={completedResult.timeTaken}
-								userAttempts={completedResult.attempts}
-								userMistakes={completedResult.mistakes}
-							/>
+						<PuzzleStats
+							stats={puzzleStats}
+							puzzleType={puzzle.type}
+							loading={loadingStats}
+							userTime={completedResult.timeTaken}
+							userAttempts={completedResult.attempts}
+						/>
 						</ScrollView>
 					</View>
 				)}

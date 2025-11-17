@@ -33,12 +33,21 @@ import {
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
-import { fetchGamesFromFirestore, FirestoreGame } from "../config/firebase";
+import {
+	fetchGamesFromFirestore,
+	FirestoreGame,
+	trackGameSkipped,
+	trackGameAttempted,
+	trackGameCompleted,
+	decrementGameSkipped,
+} from "../config/firebase";
 import {
 	getCurrentUser,
 	getUserData,
 	UserData,
 	addSkippedGame,
+	addAttemptedGame,
+	moveFromSkippedToAttempted,
 } from "../config/auth";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -62,6 +71,8 @@ const FeedScreen = () => {
 	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
 	// Track completed puzzles during this session
 	const completedPuzzlesRef = useRef<Set<string>>(new Set());
+	// Track attempted puzzles during this session (user interacted with it)
+	const attemptedPuzzlesRef = useRef<Set<string>>(new Set());
 	// Track skipped puzzles during this session to avoid duplicate tracking
 	const skippedPuzzlesRef = useRef<Set<string>>(new Set());
 	// Track keyboard state to disable FlatList scrolling when keyboard is visible
@@ -273,23 +284,73 @@ const FeedScreen = () => {
 								additionalElapsed;
 						}
 
-						// Check if the puzzle was completed - if not, mark as skipped
+						// Check if the puzzle was completed, attempted, or already skipped
 						const wasCompleted =
 							completedPuzzlesRef.current.has(currentPuzzleId);
+						const wasAttempted =
+							attemptedPuzzlesRef.current.has(currentPuzzleId);
 						const wasAlreadySkipped =
 							skippedPuzzlesRef.current.has(currentPuzzleId);
 
-						if (!wasCompleted && !wasAlreadySkipped) {
-							// Mark as skipped in this session
+						console.log(
+							`[SKIP CHECK] Puzzle: ${currentPuzzleId}, wasCompleted: ${wasCompleted}, wasAttempted: ${wasAttempted}, wasAlreadySkipped: ${wasAlreadySkipped}`
+						);
+
+						const user = getCurrentUser();
+
+						if (!wasCompleted && wasAttempted && !wasAlreadySkipped) {
+							// User attempted but didn't complete - mark as attempted
+							console.log(
+								`[ATTEMPTED] User attempted but didn't complete: ${currentPuzzleId}`
+							);
+							skippedPuzzlesRef.current.add(currentPuzzleId); // Still mark as "left" so we don't track again
+
+							// Call addAttemptedGame to update user stats
+							if (user) {
+								console.log(
+									`[ATTEMPTED] Calling addAttemptedGame for user ${user.uid}`
+								);
+								addAttemptedGame(user.uid, currentPuzzleId)
+									.then(() => {
+										console.log(
+											`[ATTEMPTED] Successfully tracked attempted game: ${currentPuzzleId}`
+										);
+									})
+									.catch((error) => {
+										console.error(
+											"[ATTEMPTED] Error adding attempted game:",
+											error
+										);
+									});
+							} else {
+								console.log("[ATTEMPTED] No user found, cannot track");
+							}
+
+							// Track attempted at global game level
+							trackGameAttempted(currentPuzzleId).catch((error) => {
+								console.error(
+									"[ATTEMPTED] Error tracking game attempted globally:",
+									error
+								);
+							});
+						} else if (!wasCompleted && !wasAttempted && !wasAlreadySkipped) {
+							// User never interacted - mark as skipped
 							skippedPuzzlesRef.current.add(currentPuzzleId);
 
-							// Call addSkippedGame to update Firestore
-							const user = getCurrentUser();
+							// Call addSkippedGame to update user stats
 							if (user) {
 								addSkippedGame(user.uid, currentPuzzleId).catch((error) => {
 									console.error("Error adding skipped game:", error);
 								});
 							}
+
+							// Track skipped at global game level
+							trackGameSkipped(currentPuzzleId).catch((error) => {
+								console.error(
+									"[SKIPPED] Error tracking game skipped globally:",
+									error
+								);
+							});
 						}
 					}
 
@@ -329,6 +390,47 @@ const FeedScreen = () => {
 		}
 	}, [filteredPuzzles, currentPuzzleId]);
 
+	// Handle when user first interacts with a game
+	const handleGameAttempt = (puzzleId: string) => {
+		// Mark puzzle as attempted in this session
+		if (!attemptedPuzzlesRef.current.has(puzzleId)) {
+			console.log(`[SESSION] Marking puzzle as attempted: ${puzzleId}`);
+			attemptedPuzzlesRef.current.add(puzzleId);
+
+			// If this game was previously marked as skipped in this session, remove it
+			if (skippedPuzzlesRef.current.has(puzzleId)) {
+				console.log(
+					`[SESSION] Removing ${puzzleId} from skipped session tracking`
+				);
+				skippedPuzzlesRef.current.delete(puzzleId);
+			}
+
+			// Check if this game was previously skipped and move it to attempted
+			const user = getCurrentUser();
+			if (user) {
+				// Update user stats (decrement user's skipped)
+				moveFromSkippedToAttempted(user.uid, puzzleId)
+					.then((wasSkipped) => {
+						// If it was previously skipped, also decrement global game stats
+						if (wasSkipped) {
+							decrementGameSkipped(puzzleId).catch((error) => {
+								console.error(
+									"[SESSION] Error decrementing game skipped:",
+									error
+								);
+							});
+						}
+					})
+					.catch((error) => {
+						console.error(
+							"[SESSION] Error moving from skipped to attempted:",
+							error
+						);
+					});
+			}
+		}
+	};
+
 	const handleGameComplete = async (result: GameResult) => {
 		addCompletedPuzzle(result);
 
@@ -337,6 +439,14 @@ const FeedScreen = () => {
 			completedPuzzlesRef.current.add(result.puzzleId);
 			// Remove from skipped set if it was previously skipped (shouldn't happen, but just in case)
 			skippedPuzzlesRef.current.delete(result.puzzleId);
+
+			// Track completed at global game level
+			trackGameCompleted(result.puzzleId).catch((error) => {
+				console.error(
+					"[COMPLETED] Error tracking game completed globally:",
+					error
+				);
+			});
 		}
 
 		// Update user data but don't filter out completed games during session
@@ -371,6 +481,7 @@ const FeedScreen = () => {
 					key={item.id}
 					puzzle={item}
 					onComplete={handleGameComplete}
+					onAttempt={handleGameAttempt}
 					startTime={puzzleStartTime}
 				/>
 			</View>

@@ -26,6 +26,7 @@ import {
 interface QuickMathProps {
 	inputData: QuickMathData;
 	onComplete: (result: GameResult) => void;
+	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
@@ -42,6 +43,7 @@ function evaluateExpression(expression: string): number {
 const QuickMathGame: React.FC<QuickMathProps> = ({
 	inputData,
 	onComplete,
+	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
@@ -60,6 +62,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	const [mistakes, setMistakes] = useState(0); // Track number of incorrect submissions
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
+	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
 
@@ -85,6 +88,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			setFeedback(null);
 			setAnswers(Array(problems.length).fill(""));
 			setMistakes(0);
+			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -136,6 +140,17 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	};
 
 	const handleChange = (idx: number, value: string) => {
+		// Track first interaction (user started attempting the game)
+		if (!hasAttemptedRef.current && value.length > 0 && puzzleId) {
+			hasAttemptedRef.current = true;
+			
+			// Update session tracking in feed.tsx
+			// Firestore will be updated only if user skips after attempting
+			if (onAttempt) {
+				onAttempt(puzzleId);
+			}
+		}
+		
 		// Allow numeric including negative and decimal
 		setAnswers((prev) => {
 			const next = [...prev];

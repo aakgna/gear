@@ -15,7 +15,6 @@ interface PuzzleStatsProps {
 	loading?: boolean;
 	userTime: number;
 	userAttempts?: number;
-	userMistakes?: number;
 }
 
 const PuzzleStats: React.FC<PuzzleStatsProps> = ({
@@ -24,7 +23,6 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 	loading,
 	userTime,
 	userAttempts,
-	userMistakes,
 }) => {
 	const formatTime = (seconds: number): string => {
 		if (seconds < 60) {
@@ -58,47 +56,11 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 	const isSlowerThanAverage = userTime > stats.averageTime;
 	const isBestTime = userTime === stats.fastestTime;
 
-	let attemptComparison: string | null = null;
-	if (
-		puzzleType === "wordle" ||
-		puzzleType === "riddle" ||
-		puzzleType === "wordChain"
-	) {
-		if (userAttempts !== undefined && stats.averageAttempts !== undefined) {
-			if (userAttempts < stats.averageAttempts) {
-				attemptComparison = `Better than average (${stats.averageAttempts} tries)`;
-			} else if (userAttempts > stats.averageAttempts) {
-				attemptComparison = `More than average (${stats.averageAttempts} tries)`;
-			} else {
-				attemptComparison = `Average (${stats.averageAttempts} tries)`;
-			}
-			if (
-				stats.bestAttempts !== undefined &&
-				userAttempts === stats.bestAttempts
-			) {
-				attemptComparison = `Best score! 🏆`;
-			}
-		}
-	}
-
-	let mistakeComparison: string | null = null;
-	if (puzzleType === "quickMath") {
-		if (userMistakes !== undefined && stats.averageMistakes !== undefined) {
-			if (userMistakes < stats.averageMistakes) {
-				mistakeComparison = `Fewer mistakes than average (${stats.averageMistakes})`;
-			} else if (userMistakes > stats.averageMistakes) {
-				mistakeComparison = `More mistakes than average (${stats.averageMistakes})`;
-			} else {
-				mistakeComparison = `Average mistakes (${stats.averageMistakes})`;
-			}
-			if (
-				stats.bestMistakes !== undefined &&
-				userMistakes === stats.bestMistakes
-			) {
-				mistakeComparison = `Perfect! No mistakes! 🏆`;
-			}
-		}
-	}
+	// Check if user achieved best attempts (lowest tries)
+	const isBestAttempts =
+		userAttempts !== undefined &&
+		stats.bestAttempts !== undefined &&
+		userAttempts === stats.bestAttempts;
 
 	return (
 		<View style={styles.container}>
@@ -141,76 +103,42 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 			{(puzzleType === "wordle" ||
 				puzzleType === "riddle" ||
 				puzzleType === "wordChain") &&
-				stats.averageAttempts !== undefined && (
+				userAttempts !== undefined &&
+				stats.bestAttempts !== undefined && (
 					<View style={styles.statCard}>
 						<View style={styles.statRow}>
-							<Text style={styles.statLabel}>Your Attempts</Text>
+							<Text style={styles.statLabel}>Your Tries</Text>
 							<Text
 								style={[
 									styles.statValue,
-									userAttempts === stats.bestAttempts && styles.bestValue,
-									userAttempts !== undefined &&
-										stats.averageAttempts !== undefined &&
-										userAttempts < stats.averageAttempts &&
+									isBestAttempts && styles.bestValue,
+									!isBestAttempts &&
+										userAttempts < stats.bestAttempts &&
 										styles.goodValue,
 								]}
 							>
 								{userAttempts}
-								{userAttempts === stats.bestAttempts && " 🏆"}
+								{isBestAttempts && " 🏆"}
 							</Text>
 						</View>
 						<View style={styles.statRow}>
-							<Text style={styles.statLabel}>Average Attempts</Text>
-							<Text style={styles.statValue}>{stats.averageAttempts}</Text>
-						</View>
-						<View style={styles.statRow}>
-							<Text style={styles.statLabel}>Best</Text>
+							<Text style={styles.statLabel}>Best (Fewest Tries)</Text>
 							<Text style={[styles.statValue, styles.bestValue]}>
-								{stats.bestAttempts} tries
+								{stats.bestAttempts}
 							</Text>
 						</View>
-						{attemptComparison && (
-							<Text style={styles.comparisonText}>{attemptComparison}</Text>
+						{isBestAttempts && (
+							<Text style={styles.comparisonText}>
+								You matched the best score! 🏆
+							</Text>
+						)}
+						{!isBestAttempts && userAttempts < stats.bestAttempts && (
+							<Text style={styles.comparisonText}>
+								Great job! Close to the best!
+							</Text>
 						)}
 					</View>
 				)}
-
-			{/* Mistakes Stats (QuickMath) */}
-			{puzzleType === "quickMath" && stats.averageMistakes !== undefined && (
-				<View style={styles.statCard}>
-					<View style={styles.statRow}>
-						<Text style={styles.statLabel}>Your Mistakes</Text>
-						<Text
-							style={[
-								styles.statValue,
-								userMistakes === stats.bestMistakes && styles.bestValue,
-								userMistakes !== undefined &&
-									stats.averageMistakes !== undefined &&
-									userMistakes < stats.averageMistakes &&
-									styles.goodValue,
-							]}
-						>
-							{userMistakes}
-							{userMistakes === stats.bestMistakes && " 🏆"}
-						</Text>
-					</View>
-					<View style={styles.statRow}>
-						<Text style={styles.statLabel}>Average Mistakes</Text>
-						<Text style={styles.statValue}>{stats.averageMistakes}</Text>
-					</View>
-					<View style={styles.statRow}>
-						<Text style={styles.statLabel}>Best</Text>
-						<Text style={[styles.statValue, styles.bestValue]}>
-							{stats.bestMistakes === 0
-								? "Perfect!"
-								: `${stats.bestMistakes} mistakes`}
-						</Text>
-					</View>
-					{mistakeComparison && (
-						<Text style={styles.comparisonText}>{mistakeComparison}</Text>
-					)}
-				</View>
-			)}
 		</View>
 	);
 };

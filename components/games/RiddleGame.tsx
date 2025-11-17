@@ -26,6 +26,7 @@ import {
 interface RiddleGameProps {
 	inputData: RiddleData;
 	onComplete: (result: GameResult) => void;
+	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
@@ -34,6 +35,7 @@ interface RiddleGameProps {
 const RiddleGame: React.FC<RiddleGameProps> = ({
 	inputData,
 	onComplete,
+	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
@@ -46,6 +48,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	const [completed, setCompleted] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
+	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
 
@@ -63,6 +66,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 			setGuess("");
 			setFeedback(null);
 			setAttempts(0);
+			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -266,7 +270,20 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 						ref={inputRef}
 						style={styles.input}
 						value={guess}
-						onChangeText={setGuess}
+						onChangeText={(text) => {
+							// Track first interaction (user started attempting the game)
+							if (!hasAttemptedRef.current && text.length > 0 && puzzleId) {
+								hasAttemptedRef.current = true;
+								
+								// Update session tracking in feed.tsx
+								// Firestore will be updated only if user skips after attempting
+								if (onAttempt) {
+									onAttempt(puzzleId);
+								}
+							}
+							
+							setGuess(text);
+						}}
 						autoCapitalize="none"
 						autoCorrect={false}
 						placeholder="Type your answer here..."

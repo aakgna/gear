@@ -32,6 +32,7 @@ const wordsSet = new Set(words.map((word: string) => word.toLowerCase()));
 interface WordChainGameProps {
 	inputData: WordChainData;
 	onComplete: (result: GameResult) => void;
+	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
@@ -40,6 +41,7 @@ interface WordChainGameProps {
 const WordChainGame: React.FC<WordChainGameProps> = ({
 	inputData,
 	onComplete,
+	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
@@ -64,6 +66,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	const inputRefs = useRef<(TextInput | null)[]>([]);
 	const scrollViewRef = useRef<ScrollView>(null);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
+	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
 
 	// Reset timer when puzzle changes
 	useEffect(() => {
@@ -77,6 +80,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 			setChain(Array(numInputs).fill(""));
 			setChainStatus(Array(numInputs).fill("empty"));
 			setAttempts(0);
+			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -325,6 +329,18 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 
 	const handleWordChange = (index: number, value: string) => {
 		if (gameWon || gameLost) return;
+
+		// Track first interaction (user started attempting the game)
+		if (!hasAttemptedRef.current && value.length > 0 && puzzleId) {
+			hasAttemptedRef.current = true;
+
+			// Update session tracking in feed.tsx
+			// Firestore will be updated only if user skips after attempting
+			if (onAttempt) {
+				onAttempt(puzzleId);
+			}
+		}
+
 		// Only allow letters and limit to word length
 		const filtered = value
 			.replace(/[^a-zA-Z]/g, "")

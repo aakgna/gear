@@ -234,7 +234,6 @@ export const savePuzzleCompletion = async (
 	mistakes?: number // for quickMath
 ): Promise<void> => {
 	try {
-		console.log("Puzzle completed - Puzzle ID:", puzzleId);
 		const firestore = require("@react-native-firebase/firestore").default;
 
 		// Parse puzzleId to get game document path
@@ -296,95 +295,40 @@ export const savePuzzleCompletion = async (
 				totalCompletions: sanitizeNumber(existingStats.totalCompletions, 0),
 				sumTime: sanitizeNumber(existingStats.sumTime, 0),
 				fastestTime: sanitizeNullableNumber(existingStats.fastestTime),
-				slowestTime: sanitizeNumber(existingStats.slowestTime, 0),
-				sumAttempts: sanitizeNumber(existingStats.sumAttempts, 0),
-				attemptCompletions: sanitizeNumber(existingStats.attemptCompletions, 0),
 				bestAttempts: sanitizeNullableNumber(existingStats.bestAttempts),
-				sumMistakes: sanitizeNumber(existingStats.sumMistakes, 0),
-				mistakeCompletions: sanitizeNumber(existingStats.mistakeCompletions, 0),
-				bestMistakes: sanitizeNullableNumber(existingStats.bestMistakes),
 			};
 
 			// Build new stats object with only valid Firestore values
 			const newStats: Record<string, number | null> = {
 				totalCompletions: currentStats.totalCompletions + 1,
 				sumTime: currentStats.sumTime + timeTaken,
-				slowestTime: Math.max(timeTaken, currentStats.slowestTime),
 			};
 
-			// Handle fastestTime
+			// Handle fastestTime (best time)
 			if (currentStats.fastestTime === null) {
 				newStats.fastestTime = timeTaken;
 			} else {
 				newStats.fastestTime = Math.min(timeTaken, currentStats.fastestTime);
 			}
 
-			// Update attempts stats if provided
+			// Update attempts stats if provided (for games like Wordle - number of tries)
+			// For bestAttempts, we want the LOWEST number (fewest tries is best)
 			if (
 				attempts !== undefined &&
 				attempts !== null &&
 				typeof attempts === "number"
 			) {
-				console.log("Processing attempts:", attempts);
-				console.log(
-					"Current attemptCompletions:",
-					currentStats.attemptCompletions
-				);
-				console.log("Current bestAttempts:", currentStats.bestAttempts);
-
-				newStats.sumAttempts = currentStats.sumAttempts + attempts;
-				newStats.attemptCompletions = currentStats.attemptCompletions + 1;
-				// Always set bestAttempts when we have an attempt value
 				if (
-					currentStats.attemptCompletions === 0 ||
 					currentStats.bestAttempts === null ||
 					currentStats.bestAttempts === undefined
 				) {
-					// First attempt or bestAttempts is null/undefined - set it directly
-					console.log("Setting bestAttempts to:", attempts);
 					newStats.bestAttempts = attempts;
 				} else {
-					// Use max to find the best (highest) attempt
-					console.log(
-						"Updating bestAttempts with max:",
-						attempts,
-						currentStats.bestAttempts
-					);
-					newStats.bestAttempts = Math.max(attempts, currentStats.bestAttempts);
+					newStats.bestAttempts = Math.min(attempts, currentStats.bestAttempts);
 				}
-				console.log("Final bestAttempts:", newStats.bestAttempts);
 			} else {
-				// Preserve existing values
-				newStats.sumAttempts = currentStats.sumAttempts;
-				newStats.attemptCompletions = currentStats.attemptCompletions;
+				// Preserve existing value
 				newStats.bestAttempts = currentStats.bestAttempts;
-			}
-
-			// Update mistakes stats if provided
-			if (
-				mistakes !== undefined &&
-				mistakes !== null &&
-				typeof mistakes === "number"
-			) {
-				newStats.sumMistakes = currentStats.sumMistakes + mistakes;
-				newStats.mistakeCompletions = currentStats.mistakeCompletions + 1;
-				// Always set bestMistakes when we have a mistake value
-				if (
-					currentStats.mistakeCompletions === 0 ||
-					currentStats.bestMistakes === null ||
-					currentStats.bestMistakes === undefined
-				) {
-					// First mistake or bestMistakes is null/undefined - set it directly
-					newStats.bestMistakes = mistakes;
-				} else {
-					// Use max to find the best (highest) mistake
-					newStats.bestMistakes = Math.max(mistakes, currentStats.bestMistakes);
-				}
-			} else {
-				// Preserve existing values
-				newStats.sumMistakes = currentStats.sumMistakes;
-				newStats.mistakeCompletions = currentStats.mistakeCompletions;
-				newStats.bestMistakes = currentStats.bestMistakes;
 			}
 
 			// Update the document
@@ -401,6 +345,235 @@ export const savePuzzleCompletion = async (
 			);
 		}
 		// Don't throw - allow game completion to proceed even if stats save fails
+	}
+};
+
+// Track when a game is skipped globally (at game document level)
+export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
+	try {
+		console.log(`[trackGameSkipped] Tracking skipped for: ${puzzleId}`);
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(`[trackGameSkipped] Invalid puzzleId format: ${puzzleId}`);
+			return;
+		}
+
+		const { gameType, difficulty, gameId } = parsed;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		// Use transaction to atomically update skipped count
+		let finalCount = 0;
+		await db.runTransaction(async (transaction) => {
+			const gameDoc = await transaction.get(gameRef);
+
+			if (!gameDoc.exists) {
+				console.warn(
+					`[trackGameSkipped] Game document not found: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			const gameData = gameDoc.data();
+			const existingStats = gameData?.stats || {};
+
+			const currentSkipped =
+				typeof existingStats.skipped === "number" &&
+				isFinite(existingStats.skipped)
+					? existingStats.skipped
+					: 0;
+
+			// Increment skipped count
+			const newSkipped = currentSkipped + 1;
+			transaction.update(gameRef, {
+				"stats.skipped": newSkipped,
+			});
+
+			finalCount = newSkipped;
+		});
+
+		console.log(
+			`[trackGameSkipped] Successfully updated skipped count to ${finalCount}`
+		);
+	} catch (error: any) {
+		console.error("[trackGameSkipped] Error:", error);
+		// Don't throw - this is non-critical tracking
+	}
+};
+
+// Track when a game is attempted globally (at game document level)
+export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
+	try {
+		console.log(`[trackGameAttempted] Tracking attempted for: ${puzzleId}`);
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(`[trackGameAttempted] Invalid puzzleId format: ${puzzleId}`);
+			return;
+		}
+
+		const { gameType, difficulty, gameId } = parsed;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		// Use transaction to atomically update attempted count
+		let finalCount = 0;
+		await db.runTransaction(async (transaction) => {
+			const gameDoc = await transaction.get(gameRef);
+
+			if (!gameDoc.exists) {
+				console.warn(
+					`[trackGameAttempted] Game document not found: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			const gameData = gameDoc.data();
+			const existingStats = gameData?.stats || {};
+
+			const currentAttempted =
+				typeof existingStats.attempted === "number" &&
+				isFinite(existingStats.attempted)
+					? existingStats.attempted
+					: 0;
+
+			// Increment attempted count
+			const newAttempted = currentAttempted + 1;
+			transaction.update(gameRef, {
+				"stats.attempted": newAttempted,
+			});
+
+			finalCount = newAttempted;
+		});
+
+		console.log(
+			`[trackGameAttempted] Successfully updated attempted count to ${finalCount}`
+		);
+	} catch (error: any) {
+		console.error("[trackGameAttempted] Error:", error);
+		// Don't throw - this is non-critical tracking
+	}
+};
+
+// Track when a game is completed globally (at game document level)
+// This increments the completed count in stats
+export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
+	try {
+		console.log(`[trackGameCompleted] Tracking completed for: ${puzzleId}`);
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(`[trackGameCompleted] Invalid puzzleId format: ${puzzleId}`);
+			return;
+		}
+
+		const { gameType, difficulty, gameId } = parsed;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		// Use transaction to atomically update completed count
+		let finalCount = 0;
+		await db.runTransaction(async (transaction) => {
+			const gameDoc = await transaction.get(gameRef);
+
+			if (!gameDoc.exists) {
+				console.warn(
+					`[trackGameCompleted] Game document not found: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			const gameData = gameDoc.data();
+			const existingStats = gameData?.stats || {};
+
+			const currentCompleted =
+				typeof existingStats.completed === "number" &&
+				isFinite(existingStats.completed)
+					? existingStats.completed
+					: 0;
+
+			// Increment completed count
+			const newCompleted = currentCompleted + 1;
+			transaction.update(gameRef, {
+				"stats.completed": newCompleted,
+			});
+
+			finalCount = newCompleted;
+		});
+
+		console.log(
+			`[trackGameCompleted] Successfully updated completed count to ${finalCount}`
+		);
+	} catch (error: any) {
+		console.error("[trackGameCompleted] Error:", error);
+		// Don't throw - this is non-critical tracking
+	}
+};
+
+// Decrement skipped count when a user comes back and attempts a previously skipped game
+export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
+	try {
+		console.log(`[decrementGameSkipped] Decrementing skipped for: ${puzzleId}`);
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(
+				`[decrementGameSkipped] Invalid puzzleId format: ${puzzleId}`
+			);
+			return;
+		}
+
+		const { gameType, difficulty, gameId } = parsed;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		// Use transaction to atomically decrement skipped count
+		let oldCount = 0;
+		let newCount = 0;
+		await db.runTransaction(async (transaction) => {
+			const gameDoc = await transaction.get(gameRef);
+
+			if (!gameDoc.exists) {
+				console.warn(
+					`[decrementGameSkipped] Game document not found: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			const gameData = gameDoc.data();
+			const existingStats = gameData?.stats || {};
+
+			const currentSkipped =
+				typeof existingStats.skipped === "number" &&
+				isFinite(existingStats.skipped)
+					? existingStats.skipped
+					: 0;
+
+			// Decrement skipped count (but don't go below 0)
+			const newSkipped = Math.max(0, currentSkipped - 1);
+			transaction.update(gameRef, {
+				"stats.skipped": newSkipped,
+			});
+
+			oldCount = currentSkipped;
+			newCount = newSkipped;
+		});
+
+		console.log(
+			`[decrementGameSkipped] Successfully decremented skipped from ${oldCount} to ${newCount}`
+		);
+	} catch (error: any) {
+		console.error("[decrementGameSkipped] Error:", error);
+		// Don't throw - this is non-critical tracking
 	}
 };
 
@@ -439,36 +612,22 @@ export const fetchPuzzleStats = async (
 		// Calculate stats from aggregated data
 		const stats: PuzzleStats = {
 			totalCompletions: statsData.totalCompletions || 0,
-			averageTime: Math.round(
-				(statsData.sumTime || 0) / (statsData.totalCompletions || 1)
-			),
+			averageTime:
+				statsData.totalCompletions > 0
+					? Math.round((statsData.sumTime || 0) / statsData.totalCompletions)
+					: 0,
 			fastestTime:
-				statsData.fastestTime !== null && statsData.fastestTime !== undefined
+				statsData.fastestTime && statsData.fastestTime > 0
 					? statsData.fastestTime
 					: 0,
-			slowestTime: statsData.slowestTime || 0,
 		};
 
-		// Calculate attempts stats if available
-		if (statsData.attemptCompletions > 0) {
-			stats.averageAttempts = Math.round(
-				(statsData.sumAttempts || 0) / statsData.attemptCompletions
-			);
-			stats.bestAttempts =
-				statsData.bestAttempts !== null && statsData.bestAttempts !== undefined
-					? statsData.bestAttempts
-					: undefined;
-		}
-
-		// Calculate mistakes stats if available
-		if (statsData.mistakeCompletions > 0) {
-			stats.averageMistakes = Math.round(
-				(statsData.sumMistakes || 0) / statsData.mistakeCompletions
-			);
-			stats.bestMistakes =
-				statsData.bestMistakes !== null && statsData.bestMistakes !== undefined
-					? statsData.bestMistakes
-					: undefined;
+		// Add bestAttempts if available (lowest number of tries)
+		if (
+			statsData.bestAttempts !== null &&
+			statsData.bestAttempts !== undefined
+		) {
+			stats.bestAttempts = statsData.bestAttempts;
 		}
 
 		return stats;

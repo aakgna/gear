@@ -84,10 +84,6 @@ export interface PuzzleCompletion {
 export interface PuzzleStats {
 	totalCompletions: number;
 	averageTime: number;
-	averageAttempts?: number; // for wordle/riddle
-	averageMistakes?: number; // for quickMath
 	fastestTime: number;
-	slowestTime: number;
 	bestAttempts?: number; // for wordle/riddle - lowest number of tries
-	bestMistakes?: number; // for quickMath - lowest number of mistakes
 }

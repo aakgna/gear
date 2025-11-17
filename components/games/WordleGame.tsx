@@ -24,6 +24,7 @@ const TILE_SIZE_FALLBACK = (width - 60) / 5;
 interface WordleGameProps {
 	inputData: WordleData;
 	onComplete: (result: GameResult) => void;
+	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
@@ -37,6 +38,7 @@ interface TileState {
 const WordleGame: React.FC<WordleGameProps> = ({
 	inputData,
 	onComplete,
+	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
@@ -50,6 +52,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
+	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
 
 	const answer = inputData.answer.toUpperCase();
 	const wordLength = answer.length;
@@ -88,6 +91,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 			setCurrentGuess("");
 			setGuesses([]);
 			setAttempts(0);
+			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
 			setBoard(initializeBoard());
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
@@ -212,14 +216,14 @@ const WordleGame: React.FC<WordleGameProps> = ({
 							duration: Animation.duration.normal,
 							useNativeDriver: true,
 						}),
-					]).start();
-					onComplete({
-						puzzleId: puzzleId || `wordle_${Date.now()}`,
-						completed: true,
-						timeTaken,
-						attempts: newAttempts,
-						completedAt: new Date().toISOString(),
-					});
+				]).start();
+			onComplete({
+				puzzleId: puzzleId || `wordle_${Date.now()}`,
+				completed: true,
+				timeTaken,
+				attempts: newAttempts,
+				completedAt: new Date().toISOString(),
+			});
 				} else if (newAttempts >= maxGuesses) {
 					const timeTaken = Math.floor((Date.now() - startTime) / 1000);
 					// Stop timer
@@ -284,6 +288,17 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		} else if (key === "⌫") {
 			setCurrentGuess((prev) => prev.slice(0, -1));
 		} else if (currentGuess.length < wordLength && key !== "ENTER") {
+			// Track first interaction (user started attempting the game)
+			if (!hasAttemptedRef.current && currentGuess.length === 0 && puzzleId) {
+				hasAttemptedRef.current = true;
+				
+				// Update session tracking in feed.tsx
+				// Firestore will be updated only if user skips after attempting
+				if (onAttempt) {
+					onAttempt(puzzleId);
+				}
+			}
+			
 			setCurrentGuess((prev) => prev + key);
 		}
 	};
