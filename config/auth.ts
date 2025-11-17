@@ -6,11 +6,13 @@ import { db } from "./firebase";
 export interface CategoryStats {
 	completed: number;
 	avgTime: number;
+	skipped?: number;
 }
 
 export interface DifficultyStats {
 	completed: number;
 	avgTime: number;
+	skipped?: number;
 }
 
 export interface UserData {
@@ -391,6 +393,85 @@ export const addCompletedGame = async (
 	}
 };
 
+// Update skipped stats when a game is skipped
+const updateSkippedStats = async (userId: string, gameId: string) => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		const userDoc = await userRef.get();
+
+		if (!userDoc.exists()) {
+			console.error("User document does not exist");
+			return;
+		}
+
+		const userData = userDoc.data() as UserData;
+		const { category, difficulty } = parseGameId(gameId);
+
+		// Update skipped stats by category (using existing statsByCategory structure)
+		const currentCategoryStats = userData.statsByCategory || {};
+		let categoryStatsUpdate: any = {};
+
+		if (category) {
+			const currentCatStats = currentCategoryStats[category] || {
+				completed: 0,
+				avgTime: 0,
+				skipped: 0,
+			};
+			const catSkipped = (currentCatStats.skipped || 0) + 1;
+
+			categoryStatsUpdate[category] = {
+				...currentCatStats,
+				skipped: catSkipped,
+			};
+		}
+
+		// Update skipped stats by difficulty (using existing statsByDifficulty structure)
+		const currentDifficultyStats = userData.statsByDifficulty || {};
+		let difficultyStatsUpdate: any = {};
+
+		if (difficulty) {
+			const currentDiffStats = currentDifficultyStats[difficulty] || {
+				completed: 0,
+				avgTime: 0,
+				skipped: 0,
+			};
+			const diffSkipped = (currentDiffStats.skipped || 0) + 1;
+
+			difficultyStatsUpdate[difficulty] = {
+				...currentDiffStats,
+				skipped: diffSkipped,
+			};
+		}
+
+		// Prepare update object
+		const updateData: any = {
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		};
+
+		// Merge category stats (preserving completed and avgTime, updating skipped)
+		if (Object.keys(categoryStatsUpdate).length > 0) {
+			updateData["statsByCategory"] = {
+				...(currentCategoryStats || {}),
+				...categoryStatsUpdate,
+			};
+		}
+
+		// Merge difficulty stats (preserving completed and avgTime, updating skipped)
+		if (Object.keys(difficultyStatsUpdate).length > 0) {
+			updateData["statsByDifficulty"] = {
+				...(currentDifficultyStats || {}),
+				...difficultyStatsUpdate,
+			};
+		}
+
+		// Update Firestore
+		await userRef.update(updateData);
+	} catch (error) {
+		console.error("Error updating skipped stats:", error);
+	}
+};
+
 // Update user's skipped games
 export const addSkippedGame = async (userId: string, gameId: string) => {
 	try {
@@ -400,6 +481,9 @@ export const addSkippedGame = async (userId: string, gameId: string) => {
 			skippedGames: firestore.FieldValue.arrayUnion(gameId),
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
+
+		// Update skipped stats by category and difficulty
+		await updateSkippedStats(userId, gameId);
 	} catch (error) {
 		console.error("Error adding skipped game:", error);
 	}

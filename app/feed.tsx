@@ -34,7 +34,12 @@ import {
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
 import { fetchGamesFromFirestore, FirestoreGame } from "../config/firebase";
-import { getCurrentUser, getUserData, UserData } from "../config/auth";
+import {
+	getCurrentUser,
+	getUserData,
+	UserData,
+	addSkippedGame,
+} from "../config/auth";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -55,6 +60,10 @@ const FeedScreen = () => {
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
 	// Track initial completed games to filter on load only
 	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
+	// Track completed puzzles during this session
+	const completedPuzzlesRef = useRef<Set<string>>(new Set());
+	// Track skipped puzzles during this session to avoid duplicate tracking
+	const skippedPuzzlesRef = useRef<Set<string>>(new Set());
 	// Track keyboard state to disable FlatList scrolling when keyboard is visible
 	const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 	const keyboardHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -105,6 +114,12 @@ const FeedScreen = () => {
 			// Store initial completed games for filtering on load only (only on initial load)
 			if (isInitialLoad && data?.completedGames) {
 				initialCompletedGamesRef.current = new Set(data.completedGames);
+				// Also initialize completed puzzles ref to track during session
+				completedPuzzlesRef.current = new Set(data.completedGames);
+			}
+			// Initialize skipped puzzles set from user data
+			if (isInitialLoad && data?.skippedGames) {
+				skippedPuzzlesRef.current = new Set(data.skippedGames);
 			}
 			// Route to username page if:
 			// 1. User document doesn't exist (!data)
@@ -245,18 +260,37 @@ const FeedScreen = () => {
 				const newPuzzleId = viewableItems[0].item?.id;
 
 				if (newPuzzleId && newPuzzleId !== currentPuzzleId) {
-					// Save elapsed time for current puzzle before switching away
-					if (
-						currentPuzzleId &&
-						puzzleVisibleTimesRef.current[currentPuzzleId]
-					) {
-						const timeVisible =
-							Date.now() - puzzleVisibleTimesRef.current[currentPuzzleId];
-						const additionalElapsed = Math.floor(timeVisible / 1000);
-						// Add to existing elapsed time
-						puzzleElapsedTimesRef.current[currentPuzzleId] =
-							(puzzleElapsedTimesRef.current[currentPuzzleId] || 0) +
-							additionalElapsed;
+					// Handle skip tracking for the previous puzzle
+					if (currentPuzzleId) {
+						// Save elapsed time for current puzzle before switching away
+						if (puzzleVisibleTimesRef.current[currentPuzzleId]) {
+							const timeVisible =
+								Date.now() - puzzleVisibleTimesRef.current[currentPuzzleId];
+							const additionalElapsed = Math.floor(timeVisible / 1000);
+							// Add to existing elapsed time
+							puzzleElapsedTimesRef.current[currentPuzzleId] =
+								(puzzleElapsedTimesRef.current[currentPuzzleId] || 0) +
+								additionalElapsed;
+						}
+
+						// Check if the puzzle was completed - if not, mark as skipped
+						const wasCompleted =
+							completedPuzzlesRef.current.has(currentPuzzleId);
+						const wasAlreadySkipped =
+							skippedPuzzlesRef.current.has(currentPuzzleId);
+
+						if (!wasCompleted && !wasAlreadySkipped) {
+							// Mark as skipped in this session
+							skippedPuzzlesRef.current.add(currentPuzzleId);
+
+							// Call addSkippedGame to update Firestore
+							const user = getCurrentUser();
+							if (user) {
+								addSkippedGame(user.uid, currentPuzzleId).catch((error) => {
+									console.error("Error adding skipped game:", error);
+								});
+							}
+						}
 					}
 
 					// Update current puzzle
@@ -297,6 +331,13 @@ const FeedScreen = () => {
 
 	const handleGameComplete = async (result: GameResult) => {
 		addCompletedPuzzle(result);
+
+		// Mark puzzle as completed in this session
+		if (result.puzzleId) {
+			completedPuzzlesRef.current.add(result.puzzleId);
+			// Remove from skipped set if it was previously skipped (shouldn't happen, but just in case)
+			skippedPuzzlesRef.current.delete(result.puzzleId);
+		}
 
 		// Update user data but don't filter out completed games during session
 		await loadUserData();

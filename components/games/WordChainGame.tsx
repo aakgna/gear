@@ -63,8 +63,6 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	const successScale = useRef(new Animated.Value(1)).current;
 	const inputRefs = useRef<(TextInput | null)[]>([]);
 	const scrollViewRef = useRef<ScrollView>(null);
-	const inputRowRefs = useRef<(View | null)[]>([]);
-	const inputRowYPositionsRef = useRef<number[]>([]);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 
 	// Reset timer when puzzle changes
@@ -387,7 +385,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 					styles.scrollContent,
 					{
 						paddingBottom:
-							keyboardHeight > 0 ? keyboardHeight + 100 : Spacing.xl,
+							keyboardHeight > 0 ? keyboardHeight + 200 : Spacing.xl,
 					},
 				]}
 				showsVerticalScrollIndicator={false}
@@ -420,52 +418,38 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 						},
 					]}
 				>
-					<View style={styles.chain}>
-						{chain.map((word, index) => (
-							<View
-								key={index}
-								ref={(ref) => (inputRowRefs.current[index] = ref)}
-								style={styles.chainRow}
-								onLayout={(e) => {
-									// Store the Y position of each input row (same as QuickMath/Riddle)
-									inputRowYPositionsRef.current[index] = e.nativeEvent.layout.y;
+					{chain.map((word, index) => (
+						<View key={index} style={styles.chainRow}>
+							<TextInput
+								ref={(ref) => {
+									inputRefs.current[index] = ref;
 								}}
-							>
-								<TextInput
-									ref={(ref) => {
-										inputRefs.current[index] = ref;
-									}}
-									style={getInputStyle(index) as any}
-									value={word}
-									onChangeText={(value) => handleWordChange(index, value)}
-									onKeyPress={(e) => handleKeyPress(index, e)}
-									maxLength={wordLength}
-									autoCapitalize="characters"
-									editable={!gameWon && !gameLost}
-									selectTextOnFocus
-									placeholder={`Word ${index + 1}`}
-									placeholderTextColor={Colors.text.disabled}
-									onFocus={() => {
-										// Scroll to input when focused - same approach as QuickMath/Riddle
-										setTimeout(() => {
-											if (
-												scrollViewRef.current &&
-												inputRowYPositionsRef.current[index] !== undefined
-											) {
-												scrollViewRef.current.scrollTo({
-													y: Math.max(
-														0,
-														inputRowYPositionsRef.current[index] - 150
-													),
-													animated: true,
-												});
-											}
-										}, 300);
-									}}
-								/>
-							</View>
-						))}
-					</View>
+								style={getInputStyle(index) as any}
+								value={word}
+								onChangeText={(value) => handleWordChange(index, value)}
+								onKeyPress={(e) => handleKeyPress(index, e)}
+								maxLength={wordLength}
+								autoCapitalize="characters"
+								editable={!gameWon && !gameLost}
+								selectTextOnFocus
+								placeholder={`Word ${index + 1}`}
+								placeholderTextColor={Colors.text.disabled}
+								onFocus={() => {
+									// Simple scroll calculation based on index
+									// Each input row is approximately 80px tall (input + margin)
+									// Start/End section is approximately 100px
+									// We want the focused input to be visible with some space above
+									const estimatedY = 100 + index * 80;
+									setTimeout(() => {
+										scrollViewRef.current?.scrollTo({
+											y: estimatedY,
+											animated: true,
+										});
+									}, 100);
+								}}
+							/>
+						</View>
+					))}
 				</Animated.View>
 
 				{/* Submit Button */}
@@ -510,10 +494,6 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
-		alignItems: "center",
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
@@ -521,7 +501,9 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "center",
 		width: "100%",
-		marginBottom: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.lg,
+		paddingBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
@@ -547,6 +529,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
+		marginTop: Spacing.lg,
 		marginBottom: Spacing.xl,
 		gap: Spacing.md,
 	},
@@ -587,17 +570,11 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
+		paddingBottom: Spacing.xxl,
 	},
 	chainContainer: {
 		width: "100%",
-		justifyContent: "center",
-		alignItems: "center",
 		marginBottom: Spacing.lg,
-	},
-	chain: {
-		width: "100%",
-		alignItems: "center",
 	},
 	chainRow: {
 		width: "100%",
