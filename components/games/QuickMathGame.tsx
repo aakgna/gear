@@ -27,6 +27,8 @@ interface QuickMathProps {
 	inputData: QuickMathData;
 	onComplete: (result: GameResult) => void;
 	startTime?: number;
+	puzzleId?: string;
+	onShowStats?: () => void;
 }
 
 function evaluateExpression(expression: string): number {
@@ -41,6 +43,8 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	inputData,
 	onComplete,
 	startTime: propStartTime,
+	puzzleId,
+	onShowStats,
 }) => {
 	const problems = useMemo(
 		() => inputData.problems.slice(0, 5),
@@ -53,6 +57,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [startTime, setStartTime] = useState(propStartTime || Date.now());
 	const [elapsedTime, setElapsedTime] = useState(0);
+	const [mistakes, setMistakes] = useState(0); // Track number of incorrect submissions
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
@@ -79,6 +84,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			setSubmitted(false);
 			setFeedback(null);
 			setAnswers(Array(problems.length).fill(""));
+			setMistakes(0);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -193,13 +199,16 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				}),
 			]).start();
 			onComplete({
-				puzzleId: `quickmath_${Date.now()}`,
+				puzzleId: puzzleId || `quickmath_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				accuracy,
+				mistakes,
 				completedAt: new Date().toISOString(),
 			});
 		} else {
+			// Increment mistakes counter
+			setMistakes((prev) => prev + 1);
 			// Show feedback that not all answers are correct
 			setFeedback(
 				`Not all answers are correct. ${correct}/${problems.length} correct. Try again!`
@@ -308,6 +317,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 									returnKeyType="done"
 									placeholderTextColor={Colors.text.disabled}
 									placeholder="?"
+									editable={!submitted}
 									onFocus={() => {
 										// Scroll to input when focused
 										setTimeout(() => {
@@ -333,44 +343,18 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 
 				<TouchableOpacity
 					style={[styles.submit, submitted && styles.submitDisabled]}
-					onPress={handleSubmit}
-					disabled={submitted}
+					onPress={submitted ? onShowStats : handleSubmit}
 					activeOpacity={0.7}
 				>
 					<Text style={styles.submitText}>
-						{submitted ? "✓ Submitted" : "Submit Answers"}
+						{submitted ? "Submitted, View Stats" : "Submit Answers"}
 					</Text>
 				</TouchableOpacity>
 
-				{feedback && (
+				{feedback && !submitted && (
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedback}>{feedback}</Text>
 					</View>
-				)}
-
-				{submitted && (
-					<Animated.View
-						style={[
-							styles.completionContainer,
-							{
-								transform: [{ scale: successScale }],
-							},
-						]}
-					>
-						<Text style={styles.completionEmoji}>🎉</Text>
-						<Text style={styles.completionText}>Perfect Score!</Text>
-						<View style={styles.statsRow}>
-							<View style={styles.statItem}>
-								<Text style={styles.statLabel}>Time</Text>
-								<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
-							</View>
-							<View style={styles.statDivider} />
-							<View style={styles.statItem}>
-								<Text style={styles.statLabel}>Accuracy</Text>
-								<Text style={styles.statValue}>100%</Text>
-							</View>
-						</View>
-					</Animated.View>
 				)}
 			</ScrollView>
 		</KeyboardAvoidingView>

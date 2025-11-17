@@ -25,6 +25,8 @@ interface WordleGameProps {
 	inputData: WordleData;
 	onComplete: (result: GameResult) => void;
 	startTime?: number;
+	puzzleId?: string;
+	onShowStats?: () => void;
 }
 
 interface TileState {
@@ -36,6 +38,8 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	inputData,
 	onComplete,
 	startTime: propStartTime,
+	puzzleId,
+	onShowStats,
 }) => {
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [guesses, setGuesses] = useState<string[]>([]);
@@ -210,7 +214,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 						}),
 					]).start();
 					onComplete({
-						puzzleId: `wordle_${Date.now()}`,
+						puzzleId: puzzleId || `wordle_${Date.now()}`,
 						completed: true,
 						timeTaken,
 						attempts: newAttempts,
@@ -248,7 +252,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 						}),
 					]).start();
 					onComplete({
-						puzzleId: `wordle_${Date.now()}`,
+						puzzleId: puzzleId || `wordle_${Date.now()}`,
 						completed: false,
 						timeTaken,
 						attempts: newAttempts,
@@ -415,49 +419,15 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				))}
 			</View>
 
-			{/* Game Status */}
-			{gameWon && (
-				<Animated.View
-					style={[
-						styles.statusContainer,
-						{
-							transform: [{ scale: successScale }],
-						},
-					]}
+			{/* View Stats Button - shown when game is completed */}
+			{(gameWon || gameLost) && onShowStats && (
+				<TouchableOpacity
+					style={styles.viewStatsButton}
+					onPress={onShowStats}
+					activeOpacity={0.7}
 				>
-					<Text style={styles.statusEmoji}>🎉</Text>
-					<Text style={styles.statusTitle}>Perfect!</Text>
-					<View style={styles.statsRow}>
-						<View style={styles.statItem}>
-							<Text style={styles.statLabel}>Time</Text>
-							<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
-						</View>
-						<View style={styles.statDivider} />
-						<View style={styles.statItem}>
-							<Text style={styles.statLabel}>Attempts</Text>
-							<Text style={styles.statValue}>{attempts}</Text>
-						</View>
-					</View>
-				</Animated.View>
-			)}
-
-			{gameLost && (
-				<View style={styles.statusContainer}>
-					<Text style={styles.statusEmoji}>😔</Text>
-					<Text style={styles.statusTitle}>The word was:</Text>
-					<Text style={styles.answerText}>{answer}</Text>
-					<View style={styles.statsRow}>
-						<View style={styles.statItem}>
-							<Text style={styles.statLabel}>Time</Text>
-							<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
-						</View>
-						<View style={styles.statDivider} />
-						<View style={styles.statItem}>
-							<Text style={styles.statLabel}>Attempts</Text>
-							<Text style={styles.statValue}>{attempts}</Text>
-						</View>
-					</View>
-				</View>
+					<Text style={styles.viewStatsButtonText}>View Stats</Text>
+				</TouchableOpacity>
 			)}
 		</View>
 	);
@@ -647,6 +617,21 @@ const styles = StyleSheet.create({
 		width: 1,
 		height: 32,
 		backgroundColor: "rgba(255, 255, 255, 0.2)",
+	},
+	viewStatsButton: {
+		marginTop: Spacing.xl,
+		backgroundColor: Colors.accent,
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
 	},
 });
 

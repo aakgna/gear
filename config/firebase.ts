@@ -5,6 +5,7 @@
 // This ensures the native Firebase app is created before we try to use Firestore
 import "@react-native-firebase/app";
 import firestore from "@react-native-firebase/firestore";
+import { PuzzleCompletion, PuzzleStats } from "./types";
 
 // Initialize Firestore - React Native Firebase auto-initializes the default app
 // from GoogleService-Info.plist (iOS) and google-services.json (Android)
@@ -21,10 +22,16 @@ export interface FirestoreGame {
 	// Riddle structure
 	question?: string;
 	answer?: string;
+	// WordChain structure
+	startWord?: string;
+	endWord?: string;
+	validWords?: string[];
+	minSteps?: number;
+	hint?: string;
 }
 
 export const fetchGamesFromFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle",
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -61,7 +68,7 @@ export const fetchGamesFromFirestore = async (
 
 // Helper to fetch all games for a specific type across all difficulties
 export const fetchAllGamesForType = async (
-	gameType: "quickMath" | "wordle" | "riddle"
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -78,7 +85,7 @@ export const fetchAllGamesForType = async (
 
 // Save a user-created game to Firestore
 export const saveGameToFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle",
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
@@ -86,6 +93,11 @@ export const saveGameToFirestore = async (
 		qna?: string;
 		question?: string;
 		answer?: string;
+		startWord?: string;
+		endWord?: string;
+		validWords?: string[];
+		minSteps?: number;
+		hint?: string;
 	},
 	userId: string
 ): Promise<void> => {
@@ -185,5 +197,288 @@ export const saveGameIdeaToFirestore = async (
 		throw new Error(
 			error.message || "Failed to save game idea. Please try again."
 		);
+	}
+};
+
+// Parse puzzleId to extract gameType, difficulty, and gameId
+// Format: {gameType}_{difficulty}_{gameId}
+// Note: puzzleId uses lowercase (e.g., "quickmath"), but Firestore uses camelCase (e.g., "quickMath")
+const parsePuzzleId = (
+	puzzleId: string
+): { gameType: string; difficulty: string; gameId: string } | null => {
+	const parts = puzzleId.split("_");
+	if (parts.length < 3) return null;
+
+	let gameType = parts[0].toLowerCase();
+	const difficulty = parts[1];
+	const gameId = parts.slice(2).join("_"); // In case gameId has underscores
+
+	// Normalize gameType to match Firestore collection names
+	// puzzleId uses lowercase, but Firestore uses camelCase
+	if (gameType === "quickmath") {
+		gameType = "quickMath";
+	} else if (gameType === "wordchain") {
+		gameType = "wordChain";
+	}
+	// wordle and riddle are already correct
+
+	return { gameType, difficulty, gameId };
+};
+
+// Save puzzle completion to Firestore - updates stats directly in game document
+export const savePuzzleCompletion = async (
+	puzzleId: string,
+	userId: string,
+	timeTaken: number,
+	attempts?: number, // for wordle/riddle/wordChain
+	mistakes?: number // for quickMath
+): Promise<void> => {
+	try {
+		console.log("Puzzle completed - Puzzle ID:", puzzleId);
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Parse puzzleId to get game document path
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(`Invalid puzzleId format: ${puzzleId}`);
+			return;
+		}
+
+		console.log("Parsed puzzle ID:", parsed);
+
+		const { gameType, difficulty, gameId } = parsed;
+		console.log(
+			`Updating stats for: games/${gameType}/${difficulty}/${gameId}`
+		);
+
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		// Use transaction to atomically update stats
+		await db.runTransaction(async (transaction) => {
+			const gameDoc = await transaction.get(gameRef);
+
+			if (!gameDoc.exists) {
+				console.warn(
+					`Game document not found: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			const gameData = gameDoc.data();
+			if (!gameData) {
+				console.warn(
+					`Game document has no data: ${gameType}/${difficulty}/${gameId}`
+				);
+				return;
+			}
+
+			// Get current stats, sanitizing any invalid values
+			const existingStats = gameData.stats || {};
+
+			// Helper to sanitize number values (handle Infinity, null, undefined)
+			const sanitizeNumber = (val: any, defaultValue: number): number => {
+				if (typeof val === "number" && isFinite(val)) return val;
+				return defaultValue;
+			};
+
+			// Helper to sanitize nullable number values
+			const sanitizeNullableNumber = (val: any): number | null => {
+				if (val === null) return null;
+				if (typeof val === "number" && isFinite(val)) return val;
+				return null;
+			};
+
+			const currentStats = {
+				totalCompletions: sanitizeNumber(existingStats.totalCompletions, 0),
+				sumTime: sanitizeNumber(existingStats.sumTime, 0),
+				fastestTime: sanitizeNullableNumber(existingStats.fastestTime),
+				slowestTime: sanitizeNumber(existingStats.slowestTime, 0),
+				sumAttempts: sanitizeNumber(existingStats.sumAttempts, 0),
+				attemptCompletions: sanitizeNumber(existingStats.attemptCompletions, 0),
+				bestAttempts: sanitizeNullableNumber(existingStats.bestAttempts),
+				sumMistakes: sanitizeNumber(existingStats.sumMistakes, 0),
+				mistakeCompletions: sanitizeNumber(existingStats.mistakeCompletions, 0),
+				bestMistakes: sanitizeNullableNumber(existingStats.bestMistakes),
+			};
+
+			// Build new stats object with only valid Firestore values
+			const newStats: Record<string, number | null> = {
+				totalCompletions: currentStats.totalCompletions + 1,
+				sumTime: currentStats.sumTime + timeTaken,
+				slowestTime: Math.max(timeTaken, currentStats.slowestTime),
+			};
+
+			// Handle fastestTime
+			if (currentStats.fastestTime === null) {
+				newStats.fastestTime = timeTaken;
+			} else {
+				newStats.fastestTime = Math.min(timeTaken, currentStats.fastestTime);
+			}
+
+			// Update attempts stats if provided
+			if (
+				attempts !== undefined &&
+				attempts !== null &&
+				typeof attempts === "number"
+			) {
+				console.log("Processing attempts:", attempts);
+				console.log(
+					"Current attemptCompletions:",
+					currentStats.attemptCompletions
+				);
+				console.log("Current bestAttempts:", currentStats.bestAttempts);
+
+				newStats.sumAttempts = currentStats.sumAttempts + attempts;
+				newStats.attemptCompletions = currentStats.attemptCompletions + 1;
+				// Always set bestAttempts when we have an attempt value
+				if (
+					currentStats.attemptCompletions === 0 ||
+					currentStats.bestAttempts === null ||
+					currentStats.bestAttempts === undefined
+				) {
+					// First attempt or bestAttempts is null/undefined - set it directly
+					console.log("Setting bestAttempts to:", attempts);
+					newStats.bestAttempts = attempts;
+				} else {
+					// Use max to find the best (highest) attempt
+					console.log(
+						"Updating bestAttempts with max:",
+						attempts,
+						currentStats.bestAttempts
+					);
+					newStats.bestAttempts = Math.max(attempts, currentStats.bestAttempts);
+				}
+				console.log("Final bestAttempts:", newStats.bestAttempts);
+			} else {
+				// Preserve existing values
+				newStats.sumAttempts = currentStats.sumAttempts;
+				newStats.attemptCompletions = currentStats.attemptCompletions;
+				newStats.bestAttempts = currentStats.bestAttempts;
+			}
+
+			// Update mistakes stats if provided
+			if (
+				mistakes !== undefined &&
+				mistakes !== null &&
+				typeof mistakes === "number"
+			) {
+				newStats.sumMistakes = currentStats.sumMistakes + mistakes;
+				newStats.mistakeCompletions = currentStats.mistakeCompletions + 1;
+				// Always set bestMistakes when we have a mistake value
+				if (
+					currentStats.mistakeCompletions === 0 ||
+					currentStats.bestMistakes === null ||
+					currentStats.bestMistakes === undefined
+				) {
+					// First mistake or bestMistakes is null/undefined - set it directly
+					newStats.bestMistakes = mistakes;
+				} else {
+					// Use max to find the best (highest) mistake
+					newStats.bestMistakes = Math.max(mistakes, currentStats.bestMistakes);
+				}
+			} else {
+				// Preserve existing values
+				newStats.sumMistakes = currentStats.sumMistakes;
+				newStats.mistakeCompletions = currentStats.mistakeCompletions;
+				newStats.bestMistakes = currentStats.bestMistakes;
+			}
+
+			// Update the document
+			console.log("Updating stats:", JSON.stringify(newStats, null, 2));
+			transaction.update(gameRef, { stats: newStats });
+		});
+
+		console.log("Stats update transaction completed successfully");
+	} catch (error: any) {
+		console.error("Error saving puzzle completion:", error);
+		if (error?.code === "firestore/permission-denied") {
+			console.warn(
+				"Firestore permission denied. Please check your Firestore security rules."
+			);
+		}
+		// Don't throw - allow game completion to proceed even if stats save fails
+	}
+};
+
+// Fetch puzzle completion stats for a specific puzzle - reads from game document
+export const fetchPuzzleStats = async (
+	puzzleId: string
+): Promise<PuzzleStats | null> => {
+	try {
+		// Parse puzzleId to get game document path
+		const parsed = parsePuzzleId(puzzleId);
+		if (!parsed) {
+			console.warn(`Invalid puzzleId format: ${puzzleId}`);
+			return null;
+		}
+
+		const { gameType, difficulty, gameId } = parsed;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(gameId);
+
+		const gameDoc = await gameRef.get();
+
+		if (!gameDoc.exists) {
+			return null;
+		}
+
+		const gameData = gameDoc.data();
+		const statsData = gameData?.stats;
+
+		if (!statsData || statsData.totalCompletions === 0) {
+			return null;
+		}
+
+		// Calculate stats from aggregated data
+		const stats: PuzzleStats = {
+			totalCompletions: statsData.totalCompletions || 0,
+			averageTime: Math.round(
+				(statsData.sumTime || 0) / (statsData.totalCompletions || 1)
+			),
+			fastestTime:
+				statsData.fastestTime !== null && statsData.fastestTime !== undefined
+					? statsData.fastestTime
+					: 0,
+			slowestTime: statsData.slowestTime || 0,
+		};
+
+		// Calculate attempts stats if available
+		if (statsData.attemptCompletions > 0) {
+			stats.averageAttempts = Math.round(
+				(statsData.sumAttempts || 0) / statsData.attemptCompletions
+			);
+			stats.bestAttempts =
+				statsData.bestAttempts !== null && statsData.bestAttempts !== undefined
+					? statsData.bestAttempts
+					: undefined;
+		}
+
+		// Calculate mistakes stats if available
+		if (statsData.mistakeCompletions > 0) {
+			stats.averageMistakes = Math.round(
+				(statsData.sumMistakes || 0) / statsData.mistakeCompletions
+			);
+			stats.bestMistakes =
+				statsData.bestMistakes !== null && statsData.bestMistakes !== undefined
+					? statsData.bestMistakes
+					: undefined;
+		}
+
+		return stats;
+	} catch (error: any) {
+		console.error("Error fetching puzzle stats:", error);
+		if (error?.code === "firestore/permission-denied") {
+			console.warn(
+				"Firestore permission denied. Please check your Firestore security rules."
+			);
+		}
+		return null;
 	}
 };

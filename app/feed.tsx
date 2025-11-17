@@ -29,6 +29,7 @@ import {
 	QuickMathData,
 	WordleData,
 	RiddleData,
+	WordChainData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -176,6 +177,30 @@ const FeedScreen = () => {
 								prompt: game.question,
 								answer: game.answer,
 							} as RiddleData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch WordChain
+				const wordChainGames = await fetchGamesFromFirestore(
+					"wordChain",
+					difficulty
+				);
+				wordChainGames.forEach((game) => {
+					if (game.startWord && game.endWord && game.validWords) {
+						allPuzzles.push({
+							id: `wordchain_${difficulty}_${game.id}`,
+							type: "wordChain",
+							data: {
+								startWord: game.startWord,
+								endWord: game.endWord,
+								validWords: game.validWords,
+								minSteps: game.minSteps || 3,
+								hint: game.hint,
+							} as WordChainData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

@@ -66,6 +66,8 @@ const ProfileScreen = () => {
 				? "wordle"
 				: id.includes("quickmath")
 				? "quickMath"
+				: id.includes("wordchain")
+				? "wordChain"
 				: "riddle",
 			data: {} as any,
 			difficulty: 1,
@@ -288,6 +290,16 @@ const ProfileScreen = () => {
 											{String(userData.statsByCategory.riddle.completed)}{" "}
 											completed •{" "}
 											{formatTime(userData.statsByCategory.riddle.avgTime)} avg
+										</Text>
+									</View>
+								)}
+								{userData.statsByCategory.wordChain && (
+									<View style={styles.statRow}>
+										<Text style={styles.statRowLabel}>Word Chain:</Text>
+										<Text style={styles.statRowValue}>
+											{String(userData.statsByCategory.wordChain.completed)}{" "}
+											completed •{" "}
+											{formatTime(userData.statsByCategory.wordChain.avgTime)} avg
 										</Text>
 									</View>
 								)}

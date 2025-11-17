@@ -1,22 +1,28 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	StyleSheet,
 	Text,
 	KeyboardAvoidingView,
 	Platform,
+	ScrollView,
+	TouchableOpacity,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Puzzle, GameResult } from "../../config/types";
+import { Puzzle, GameResult, PuzzleStats as PuzzleStatsType } from "../../config/types";
 import WordleGame from "./WordleGame";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
+import WordChainGame from "./WordChainGame";
+import PuzzleStats from "../PuzzleStats";
 import {
 	getCurrentUser,
 	addSeenGame,
 	addCompletedGame,
 } from "../../config/auth";
-import { Colors } from "../../constants/DesignSystem";
+import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
+import { Colors, Shadows } from "../../constants/DesignSystem";
 
 interface GameWrapperProps {
 	puzzle: Puzzle;
@@ -31,6 +37,11 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onSkipped,
 	startTime,
 }) => {
+	const [showStats, setShowStats] = useState(false);
+	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
+	const [loadingStats, setLoadingStats] = useState(false);
+	const [completedResult, setCompletedResult] = useState<GameResult | null>(null);
+
 	// Track when game is seen
 	useEffect(() => {
 		const trackSeenGame = async () => {
@@ -42,14 +53,45 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		trackSeenGame();
 	}, [puzzle.id]);
 
-	// Enhanced onComplete that also tracks completion
+	// Enhanced onComplete that also tracks completion and prepares stats
 	const handleComplete = async (result: GameResult) => {
 		const user = getCurrentUser();
-		if (user) {
-			// Pass timeTaken to update stats
+		if (user && result.completed) {
+			// Update result with actual puzzle ID
+			const updatedResult = {
+				...result,
+				puzzleId: puzzle.id,
+			};
+
+			// Save to user's completed games
 			await addCompletedGame(user.uid, puzzle.id, result.timeTaken);
+
+			// Save puzzle completion to Firestore for stats
+			await savePuzzleCompletion(
+				puzzle.id,
+				user.uid,
+				result.timeTaken,
+				result.attempts,
+				result.mistakes
+			);
+
+			// Store result for stats display (but don't show yet)
+			setCompletedResult(updatedResult);
 		}
+
+		// Still call the original onComplete callback
 		onComplete(result);
+	};
+
+	// Handle showing stats when button is clicked
+	const handleShowStats = async () => {
+		if (!completedResult) return;
+		
+		setLoadingStats(true);
+		setShowStats(true);
+		const stats = await fetchPuzzleStats(puzzle.id);
+		setPuzzleStats(stats);
+		setLoadingStats(false);
 	};
 	const renderGame = () => {
 		switch (puzzle.type) {
@@ -60,6 +102,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
 						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			case "quickMath":
@@ -69,6 +113,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
 						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			case "riddle":
@@ -78,6 +124,19 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
 						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+					/>
+				);
+			case "wordChain":
+				return (
+					<WordChainGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			default:
@@ -91,7 +150,46 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={[]}>
-			{renderGame()}
+			<View style={styles.container}>
+				{/* Game Container - scrollable, takes less space when stats are shown */}
+				<View
+					style={[
+						styles.gameContainer,
+						showStats && styles.gameContainerWithStats,
+					]}
+				>
+					{renderGame()}
+				</View>
+
+				{/* Stats Container - always visible when shown, fixed at bottom */}
+				{showStats && completedResult && (
+					<View style={styles.statsContainer}>
+						<View style={styles.statsHeader}>
+							<Text style={styles.statsHeaderText}>Comparison Stats</Text>
+							<TouchableOpacity
+								onPress={() => setShowStats(false)}
+								style={styles.closeButton}
+							>
+								<Ionicons name="close" size={24} color={Colors.text.primary} />
+							</TouchableOpacity>
+						</View>
+						<ScrollView
+							style={styles.statsScrollView}
+							contentContainerStyle={styles.statsContent}
+							showsVerticalScrollIndicator={true}
+						>
+							<PuzzleStats
+								stats={puzzleStats}
+								puzzleType={puzzle.type}
+								loading={loadingStats}
+								userTime={completedResult.timeTaken}
+								userAttempts={completedResult.attempts}
+								userMistakes={completedResult.mistakes}
+							/>
+						</ScrollView>
+					</View>
+				)}
+			</View>
 		</SafeAreaView>
 	);
 };
@@ -104,6 +202,43 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: Colors.background.secondary,
+		flexDirection: "column",
+	},
+	gameContainer: {
+		flex: 1,
+		overflow: "hidden",
+	},
+	gameContainerWithStats: {
+		flex: 0.55, // Takes 55% when stats are shown
+	},
+	statsContainer: {
+		flex: 0.45, // Takes 45% when shown
+		backgroundColor: Colors.background.secondary,
+		borderTopWidth: 2,
+		borderTopColor: Colors.accent,
+		...Shadows.heavy,
+	},
+	statsHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+	},
+	statsHeaderText: {
+		fontSize: 18,
+		fontWeight: "bold",
+		color: Colors.text.primary,
+	},
+	closeButton: {
+		padding: 4,
+	},
+	statsScrollView: {
+		flex: 1,
+	},
+	statsContent: {
+		paddingBottom: 20,
 	},
 	error: {
 		flex: 1,

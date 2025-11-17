@@ -31,6 +31,7 @@ export interface UserData {
 		wordle?: CategoryStats;
 		riddle?: CategoryStats;
 		quickMath?: CategoryStats;
+		wordChain?: CategoryStats;
 	};
 	statsByDifficulty?: {
 		easy?: DifficultyStats;
@@ -195,7 +196,7 @@ export const addSeenGame = async (userId: string, gameId: string) => {
 const parseGameId = (
 	gameId: string
 ): {
-	category: "wordle" | "riddle" | "quickMath" | null;
+	category: "wordle" | "riddle" | "quickMath" | "wordChain" | null;
 	difficulty: "easy" | "medium" | "hard" | null;
 } => {
 	const parts = gameId.split("_");
@@ -204,10 +205,11 @@ const parseGameId = (
 	const categoryPart = parts[0];
 	const difficultyPart = parts[1];
 
-	let category: "wordle" | "riddle" | "quickMath" | null = null;
+	let category: "wordle" | "riddle" | "quickMath" | "wordChain" | null = null;
 	if (categoryPart === "wordle") category = "wordle";
 	else if (categoryPart === "riddle") category = "riddle";
 	else if (categoryPart === "quickmath") category = "quickMath";
+	else if (categoryPart === "wordchain") category = "wordChain";
 
 	let difficulty: "easy" | "medium" | "hard" | null = null;
 	if (

@@ -27,12 +27,16 @@ interface RiddleGameProps {
 	inputData: RiddleData;
 	onComplete: (result: GameResult) => void;
 	startTime?: number;
+	puzzleId?: string;
+	onShowStats?: () => void;
 }
 
 const RiddleGame: React.FC<RiddleGameProps> = ({
 	inputData,
 	onComplete,
 	startTime: propStartTime,
+	puzzleId,
+	onShowStats,
 }) => {
 	const [guess, setGuess] = useState("");
 	const [feedback, setFeedback] = useState<string | null>(null);
@@ -143,7 +147,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 				}),
 			]).start();
 			onComplete({
-				puzzleId: `riddle_${Date.now()}`,
+				puzzleId: puzzleId || `riddle_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				attempts: attempts + 1,
@@ -286,12 +290,11 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 
 				<TouchableOpacity
 					style={[styles.submit, completed && styles.submitDisabled]}
-					onPress={submit}
+					onPress={completed ? onShowStats : submit}
 					activeOpacity={0.7}
-					disabled={completed}
 				>
 					<Text style={styles.submitText}>
-						{completed ? "✓ Submitted" : "Submit Answer"}
+						{completed ? "Submitted, View Stats" : "Submit Answer"}
 					</Text>
 				</TouchableOpacity>
 
@@ -299,31 +302,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedback}>{feedback}</Text>
 					</View>
-				)}
-
-				{completed && (
-					<Animated.View
-						style={[
-							styles.completionContainer,
-							{
-								transform: [{ scale: successScale }],
-							},
-						]}
-					>
-						<Text style={styles.completionEmoji}>🎉</Text>
-						<Text style={styles.completionText}>Solved!</Text>
-						<View style={styles.statsRow}>
-							<View style={styles.statItem}>
-								<Text style={styles.statLabel}>Time</Text>
-								<Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
-							</View>
-							<View style={styles.statDivider} />
-							<View style={styles.statItem}>
-								<Text style={styles.statLabel}>Attempts</Text>
-								<Text style={styles.statValue}>{attempts}</Text>
-							</View>
-						</View>
-					</Animated.View>
 				)}
 			</ScrollView>
 		</KeyboardAvoidingView>
