@@ -20,11 +20,9 @@ export interface DifficultyStats {
 export interface UserData {
 	email: string;
 	username?: string;
-	seenGames: string[];
-	completedGames: string[];
-	skippedGames: string[];
 	createdAt: any; // Firestore timestamp
 	updatedAt: any; // Firestore timestamp
+	_historyMigrated?: boolean; // Flag for migration from arrays to gameHistory
 	// Stats fields
 	totalGamesPlayed?: number;
 	totalPlayTime?: number; // in seconds
@@ -126,9 +124,6 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 			// New user - create document with initial stats
 			await userRef.set({
 				email: firebaseUser.email || "",
-				seenGames: [],
-				completedGames: [],
-				skippedGames: [],
 				totalGamesPlayed: 0,
 				totalPlayTime: 0,
 				averageTimePerGame: 0,
@@ -180,20 +175,6 @@ export const hasUserData = (
 	userData: UserData | null
 ): userData is UserData => {
 	return userData !== null && userData !== undefined;
-};
-
-// Update user's seen games
-export const addSeenGame = async (userId: string, gameId: string) => {
-	try {
-		const firestore = require("@react-native-firebase/firestore").default;
-		const userRef = db.collection("users").doc(userId);
-		await userRef.update({
-			seenGames: firestore.FieldValue.arrayUnion(gameId),
-			updatedAt: firestore.FieldValue.serverTimestamp(),
-		});
-	} catch (error) {
-		console.error("Error adding seen game:", error);
-	}
 };
 
 // Helper to parse game ID and extract category and difficulty
@@ -249,7 +230,6 @@ export const updateUserStats = async (
 		// Get current stats or initialize defaults
 		const currentTotalGames = userData.totalGamesPlayed || 0;
 		const currentTotalTime = userData.totalPlayTime || 0;
-		const currentCompletedGames = userData.completedGames || [];
 
 		// Calculate new totals
 		const newTotalGames = currentTotalGames + 1;
@@ -406,21 +386,24 @@ export const updateUserStats = async (
 export const addCompletedGame = async (
 	userId: string,
 	gameId: string,
-	timeTaken?: number // in seconds
+	timeTaken?: number, // in seconds
+	answerRevealed?: boolean // true if user used "Show Answer" feature
 ) => {
 	try {
-		const firestore = require("@react-native-firebase/firestore").default;
-		const userRef = db.collection("users").doc(userId);
+		const { addGameHistory } = require("./firebase");
 
-		// Add to completed games array
-		await userRef.update({
-			completedGames: firestore.FieldValue.arrayUnion(gameId),
-			updatedAt: firestore.FieldValue.serverTimestamp(),
+		// Add to game history subcollection (always add to history)
+		await addGameHistory(userId, gameId, "completed", {
+			timeTaken,
+			timestamp: new Date(),
+			answerRevealed,
 		});
 
-		// Update stats if timeTaken is provided
-		if (timeTaken !== undefined) {
+		// Update stats only if answer was not revealed
+		if (timeTaken !== undefined && !answerRevealed) {
 			await updateUserStats(userId, gameId, timeTaken);
+		} else if (answerRevealed) {
+			console.log("[Stats] Answer was revealed - skipping user stats update");
 		}
 	} catch (error) {
 		console.error("Error adding completed game:", error);
@@ -559,11 +542,11 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 // Update user's skipped games
 export const addSkippedGame = async (userId: string, gameId: string) => {
 	try {
-		const firestore = require("@react-native-firebase/firestore").default;
-		const userRef = db.collection("users").doc(userId);
-		await userRef.update({
-			skippedGames: firestore.FieldValue.arrayUnion(gameId),
-			updatedAt: firestore.FieldValue.serverTimestamp(),
+		const { addGameHistory } = require("./firebase");
+
+		// Add to game history subcollection
+		await addGameHistory(userId, gameId, "skipped", {
+			timestamp: new Date(),
 		});
 
 		// Update skipped stats by category and difficulty
@@ -582,22 +565,12 @@ export const moveFromSkippedToAttempted = async (
 		console.log(
 			`[moveFromSkippedToAttempted] Checking if ${gameId} was previously skipped`
 		);
-		const firestore = require("@react-native-firebase/firestore").default;
-		const userRef = db.collection("users").doc(userId);
-		const userDoc = await userRef.get();
+		const { checkGameHistory, updateGameHistory } = require("./firebase");
 
-		if (!userDoc.exists()) {
-			console.error(
-				"[moveFromSkippedToAttempted] User document does not exist"
-			);
-			return false;
-		}
+		// Check if this game was previously skipped using gameHistory
+		const wasSkipped = await checkGameHistory(userId, gameId, "skipped");
 
-		const userData = userDoc.data() as UserData;
-		const skippedGames = userData.skippedGames || [];
-
-		// Check if this game was previously skipped
-		if (!skippedGames.includes(gameId)) {
+		if (!wasSkipped) {
 			console.log(
 				`[moveFromSkippedToAttempted] Game ${gameId} was not previously skipped`
 			);
@@ -608,13 +581,25 @@ export const moveFromSkippedToAttempted = async (
 			`[moveFromSkippedToAttempted] Game ${gameId} was previously skipped, moving to attempted`
 		);
 
-		// Remove from skippedGames array
-		await userRef.update({
-			skippedGames: firestore.FieldValue.arrayRemove(gameId),
-			updatedAt: firestore.FieldValue.serverTimestamp(),
+		// Update gameHistory document to change action from "skipped" to "attempted"
+		await updateGameHistory(userId, gameId, {
+			action: "attempted",
+			timestamp: new Date(),
 		});
 
 		// Decrement skipped stats
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		const userDoc = await userRef.get();
+
+		if (!userDoc.exists()) {
+			console.error(
+				"[moveFromSkippedToAttempted] User document does not exist"
+			);
+			return true; // Still return true since we updated the history
+		}
+
+		const userData = userDoc.data() as UserData;
 		const { category, difficulty } = parseGameId(gameId);
 		const currentCategoryStats = userData.statsByCategory || {};
 		const currentDifficultyStats = userData.statsByDifficulty || {};
@@ -839,6 +824,13 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 // Track when user first interacts with a game (types/clicks)
 export const addAttemptedGame = async (userId: string, gameId: string) => {
 	try {
+		const { addGameHistory } = require("./firebase");
+
+		// Add to game history subcollection
+		await addGameHistory(userId, gameId, "attempted", {
+			timestamp: new Date(),
+		});
+
 		// Update attempted stats by category and difficulty
 		await updateAttemptedStats(userId, gameId);
 	} catch (error) {

@@ -45,6 +45,7 @@ export interface GameResult {
 	mistakes?: number; // for quickMath - number of incorrect submissions
 	accuracy?: number; // for quick math score percentage
 	completedAt: string;
+	answerRevealed?: boolean; // true if user used "Show Answer" feature
 }
 
 // User data types

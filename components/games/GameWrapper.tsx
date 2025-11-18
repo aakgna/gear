@@ -10,17 +10,17 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Puzzle, GameResult, PuzzleStats as PuzzleStatsType } from "../../config/types";
+import {
+	Puzzle,
+	GameResult,
+	PuzzleStats as PuzzleStatsType,
+} from "../../config/types";
 import WordleGame from "./WordleGame";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
 import WordChainGame from "./WordChainGame";
 import PuzzleStats from "../PuzzleStats";
-import {
-	getCurrentUser,
-	addSeenGame,
-	addCompletedGame,
-} from "../../config/auth";
+import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
 import { Colors, Shadows } from "../../constants/DesignSystem";
 
@@ -42,18 +42,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
-	const [completedResult, setCompletedResult] = useState<GameResult | null>(null);
-
-	// Track when game is seen
-	useEffect(() => {
-		const trackSeenGame = async () => {
-			const user = getCurrentUser();
-			if (user) {
-				await addSeenGame(user.uid, puzzle.id);
-			}
-		};
-		trackSeenGame();
-	}, [puzzle.id]);
+	const [completedResult, setCompletedResult] = useState<GameResult | null>(
+		null
+	);
 
 	// Enhanced onComplete that also tracks completion and prepares stats
 	const handleComplete = async (result: GameResult) => {
@@ -65,17 +56,24 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				puzzleId: puzzle.id,
 			};
 
-		// Save to user's completed games
-		await addCompletedGame(user.uid, puzzle.id, result.timeTaken);
+			// Save to user's completed games
+			await addCompletedGame(
+				user.uid,
+				puzzle.id,
+				result.timeTaken,
+				result.answerRevealed
+			);
 
-		// Save puzzle completion to Firestore for stats
-		await savePuzzleCompletion(
-			puzzle.id,
-			user.uid,
-			result.timeTaken,
-			result.attempts,
-			result.mistakes
-		);
+			// Save puzzle completion to Firestore for stats
+			// (skipped if answerRevealed is true)
+			await savePuzzleCompletion(
+				puzzle.id,
+				user.uid,
+				result.timeTaken,
+				result.attempts,
+				result.mistakes,
+				result.answerRevealed
+			);
 
 			// Store result for stats display (but don't show yet)
 			setCompletedResult(updatedResult);
@@ -88,7 +86,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	// Handle showing stats when button is clicked
 	const handleShowStats = async () => {
 		if (!completedResult) return;
-		
+
 		setLoadingStats(true);
 		setShowStats(true);
 		const stats = await fetchPuzzleStats(puzzle.id);
@@ -184,13 +182,13 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 							contentContainerStyle={styles.statsContent}
 							showsVerticalScrollIndicator={true}
 						>
-						<PuzzleStats
-							stats={puzzleStats}
-							puzzleType={puzzle.type}
-							loading={loadingStats}
-							userTime={completedResult.timeTaken}
-							userAttempts={completedResult.attempts}
-						/>
+							<PuzzleStats
+								stats={puzzleStats}
+								puzzleType={puzzle.type}
+								loading={loadingStats}
+								userTime={completedResult.timeTaken}
+								userAttempts={completedResult.attempts}
+							/>
 						</ScrollView>
 					</View>
 				)}

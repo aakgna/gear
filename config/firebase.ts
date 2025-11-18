@@ -30,6 +30,19 @@ export interface FirestoreGame {
 	hint?: string;
 }
 
+// Game History Entry interface
+export interface GameHistoryEntry {
+	gameId: string;
+	action: "completed" | "skipped" | "attempted";
+	timestamp: Date;
+	timeTaken?: number;
+	attempts?: number;
+	difficulty?: string;
+	category?: string;
+	migrated?: boolean;
+	answerRevealed?: boolean; // true if user used "Show Answer" feature
+}
+
 export const fetchGamesFromFirestore = async (
 	gameType: "quickMath" | "wordle" | "riddle" | "wordChain",
 	difficulty: "easy" | "medium" | "hard"
@@ -231,8 +244,16 @@ export const savePuzzleCompletion = async (
 	userId: string,
 	timeTaken: number,
 	attempts?: number, // for wordle/riddle/wordChain
-	mistakes?: number // for quickMath
+	mistakes?: number, // for quickMath
+	answerRevealed?: boolean // true if user used "Show Answer" feature
 ): Promise<void> => {
+	// Skip stats update if answer was revealed
+	// Game is still marked as completed in user's history, but doesn't affect leaderboard
+	if (answerRevealed) {
+		console.log("[Stats] Answer was revealed - skipping global stats update");
+		return;
+	}
+
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
 
@@ -639,5 +660,355 @@ export const fetchPuzzleStats = async (
 			);
 		}
 		return null;
+	}
+};
+
+// ============================================================================
+// GAME HISTORY SUBCOLLECTION FUNCTIONS
+// ============================================================================
+
+// Helper to parse gameId and extract metadata
+const parseGameIdForHistory = (
+	gameId: string
+): { category: string; difficulty: string } | null => {
+	const parts = gameId.split("_");
+	if (parts.length >= 2) {
+		return {
+			category: parts[0], // wordle, riddle, quickmath, wordchain
+			difficulty: parts[1], // easy, medium, hard
+		};
+	}
+	return null;
+};
+
+// Add activity to user's game history
+export const addGameHistory = async (
+	userId: string,
+	gameId: string,
+	action: "completed" | "skipped" | "attempted",
+	metadata: {
+		timeTaken?: number;
+		attempts?: number;
+		timestamp?: Date;
+		migrated?: boolean;
+	} = {}
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const historyRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory")
+			.doc(gameId);
+
+		const parsed = parseGameIdForHistory(gameId);
+
+		const historyData: any = {
+			gameId,
+			action,
+			timestamp: metadata.timestamp
+				? firestore.Timestamp.fromDate(metadata.timestamp)
+				: firestore.FieldValue.serverTimestamp(),
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		};
+
+		if (parsed) {
+			historyData.category = parsed.category;
+			historyData.difficulty = parsed.difficulty;
+		}
+
+		if (metadata.timeTaken !== undefined) {
+			historyData.timeTaken = metadata.timeTaken;
+		}
+
+		if (metadata.attempts !== undefined) {
+			historyData.attempts = metadata.attempts;
+		}
+
+		if (metadata.migrated) {
+			historyData.migrated = true;
+		}
+
+		await historyRef.set(historyData, { merge: true });
+		console.log(
+			`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId})`
+		);
+	} catch (error) {
+		console.error("[addGameHistory] Error:", error);
+		throw error;
+	}
+};
+
+// Check if specific game has history entry
+export const checkGameHistory = async (
+	userId: string,
+	gameId: string,
+	action?: "completed" | "skipped" | "attempted"
+): Promise<boolean> => {
+	try {
+		const historyRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory")
+			.doc(gameId);
+
+		const doc = await historyRef.get();
+
+		if (!doc.exists) {
+			return false;
+		}
+
+		if (action) {
+			const data = doc.data();
+			return data?.action === action;
+		}
+
+		return true;
+	} catch (error) {
+		console.error("[checkGameHistory] Error:", error);
+		return false;
+	}
+};
+
+// Fetch recent game history with time window
+export const fetchGameHistory = async (
+	userId: string,
+	options: {
+		action?: "completed" | "skipped" | "attempted";
+		daysBack?: number;
+		limit?: number;
+	} = {}
+): Promise<GameHistoryEntry[]> => {
+	try {
+		let query = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory") as any;
+
+		// Filter by action if specified
+		if (options.action) {
+			query = query.where("action", "==", options.action);
+		}
+
+		// Filter by time if specified
+		if (options.daysBack) {
+			const cutoffDate = new Date();
+			cutoffDate.setDate(cutoffDate.getDate() - options.daysBack);
+			query = query.where("timestamp", ">=", cutoffDate);
+		}
+
+		// WORKAROUND: Only order by timestamp if NOT filtering by action
+		// (to avoid composite index requirement)
+		// When we need both action filter + sorting, we'll sort in memory
+		const needsMemorySort = options.action !== undefined;
+
+		if (!needsMemorySort) {
+			query = query.orderBy("timestamp", "desc");
+		}
+
+		// Limit if specified (apply before sorting for efficiency)
+		if (options.limit && !needsMemorySort) {
+			query = query.limit(options.limit);
+		}
+
+		const snapshot = await query.get();
+
+		const history: GameHistoryEntry[] = [];
+		snapshot.forEach((doc: any) => {
+			const data = doc.data();
+			history.push({
+				gameId: data.gameId,
+				action: data.action,
+				timestamp: data.timestamp?.toDate() || new Date(),
+				timeTaken: data.timeTaken,
+				attempts: data.attempts,
+				difficulty: data.difficulty,
+				category: data.category,
+				migrated: data.migrated,
+			});
+		});
+
+		// Sort in memory if needed (when we filtered by action)
+		if (needsMemorySort) {
+			history.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+			// Apply limit after sorting
+			if (options.limit) {
+				return history.slice(0, options.limit);
+			}
+		}
+
+		return history;
+	} catch (error) {
+		console.error("[fetchGameHistory] Error:", error);
+		return [];
+	}
+};
+
+// Batch check multiple games at once (for feed filtering)
+export const batchCheckGameHistory = async (
+	userId: string,
+	gameIds: string[],
+	action: "completed" | "skipped"
+): Promise<Set<string>> => {
+	try {
+		const matchingIds = new Set<string>();
+
+		// Firestore 'in' queries are limited to 10 items, so we need to batch
+		const batchSize = 10;
+		for (let i = 0; i < gameIds.length; i += batchSize) {
+			const batch = gameIds.slice(i, i + batchSize);
+
+			const snapshot = await db
+				.collection("users")
+				.doc(userId)
+				.collection("gameHistory")
+				.where("gameId", "in", batch)
+				.where("action", "==", action)
+				.get();
+
+			snapshot.forEach((doc: any) => {
+				const data = doc.data();
+				if (data.gameId) {
+					matchingIds.add(data.gameId);
+				}
+			});
+		}
+
+		console.log(
+			`[batchCheckGameHistory] Found ${matchingIds.size} ${action} games for user ${userId}`
+		);
+		return matchingIds;
+	} catch (error) {
+		console.error("[batchCheckGameHistory] Error:", error);
+		return new Set();
+	}
+};
+
+// Update existing history entry (for skip → attempt transition)
+export const updateGameHistory = async (
+	userId: string,
+	gameId: string,
+	updates: Partial<{ action: string; timestamp: Date }>
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const historyRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory")
+			.doc(gameId);
+
+		const updateData: any = {
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		};
+
+		if (updates.action) {
+			updateData.action = updates.action;
+		}
+
+		if (updates.timestamp) {
+			updateData.timestamp = firestore.Timestamp.fromDate(updates.timestamp);
+		}
+
+		await historyRef.update(updateData);
+		console.log(
+			`[updateGameHistory] Updated ${gameId} for user ${userId}:`,
+			updates
+		);
+	} catch (error) {
+		console.error("[updateGameHistory] Error:", error);
+		throw error;
+	}
+};
+
+// ============================================================================
+// MIGRATION FUNCTION
+// ============================================================================
+
+// One-time migration from arrays to gameHistory subcollection
+export const migrateUserArraysToHistory = async (
+	userId: string
+): Promise<void> => {
+	try {
+		console.log(`[Migration] Starting migration for user ${userId}`);
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Import getUserData to check user document
+		const { getUserData } = require("./auth");
+		const userDoc = await getUserData(userId);
+
+		if (!userDoc) {
+			console.log("[Migration] User document not found, skipping");
+			return;
+		}
+
+		// Check if already migrated
+		if (userDoc._historyMigrated) {
+			console.log("[Migration] Already migrated, skipping");
+			return;
+		}
+
+		let migratedCount = 0;
+
+		// Migrate completed games if they exist
+		const completedGames = (userDoc as any).completedGames || [];
+		if (completedGames.length > 0) {
+			console.log(
+				`[Migration] Migrating ${completedGames.length} completed games`
+			);
+			for (const gameId of completedGames) {
+				try {
+					await addGameHistory(userId, gameId, "completed", {
+						timestamp: userDoc.createdAt?.toDate
+							? userDoc.createdAt.toDate()
+							: new Date(),
+						migrated: true,
+					});
+					migratedCount++;
+				} catch (error) {
+					console.error(
+						`[Migration] Error migrating completed game ${gameId}:`,
+						error
+					);
+				}
+			}
+		}
+
+		// Migrate skipped games if they exist
+		const skippedGames = (userDoc as any).skippedGames || [];
+		if (skippedGames.length > 0) {
+			console.log(`[Migration] Migrating ${skippedGames.length} skipped games`);
+			for (const gameId of skippedGames) {
+				try {
+					await addGameHistory(userId, gameId, "skipped", {
+						timestamp: userDoc.createdAt?.toDate
+							? userDoc.createdAt.toDate()
+							: new Date(),
+						migrated: true,
+					});
+					migratedCount++;
+				} catch (error) {
+					console.error(
+						`[Migration] Error migrating skipped game ${gameId}:`,
+						error
+					);
+				}
+			}
+		}
+
+		// Mark as migrated
+		const userRef = db.collection("users").doc(userId);
+		await userRef.update({
+			_historyMigrated: true,
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		console.log(
+			`[Migration] Completed! Migrated ${migratedCount} games for user ${userId}`
+		);
+	} catch (error) {
+		console.error(`[Migration] Error migrating user ${userId}:`, error);
+		// Don't throw - allow app to continue even if migration fails
 	}
 };

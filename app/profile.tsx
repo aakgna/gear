@@ -48,9 +48,18 @@ const ProfileScreen = () => {
 		if (user) {
 			const data = await getUserData(user.uid);
 			setUserData(data);
-			if (data?.completedGames) {
+
+			// Fetch completed games from gameHistory
+			const { fetchGameHistory } = require("../config/firebase");
+			const completedHistory = await fetchGameHistory(user.uid, {
+				action: "completed",
+				limit: 50, // Start with recent 50
+			});
+			const completedGameIds = completedHistory.map((entry) => entry.gameId);
+
+			if (completedGameIds.length > 0) {
 				// Load puzzle details for completed games
-				await loadHistoryPuzzles(data.completedGames);
+				await loadHistoryPuzzles(completedGameIds);
 			}
 		}
 		setLoading(false);

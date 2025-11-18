@@ -46,6 +46,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	const [startTime, setStartTime] = useState(propStartTime || Date.now());
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
+	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
@@ -115,6 +116,39 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		const minutes = Math.floor(seconds / 60);
 		const remainingSeconds = seconds % 60;
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+	};
+
+	const handleShowAnswer = () => {
+		if (completed || answerRevealed) return;
+
+		// Get the first valid answer
+		const validAnswers = inputData.answer
+			.split(",")
+			.map((ans) => ans.trim());
+		const correctAnswer = validAnswers[0];
+		
+		setGuess(correctAnswer);
+		setAnswerRevealed(true);
+		setCompleted(true);
+		setFeedback("Answer revealed!");
+
+		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+
+		// Stop timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+		}
+		setElapsedTime(timeTaken);
+
+		// Mark as completed
+		onComplete({
+			puzzleId: puzzleId || `riddle_${Date.now()}`,
+			completed: true,
+			timeTaken,
+			attempts: attempts + 1,
+			completedAt: new Date().toISOString(),
+			answerRevealed: true,
+		});
 	};
 
 	const submit = () => {
@@ -315,6 +349,16 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					</Text>
 				</TouchableOpacity>
 
+				{!completed && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
+				)}
+
 				{feedback && !completed && (
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedback}>{feedback}</Text>
@@ -447,6 +491,23 @@ const styles = StyleSheet.create({
 	},
 	submitDisabled: {
 		opacity: 0.6,
+	},
+	showAnswerButton: {
+		marginTop: Spacing.md,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: ComponentStyles.button.borderRadius,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		borderWidth: 1,
+		borderColor: Colors.text.secondary + "40",
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	feedbackContainer: {
 		marginTop: Spacing.lg,

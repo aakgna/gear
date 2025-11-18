@@ -40,7 +40,13 @@ import {
 	trackGameAttempted,
 	trackGameCompleted,
 	decrementGameSkipped,
+	batchCheckGameHistory,
+	migrateUserArraysToHistory,
 } from "../config/firebase";
+import {
+	getSimpleRecommendations,
+	interleaveGamesByType,
+} from "../config/recommendations";
 import {
 	getCurrentUser,
 	getUserData,
@@ -52,13 +58,38 @@ import {
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
+// Utility function to deduplicate games by ID
+function deduplicateGames(games: Puzzle[]): Puzzle[] {
+	const seen = new Map<string, Puzzle>();
+	let duplicateCount = 0;
+
+	games.forEach((game) => {
+		if (!seen.has(game.id)) {
+			seen.set(game.id, game);
+		} else {
+			duplicateCount++;
+		}
+	});
+
+	if (duplicateCount > 0) {
+		console.log(`[Dedupe] Removed ${duplicateCount} duplicate games`);
+	}
+
+	return Array.from(seen.values());
+}
+
 const FeedScreen = () => {
 	const router = useRouter();
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [headerHeight, setHeaderHeight] = useState(0);
 	const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
+	const [displayedPuzzles, setDisplayedPuzzles] = useState<Puzzle[]>([]);
+	const [allRecommendedPuzzles, setAllRecommendedPuzzles] = useState<Puzzle[]>(
+		[]
+	);
 	const [loading, setLoading] = useState(true);
+	const [loadingMore, setLoadingMore] = useState(false);
 	const [userData, setUserData] = useState<UserData | null>(null);
 	// Track elapsed time for each puzzle (in seconds) - initialized to 0 for all puzzles
 	const puzzleElapsedTimesRef = useRef<Record<string, number>>({});
@@ -75,9 +106,14 @@ const FeedScreen = () => {
 	const attemptedPuzzlesRef = useRef<Set<string>>(new Set());
 	// Track skipped puzzles during this session to avoid duplicate tracking
 	const skippedPuzzlesRef = useRef<Set<string>>(new Set());
+	// Track checked games to avoid duplicate completion checks
+	const checkedGamesRef = useRef<Map<string, boolean>>(new Map());
 	// Track keyboard state to disable FlatList scrolling when keyboard is visible
 	const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 	const keyboardHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Infinite scroll state
+	const [isFetchingMore, setIsFetchingMore] = useState(false);
+	const [hasMoreGamesToFetch, setHasMoreGamesToFetch] = useState(true);
 
 	const { addCompletedPuzzle } = useGameStore();
 
@@ -120,18 +156,14 @@ const FeedScreen = () => {
 	const loadUserData = async (isInitialLoad = false) => {
 		const user = getCurrentUser();
 		if (user) {
+			// Run migration on first load (will skip if already migrated)
+			if (isInitialLoad) {
+				await migrateUserArraysToHistory(user.uid);
+			}
+
 			const data = await getUserData(user.uid);
 			setUserData(data);
-			// Store initial completed games for filtering on load only (only on initial load)
-			if (isInitialLoad && data?.completedGames) {
-				initialCompletedGamesRef.current = new Set(data.completedGames);
-				// Also initialize completed puzzles ref to track during session
-				completedPuzzlesRef.current = new Set(data.completedGames);
-			}
-			// Initialize skipped puzzles set from user data
-			if (isInitialLoad && data?.skippedGames) {
-				skippedPuzzlesRef.current = new Set(data.skippedGames);
-			}
+
 			// Route to username page if:
 			// 1. User document doesn't exist (!data)
 			// 2. User document exists but doesn't have username field (!data.username)
@@ -235,13 +267,51 @@ const FeedScreen = () => {
 				});
 			}
 
+			// Store all puzzles
 			setPuzzles(allPuzzles);
+
 			// Initialize elapsed times for all puzzles to 0
 			const initialElapsedTimes: Record<string, number> = {};
 			allPuzzles.forEach((puzzle) => {
 				initialElapsedTimes[puzzle.id] = 0;
 			});
 			puzzleElapsedTimesRef.current = initialElapsedTimes;
+
+			// Generate recommendations and show immediately (no filtering yet!)
+			console.log("[Feed] Generating recommendations from all games...");
+
+			// Get simple recommendations from ALL games (no upfront filtering)
+			const recommended = getSimpleRecommendations(
+				allPuzzles,
+				userData,
+				allPuzzles.length
+			);
+
+			// LAYER 1: Deduplicate after recommendations
+			const uniqueRecommended = deduplicateGames(recommended);
+
+			// Interleave game types for visual variety
+			const interleaved = interleaveGamesByType(uniqueRecommended);
+
+			// LAYER 2: Deduplicate after interleaving (double-check)
+			const uniqueInterleaved = deduplicateGames(interleaved);
+			setAllRecommendedPuzzles(uniqueInterleaved);
+
+			// Display first 15 games immediately
+			const BATCH_SIZE = 15;
+			const firstBatch = uniqueInterleaved.slice(0, BATCH_SIZE);
+			setDisplayedPuzzles(firstBatch);
+
+			console.log(
+				`[Feed] Displaying first ${firstBatch.length} games immediately`
+			);
+
+			// Now filter displayed games in background (non-blocking)
+			const user = getCurrentUser();
+			if (user) {
+				// Don't await - let it run in background
+				filterDisplayedGamesInBackground(firstBatch);
+			}
 		} catch (error) {
 			console.error("Error loading puzzles from Firestore:", error);
 			Alert.alert(
@@ -253,15 +323,318 @@ const FeedScreen = () => {
 		}
 	};
 
-	// Filter puzzles: only exclude completed games that were completed before app start
-	// This allows completed games to show during the session
-	const filteredPuzzles = puzzles.filter((puzzle) => {
-		// Only exclude if it was in the initial completed games list
-		if (initialCompletedGamesRef.current.has(puzzle.id)) {
-			return false;
+	// Filter displayed games in background (lazy filtering)
+	const filterDisplayedGamesInBackground = async (games: Puzzle[]) => {
+		const user = getCurrentUser();
+		if (!user) return;
+
+		// Only check games we haven't checked yet
+		const uncheckedGames = games.filter(
+			(g) => !checkedGamesRef.current.has(g.id)
+		);
+		if (uncheckedGames.length === 0) return;
+
+		const gameIds = uncheckedGames.map((g) => g.id);
+
+		console.log(
+			`[LazyFilter] Checking ${gameIds.length} games for completion status...`
+		);
+
+		// Fast check - only these specific games (not all 500!)
+		const completedIds = await batchCheckGameHistory(
+			user.uid,
+			gameIds,
+			"completed"
+		);
+
+		// Cache results so we don't check again
+		gameIds.forEach((id) => {
+			checkedGamesRef.current.set(id, completedIds.has(id));
+		});
+
+		// Update session tracking
+		completedIds.forEach((id) => {
+			initialCompletedGamesRef.current.add(id);
+			completedPuzzlesRef.current.add(id);
+		});
+
+		// Remove completed games from display
+		if (completedIds.size > 0) {
+			console.log(`[LazyFilter] Removing ${completedIds.size} completed games`);
+			setDisplayedPuzzles((prev) =>
+				prev.filter((p) => !completedIds.has(p.id))
+			);
 		}
-		return true;
-	});
+	};
+
+	// Fetch more games from Firestore for infinite scroll
+	const fetchMoreGamesFromFirestore = async () => {
+		if (isFetchingMore || !hasMoreGamesToFetch) return;
+
+		console.log("[Prefetch] Starting background fetch of more games...");
+		setIsFetchingMore(true);
+
+		try {
+			const user = getCurrentUser();
+			if (!user) {
+				setIsFetchingMore(false);
+				return;
+			}
+
+			// Get all game IDs currently in use (displayed + recommended pool)
+			const existingGameIds = new Set([
+				...puzzles.map((p) => p.id),
+				...allRecommendedPuzzles.map((p) => p.id),
+			]);
+
+			console.log(
+				`[Prefetch] Currently have ${existingGameIds.size} unique games in pool`
+			);
+
+			// Fetch ONLY completed games from gameHistory
+			// (We want to allow previously skipped games to appear again)
+			const { fetchGameHistory } = require("../config/firebase");
+			const completedHistory = await fetchGameHistory(user.uid, {
+				action: "completed",
+			});
+
+			// Create set of completed games (permanently exclude these)
+			const completedGameIds = new Set(
+				completedHistory.map((h: any) => h.gameId)
+			);
+
+			console.log(
+				`[Prefetch] User has completed ${completedGameIds.size} games (will exclude these)`
+			);
+
+			const newGames: Puzzle[] = [];
+			const difficulties: Array<"easy" | "medium" | "hard"> = [
+				"easy",
+				"medium",
+				"hard",
+			];
+
+			// Fetch more games (same logic as initial load)
+			for (const difficulty of difficulties) {
+				// Fetch QuickMath
+				const quickMathGames = await fetchGamesFromFirestore(
+					"quickMath",
+					difficulty
+				);
+				quickMathGames.forEach((game) => {
+					if (game.questions && game.answers) {
+						newGames.push({
+							id: `quickmath_${difficulty}_${game.id}`,
+							type: "quickMath",
+							data: {
+								problems: game.questions,
+								answers: game.answers,
+							} as QuickMathData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Wordle
+				const wordleGames = await fetchGamesFromFirestore("wordle", difficulty);
+				wordleGames.forEach((game) => {
+					if (game.qna) {
+						const qna = game.qna.split("|");
+						const question = qna[0];
+						const answer = qna[1];
+						newGames.push({
+							id: `wordle_${difficulty}_${game.id}`,
+							type: "wordle",
+							data: { question, answer } as WordleData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Riddle
+				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
+				riddleGames.forEach((game) => {
+					if (game.question && game.answer) {
+						newGames.push({
+							id: `riddle_${difficulty}_${game.id}`,
+							type: "riddle",
+							data: {
+								prompt: game.question,
+								answer: game.answer,
+							} as RiddleData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch WordChain
+				const wordChainGames = await fetchGamesFromFirestore(
+					"wordChain",
+					difficulty
+				);
+				wordChainGames.forEach((game) => {
+					if (
+						game.startWord &&
+						game.endWord &&
+						game.validWords &&
+						game.minSteps !== undefined
+					) {
+						newGames.push({
+							id: `wordchain_${difficulty}_${game.id}`,
+							type: "wordChain",
+							data: {
+								startWord: game.startWord,
+								endWord: game.endWord,
+								validWords: game.validWords,
+								minSteps: game.minSteps,
+								hint: game.hint,
+							} as WordChainData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+			}
+
+			if (newGames.length === 0) {
+				console.log("[Prefetch] No more games available in Firestore");
+				setHasMoreGamesToFetch(false);
+				return;
+			}
+
+			console.log(
+				`[Prefetch] Fetched ${newGames.length} raw games from Firestore`
+			);
+
+			// Filter out games that:
+			// 1. We already have in our current pool (avoid immediate duplicates)
+			// 2. User has already completed (permanently done)
+			// NOTE: We DO allow previously skipped games (user might want to try again)
+			const freshGames = newGames.filter(
+				(game) =>
+					!existingGameIds.has(game.id) && !completedGameIds.has(game.id)
+			);
+
+			if (freshGames.length === 0) {
+				console.log(
+					"[Prefetch] No new games found - user may have completed everything!"
+				);
+				setHasMoreGamesToFetch(false);
+				return;
+			}
+
+			console.log(
+				`[Prefetch] ${freshGames.length} fresh games after filtering (not in current pool, not completed)`
+			);
+
+			// Add fresh games to puzzles pool
+			setPuzzles((prev) => [...prev, ...freshGames]);
+
+			// Generate recommendations for fresh games
+			const recommended = getSimpleRecommendations(
+				freshGames,
+				userData,
+				freshGames.length
+			);
+			const interleaved = interleaveGamesByType(recommended);
+
+			// LAYER 3: Deduplicate before appending to ensure no overlap
+			setAllRecommendedPuzzles((prev) => {
+				// Get existing IDs
+				const existingIds = new Set(prev.map((p) => p.id));
+
+				// Filter out any games that somehow already exist
+				const newUnique = interleaved.filter((g) => !existingIds.has(g.id));
+
+				if (newUnique.length < interleaved.length) {
+					console.log(
+						`[Dedupe] Filtered ${
+							interleaved.length - newUnique.length
+						} duplicates during prefetch append`
+					);
+				}
+
+				return [...prev, ...newUnique];
+			});
+
+			console.log(`[Prefetch] Added fresh recommended games to pool`);
+		} catch (error) {
+			console.error("[Prefetch] Error fetching more games:", error);
+		} finally {
+			setIsFetchingMore(false);
+		}
+	};
+
+	// Load next batch for infinite scroll
+	const loadNextBatch = useCallback(async () => {
+		if (
+			loadingMore ||
+			displayedPuzzles.length >= allRecommendedPuzzles.length
+		) {
+			return; // Already loading or no more games
+		}
+
+		// PREFETCH: At 90%, fetch more games in background
+		const percentageViewed =
+			displayedPuzzles.length / allRecommendedPuzzles.length;
+		if (percentageViewed >= 0.9 && !isFetchingMore && hasMoreGamesToFetch) {
+			console.log("[Prefetch] At 90%, fetching more games in background...");
+			fetchMoreGamesFromFirestore(); // Don't await - background operation
+		}
+
+		setLoadingMore(true);
+		const BATCH_SIZE = 15;
+		const currentLength = displayedPuzzles.length;
+		const nextBatch = allRecommendedPuzzles.slice(
+			currentLength,
+			currentLength + BATCH_SIZE
+		);
+
+		if (nextBatch.length > 0) {
+			console.log(`[Feed] Loading next ${nextBatch.length} games`);
+
+			// Check completion for this batch only
+			await filterDisplayedGamesInBackground(nextBatch);
+
+			// Add non-completed games
+			const filtered = nextBatch.filter(
+				(g) => !initialCompletedGamesRef.current.has(g.id)
+			);
+
+			if (filtered.length > 0) {
+				// LAYER 4: Deduplicate before adding to displayed list
+				const displayedIds = new Set(displayedPuzzles.map((p) => p.id));
+				const uniqueBatch = filtered.filter((g) => !displayedIds.has(g.id));
+
+				if (uniqueBatch.length < filtered.length) {
+					console.log(
+						`[Dedupe] Filtered ${
+							filtered.length - uniqueBatch.length
+						} duplicates from batch`
+					);
+				}
+
+				if (uniqueBatch.length > 0) {
+					setDisplayedPuzzles([...displayedPuzzles, ...uniqueBatch]);
+				}
+			}
+		}
+
+		setLoadingMore(false);
+	}, [
+		displayedPuzzles,
+		allRecommendedPuzzles,
+		loadingMore,
+		isFetchingMore,
+		hasMoreGamesToFetch,
+	]);
 
 	// Handle viewable items changed (TikTok-like scrolling)
 	const onViewableItemsChanged = useCallback(
@@ -377,8 +750,8 @@ const FeedScreen = () => {
 
 	// Initialize first puzzle timer
 	useEffect(() => {
-		if (filteredPuzzles.length > 0 && !currentPuzzleId) {
-			const firstPuzzleId = filteredPuzzles[0].id;
+		if (displayedPuzzles.length > 0 && !currentPuzzleId) {
+			const firstPuzzleId = displayedPuzzles[0].id;
 			setCurrentPuzzleId(firstPuzzleId);
 			setCurrentIndex(0);
 			// Calculate startTime for first puzzle (elapsed time is 0, so startTime is now)
@@ -388,7 +761,7 @@ const FeedScreen = () => {
 			// Mark when first puzzle became visible
 			puzzleVisibleTimesRef.current[firstPuzzleId] = Date.now();
 		}
-	}, [filteredPuzzles, currentPuzzleId]);
+	}, [displayedPuzzles, currentPuzzleId]);
 
 	// Handle when user first interacts with a game
 	const handleGameAttempt = (puzzleId: string) => {
@@ -440,13 +813,19 @@ const FeedScreen = () => {
 			// Remove from skipped set if it was previously skipped (shouldn't happen, but just in case)
 			skippedPuzzlesRef.current.delete(result.puzzleId);
 
-			// Track completed at global game level
-			trackGameCompleted(result.puzzleId).catch((error) => {
-				console.error(
-					"[COMPLETED] Error tracking game completed globally:",
-					error
+			// Track completed at global game level (skip if answer was revealed)
+			if (!result.answerRevealed) {
+				trackGameCompleted(result.puzzleId).catch((error) => {
+					console.error(
+						"[COMPLETED] Error tracking game completed globally:",
+						error
+					);
+				});
+			} else {
+				console.log(
+					"[COMPLETED] Answer was revealed - skipping global completion tracking"
 				);
-			});
+			}
 		}
 
 		// Update user data but don't filter out completed games during session
@@ -535,10 +914,10 @@ const FeedScreen = () => {
 			) : (
 				<>
 					{/* Puzzle Feed */}
-					{filteredPuzzles.length > 0 ? (
+					{displayedPuzzles.length > 0 ? (
 						<FlatList
 							ref={flatListRef}
-							data={filteredPuzzles}
+							data={displayedPuzzles}
 							renderItem={renderPuzzleCard}
 							keyExtractor={(item) => item.id}
 							pagingEnabled
@@ -550,6 +929,15 @@ const FeedScreen = () => {
 							keyboardDismissMode="on-drag"
 							keyboardShouldPersistTaps="handled"
 							scrollEnabled={!isKeyboardVisible}
+							onEndReached={loadNextBatch}
+							onEndReachedThreshold={0.5}
+							ListFooterComponent={
+								loadingMore ? (
+									<View style={styles.loadingFooter}>
+										<ActivityIndicator size="small" color={Colors.accent} />
+									</View>
+								) : null
+							}
 						/>
 					) : (
 						<View style={styles.loadingContainer}>
@@ -639,6 +1027,11 @@ const styles = StyleSheet.create({
 		color: Colors.text.secondary,
 		textAlign: "center",
 		fontWeight: Typography.fontWeight.medium,
+	},
+	loadingFooter: {
+		padding: Spacing.lg,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 });
 

@@ -50,6 +50,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	const [startTime, setStartTime] = useState(propStartTime || Date.now());
 	const [attempts, setAttempts] = useState(0);
 	const [elapsedTime, setElapsedTime] = useState(0);
+	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
@@ -178,8 +179,51 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		return result;
 	};
 
+	const handleShowAnswer = () => {
+		if (gameWon || gameLost || answerRevealed) return;
+
+		// Fill the board with the correct answer
+		const correctGuess = answer;
+		const newGuesses = [...guesses, correctGuess];
+		setGuesses(newGuesses);
+		setCurrentGuess("");
+		setAnswerRevealed(true);
+		setGameWon(true);
+
+		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+		
+		// Stop timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+		}
+		setElapsedTime(timeTaken);
+
+		// Create board with correct answer
+		const newBoard = [...board];
+		const currentRow = guesses.length;
+		
+		for (let i = 0; i < wordLength; i++) {
+			newBoard[currentRow][i] = {
+				letter: answer[i],
+				status: "correct",
+			};
+		}
+		setBoard(newBoard);
+
+		// Mark as completed
+		onComplete({
+			puzzleId: puzzleId || `wordle_${Date.now()}`,
+			completed: true,
+			timeTaken,
+			attempts: guesses.length + 1,
+			mistakes: undefined,
+			completedAt: new Date().toISOString(),
+			answerRevealed: true,
+		});
+	};
+
 	const handleKeyPress = (key: string) => {
-		if (gameWon || gameLost || !validWordLength) return;
+		if (gameWon || gameLost || !validWordLength || answerRevealed) return;
 
 		if (key === "ENTER") {
 			if (currentGuess.length === wordLength) {
@@ -434,6 +478,17 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				))}
 			</View>
 
+			{/* Show Answer Button */}
+			{!gameWon && !gameLost && !answerRevealed && (
+				<TouchableOpacity
+					style={styles.showAnswerButton}
+					onPress={handleShowAnswer}
+					activeOpacity={0.7}
+				>
+					<Text style={styles.showAnswerText}>Show Answer</Text>
+				</TouchableOpacity>
+			)}
+
 			{/* View Stats Button - shown when game is completed */}
 			{(gameWon || gameLost) && onShowStats && (
 				<TouchableOpacity
@@ -647,6 +702,23 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.white,
+	},
+	showAnswerButton: {
+		marginTop: Spacing.lg,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		borderWidth: 1,
+		borderColor: Colors.text.secondary + "40",
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 });
 
