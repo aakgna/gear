@@ -30,6 +30,7 @@ import {
 	WordleData,
 	RiddleData,
 	WordChainData,
+	AliasData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -265,6 +266,25 @@ const FeedScreen = () => {
 						});
 					}
 				});
+
+				// Fetch Alias
+				const aliasGames = await fetchGamesFromFirestore("alias", difficulty);
+				aliasGames.forEach((game) => {
+					if (game.definitions && game.answer) {
+						allPuzzles.push({
+							id: `alias_${difficulty}_${game.id}`,
+							type: "alias",
+							data: {
+								definitions: game.definitions,
+								answer: game.answer,
+								hint: game.hint,
+							} as AliasData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
 			}
 
 			// Store all puzzles
@@ -441,13 +461,12 @@ const FeedScreen = () => {
 				const wordleGames = await fetchGamesFromFirestore("wordle", difficulty);
 				wordleGames.forEach((game) => {
 					if (game.qna) {
-						const qna = game.qna.split("|");
-						const question = qna[0];
-						const answer = qna[1];
 						newGames.push({
 							id: `wordle_${difficulty}_${game.id}`,
 							type: "wordle",
-							data: { question, answer } as WordleData,
+							data: {
+								answer: game.qna.toUpperCase(),
+							} as WordleData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -479,12 +498,7 @@ const FeedScreen = () => {
 					difficulty
 				);
 				wordChainGames.forEach((game) => {
-					if (
-						game.startWord &&
-						game.endWord &&
-						game.validWords &&
-						game.minSteps !== undefined
-					) {
+					if (game.startWord && game.endWord && game.validWords) {
 						newGames.push({
 							id: `wordchain_${difficulty}_${game.id}`,
 							type: "wordChain",
@@ -492,9 +506,28 @@ const FeedScreen = () => {
 								startWord: game.startWord,
 								endWord: game.endWord,
 								validWords: game.validWords,
-								minSteps: game.minSteps,
+								minSteps: game.minSteps || 3,
 								hint: game.hint,
 							} as WordChainData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Alias
+				const aliasGames = await fetchGamesFromFirestore("alias", difficulty);
+				aliasGames.forEach((game) => {
+					if (game.definitions && game.answer) {
+						newGames.push({
+							id: `alias_${difficulty}_${game.id}`,
+							type: "alias",
+							data: {
+								definitions: game.definitions,
+								answer: game.answer,
+								hint: game.hint,
+							} as AliasData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

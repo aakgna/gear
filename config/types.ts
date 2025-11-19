@@ -1,10 +1,15 @@
 // Puzzle types
-export type PuzzleType = "wordle" | "quickMath" | "riddle" | "wordChain";
+export type PuzzleType =
+	| "wordle"
+	| "quickMath"
+	| "riddle"
+	| "wordChain"
+	| "alias";
 
 export interface Puzzle {
 	id: string;
 	type: PuzzleType;
-	data: WordleData | QuickMathData | RiddleData | WordChainData;
+	data: WordleData | QuickMathData | RiddleData | WordChainData | AliasData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -33,6 +38,12 @@ export interface WordChainData {
 	endWord: string; // From Firestore 'endWord' field
 	validWords: string[]; // From Firestore 'validWords' array - all valid intermediate words
 	minSteps: number; // Minimum steps required
+	hint?: string;
+}
+
+export interface AliasData {
+	definitions: string[]; // Array of cryptic definitions (3-5 items)
+	answer: string; // The single word that fits all definitions
 	hint?: string;
 }
 
