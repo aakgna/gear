@@ -29,6 +29,11 @@ export interface FirestoreGame {
 	minSteps?: number;
 	// Alias structure
 	definitions?: string[];
+	// Zip structure
+	rows?: number;
+	cols?: number;
+	cells?: Array<{ pos: number; number: number }>;
+	solution?: number[];
 	hint?: string;
 }
 
@@ -46,7 +51,7 @@ export interface GameHistoryEntry {
 }
 
 export const fetchGamesFromFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias",
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -83,7 +88,7 @@ export const fetchGamesFromFirestore = async (
 
 // Helper to fetch all games for a specific type across all difficulties
 export const fetchAllGamesForType = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias"
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -100,7 +105,7 @@ export const fetchAllGamesForType = async (
 
 // Save a user-created game to Firestore
 export const saveGameToFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias",
+	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
@@ -113,6 +118,10 @@ export const saveGameToFirestore = async (
 		validWords?: string[];
 		minSteps?: number;
 		definitions?: string[];
+		rows?: number;
+		cols?: number;
+		cells?: Array<{ pos: number; number: number }>;
+		solution?: number[];
 		hint?: string;
 	},
 	userId: string

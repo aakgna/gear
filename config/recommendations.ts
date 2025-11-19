@@ -17,7 +17,7 @@ function getFavoriteCategory(
 ): string {
 	if (!statsByCategory || Object.keys(statsByCategory).length === 0) {
 		// No history, return random category
-		const categories = ["wordle", "riddle", "quickMath", "wordChain", "alias"];
+		const categories = ["wordle", "riddle", "quickMath", "wordChain", "alias", "zip"];
 		return categories[Math.floor(Math.random() * categories.length)];
 	}
 
@@ -201,6 +201,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 		wordChain: [],
 		riddle: [],
 		alias: [],
+		zip: [],
 	};
 
 	games.forEach((game) => {
@@ -211,7 +212,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 
 	// Interleave: take 1 from each type in rotation
 	const interleaved: Puzzle[] = [];
-	const types = ["quickMath", "wordle", "wordChain", "riddle", "alias"];
+	const types = ["quickMath", "wordle", "wordChain", "riddle", "alias", "zip"];
 	const maxLength = Math.max(...Object.values(byType).map((arr) => arr.length));
 
 	for (let i = 0; i < maxLength; i++) {
@@ -225,7 +226,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 	console.log(
 		`[Interleave] Result: ${interleaved.length} games`,
 		`(${byType.quickMath.length} QM, ${byType.wordle.length} W,`,
-		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.alias.length} A)`
+		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.alias.length} A, ${byType.zip.length} Z)`
 	);
 
 	return interleaved;

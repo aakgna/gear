@@ -4,12 +4,19 @@ export type PuzzleType =
 	| "quickMath"
 	| "riddle"
 	| "wordChain"
-	| "alias";
+	| "alias"
+	| "zip";
 
 export interface Puzzle {
 	id: string;
 	type: PuzzleType;
-	data: WordleData | QuickMathData | RiddleData | WordChainData | AliasData;
+	data:
+		| WordleData
+		| QuickMathData
+		| RiddleData
+		| WordChainData
+		| AliasData
+		| ZipData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -45,6 +52,13 @@ export interface AliasData {
 	definitions: string[]; // Array of cryptic definitions (3-5 items)
 	answer: string; // The single word that fits all definitions
 	hint?: string;
+}
+
+export interface ZipData {
+	rows: number;
+	cols: number;
+	cells: Array<{ pos: number; number: number }>; // Numbered cells with positions
+	solution: number[]; // Array of positions in order (the correct path)
 }
 
 // Game result types

@@ -31,6 +31,7 @@ import {
 	RiddleData,
 	WordChainData,
 	AliasData,
+	ZipData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -285,6 +286,26 @@ const FeedScreen = () => {
 						});
 					}
 				});
+
+				// Fetch Zip
+				const zipGames = await fetchGamesFromFirestore("zip", difficulty);
+				zipGames.forEach((game) => {
+					if (game.rows && game.cols && game.cells && game.solution) {
+						allPuzzles.push({
+							id: `zip_${difficulty}_${game.id}`,
+							type: "zip",
+							data: {
+								rows: game.rows,
+								cols: game.cols,
+								cells: game.cells,
+								solution: game.solution,
+							} as ZipData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
 			}
 
 			// Store all puzzles
@@ -528,6 +549,26 @@ const FeedScreen = () => {
 								answer: game.answer,
 								hint: game.hint,
 							} as AliasData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Zip
+				const zipGames = await fetchGamesFromFirestore("zip", difficulty);
+				zipGames.forEach((game) => {
+					if (game.rows && game.cols && game.cells && game.solution) {
+						newGames.push({
+							id: `zip_${difficulty}_${game.id}`,
+							type: "zip",
+							data: {
+								rows: game.rows,
+								cols: game.cols,
+								cells: game.cells,
+								solution: game.solution,
+							} as ZipData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

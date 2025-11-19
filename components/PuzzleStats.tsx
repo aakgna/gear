@@ -99,11 +99,12 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 				</View>
 			</View>
 
-			{/* Attempts Stats (Wordle/Riddle/WordChain/Alias) */}
+			{/* Attempts Stats (Wordle/Riddle/WordChain/Alias/Zip) */}
 			{(puzzleType === "wordle" ||
 				puzzleType === "riddle" ||
 				puzzleType === "wordChain" ||
-				puzzleType === "alias") &&
+				puzzleType === "alias" ||
+				puzzleType === "zip") &&
 				userAttempts !== undefined &&
 				stats.bestAttempts !== undefined && (
 					<View style={styles.statCard}>
