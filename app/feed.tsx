@@ -32,6 +32,7 @@ import {
 	WordChainData,
 	AliasData,
 	ZipData,
+	FutoshikiData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -306,6 +307,29 @@ const FeedScreen = () => {
 						});
 					}
 				});
+
+				// Fetch Futoshiki
+				const futoshikiGames = await fetchGamesFromFirestore(
+					"futoshiki",
+					difficulty
+				);
+				futoshikiGames.forEach((game) => {
+					if (game.size && game.grid && game.givens && game.inequalities) {
+						allPuzzles.push({
+							id: `futoshiki_${difficulty}_${game.id}`,
+							type: "futoshiki",
+							data: {
+								size: game.size,
+								grid: game.grid,
+								givens: game.givens,
+								inequalities: game.inequalities,
+							} as FutoshikiData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
 			}
 
 			// Store all puzzles
@@ -569,6 +593,29 @@ const FeedScreen = () => {
 								cells: game.cells,
 								solution: game.solution,
 							} as ZipData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Futoshiki
+				const futoshikiGames = await fetchGamesFromFirestore(
+					"futoshiki",
+					difficulty
+				);
+				futoshikiGames.forEach((game) => {
+					if (game.size && game.grid && game.givens && game.inequalities) {
+						newGames.push({
+							id: `futoshiki_${difficulty}_${game.id}`,
+							type: "futoshiki",
+							data: {
+								size: game.size,
+								grid: game.grid,
+								givens: game.givens,
+								inequalities: game.inequalities,
+							} as FutoshikiData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

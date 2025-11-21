@@ -21,6 +21,7 @@ import RiddleGame from "./RiddleGame";
 import WordChainGame from "./WordChainGame";
 import AliasGame from "./AliasGame";
 import ZipGame from "./ZipGame";
+import FutoshikiGame from "./FutoshikiGame";
 import PuzzleStats from "../PuzzleStats";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
@@ -167,6 +168,17 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						startTime={startTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
+					/>
+				);
+			case "futoshiki":
+				return (
+					<FutoshikiGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={startTime}
+						puzzleId={puzzle.id}
 					/>
 				);
 			default:

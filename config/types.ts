@@ -5,7 +5,8 @@ export type PuzzleType =
 	| "riddle"
 	| "wordChain"
 	| "alias"
-	| "zip";
+	| "zip"
+	| "futoshiki";
 
 export interface Puzzle {
 	id: string;
@@ -16,7 +17,8 @@ export interface Puzzle {
 		| RiddleData
 		| WordChainData
 		| AliasData
-		| ZipData;
+		| ZipData
+		| FutoshikiData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -59,6 +61,19 @@ export interface ZipData {
 	cols: number;
 	cells: Array<{ pos: number; number: number }>; // Numbered cells with positions
 	solution: number[]; // Array of positions in order (the correct path)
+}
+
+export interface FutoshikiData {
+	size: number;
+	grid: number[]; // 1D array (flattened 2D grid)
+	givens: Array<{ row: number; col: number; value: number }>;
+	inequalities: Array<{
+		row1: number;
+		col1: number;
+		row2: number;
+		col2: number;
+		operator: "<" | ">";
+	}>;
 }
 
 // Game result types

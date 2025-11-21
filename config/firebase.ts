@@ -34,6 +34,17 @@ export interface FirestoreGame {
 	cols?: number;
 	cells?: Array<{ pos: number; number: number }>;
 	solution?: number[];
+	// Futoshiki structure
+	size?: number;
+	grid?: number[];
+	givens?: Array<{ row: number; col: number; value: number }>;
+	inequalities?: Array<{
+		row1: number;
+		col1: number;
+		row2: number;
+		col2: number;
+		operator: "<" | ">";
+	}>;
 	hint?: string;
 }
 
@@ -51,7 +62,14 @@ export interface GameHistoryEntry {
 }
 
 export const fetchGamesFromFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip",
+	gameType:
+		| "quickMath"
+		| "wordle"
+		| "riddle"
+		| "wordChain"
+		| "alias"
+		| "zip"
+		| "futoshiki",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -88,7 +106,14 @@ export const fetchGamesFromFirestore = async (
 
 // Helper to fetch all games for a specific type across all difficulties
 export const fetchAllGamesForType = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip"
+	gameType:
+		| "quickMath"
+		| "wordle"
+		| "riddle"
+		| "wordChain"
+		| "alias"
+		| "zip"
+		| "futoshiki"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -105,7 +130,14 @@ export const fetchAllGamesForType = async (
 
 // Save a user-created game to Firestore
 export const saveGameToFirestore = async (
-	gameType: "quickMath" | "wordle" | "riddle" | "wordChain" | "alias" | "zip",
+	gameType:
+		| "quickMath"
+		| "wordle"
+		| "riddle"
+		| "wordChain"
+		| "alias"
+		| "zip"
+		| "futoshiki",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
@@ -122,6 +154,16 @@ export const saveGameToFirestore = async (
 		cols?: number;
 		cells?: Array<{ pos: number; number: number }>;
 		solution?: number[];
+		size?: number;
+		grid?: number[];
+		givens?: Array<{ row: number; col: number; value: number }>;
+		inequalities?: Array<{
+			row1: number;
+			col1: number;
+			row2: number;
+			col2: number;
+			operator: "<" | ">";
+		}>;
 		hint?: string;
 	},
 	userId: string
