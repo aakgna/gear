@@ -8,7 +8,8 @@ export type PuzzleType =
 	| "zip"
 	| "futoshiki"
 	| "magicSquare"
-	| "hidato";
+	| "hidato"
+	| "sudoku";
 
 export interface Puzzle {
 	id: string;
@@ -22,7 +23,8 @@ export interface Puzzle {
 		| ZipData
 		| FutoshikiData
 		| MagicSquareData
-		| HidatoData;
+		| HidatoData
+		| SudokuData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -93,6 +95,11 @@ export interface HidatoData {
 	startNum: number;
 	endNum: number;
 	path: Array<{ row: number; col: number; value?: number }>; // Solution path positions (value is optional, can be calculated)
+	givens: Array<{ row: number; col: number; value: number }>;
+}
+
+export interface SudokuData {
+	grid: number[]; // Flattened 1D array of complete solution (81 numbers)
 	givens: Array<{ row: number; col: number; value: number }>;
 }
 

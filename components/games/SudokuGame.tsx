@@ -8,7 +8,7 @@ import {
 	ScrollView,
 	Dimensions,
 } from "react-native";
-import { GameResult, FutoshikiData } from "../../config/types";
+import { GameResult, SudokuData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -21,8 +21,8 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-interface FutoshikiGameProps {
-	inputData: FutoshikiData;
+interface SudokuGameProps {
+	inputData: SudokuData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -30,7 +30,7 @@ interface FutoshikiGameProps {
 	onShowStats?: () => void;
 }
 
-const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
+const SudokuGame: React.FC<SudokuGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -38,28 +38,29 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 	puzzleId,
 	onShowStats,
 }) => {
-	const { size, grid, givens, inequalities } = inputData;
+	const { grid, givens } = inputData;
+	const SIZE = 9; // Sudoku is always 9x9
 
 	// Reconstruct 2D grid from 1D array
-	const reconstructGrid = (flatGrid: number[], size: number): number[][] => {
+	const reconstructGrid = (flatGrid: number[]): number[][] => {
 		const grid2D: number[][] = [];
-		for (let row = 0; row < size; row++) {
+		for (let row = 0; row < SIZE; row++) {
 			grid2D[row] = [];
-			for (let col = 0; col < size; col++) {
-				grid2D[row][col] = flatGrid[row * size + col];
+			for (let col = 0; col < SIZE; col++) {
+				grid2D[row][col] = flatGrid[row * SIZE + col];
 			}
 		}
 		return grid2D;
 	};
 
-	const solutionGrid = reconstructGrid(grid, size);
+	const solutionGrid = reconstructGrid(grid);
 
 	// Initialize user grid with givens
 	const initializeUserGrid = (): (number | null)[][] => {
 		const userGrid: (number | null)[][] = [];
-		for (let row = 0; row < size; row++) {
+		for (let row = 0; row < SIZE; row++) {
 			userGrid[row] = [];
-			for (let col = 0; col < size; col++) {
+			for (let col = 0; col < SIZE; col++) {
 				userGrid[row][col] = null;
 			}
 		}
@@ -89,7 +90,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
 
-	const puzzleSignature = `${size}-${givens
+	const puzzleSignature = `${grid.join(",")}-${givens
 		.map((g) => `${g.row},${g.col},${g.value}`)
 		.join(",")}`;
 
@@ -100,55 +101,38 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 			setElapsedTime(0);
 			setStartTime(newStartTime);
 			setCompleted(false);
+			setAnswerRevealed(false);
 			setUserGrid(initializeUserGrid());
 			setSelectedCell(null);
-			setAttempts(0);
 			setFeedback(null);
-			setAnswerRevealed(false);
+			setAttempts(0);
 			hasAttemptedRef.current = false;
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-		} else if (propStartTime && startTime !== propStartTime) {
-			setElapsedTime(0);
-			setStartTime(propStartTime);
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
 		}
-	}, [puzzleSignature, propStartTime, startTime]);
+	}, [puzzleSignature, propStartTime]);
 
 	// Timer effect
 	useEffect(() => {
-		if (completed) {
+		if (!completed && !answerRevealed) {
+			timerIntervalRef.current = setInterval(() => {
+				setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+			}, 1000);
+		} else {
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
-			return;
 		}
-
-		if (timerIntervalRef.current) {
-			clearInterval(timerIntervalRef.current);
-		}
-
-		timerIntervalRef.current = setInterval(() => {
-			setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
-		}, 1000);
 
 		return () => {
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [completed, startTime]);
+	}, [completed, answerRevealed, startTime]);
 
 	const formatTime = (seconds: number): string => {
-		if (seconds < 60) {
-			return `${seconds}s`;
-		}
-		const minutes = Math.floor(seconds / 60);
-		const remainingSeconds = seconds % 60;
-		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, "0")}`;
 	};
 
 	const isGiven = (row: number, col: number): boolean => {
@@ -159,88 +143,16 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 		return userGrid[row][col];
 	};
 
-	const getInequality = (
-		row: number,
-		col: number,
-		direction: "right" | "down" | "left" | "up"
-	): {
-		operator: "<" | ">" | "ʌ" | "v";
-		cell1: { row: number; col: number };
-		cell2: { row: number; col: number };
-	} | null => {
-		for (const ineq of inequalities) {
-			if (direction === "right") {
-				if (
-					ineq.row1 === row &&
-					ineq.col1 === col &&
-					ineq.row2 === row &&
-					ineq.col2 === col + 1
-				) {
-					return {
-						operator: ineq.operator,
-						cell1: { row: ineq.row1, col: ineq.col1 },
-						cell2: { row: ineq.row2, col: ineq.col2 },
-					};
-				}
-			} else if (direction === "down") {
-				if (
-					ineq.row1 === row &&
-					ineq.col1 === col &&
-					ineq.row2 === row + 1 &&
-					ineq.col2 === col
-				) {
-					// For vertical inequalities:
-					// If operator is ">", it means top > bottom, so show "v" (pointing down to the smaller bottom value)
-					// If operator is "<", it means top < bottom, so show "ʌ" (pointing up to the smaller top value)
-					// This way the arrow points toward the smaller value
-					const verticalOperator = ineq.operator === ">" ? "v" : "ʌ";
-					return {
-						operator: verticalOperator as "<" | ">" | "ʌ" | "v",
-						cell1: { row: ineq.row1, col: ineq.col1 },
-						cell2: { row: ineq.row2, col: ineq.col2 },
-					};
-				}
-			} else if (direction === "left") {
-				if (
-					ineq.row1 === row &&
-					ineq.col1 === col - 1 &&
-					ineq.row2 === row &&
-					ineq.col2 === col
-				) {
-					return {
-						operator: ineq.operator === "<" ? ">" : "<",
-						cell1: { row: ineq.row2, col: ineq.col2 },
-						cell2: { row: ineq.row1, col: ineq.col1 },
-					};
-				}
-			} else if (direction === "up") {
-				if (
-					ineq.row1 === row - 1 &&
-					ineq.col1 === col &&
-					ineq.row2 === row &&
-					ineq.col2 === col
-				) {
-					// When looking up, the stored operator is from (row-1) to (row)
-					// If operator is ">", it means (row-1) > (row), so top > bottom, show "v" (pointing down to smaller bottom)
-					// If operator is "<", it means (row-1) < (row), so top < bottom, show "ʌ" (pointing up to smaller top)
-					const verticalOperator = ineq.operator === ">" ? "v" : "ʌ";
-					return {
-						operator: verticalOperator as "<" | ">" | "ʌ" | "v",
-						cell1: { row: ineq.row2, col: ineq.col2 },
-						cell2: { row: ineq.row1, col: ineq.col1 },
-					};
-				}
-			}
-		}
-		return null;
+	const getBoxNumber = (row: number, col: number): number => {
+		return Math.floor(row / 3) * 3 + Math.floor(col / 3);
 	};
 
 	const validatePuzzle = (): { valid: boolean; errors: string[] } => {
 		const errors: string[] = [];
 
-		// Check all cells are filled
-		for (let row = 0; row < size; row++) {
-			for (let col = 0; col < size; col++) {
+		// 1. Check all cells are filled
+		for (let row = 0; row < SIZE; row++) {
+			for (let col = 0; col < SIZE; col++) {
 				if (userGrid[row][col] === null) {
 					errors.push("All cells must be filled");
 					return { valid: false, errors };
@@ -248,41 +160,63 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 			}
 		}
 
-		// Check each row contains 1-size exactly once
-		for (let row = 0; row < size; row++) {
-			const rowValues = userGrid[row].filter((v) => v !== null) as number[];
-			const expected = Array.from({ length: size }, (_, i) => i + 1);
+		// 2. Check each row contains 1-9 exactly once
+		for (let row = 0; row < SIZE; row++) {
+			const rowValues = userGrid[row].filter(
+				(v) => v !== null
+			) as number[];
+			const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 			const sorted = [...rowValues].sort((a, b) => a - b);
 			if (JSON.stringify(sorted) !== JSON.stringify(expected)) {
 				errors.push(`Row ${row + 1} is invalid`);
 			}
 		}
 
-		// Check each column contains 1-size exactly once
-		for (let col = 0; col < size; col++) {
+		// 3. Check each column contains 1-9 exactly once
+		for (let col = 0; col < SIZE; col++) {
 			const colValues: number[] = [];
-			for (let row = 0; row < size; row++) {
+			for (let row = 0; row < SIZE; row++) {
 				if (userGrid[row][col] !== null) {
 					colValues.push(userGrid[row][col]!);
 				}
 			}
-			const expected = Array.from({ length: size }, (_, i) => i + 1);
+			const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 			const sorted = [...colValues].sort((a, b) => a - b);
 			if (JSON.stringify(sorted) !== JSON.stringify(expected)) {
 				errors.push(`Column ${col + 1} is invalid`);
 			}
 		}
 
-		// Check all inequalities are satisfied
-		for (const ineq of inequalities) {
-			const val1 = userGrid[ineq.row1][ineq.col1];
-			const val2 = userGrid[ineq.row2][ineq.col2];
-			if (val1 === null || val2 === null) continue;
+		// 4. Check each 3×3 box contains 1-9 exactly once
+		for (let box = 0; box < 9; box++) {
+			const boxRow = Math.floor(box / 3) * 3;
+			const boxCol = (box % 3) * 3;
+			const boxValues: number[] = [];
 
-			if (ineq.operator === "<" && val1 >= val2) {
-				errors.push("Inequality constraint violated");
-			} else if (ineq.operator === ">" && val1 <= val2) {
-				errors.push("Inequality constraint violated");
+			for (let r = 0; r < 3; r++) {
+				for (let c = 0; c < 3; c++) {
+					const value = userGrid[boxRow + r][boxCol + c];
+					if (value !== null) {
+						boxValues.push(value);
+					}
+				}
+			}
+
+			const expected = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+			const sorted = [...boxValues].sort((a, b) => a - b);
+			if (JSON.stringify(sorted) !== JSON.stringify(expected)) {
+				errors.push(`Box ${box + 1} is invalid`);
+			}
+		}
+
+		// 5. Verify givens match user input
+		for (const given of givens) {
+			const userValue = userGrid[given.row][given.col];
+			if (userValue !== given.value) {
+				errors.push(
+					`Given at (${given.row}, ${given.col}) should be ${given.value}`
+				);
+				return { valid: false, errors };
 			}
 		}
 
@@ -319,6 +253,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 		const newGrid = userGrid.map((r) => [...r]);
 		newGrid[row][col] = value;
 		setUserGrid(newGrid);
+		setSelectedCell(null);
 		setFeedback(null);
 
 		// Auto-check if puzzle is complete
@@ -345,7 +280,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 			]).start();
 
 			onComplete({
-				puzzleId: puzzleId || `futoshiki_${Date.now()}`,
+				puzzleId: puzzleId || `sudoku_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				attempts: attempts,
@@ -355,15 +290,10 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 	};
 
 	const handleCheck = () => {
-		if (completed || answerRevealed) return;
-
 		const validation = validatePuzzle();
-		const newAttempts = attempts + 1;
-		setAttempts(newAttempts);
-
 		if (validation.valid) {
+			setFeedback("Correct! Well done!");
 			setCompleted(true);
-			setFeedback("Correct!");
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -384,22 +314,23 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 			]).start();
 
 			onComplete({
-				puzzleId: puzzleId || `futoshiki_${Date.now()}`,
+				puzzleId: puzzleId || `sudoku_${Date.now()}`,
 				completed: true,
 				timeTaken,
-				attempts: newAttempts,
+				attempts: attempts,
 				completedAt: new Date().toISOString(),
 			});
 		} else {
-			setFeedback(validation.errors[0] || "Puzzle is incorrect");
+			setAttempts(attempts + 1);
+			setFeedback(validation.errors[0] || "Incorrect. Keep trying!");
 			Animated.sequence([
 				Animated.timing(shakeAnimation, {
-					toValue: 5,
+					toValue: 10,
 					duration: Animation.duration.fast,
 					useNativeDriver: true,
 				}),
 				Animated.timing(shakeAnimation, {
-					toValue: -5,
+					toValue: -10,
 					duration: Animation.duration.fast,
 					useNativeDriver: true,
 				}),
@@ -413,116 +344,98 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 	};
 
 	const handleShowAnswer = () => {
-		if (completed || answerRevealed) return;
-
 		setAnswerRevealed(true);
+		setUserGrid(solutionGrid.map((row) => [...row]));
 		setCompleted(true);
-		setUserGrid(solutionGrid.map((r) => [...r]));
-		setFeedback("Answer revealed!");
-
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
 		if (timerIntervalRef.current) {
 			clearInterval(timerIntervalRef.current);
 		}
+		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
 		setElapsedTime(timeTaken);
 
 		onComplete({
-			puzzleId: puzzleId || `futoshiki_${Date.now()}`,
-			completed: true,
+			puzzleId: puzzleId || `sudoku_${Date.now()}`,
+			completed: false,
 			timeTaken,
-			attempts: attempts + 1,
+			attempts: attempts,
 			completedAt: new Date().toISOString(),
 			answerRevealed: true,
 		});
 	};
 
 	const handleClear = () => {
-		if (completed || answerRevealed || !selectedCell) return;
+		if (!selectedCell || completed || answerRevealed) return;
 		const { row, col } = selectedCell;
 		if (isGiven(row, col)) return;
 
 		const newGrid = userGrid.map((r) => [...r]);
 		newGrid[row][col] = null;
 		setUserGrid(newGrid);
+		setSelectedCell(null);
 		setFeedback(null);
 	};
 
-	// Calculate cell size based on grid dimensions
-	const gridPadding = Spacing.xl * 2;
-	const availableWidth = SCREEN_WIDTH - gridPadding;
-	const cellMargin = 4;
-	const inequalitySize = 20;
-	const cellSize = Math.floor(
-		(availableWidth - (size - 1) * (cellMargin * 2 + inequalitySize)) / size
-	);
+	// Calculate cell size based on screen width
+	const maxGridWidth = SCREEN_WIDTH - Spacing.xl * 2;
+	const cellSize = Math.floor((maxGridWidth - (SIZE - 1) * 2) / SIZE);
+	const cellSizeClamped = Math.min(cellSize, 50);
 
 	const renderCell = (row: number, col: number) => {
 		const value = getCellValue(row, col);
 		const isGivenCell = isGiven(row, col);
-		const isSelected = selectedCell?.row === row && selectedCell?.col === col;
-		const isCompleted = completed && !answerRevealed;
+		const isSelected =
+			selectedCell?.row === row && selectedCell?.col === col;
+		const isCompleted = completed;
 		const isRevealed = answerRevealed;
 
-		const rightInequality = getInequality(row, col, "right");
+		// Determine border widths for 3x3 box separation
+		const isBoxLeftEdge = col % 3 === 0;
+		const isBoxTopEdge = row % 3 === 0;
+		const isBoxRightEdge = col === SIZE - 1;
+		const isBoxBottomEdge = row === SIZE - 1;
+
+		// Thicker borders (3px) between boxes, thinner (1px) within boxes
+		const borderLeftWidth = isBoxLeftEdge ? 3 : 1;
+		const borderTopWidth = isBoxTopEdge ? 3 : 1;
+		const borderRightWidth = isBoxRightEdge ? 3 : 1;
+		const borderBottomWidth = isBoxBottomEdge ? 3 : 1;
+
+		// Optional: subtle background color for boxes (alternating)
+		const boxNumber = getBoxNumber(row, col);
+		const isEvenBox = boxNumber % 2 === 0;
 
 		return (
-			<View key={`${row}-${col}`} style={styles.cellWrapper}>
-				<TouchableOpacity
+			<TouchableOpacity
+				key={`cell-${row}-${col}`}
+				style={[
+					styles.cell,
+					{
+						width: cellSizeClamped,
+						height: cellSizeClamped,
+						borderLeftWidth,
+						borderTopWidth,
+						borderRightWidth,
+						borderBottomWidth,
+					},
+					isEvenBox && !isGivenCell && styles.cellEvenBox,
+					isGivenCell && styles.cellGiven,
+					isSelected && styles.cellSelected,
+					isCompleted && styles.cellCompleted,
+					isRevealed && styles.cellRevealed,
+				]}
+				onPress={() => handleCellPress(row, col)}
+				disabled={completed || answerRevealed || isGivenCell}
+			>
+				<Text
 					style={[
-						styles.cell,
-						{
-							width: cellSize,
-							height: cellSize,
-						},
-						isGivenCell && styles.cellGiven,
-						isSelected && styles.cellSelected,
-						isCompleted && styles.cellCompleted,
-						isRevealed && styles.cellRevealed,
+						styles.cellText,
+						isGivenCell && styles.cellTextGiven,
+						isRevealed && styles.cellTextRevealed,
 					]}
-					onPress={() => handleCellPress(row, col)}
-					disabled={completed || answerRevealed || isGivenCell}
 				>
-					<Text style={[styles.cellText, isGivenCell && styles.cellTextGiven]}>
-						{value || ""}
-					</Text>
-				</TouchableOpacity>
-				{col < size - 1 && (
-					<View
-						style={[
-							styles.inequalityContainer,
-							{ width: inequalitySize, height: cellSize },
-						]}
-					>
-						{rightInequality && (
-							<Text style={styles.inequalityText}>
-								{rightInequality.operator}
-							</Text>
-						)}
-					</View>
-				)}
-			</View>
-		);
-	};
-
-	const renderInequalityRow = (row: number) => {
-		return (
-			<View key={`ineq-${row}`} style={styles.inequalityRowContainer}>
-				{Array.from({ length: size }, (_, col) => {
-					const downInequality = getInequality(row, col, "down");
-					return (
-						<React.Fragment key={col}>
-							<View style={[styles.inequalityRow, { width: cellSize }]}>
-								{downInequality && (
-									<Text style={styles.inequalityTextVertical}>
-										{downInequality.operator}
-									</Text>
-								)}
-							</View>
-							{col < size - 1 && <View style={{ width: inequalitySize }} />}
-						</React.Fragment>
-					);
-				})}
-			</View>
+					{value !== null ? value : ""}
+				</Text>
+			</TouchableOpacity>
 		);
 	};
 
@@ -545,7 +458,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 			>
 				{/* Header */}
 				<View style={styles.header}>
-					<Text style={styles.title}>Futoshiki</Text>
+					<Text style={styles.title}>Sudoku</Text>
 					<View style={styles.timerBadge}>
 						<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
 					</View>
@@ -553,20 +466,19 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 
 				{/* Grid */}
 				<View style={styles.gridContainer}>
-					{Array.from({ length: size }, (_, row) => (
-						<React.Fragment key={row}>
-							<View style={styles.gridRow}>
-								{Array.from({ length: size }, (_, col) => renderCell(row, col))}
-							</View>
-							{row < size - 1 && renderInequalityRow(row)}
-						</React.Fragment>
+					{Array.from({ length: SIZE }, (_, row) => (
+						<View key={row} style={styles.gridRow}>
+							{Array.from({ length: SIZE }, (_, col) =>
+								renderCell(row, col)
+							)}
+						</View>
 					))}
 				</View>
 
 				{/* Number Input Buttons */}
 				{!completed && !answerRevealed && (
 					<View style={styles.numberInputContainer}>
-						{Array.from({ length: size }, (_, i) => i + 1).map((num) => (
+						{Array.from({ length: 9 }, (_, i) => i + 1).map((num) => (
 							<TouchableOpacity
 								key={num}
 								style={[
@@ -681,37 +593,19 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 	},
-	cellWrapper: {
-		flexDirection: "row",
-		alignItems: "center",
-	},
-	inequalityRowContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		height: 20,
-		marginVertical: 2,
-	},
-	inequalityRow: {
-		height: 20,
-		alignItems: "center",
-		justifyContent: "center",
-	},
 	cell: {
 		backgroundColor: Colors.background.tertiary,
-		borderWidth: 2,
-		borderColor: "rgba(255, 255, 255, 0.2)",
-		borderRadius: BorderRadius.sm,
+		borderColor: Colors.text.primary + "40",
 		alignItems: "center",
 		justifyContent: "center",
 		...Shadows.light,
 	},
 	cellGiven: {
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: "#4CAF5030", // Light green with opacity (30 = ~19% opacity)
 		borderColor: Colors.text.secondary + "40",
 	},
 	cellSelected: {
 		borderColor: Colors.accent,
-		borderWidth: 3,
 		backgroundColor: Colors.accent + "40",
 	},
 	cellCompleted: {
@@ -722,37 +616,28 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.accent + "20",
 		borderColor: Colors.accent + "60",
 	},
+	cellEvenBox: {
+		backgroundColor: Colors.background.tertiary + "80",
+	},
 	cellText: {
-		fontSize: 24,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
 	},
 	cellTextGiven: {
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.secondary,
-	},
-	inequalityContainer: {
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	inequalityText: {
-		fontSize: 20,
-		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-	},
-	inequalityTextVertical: {
-		fontSize: 20,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		textAlign: "center",
-		lineHeight: 20,
+	},
+	cellTextRevealed: {
+		color: Colors.accent,
 	},
 	numberInputContainer: {
 		flexDirection: "row",
-		justifyContent: "center",
 		flexWrap: "wrap",
-		marginBottom: Spacing.lg,
+		justifyContent: "center",
 		gap: Spacing.sm,
+		marginBottom: Spacing.lg,
+		paddingHorizontal: Spacing.md,
 	},
 	numberButton: {
 		width: 50,
@@ -761,75 +646,64 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.md,
 		alignItems: "center",
 		justifyContent: "center",
-		borderWidth: 1,
+		borderWidth: 2,
 		borderColor: Colors.text.secondary + "40",
-		...Shadows.light,
 		opacity: 0.5,
 	},
 	numberButtonActive: {
 		opacity: 1,
-		backgroundColor: Colors.accent + "40",
-		borderWidth: 2,
 		borderColor: Colors.accent,
+		backgroundColor: Colors.accent + "20",
 	},
 	numberButtonText: {
-		fontSize: 20,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
 	},
 	actionButtonsContainer: {
 		flexDirection: "row",
 		justifyContent: "center",
-		flexWrap: "wrap",
+		gap: Spacing.md,
 		marginBottom: Spacing.lg,
-		gap: Spacing.sm,
+		flexWrap: "wrap",
 	},
 	actionButton: {
 		paddingHorizontal: Spacing.lg,
 		paddingVertical: Spacing.md,
 		borderRadius: BorderRadius.md,
-		...Shadows.light,
 		minWidth: 100,
 		alignItems: "center",
-		justifyContent: "center",
+		...Shadows.medium,
+	},
+	clearButton: {
+		backgroundColor: Colors.background.secondary,
+	},
+	checkButton: {
+		backgroundColor: Colors.accent,
+	},
+	showAnswerButton: {
+		backgroundColor: Colors.text.secondary,
 	},
 	actionButtonDisabled: {
 		opacity: 0.5,
 	},
-	clearButton: {
-		backgroundColor: Colors.background.tertiary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
-	},
-	checkButton: {
-		backgroundColor: Colors.accent,
-		...Shadows.medium,
-	},
-	showAnswerButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
-	},
 	actionButtonText: {
 		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		textAlign: "center",
 	},
 	feedbackContainer: {
 		marginTop: Spacing.md,
 		padding: Spacing.md,
-		backgroundColor: Colors.error + "15",
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.error + "40",
-		...Shadows.light,
+		alignItems: "center",
 	},
 	feedbackText: {
 		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.primary,
 		textAlign: "center",
-		fontWeight: Typography.fontWeight.semiBold,
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
@@ -848,4 +722,5 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default FutoshikiGame;
+export default SudokuGame;
+

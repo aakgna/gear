@@ -24,6 +24,7 @@ import ZipGame from "./ZipGame";
 import FutoshikiGame from "./FutoshikiGame";
 import MagicSquareGame from "./MagicSquareGame";
 import HidatoGame from "./HidatoGame";
+import SudokuGame from "./SudokuGame";
 import PuzzleStats from "../PuzzleStats";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
@@ -181,6 +182,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			case "magicSquare":
@@ -192,6 +194,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			case "hidato":
@@ -203,6 +206,19 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						onAttempt={onAttempt}
 						startTime={startTime}
 						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+					/>
+				);
+			case "sudoku":
+				return (
+					<SudokuGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
 					/>
 				);
 			default:

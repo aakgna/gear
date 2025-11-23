@@ -27,6 +27,7 @@ interface MagicSquareGameProps {
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
+	onShowStats?: () => void;
 }
 
 const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
@@ -35,6 +36,7 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
+	onShowStats,
 }) => {
 	const { size, grid, magicConstant, givens } = inputData;
 
@@ -498,6 +500,17 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 						<Text style={styles.feedbackText}>{feedback}</Text>
 					</View>
 				)}
+
+				{/* View Stats Button - shown when game is completed */}
+				{(completed || answerRevealed) && onShowStats && (
+					<TouchableOpacity
+						style={styles.viewStatsButton}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.viewStatsButtonText}>View Stats</Text>
+					</TouchableOpacity>
+				)}
 			</Animated.View>
 		</ScrollView>
 	);
@@ -685,6 +698,21 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.primary,
 		textAlign: "center",
+	},
+	viewStatsButton: {
+		marginTop: Spacing.xl,
+		backgroundColor: Colors.accent,
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
 	},
 });
 

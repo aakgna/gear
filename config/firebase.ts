@@ -51,6 +51,7 @@ export interface FirestoreGame {
 	startNum?: number;
 	endNum?: number;
 	path?: Array<{ row: number; col: number; value?: number }>;
+	// Sudoku structure (grid is already defined above for Futoshiki/MagicSquare)
 	hint?: string;
 }
 
@@ -77,7 +78,8 @@ export const fetchGamesFromFirestore = async (
 		| "zip"
 		| "futoshiki"
 		| "magicSquare"
-		| "hidato",
+		| "hidato"
+		| "sudoku",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -124,6 +126,7 @@ export const fetchAllGamesForType = async (
 		| "futoshiki"
 		| "magicSquare"
 		| "hidato"
+		| "sudoku"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -149,7 +152,8 @@ export const saveGameToFirestore = async (
 		| "zip"
 		| "futoshiki"
 		| "magicSquare"
-		| "hidato",
+		| "hidato"
+		| "sudoku",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];

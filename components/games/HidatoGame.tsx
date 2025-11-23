@@ -27,6 +27,7 @@ interface HidatoGameProps {
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
 	puzzleId?: string;
+	onShowStats?: () => void;
 }
 
 const HidatoGame: React.FC<HidatoGameProps> = ({
@@ -35,6 +36,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 	onAttempt,
 	startTime: propStartTime,
 	puzzleId,
+	onShowStats,
 }) => {
 	const { rows, cols, startNum, endNum, path, givens } = inputData;
 
@@ -151,9 +153,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 		const rowDiff = Math.abs(pos1.row - pos2.row);
 		const colDiff = Math.abs(pos1.col - pos2.col);
 		// Adjacent if: same row/col (4 directions) or diagonal (4 directions)
-		return (
-			rowDiff <= 1 && colDiff <= 1 && !(rowDiff === 0 && colDiff === 0)
-		);
+		return rowDiff <= 1 && colDiff <= 1 && !(rowDiff === 0 && colDiff === 0);
 	};
 
 	const validatePuzzle = (): { valid: boolean; errors: string[] } => {
@@ -162,10 +162,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 
 		// 1. Check all numbers from startNum to endNum are present
 		const numbersFound = new Set<number>();
-		const numberPositions = new Map<
-			number,
-			{ row: number; col: number }
-		>();
+		const numberPositions = new Map<number, { row: number; col: number }>();
 
 		for (let row = 0; row < rows; row++) {
 			for (let col = 0; col < cols; col++) {
@@ -387,8 +384,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 	const renderCell = (row: number, col: number) => {
 		const value = getCellValue(row, col);
 		const isGivenCell = isGiven(row, col);
-		const isSelected =
-			selectedCell?.row === row && selectedCell?.col === col;
+		const isSelected = selectedCell?.row === row && selectedCell?.col === col;
 		const isCompleted = completed;
 		const isRevealed = answerRevealed;
 		const isStart = value === startNum;
@@ -464,9 +460,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 				<View style={styles.gridContainer}>
 					{Array.from({ length: rows }, (_, row) => (
 						<View key={row} style={styles.gridRow}>
-							{Array.from({ length: cols }, (_, col) =>
-								renderCell(row, col)
-							)}
+							{Array.from({ length: cols }, (_, col) => renderCell(row, col))}
 						</View>
 					))}
 				</View>
@@ -527,6 +521,17 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedbackText}>{feedback}</Text>
 					</View>
+				)}
+
+				{/* View Stats Button - shown when game is completed */}
+				{(completed || answerRevealed) && onShowStats && (
+					<TouchableOpacity
+						style={styles.viewStatsButton}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.viewStatsButtonText}>View Stats</Text>
+					</TouchableOpacity>
 				)}
 			</Animated.View>
 		</ScrollView>
@@ -724,7 +729,21 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		textAlign: "center",
 	},
+	viewStatsButton: {
+		marginTop: Spacing.xl,
+		backgroundColor: Colors.accent,
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
+	},
 });
 
 export default HidatoGame;
-

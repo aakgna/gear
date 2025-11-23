@@ -35,6 +35,7 @@ import {
 	FutoshikiData,
 	MagicSquareData,
 	HidatoData,
+	SudokuData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -391,6 +392,26 @@ const FeedScreen = () => {
 				});
 			}
 
+			// Fetch Sudoku games
+			for (const difficulty of ["easy", "medium", "hard"] as const) {
+				const sudokuGames = await fetchGamesFromFirestore("sudoku", difficulty);
+				sudokuGames.forEach((game) => {
+					if (game.grid && game.givens) {
+						allPuzzles.push({
+							id: `sudoku_${difficulty}_${game.id}`,
+							type: "sudoku",
+							data: {
+								grid: game.grid,
+								givens: game.givens,
+							} as SudokuData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+			}
+
 			// Store all puzzles
 			setPuzzles(allPuzzles);
 
@@ -732,6 +753,26 @@ const FeedScreen = () => {
 								path: game.path,
 								givens: game.givens,
 							} as HidatoData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+			}
+
+			// Fetch Sudoku games
+			for (const difficulty of ["easy", "medium", "hard"] as const) {
+				const sudokuGames = await fetchGamesFromFirestore("sudoku", difficulty);
+				sudokuGames.forEach((game) => {
+					if (game.grid && game.givens) {
+						newGames.push({
+							id: `sudoku_${difficulty}_${game.id}`,
+							type: "sudoku",
+							data: {
+								grid: game.grid,
+								givens: game.givens,
+							} as SudokuData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
