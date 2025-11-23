@@ -22,6 +22,8 @@ import WordChainGame from "./WordChainGame";
 import AliasGame from "./AliasGame";
 import ZipGame from "./ZipGame";
 import FutoshikiGame from "./FutoshikiGame";
+import MagicSquareGame from "./MagicSquareGame";
+import HidatoGame from "./HidatoGame";
 import PuzzleStats from "../PuzzleStats";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
@@ -173,6 +175,28 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			case "futoshiki":
 				return (
 					<FutoshikiGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={startTime}
+						puzzleId={puzzle.id}
+					/>
+				);
+			case "magicSquare":
+				return (
+					<MagicSquareGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={startTime}
+						puzzleId={puzzle.id}
+					/>
+				);
+			case "hidato":
+				return (
+					<HidatoGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}

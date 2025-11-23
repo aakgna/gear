@@ -143,14 +143,14 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		// Track first interaction (user started attempting the game)
 		if (!hasAttemptedRef.current && value.length > 0 && puzzleId) {
 			hasAttemptedRef.current = true;
-			
+
 			// Update session tracking in feed.tsx
 			// Firestore will be updated only if user skips after attempting
 			if (onAttempt) {
 				onAttempt(puzzleId);
 			}
 		}
-		
+
 		// Allow numeric including negative and decimal
 		setAnswers((prev) => {
 			const next = [...prev];
@@ -328,7 +328,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 									onChangeText={(t) =>
 										handleChange(idx, t.replace(/[^0-9\-+.]/g, ""))
 									}
-									keyboardType="numbers-and-punctuation"
+									keyboardType="numeric" // Changed from "numbers-and-punctuation"
 									returnKeyType="done"
 									placeholderTextColor={Colors.text.disabled}
 									placeholder="?"

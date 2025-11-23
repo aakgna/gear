@@ -45,6 +45,12 @@ export interface FirestoreGame {
 		col2: number;
 		operator: "<" | ">";
 	}>;
+	// Magic Square structure
+	magicConstant?: number;
+	// Hidato structure
+	startNum?: number;
+	endNum?: number;
+	path?: Array<{ row: number; col: number; value?: number }>;
 	hint?: string;
 }
 
@@ -69,7 +75,9 @@ export const fetchGamesFromFirestore = async (
 		| "wordChain"
 		| "alias"
 		| "zip"
-		| "futoshiki",
+		| "futoshiki"
+		| "magicSquare"
+		| "hidato",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -114,6 +122,8 @@ export const fetchAllGamesForType = async (
 		| "alias"
 		| "zip"
 		| "futoshiki"
+		| "magicSquare"
+		| "hidato"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -137,7 +147,9 @@ export const saveGameToFirestore = async (
 		| "wordChain"
 		| "alias"
 		| "zip"
-		| "futoshiki",
+		| "futoshiki"
+		| "magicSquare"
+		| "hidato",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
@@ -164,6 +176,10 @@ export const saveGameToFirestore = async (
 			col2: number;
 			operator: "<" | ">";
 		}>;
+		magicConstant?: number;
+		startNum?: number;
+		endNum?: number;
+		path?: Array<{ row: number; col: number; value?: number }>;
 		hint?: string;
 	},
 	userId: string
@@ -286,8 +302,10 @@ const parsePuzzleId = (
 		gameType = "quickMath";
 	} else if (gameType === "wordchain") {
 		gameType = "wordChain";
+	} else if (gameType === "magicsquare") {
+		gameType = "magicSquare";
 	}
-	// wordle and riddle are already correct
+	// wordle, riddle, alias, zip, and futoshiki are already correct
 
 	return { gameType, difficulty, gameId };
 };

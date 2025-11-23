@@ -54,7 +54,9 @@ const AliasGame: React.FC<AliasGameProps> = ({
 	const successScale = useRef(new Animated.Value(1)).current;
 
 	// Reset timer when puzzle changes (using definitions and answer as unique identifier)
-	const puzzleSignature = `${inputData.definitions.join("-")}-${inputData.answer}`;
+	const puzzleSignature = `${inputData.definitions.join("-")}-${
+		inputData.answer
+	}`;
 
 	useEffect(() => {
 		// Only reset if this is a different puzzle
@@ -273,7 +275,7 @@ const AliasGame: React.FC<AliasGameProps> = ({
 					]}
 				>
 					<View style={styles.definitionsCard}>
-						<Text style={styles.definitionsIcon}>🔍</Text>
+						{/* <Text style={styles.definitionsIcon}>🔍</Text> */}
 						<Text style={styles.definitionsTitle}>
 							Find the word that matches all definitions:
 						</Text>
@@ -420,7 +422,7 @@ const styles = StyleSheet.create({
 	definitionsCard: {
 		backgroundColor: Colors.background.tertiary,
 		borderRadius: BorderRadius.xl,
-		padding: Spacing.xxl,
+		padding: Spacing.xl,
 		borderWidth: 1,
 		borderColor: "rgba(255, 255, 255, 0.1)",
 		...Shadows.medium,
@@ -552,4 +554,3 @@ const styles = StyleSheet.create({
 });
 
 export default AliasGame;
-

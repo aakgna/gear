@@ -122,11 +122,9 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		if (completed || answerRevealed) return;
 
 		// Get the first valid answer
-		const validAnswers = inputData.answer
-			.split(",")
-			.map((ans) => ans.trim());
+		const validAnswers = inputData.answer.split(",").map((ans) => ans.trim());
 		const correctAnswer = validAnswers[0];
-		
+
 		setGuess(correctAnswer);
 		setAnswerRevealed(true);
 		setCompleted(true);
@@ -280,7 +278,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					]}
 				>
 					<View style={styles.promptCard}>
-						<Text style={styles.promptIcon}>🤔</Text>
+						{/* <Text style={styles.promptIcon}>🤔</Text> */}
 						<Text style={styles.prompt}>{inputData.prompt}</Text>
 					</View>
 				</Animated.View>
@@ -308,14 +306,14 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 							// Track first interaction (user started attempting the game)
 							if (!hasAttemptedRef.current && text.length > 0 && puzzleId) {
 								hasAttemptedRef.current = true;
-								
+
 								// Update session tracking in feed.tsx
 								// Firestore will be updated only if user skips after attempting
 								if (onAttempt) {
 									onAttempt(puzzleId);
 								}
 							}
-							
+
 							setGuess(text);
 						}}
 						autoCapitalize="none"

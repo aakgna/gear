@@ -17,7 +17,7 @@ function getFavoriteCategory(
 ): string {
 	if (!statsByCategory || Object.keys(statsByCategory).length === 0) {
 		// No history, return random category
-		const categories = ["wordle", "riddle", "quickMath", "wordChain", "alias", "zip", "futoshiki"];
+		const categories = ["wordle", "riddle", "quickMath", "wordChain", "alias", "zip", "futoshiki", "magicSquare", "hidato"];
 		return categories[Math.floor(Math.random() * categories.length)];
 	}
 
@@ -203,6 +203,8 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 		alias: [],
 		zip: [],
 		futoshiki: [],
+		magicSquare: [],
+		hidato: [],
 	};
 
 	games.forEach((game) => {
@@ -213,7 +215,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 
 	// Interleave: take 1 from each type in rotation
 	const interleaved: Puzzle[] = [];
-	const types = ["quickMath", "wordle", "wordChain", "riddle", "alias", "zip", "futoshiki"];
+	const types = ["quickMath", "wordle", "wordChain", "riddle", "alias", "zip", "futoshiki", "magicSquare", "hidato"];
 	const maxLength = Math.max(...Object.values(byType).map((arr) => arr.length));
 
 	for (let i = 0; i < maxLength; i++) {
@@ -227,7 +229,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 	console.log(
 		`[Interleave] Result: ${interleaved.length} games`,
 		`(${byType.quickMath.length} QM, ${byType.wordle.length} W,`,
-		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.alias.length} A, ${byType.zip.length} Z, ${byType.futoshiki.length} F)`
+		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.alias.length} A, ${byType.zip.length} Z, ${byType.futoshiki.length} F, ${byType.magicSquare.length} MS, ${byType.hidato.length} H)`
 	);
 
 	return interleaved;

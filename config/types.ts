@@ -6,7 +6,9 @@ export type PuzzleType =
 	| "wordChain"
 	| "alias"
 	| "zip"
-	| "futoshiki";
+	| "futoshiki"
+	| "magicSquare"
+	| "hidato";
 
 export interface Puzzle {
 	id: string;
@@ -18,7 +20,9 @@ export interface Puzzle {
 		| WordChainData
 		| AliasData
 		| ZipData
-		| FutoshikiData;
+		| FutoshikiData
+		| MagicSquareData
+		| HidatoData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -74,6 +78,22 @@ export interface FutoshikiData {
 		col2: number;
 		operator: "<" | ">";
 	}>;
+}
+
+export interface MagicSquareData {
+	size: number;
+	grid: number[]; // Flattened 1D array of solution
+	magicConstant: number;
+	givens: Array<{ row: number; col: number; value: number }>;
+}
+
+export interface HidatoData {
+	rows: number;
+	cols: number;
+	startNum: number;
+	endNum: number;
+	path: Array<{ row: number; col: number; value?: number }>; // Solution path positions (value is optional, can be calculated)
+	givens: Array<{ row: number; col: number; value: number }>;
 }
 
 // Game result types

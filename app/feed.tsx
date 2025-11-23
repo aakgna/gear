@@ -33,6 +33,8 @@ import {
 	AliasData,
 	ZipData,
 	FutoshikiData,
+	MagicSquareData,
+	HidatoData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -330,6 +332,63 @@ const FeedScreen = () => {
 						});
 					}
 				});
+
+				// Fetch Magic Square
+				const magicSquareGames = await fetchGamesFromFirestore(
+					"magicSquare",
+					difficulty
+				);
+				magicSquareGames.forEach((game) => {
+					if (
+						game.size &&
+						game.grid &&
+						game.magicConstant !== undefined &&
+						game.givens
+					) {
+						allPuzzles.push({
+							id: `magicSquare_${difficulty}_${game.id}`,
+							type: "magicSquare",
+							data: {
+								size: game.size,
+								grid: game.grid,
+								magicConstant: game.magicConstant,
+								givens: game.givens,
+							} as MagicSquareData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Hidato
+				const hidatoGames = await fetchGamesFromFirestore("hidato", difficulty);
+				hidatoGames.forEach((game) => {
+					if (
+						game.rows &&
+						game.cols &&
+						game.startNum !== undefined &&
+						game.endNum !== undefined &&
+						game.path &&
+						game.givens
+					) {
+						allPuzzles.push({
+							id: `hidato_${difficulty}_${game.id}`,
+							type: "hidato",
+							data: {
+								rows: game.rows,
+								cols: game.cols,
+								startNum: game.startNum,
+								endNum: game.endNum,
+								path: game.path,
+								givens: game.givens,
+							} as HidatoData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
 			}
 
 			// Store all puzzles
@@ -616,6 +675,63 @@ const FeedScreen = () => {
 								givens: game.givens,
 								inequalities: game.inequalities,
 							} as FutoshikiData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Magic Square
+				const magicSquareGames = await fetchGamesFromFirestore(
+					"magicSquare",
+					difficulty
+				);
+				magicSquareGames.forEach((game) => {
+					if (
+						game.size &&
+						game.grid &&
+						game.magicConstant !== undefined &&
+						game.givens
+					) {
+						newGames.push({
+							id: `magicSquare_${difficulty}_${game.id}`,
+							type: "magicSquare",
+							data: {
+								size: game.size,
+								grid: game.grid,
+								magicConstant: game.magicConstant,
+								givens: game.givens,
+							} as MagicSquareData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Hidato
+				const hidatoGames = await fetchGamesFromFirestore("hidato", difficulty);
+				hidatoGames.forEach((game) => {
+					if (
+						game.rows &&
+						game.cols &&
+						game.startNum !== undefined &&
+						game.endNum !== undefined &&
+						game.path &&
+						game.givens
+					) {
+						newGames.push({
+							id: `hidato_${difficulty}_${game.id}`,
+							type: "hidato",
+							data: {
+								rows: game.rows,
+								cols: game.cols,
+								startNum: game.startNum,
+								endNum: game.endNum,
+								path: game.path,
+								givens: game.givens,
+							} as HidatoData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
