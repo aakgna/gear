@@ -22,6 +22,7 @@ export interface FirestoreGame {
 	// Riddle structure
 	question?: string;
 	answer?: string;
+	choices?: string[]; // MCQ choices (includes correct answer, shuffled)
 	// WordChain structure
 	startWord?: string;
 	endWord?: string;
@@ -53,6 +54,8 @@ export interface FirestoreGame {
 	path?: Array<{ row: number; col: number; value?: number }>;
 	// Sudoku structure (grid is already defined above for Futoshiki/MagicSquare)
 	hint?: string;
+	// Trivia structure - reuses questions field name but with different type
+	// questions?: Array<{ question: string; answer: string; choices: string[] }>;
 }
 
 // Game History Entry interface
@@ -73,6 +76,7 @@ export const fetchGamesFromFirestore = async (
 		| "quickMath"
 		| "wordle"
 		| "riddle"
+		| "trivia"
 		| "wordChain"
 		| "alias"
 		| "zip"
@@ -319,9 +323,10 @@ export const savePuzzleCompletion = async (
 	puzzleId: string,
 	userId: string,
 	timeTaken: number,
-	attempts?: number, // for wordle/riddle/wordChain
-	mistakes?: number, // for quickMath
-	answerRevealed?: boolean // true if user used "Show Answer" feature
+	attempts?: number, // for wordle/riddle/wordChain/trivia
+	mistakes?: number, // for quickMath/trivia
+	answerRevealed?: boolean, // true if user used "Show Answer" feature
+	higherIsBetter?: boolean // true for trivia (higher score is better), false for wordle (fewer tries is better)
 ): Promise<void> => {
 	// Skip stats update if answer was revealed
 	// Game is still marked as completed in user's history, but doesn't affect leaderboard
@@ -408,8 +413,9 @@ export const savePuzzleCompletion = async (
 				newStats.fastestTime = Math.min(timeTaken, currentStats.fastestTime);
 			}
 
-			// Update attempts stats if provided (for games like Wordle - number of tries)
-			// For bestAttempts, we want the LOWEST number (fewest tries is best)
+			// Update attempts stats if provided
+			// For Wordle/Riddle/etc: LOWEST number is best (fewest tries)
+			// For Trivia: HIGHEST number is best (most correct answers)
 			if (
 				attempts !== undefined &&
 				attempts !== null &&
@@ -421,7 +427,12 @@ export const savePuzzleCompletion = async (
 				) {
 					newStats.bestAttempts = attempts;
 				} else {
-					newStats.bestAttempts = Math.min(attempts, currentStats.bestAttempts);
+					// Use Math.max for trivia (higher is better), Math.min for others (lower is better)
+					if (higherIsBetter) {
+						newStats.bestAttempts = Math.max(attempts, currentStats.bestAttempts);
+					} else {
+						newStats.bestAttempts = Math.min(attempts, currentStats.bestAttempts);
+					}
 				}
 			} else {
 				// Preserve existing value

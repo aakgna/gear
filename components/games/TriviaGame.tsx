@@ -7,7 +7,7 @@ import {
 	Animated,
 	ScrollView,
 } from "react-native";
-import { GameResult, RiddleData } from "../../config/types";
+import { GameResult, TriviaData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -16,11 +16,10 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
-	Layout,
 } from "../../constants/DesignSystem";
 
-interface RiddleGameProps {
-	inputData: RiddleData;
+interface TriviaGameProps {
+	inputData: TriviaData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -28,7 +27,7 @@ interface RiddleGameProps {
 	onShowStats?: () => void;
 }
 
-const RiddleGame: React.FC<RiddleGameProps> = ({
+const TriviaGame: React.FC<TriviaGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -36,63 +35,62 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	puzzleId,
 	onShowStats,
 }) => {
-	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
-	const [feedback, setFeedback] = useState<string | null>(null);
-	const [attempts, setAttempts] = useState(0);
+	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+	const [selectedChoices, setSelectedChoices] = useState<(string | null)[]>(
+		new Array(inputData.questions.length).fill(null)
+	);
+	const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(
+		new Array(inputData.questions.length).fill(false)
+	);
 	const [startTime, setStartTime] = useState(propStartTime || Date.now());
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
-	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
-	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
+	const hasAttemptedRef = useRef(false);
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
+	const scrollViewRef = useRef<ScrollView>(null);
 
-	// Reset timer when puzzle changes (using prompt and answer as unique identifier)
-	const puzzleSignature = `${inputData.prompt}-${inputData.answer}`;
+	// Reset timer when puzzle changes
+	const puzzleSignature = `${inputData.questions[0]?.question}-${inputData.questions.length}`;
 
 	useEffect(() => {
-		// Only reset if this is a different puzzle
 		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
 			setStartTime(newStartTime);
 			setCompleted(false);
-			setSelectedChoice(null);
-			setFeedback(null);
-			setAttempts(0);
-			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
+			setCurrentQuestionIndex(0);
+			setSelectedChoices(new Array(inputData.questions.length).fill(null));
+			setAnsweredQuestions(new Array(inputData.questions.length).fill(false));
+			hasAttemptedRef.current = false;
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			// Reset timer when startTime prop changes (puzzle switch)
 			setElapsedTime(0);
 			setStartTime(propStartTime);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [puzzleSignature, propStartTime, startTime]);
+	}, [puzzleSignature, propStartTime, startTime, inputData.questions.length]);
 
-	// Timer effect - updates every second
+	// Timer effect
 	useEffect(() => {
 		if (completed) {
-			// Stop timer when game is completed
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 			return;
 		}
 
-		// Clear any existing interval
 		if (timerIntervalRef.current) {
 			clearInterval(timerIntervalRef.current);
 		}
 
-		// Start timer
 		timerIntervalRef.current = setInterval(() => {
 			setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
 		}, 1000);
@@ -104,7 +102,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		};
 	}, [completed, startTime]);
 
-	// Format time as MM:SS or SS
 	const formatTime = (seconds: number): string => {
 		if (seconds < 60) {
 			return `${seconds}s`;
@@ -114,51 +111,37 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
-	const handleShowAnswer = () => {
-		if (completed || answerRevealed) return;
+	const handleChoiceSelect = (choice: string) => {
+		if (answeredQuestions[currentQuestionIndex] || completed) return;
 
-		const correctAnswer = inputData.answer.trim().toLowerCase();
-
-		setSelectedChoice(correctAnswer);
-		setAnswerRevealed(true);
-		setCompleted(true);
-		setFeedback("Answer revealed!");
-
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-		// Stop timer
-		if (timerIntervalRef.current) {
-			clearInterval(timerIntervalRef.current);
+		// Track first interaction
+		if (!hasAttemptedRef.current && puzzleId) {
+			hasAttemptedRef.current = true;
+			if (onAttempt) {
+				onAttempt(puzzleId);
+			}
 		}
-		setElapsedTime(timeTaken);
 
-		// Mark as completed
-		onComplete({
-			puzzleId: puzzleId || `riddle_${Date.now()}`,
-			completed: true,
-			timeTaken,
-			attempts: attempts + 1,
-			completedAt: new Date().toISOString(),
-			answerRevealed: true,
-		});
+		const newSelectedChoices = [...selectedChoices];
+		newSelectedChoices[currentQuestionIndex] = choice;
+		setSelectedChoices(newSelectedChoices);
 	};
 
-	const submit = () => {
+	const handleSubmit = () => {
+		const currentQuestion = inputData.questions[currentQuestionIndex];
+		const selectedChoice = selectedChoices[currentQuestionIndex];
+
 		if (!selectedChoice) return;
 
-		const correctAnswer = inputData.answer.trim().toLowerCase();
-		const isCorrect = selectedChoice.toLowerCase() === correctAnswer;
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-		setAttempts((a) => a + 1);
-		
+		// Mark this question as answered
+		const newAnsweredQuestions = [...answeredQuestions];
+		newAnsweredQuestions[currentQuestionIndex] = true;
+		setAnsweredQuestions(newAnsweredQuestions);
+
+		const isCorrect =
+			selectedChoice.toLowerCase() === currentQuestion.answer.toLowerCase();
+
 		if (isCorrect) {
-			// Stop timer
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			setElapsedTime(timeTaken);
-			setCompleted(true);
-			setFeedback("Correct!");
 			// Success animation
 			Animated.sequence([
 				Animated.timing(successScale, {
@@ -172,15 +155,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					useNativeDriver: true,
 				}),
 			]).start();
-			onComplete({
-				puzzleId: puzzleId || `riddle_${Date.now()}`,
-				completed: true,
-				timeTaken,
-				attempts: attempts + 1,
-				completedAt: new Date().toISOString(),
-			});
 		} else {
-			setFeedback("Try again.");
 			// Shake animation for incorrect
 			Animated.sequence([
 				Animated.timing(shakeAnimation, {
@@ -202,30 +177,83 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		}
 	};
 
-	const handleChoiceSelect = (choice: string) => {
-		if (completed) return;
-
-		// Track first interaction
-		if (!hasAttemptedRef.current && puzzleId) {
-			hasAttemptedRef.current = true;
-			if (onAttempt) {
-				onAttempt(puzzleId);
-			}
+	const handleNext = () => {
+		if (currentQuestionIndex < inputData.questions.length - 1) {
+			setCurrentQuestionIndex(currentQuestionIndex + 1);
+			// Scroll to top when moving to next question
+			setTimeout(() => {
+				scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+			}, 100);
 		}
-
-		setSelectedChoice(choice);
-		setFeedback(null);
 	};
 
-	const scrollViewRef = useRef<ScrollView>(null);
+	const handleViewStats = () => {
+		if (completed) {
+			if (onShowStats) {
+				onShowStats();
+			}
+			return;
+		}
+
+		// Calculate final stats
+		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+		const correctAnswers = selectedChoices.filter((choice, index) => {
+			if (!choice) return false;
+			return (
+				choice.toLowerCase() ===
+				inputData.questions[index].answer.toLowerCase()
+			);
+		}).length;
+		const totalQuestions = inputData.questions.length;
+
+		// Stop timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+		}
+		setElapsedTime(timeTaken);
+		setCompleted(true);
+
+		onComplete({
+			puzzleId: puzzleId || `trivia_${Date.now()}`,
+			completed: true,
+			timeTaken,
+			attempts: correctAnswers, // Number of correct answers for trivia
+			mistakes: totalQuestions - correctAnswers, // Number of wrong answers
+			accuracy: (correctAnswers / totalQuestions) * 100,
+			completedAt: new Date().toISOString(),
+		});
+
+		if (onShowStats) {
+			onShowStats();
+		}
+	};
+
+	const currentQuestion = inputData.questions[currentQuestionIndex];
+	const currentSelected = selectedChoices[currentQuestionIndex];
+	const isCurrentAnswered = answeredQuestions[currentQuestionIndex];
+	const isLastQuestion = currentQuestionIndex === inputData.questions.length - 1;
+
+	// Calculate progress
+	const answeredCount = answeredQuestions.filter((a) => a).length;
+	const progress = (answeredCount / inputData.questions.length) * 100;
 
 	return (
 		<View style={styles.container}>
 			<View style={styles.header}>
-				<Text style={styles.title}>Riddle</Text>
+				<View>
+					<Text style={styles.title}>Trivia</Text>
+					<Text style={styles.questionCounter}>
+						Question {currentQuestionIndex + 1} of {inputData.questions.length}
+					</Text>
+				</View>
 				<View style={styles.timerBadge}>
 					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
 				</View>
+			</View>
+
+			{/* Progress bar */}
+			<View style={styles.progressBarContainer}>
+				<View style={[styles.progressBar, { width: `${progress}%` }]} />
 			</View>
 
 			<ScrollView
@@ -236,49 +264,44 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 			>
 				<Animated.View
 					style={[
-						styles.promptContainer,
+						styles.questionContainer,
 						{
 							transform: [{ translateX: shakeAnimation }],
 						},
 					]}
 				>
-					<View style={styles.promptCard}>
-						<Text style={styles.prompt}>{inputData.prompt}</Text>
+					<View style={styles.questionCard}>
+						<Text style={styles.question}>{currentQuestion.question}</Text>
 					</View>
 				</Animated.View>
 
-				{inputData.hint && (
-					<View style={styles.hintContainer}>
-						<Text style={styles.hintLabel}>💡 Hint:</Text>
-						<Text style={styles.hint}>{inputData.hint}</Text>
-					</View>
-				)}
-
 				<View style={styles.choicesContainer}>
-					{inputData.choices.map((choice, index) => {
-						const isSelected = selectedChoice === choice;
-						const correctAnswer = inputData.answer.trim().toLowerCase();
+					{currentQuestion.choices.map((choice, index) => {
+						const isSelected = currentSelected === choice;
+						const correctAnswer = currentQuestion.answer.trim().toLowerCase();
 						const isCorrect = choice.toLowerCase() === correctAnswer;
-						const showCorrect = completed && isCorrect;
-						const showWrong = completed && isSelected && !isCorrect;
+						const showCorrect = isCurrentAnswered && isCorrect;
+						const showWrong = isCurrentAnswered && isSelected && !isCorrect;
 
 						return (
 							<TouchableOpacity
 								key={index}
 								style={[
 									styles.choiceButton,
-									isSelected && !completed && styles.choiceButtonSelected,
+									isSelected && !isCurrentAnswered && styles.choiceButtonSelected,
 									showCorrect && styles.choiceButtonCorrect,
 									showWrong && styles.choiceButtonWrong,
 								]}
 								onPress={() => handleChoiceSelect(choice)}
 								activeOpacity={0.7}
-								disabled={completed}
+								disabled={isCurrentAnswered}
 							>
 								<Text
 									style={[
 										styles.choiceText,
-										isSelected && !completed && styles.choiceTextSelected,
+										isSelected &&
+											!isCurrentAnswered &&
+											styles.choiceTextSelected,
 										showCorrect && styles.choiceTextCorrect,
 										showWrong && styles.choiceTextWrong,
 									]}
@@ -290,33 +313,33 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					})}
 				</View>
 
-				{feedback && !completed && (
-					<View style={styles.feedbackContainer}>
-						<Text style={styles.feedback}>{feedback}</Text>
-					</View>
-				)}
-
-				<TouchableOpacity
-					style={[
-						styles.submit,
-						(!selectedChoice || completed) && styles.submitDisabled,
-					]}
-					onPress={completed ? onShowStats : submit}
-					activeOpacity={0.7}
-					disabled={!selectedChoice && !completed}
-				>
-					<Text style={styles.submitText}>
-						{completed ? "Submitted, View Stats" : "Submit Answer"}
-					</Text>
-				</TouchableOpacity>
-
-				{!completed && !answerRevealed && (
+				{!isCurrentAnswered ? (
 					<TouchableOpacity
-						style={styles.showAnswerButton}
-						onPress={handleShowAnswer}
+						style={[
+							styles.submitButton,
+							!currentSelected && styles.submitButtonDisabled,
+						]}
+						onPress={handleSubmit}
+						activeOpacity={0.7}
+						disabled={!currentSelected}
+					>
+						<Text style={styles.submitButtonText}>Submit Answer</Text>
+					</TouchableOpacity>
+				) : isLastQuestion ? (
+					<TouchableOpacity
+						style={styles.submitButton}
+						onPress={handleViewStats}
 						activeOpacity={0.7}
 					>
-						<Text style={styles.showAnswerText}>Show Answer</Text>
+						<Text style={styles.submitButtonText}>View Stats</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.nextButton}
+						onPress={handleNext}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.nextButtonText}>Next Question →</Text>
 					</TouchableOpacity>
 				)}
 			</ScrollView>
@@ -336,13 +359,18 @@ const styles = StyleSheet.create({
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
 		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingBottom: Spacing.md,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.primary,
 		letterSpacing: -0.5,
+	},
+	questionCounter: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		marginTop: Spacing.xs,
 	},
 	timerBadge: {
 		backgroundColor: Colors.accent + "20",
@@ -358,6 +386,19 @@ const styles = StyleSheet.create({
 		color: Colors.accent,
 		fontFamily: Typography.fontFamily.monospace,
 	},
+	progressBarContainer: {
+		height: 4,
+		backgroundColor: Colors.background.secondary,
+		marginHorizontal: Spacing.xl,
+		marginBottom: Spacing.md,
+		borderRadius: 2,
+		overflow: "hidden",
+	},
+	progressBar: {
+		height: "100%",
+		backgroundColor: Colors.primary,
+		borderRadius: 2,
+	},
 	scrollView: {
 		flex: 1,
 	},
@@ -365,11 +406,11 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.xl,
 		paddingBottom: Spacing.lg,
 	},
-	promptContainer: {
+	questionContainer: {
 		width: "100%",
 		marginBottom: Spacing.lg,
 	},
-	promptCard: {
+	questionCard: {
 		backgroundColor: Colors.background.tertiary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
@@ -378,32 +419,12 @@ const styles = StyleSheet.create({
 		...Shadows.medium,
 		alignItems: "center",
 	},
-	prompt: {
+	question: {
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
 		textAlign: "center",
 		lineHeight: Typography.fontSize.body * 1.4,
 		fontWeight: Typography.fontWeight.medium,
-	},
-	hintContainer: {
-		backgroundColor: Colors.accent + "10",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginBottom: Spacing.lg,
-		borderWidth: 1,
-		borderColor: Colors.accent + "30",
-	},
-	hintLabel: {
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
-		marginBottom: Spacing.xs,
-	},
-	hint: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-		lineHeight: Typography.fontSize.caption * 1.4,
-		fontStyle: "italic",
 	},
 	choicesContainer: {
 		marginBottom: Spacing.md,
@@ -452,106 +473,45 @@ const styles = StyleSheet.create({
 		color: Colors.error,
 		fontWeight: Typography.fontWeight.bold,
 	},
-	submit: {
+	submitButton: {
 		backgroundColor: ComponentStyles.button.backgroundColor,
 		borderRadius: ComponentStyles.button.borderRadius,
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.xl,
 		minHeight: 48,
-		alignItems: ComponentStyles.button.alignItems,
-		justifyContent: ComponentStyles.button.justifyContent,
+		alignItems: "center",
+		justifyContent: "center",
 		width: "100%",
 		...Shadows.medium,
 		marginBottom: Spacing.sm,
 	},
-	submitText: {
+	submitButtonText: {
 		color: Colors.text.white,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		letterSpacing: 0.5,
 	},
-	submitDisabled: {
+	submitButtonDisabled: {
 		opacity: 0.5,
 	},
-	showAnswerButton: {
-		marginTop: 0,
-		backgroundColor: Colors.background.secondary,
+	nextButton: {
+		backgroundColor: Colors.primary,
 		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.sm,
+		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.xl,
+		minHeight: 48,
 		alignItems: "center",
 		justifyContent: "center",
 		width: "100%",
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
+		...Shadows.medium,
 	},
-	showAnswerText: {
-		color: Colors.text.secondary,
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
-	},
-	feedbackContainer: {
-		marginBottom: Spacing.md,
-		padding: Spacing.sm,
-		backgroundColor: Colors.error + "15",
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.error + "40",
-	},
-	feedback: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.error,
-		textAlign: "center",
-		fontWeight: Typography.fontWeight.semiBold,
-	},
-	completionContainer: {
-		marginTop: Spacing.xl,
-		padding: Spacing.xxl,
-		backgroundColor: Colors.accent + "10",
-		borderRadius: BorderRadius.xl,
-		alignItems: "center",
-		borderWidth: 2,
-		borderColor: Colors.accent,
-		...Shadows.large,
-	},
-	completionEmoji: {
-		fontSize: 48,
-		marginBottom: Spacing.sm,
-	},
-	completionText: {
-		fontSize: Typography.fontSize.h2,
+	nextButtonText: {
+		color: Colors.text.white,
+		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
-		marginBottom: Spacing.lg,
-		letterSpacing: -0.5,
-	},
-	statsRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.xl,
-	},
-	statItem: {
-		alignItems: "center",
-		gap: Spacing.xs,
-	},
-	statLabel: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-		fontWeight: Typography.fontWeight.medium,
-		textTransform: "uppercase",
 		letterSpacing: 0.5,
-	},
-	statValue: {
-		fontSize: Typography.fontSize.h3,
-		color: Colors.text.primary,
-		fontWeight: Typography.fontWeight.bold,
-		fontFamily: Typography.fontFamily.monospace,
-	},
-	statDivider: {
-		width: 1,
-		height: 32,
-		backgroundColor: "rgba(255, 255, 255, 0.2)",
 	},
 });
 
-export default RiddleGame;
+export default TriviaGame;
+

@@ -9,7 +9,8 @@ export type PuzzleType =
 	| "futoshiki"
 	| "magicSquare"
 	| "hidato"
-	| "sudoku";
+	| "sudoku"
+	| "trivia";
 
 export interface Puzzle {
 	id: string;
@@ -24,7 +25,8 @@ export interface Puzzle {
 		| FutoshikiData
 		| MagicSquareData
 		| HidatoData
-		| SudokuData;
+		| SudokuData
+		| TriviaData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -44,7 +46,8 @@ export interface QuickMathData {
 
 export interface RiddleData {
 	prompt: string; // From Firestore 'question' field
-	answer: string; // From Firestore 'answer' field - can be comma-separated for multiple valid answers
+	answer: string; // From Firestore 'answer' field - the correct answer
+	choices: string[]; // MCQ choices (includes correct answer, shuffled)
 	hint?: string;
 }
 
@@ -101,6 +104,16 @@ export interface HidatoData {
 export interface SudokuData {
 	grid: number[]; // Flattened 1D array of complete solution (81 numbers)
 	givens: Array<{ row: number; col: number; value: number }>;
+}
+
+export interface TriviaQuestion {
+	question: string; // The question text
+	answer: string; // The correct answer
+	choices: string[]; // Array of 4 choices (includes correct answer, shuffled)
+}
+
+export interface TriviaData {
+	questions: TriviaQuestion[]; // Array of questions (3 for easy, 4 for medium, 5 for hard)
 }
 
 // Game result types

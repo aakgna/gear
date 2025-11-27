@@ -18,6 +18,7 @@ import {
 import WordleGame from "./WordleGame";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
+import TriviaGame from "./TriviaGame";
 import WordChainGame from "./WordChainGame";
 import AliasGame from "./AliasGame";
 import ZipGame from "./ZipGame";
@@ -72,13 +73,15 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			// Save puzzle completion to Firestore for stats
 			// (skipped if answerRevealed is true)
+			// For trivia, higher score is better; for others, fewer attempts is better
 			await savePuzzleCompletion(
 				puzzle.id,
 				user.uid,
 				result.timeTaken,
 				result.attempts,
 				result.mistakes,
-				result.answerRevealed
+				result.answerRevealed,
+				puzzle.type === "trivia" // higherIsBetter for trivia
 			);
 
 			// Store result for stats display (but don't show yet)
@@ -128,6 +131,18 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			case "riddle":
 				return (
 					<RiddleGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={startTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+					/>
+				);
+			case "trivia":
+				return (
+					<TriviaGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -266,6 +281,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 								loading={loadingStats}
 								userTime={completedResult.timeTaken}
 								userAttempts={completedResult.attempts}
+								userMistakes={completedResult.mistakes}
 							/>
 						</ScrollView>
 					</View>

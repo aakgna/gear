@@ -15,6 +15,7 @@ interface PuzzleStatsProps {
 	loading?: boolean;
 	userTime: number;
 	userAttempts?: number;
+	userMistakes?: number;
 }
 
 const PuzzleStats: React.FC<PuzzleStatsProps> = ({
@@ -23,6 +24,7 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 	loading,
 	userTime,
 	userAttempts,
+	userMistakes,
 }) => {
 	const formatTime = (seconds: number): string => {
 		if (seconds < 60) {
@@ -98,6 +100,46 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 					</Text>
 				</View>
 			</View>
+
+			{/* Trivia Score Stats */}
+			{puzzleType === "trivia" &&
+				userAttempts !== undefined &&
+				userMistakes !== undefined &&
+				stats.bestAttempts !== undefined && (
+					<View style={styles.statCard}>
+						<View style={styles.statRow}>
+							<Text style={styles.statLabel}>Your Score</Text>
+							<Text
+								style={[
+									styles.statValue,
+									isBestAttempts && styles.bestValue,
+									!isBestAttempts &&
+										userAttempts >= stats.bestAttempts &&
+										styles.goodValue,
+								]}
+							>
+								{userAttempts}/{userAttempts + userMistakes}
+								{isBestAttempts && " 🏆"}
+							</Text>
+						</View>
+						<View style={styles.statRow}>
+							<Text style={styles.statLabel}>Best Score</Text>
+							<Text style={[styles.statValue, styles.bestValue]}>
+								{stats.bestAttempts}/{userAttempts + userMistakes}
+							</Text>
+						</View>
+						{isBestAttempts && (
+							<Text style={styles.comparisonText}>
+								Perfect! You matched the best score! 🏆
+							</Text>
+						)}
+						{!isBestAttempts && userAttempts >= stats.bestAttempts && (
+							<Text style={styles.comparisonText}>
+								Great job! Close to perfect!
+							</Text>
+						)}
+					</View>
+				)}
 
 			{/* Attempts Stats (Wordle/Riddle/WordChain/Alias/Zip) */}
 			{(puzzleType === "wordle" ||

@@ -36,6 +36,7 @@ import {
 	MagicSquareData,
 	HidatoData,
 	SudokuData,
+	TriviaData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -233,18 +234,53 @@ const FeedScreen = () => {
 				// Fetch Riddle
 				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
 				riddleGames.forEach((game) => {
-					if (game.question && game.answer) {
+					if (game.question && game.answer && game.choices) {
 						allPuzzles.push({
 							id: `riddle_${difficulty}_${game.id}`,
 							type: "riddle",
 							data: {
 								prompt: game.question,
 								answer: game.answer,
+								choices: game.choices,
 							} as RiddleData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 						});
+					}
+				});
+
+				// Fetch Trivia
+				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
+				console.log(
+					`[Trivia] Fetched ${triviaGames.length} trivia games for ${difficulty}`
+				);
+				if (triviaGames.length > 0) {
+					console.log(
+						"[Trivia] First game:",
+						JSON.stringify(triviaGames[0], null, 2)
+					);
+				}
+				triviaGames.forEach((game) => {
+					if (game.questions && Array.isArray(game.questions)) {
+						console.log(
+							`[Trivia] Adding game ${game.id} with ${game.questions.length} questions`
+						);
+						allPuzzles.push({
+							id: `trivia_${difficulty}_${game.id}`,
+							type: "trivia",
+							data: {
+								questions: game.questions as any,
+							} as TriviaData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					} else {
+						console.log(
+							`[Trivia] Skipping game ${game.id} - invalid questions field:`,
+							game.questions
+						);
 					}
 				});
 
@@ -602,18 +638,53 @@ const FeedScreen = () => {
 				// Fetch Riddle
 				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
 				riddleGames.forEach((game) => {
-					if (game.question && game.answer) {
+					if (game.question && game.answer && game.choices) {
 						newGames.push({
 							id: `riddle_${difficulty}_${game.id}`,
 							type: "riddle",
 							data: {
 								prompt: game.question,
 								answer: game.answer,
+								choices: game.choices,
 							} as RiddleData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 						});
+					}
+				});
+
+				// Fetch Trivia
+				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
+				console.log(
+					`[Trivia Prefetch] Fetched ${triviaGames.length} trivia games for ${difficulty}`
+				);
+				if (triviaGames.length > 0) {
+					console.log(
+						"[Trivia Prefetch] First game:",
+						JSON.stringify(triviaGames[0], null, 2)
+					);
+				}
+				triviaGames.forEach((game) => {
+					if (game.questions && Array.isArray(game.questions)) {
+						console.log(
+							`[Trivia Prefetch] Adding game ${game.id} with ${game.questions.length} questions`
+						);
+						newGames.push({
+							id: `trivia_${difficulty}_${game.id}`,
+							type: "trivia",
+							data: {
+								questions: game.questions as any,
+							} as TriviaData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					} else {
+						console.log(
+							`[Trivia Prefetch] Skipping game ${game.id} - invalid questions field:`,
+							game.questions
+						);
 					}
 				});
 
