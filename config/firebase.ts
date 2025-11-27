@@ -56,6 +56,9 @@ export interface FirestoreGame {
 	hint?: string;
 	// Trivia structure - reuses questions field name but with different type
 	// questions?: Array<{ question: string; answer: string; choices: string[] }>;
+	// Mastermind structure
+	secretCode?: string[]; // Array of 6 color names
+	maxGuesses?: number; // Max attempts allowed
 }
 
 // Game History Entry interface
@@ -77,6 +80,7 @@ export const fetchGamesFromFirestore = async (
 		| "wordle"
 		| "riddle"
 		| "trivia"
+		| "mastermind"
 		| "wordChain"
 		| "alias"
 		| "zip"

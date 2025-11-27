@@ -10,7 +10,8 @@ export type PuzzleType =
 	| "magicSquare"
 	| "hidato"
 	| "sudoku"
-	| "trivia";
+	| "trivia"
+	| "mastermind";
 
 export interface Puzzle {
 	id: string;
@@ -26,7 +27,8 @@ export interface Puzzle {
 		| MagicSquareData
 		| HidatoData
 		| SudokuData
-		| TriviaData;
+		| TriviaData
+		| MastermindData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -114,6 +116,11 @@ export interface TriviaQuestion {
 
 export interface TriviaData {
 	questions: TriviaQuestion[]; // Array of questions (3 for easy, 4 for medium, 5 for hard)
+}
+
+export interface MastermindData {
+	secretCode: string[]; // Array of 6 color names
+	maxGuesses: number; // Max attempts allowed (12 for easy, 10 for medium, 8 for hard)
 }
 
 // Game result types

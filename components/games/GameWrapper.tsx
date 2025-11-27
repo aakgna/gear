@@ -19,6 +19,7 @@ import WordleGame from "./WordleGame";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
 import TriviaGame from "./TriviaGame";
+import MastermindGame from "./MastermindGame";
 import WordChainGame from "./WordChainGame";
 import AliasGame from "./AliasGame";
 import ZipGame from "./ZipGame";
@@ -140,19 +141,31 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						onShowStats={handleShowStats}
 					/>
 				);
-			case "trivia":
-				return (
-					<TriviaGame
-						key={puzzle.id}
-						inputData={puzzle.data as any}
-						onComplete={handleComplete}
-						onAttempt={onAttempt}
-						startTime={startTime}
-						puzzleId={puzzle.id}
-						onShowStats={handleShowStats}
-					/>
-				);
-			case "wordChain":
+		case "trivia":
+			return (
+				<TriviaGame
+					key={puzzle.id}
+					inputData={puzzle.data as any}
+					onComplete={handleComplete}
+					onAttempt={onAttempt}
+					startTime={startTime}
+					puzzleId={puzzle.id}
+					onShowStats={handleShowStats}
+				/>
+			);
+		case "mastermind":
+			return (
+				<MastermindGame
+					key={puzzle.id}
+					inputData={puzzle.data as any}
+					onComplete={handleComplete}
+					onAttempt={onAttempt}
+					startTime={startTime}
+					puzzleId={puzzle.id}
+					onShowStats={handleShowStats}
+				/>
+			);
+		case "wordChain":
 				return (
 					<WordChainGame
 						key={puzzle.id}

@@ -37,6 +37,7 @@ import {
 	HidatoData,
 	SudokuData,
 	TriviaData,
+	MastermindData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -281,6 +282,31 @@ const FeedScreen = () => {
 							`[Trivia] Skipping game ${game.id} - invalid questions field:`,
 							game.questions
 						);
+					}
+				});
+
+				// Fetch Mastermind
+				const mastermindGames = await fetchGamesFromFirestore(
+					"mastermind",
+					difficulty
+				);
+				mastermindGames.forEach((game) => {
+					if (
+						game.secretCode &&
+						Array.isArray(game.secretCode) &&
+						game.maxGuesses
+					) {
+						allPuzzles.push({
+							id: `mastermind_${difficulty}_${game.id}`,
+							type: "mastermind",
+							data: {
+								secretCode: game.secretCode,
+								maxGuesses: game.maxGuesses,
+							} as MastermindData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
 					}
 				});
 
@@ -685,6 +711,31 @@ const FeedScreen = () => {
 							`[Trivia Prefetch] Skipping game ${game.id} - invalid questions field:`,
 							game.questions
 						);
+					}
+				});
+
+				// Fetch Mastermind
+				const mastermindGamesPrefetch = await fetchGamesFromFirestore(
+					"mastermind",
+					difficulty
+				);
+				mastermindGamesPrefetch.forEach((game) => {
+					if (
+						game.secretCode &&
+						Array.isArray(game.secretCode) &&
+						game.maxGuesses
+					) {
+						newGames.push({
+							id: `mastermind_${difficulty}_${game.id}`,
+							type: "mastermind",
+							data: {
+								secretCode: game.secretCode,
+								maxGuesses: game.maxGuesses,
+							} as MastermindData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
 					}
 				});
 
