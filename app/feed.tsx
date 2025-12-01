@@ -38,6 +38,7 @@ import {
 	SudokuData,
 	TriviaData,
 	MastermindData,
+	SequencingData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import { useGameStore } from "../stores/gameStore";
@@ -303,6 +304,46 @@ const FeedScreen = () => {
 								secretCode: game.secretCode,
 								maxGuesses: game.maxGuesses,
 							} as MastermindData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Sequencing
+				const sequencingGames = await fetchGamesFromFirestore(
+					"sequencing",
+					difficulty
+				);
+				sequencingGames.forEach((game) => {
+					if (
+						game.theme &&
+						game.numSlots &&
+						game.entities &&
+						Array.isArray(game.entities) &&
+						game.rules &&
+						Array.isArray(game.rules) &&
+						game.solution &&
+						Array.isArray(game.solution)
+					) {
+						allPuzzles.push({
+							id: `sequencing_${difficulty}_${game.id}`,
+							type: "sequencing",
+							data: {
+								theme: game.theme as "people" | "appointments" | "runners",
+								numSlots: game.numSlots,
+								entities: game.entities,
+								rules: game.rules.map((r: any) => ({
+									type: r.type,
+									entity1: r.entity1,
+									entity2: r.entity2,
+									position: r.position,
+									minDistance: r.minDistance,
+									description: r.description,
+								})),
+								solution: game.solution,
+							} as SequencingData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -732,6 +773,46 @@ const FeedScreen = () => {
 								secretCode: game.secretCode,
 								maxGuesses: game.maxGuesses,
 							} as MastermindData,
+							difficulty:
+								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
+							createdAt: new Date().toISOString(),
+						});
+					}
+				});
+
+				// Fetch Sequencing
+				const sequencingGamesPrefetch = await fetchGamesFromFirestore(
+					"sequencing",
+					difficulty
+				);
+				sequencingGamesPrefetch.forEach((game) => {
+					if (
+						game.theme &&
+						game.numSlots &&
+						game.entities &&
+						Array.isArray(game.entities) &&
+						game.rules &&
+						Array.isArray(game.rules) &&
+						game.solution &&
+						Array.isArray(game.solution)
+					) {
+						newGames.push({
+							id: `sequencing_${difficulty}_${game.id}`,
+							type: "sequencing",
+							data: {
+								theme: game.theme as "people" | "appointments" | "runners",
+								numSlots: game.numSlots,
+								entities: game.entities,
+								rules: game.rules.map((r: any) => ({
+									type: r.type,
+									entity1: r.entity1,
+									entity2: r.entity2,
+									position: r.position,
+									minDistance: r.minDistance,
+									description: r.description,
+								})),
+								solution: game.solution,
+							} as SequencingData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

@@ -11,7 +11,8 @@ export type PuzzleType =
 	| "hidato"
 	| "sudoku"
 	| "trivia"
-	| "mastermind";
+	| "mastermind"
+	| "sequencing";
 
 export interface Puzzle {
 	id: string;
@@ -28,7 +29,8 @@ export interface Puzzle {
 		| HidatoData
 		| SudokuData
 		| TriviaData
-		| MastermindData;
+		| MastermindData
+		| SequencingData;
 	difficulty: number;
 	createdAt: string;
 }
@@ -121,6 +123,23 @@ export interface TriviaData {
 export interface MastermindData {
 	secretCode: string[]; // Array of 6 color names
 	maxGuesses: number; // Max attempts allowed (12 for easy, 10 for medium, 8 for hard)
+}
+
+export interface SequencingRule {
+	type: "ordering" | "adjacency" | "fixed" | "separation";
+	entity1?: string; // For ordering, adjacency, separation
+	entity2?: string; // For ordering, adjacency, separation
+	position?: number; // For fixed position rules
+	minDistance?: number; // For separation rules
+	description: string; // Human-readable rule description
+}
+
+export interface SequencingData {
+	theme: "people" | "appointments" | "runners";
+	numSlots: number; // 4-8 based on difficulty
+	entities: string[]; // Entity names (e.g., ["Person A", "Person B", ...] or ["Monday", "Tuesday", ...])
+	rules: SequencingRule[];
+	solution: number[]; // Array of entity indices in correct order (0-based)
 }
 
 // Game result types

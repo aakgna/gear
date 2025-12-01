@@ -161,20 +161,40 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 
 	// Setup timer and puzzleId tracking
 	useEffect(() => {
-		if (puzzleId && !puzzleIdRef.current) {
-			puzzleIdRef.current = puzzleId;
+		// Clear any existing timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
 		}
 
+		// Reset if puzzle changed
+		if (puzzleId && puzzleIdRef.current !== puzzleId) {
+			puzzleIdRef.current = puzzleId;
+			setStartTime(propStartTime || Date.now());
+			setElapsedTime(0);
+			setGameWon(false);
+			setGameLost(false);
+			setAttemptsUsed(0);
+			setCurrentGuess(new Array(6).fill(null));
+			setGuessHistory([]);
+			setSelectedPosition(null);
+			hasAttemptedRef.current = false;
+		}
+
+		// Set up new timer
+		const newStartTime = propStartTime || Date.now();
+		setStartTime(newStartTime);
 		timerIntervalRef.current = setInterval(() => {
-			setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+			setElapsedTime(Math.floor((Date.now() - newStartTime) / 1000));
 		}, 1000);
 
 		return () => {
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
+				timerIntervalRef.current = null;
 			}
 		};
-	}, [startTime, puzzleId]);
+	}, [puzzleId, propStartTime]);
 
 	// Handle color selection
 	const handleColorSelect = (color: string) => {

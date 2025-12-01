@@ -59,6 +59,19 @@ export interface FirestoreGame {
 	// Mastermind structure
 	secretCode?: string[]; // Array of 6 color names
 	maxGuesses?: number; // Max attempts allowed
+	// Sequencing structure
+	theme?: "people" | "appointments" | "runners";
+	numSlots?: number;
+	entities?: string[];
+	rules?: Array<{
+		type: string;
+		entity1?: string;
+		entity2?: string;
+		position?: number;
+		minDistance?: number;
+		description: string;
+	}>;
+	solution?: number[];
 }
 
 // Game History Entry interface
@@ -81,6 +94,7 @@ export const fetchGamesFromFirestore = async (
 		| "riddle"
 		| "trivia"
 		| "mastermind"
+		| "sequencing"
 		| "wordChain"
 		| "alias"
 		| "zip"

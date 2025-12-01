@@ -20,6 +20,7 @@ import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
 import TriviaGame from "./TriviaGame";
 import MastermindGame from "./MastermindGame";
+import SequencingGame from "./SequencingGame";
 import WordChainGame from "./WordChainGame";
 import AliasGame from "./AliasGame";
 import ZipGame from "./ZipGame";
@@ -156,6 +157,18 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		case "mastermind":
 			return (
 				<MastermindGame
+					key={puzzle.id}
+					inputData={puzzle.data as any}
+					onComplete={handleComplete}
+					onAttempt={onAttempt}
+					startTime={startTime}
+					puzzleId={puzzle.id}
+					onShowStats={handleShowStats}
+				/>
+			);
+		case "sequencing":
+			return (
+				<SequencingGame
 					key={puzzle.id}
 					inputData={puzzle.data as any}
 					onComplete={handleComplete}
