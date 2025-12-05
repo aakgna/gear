@@ -18,6 +18,7 @@ import {
 	ComponentStyles,
 	Layout,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface RiddleGameProps {
 	inputData: RiddleData;
@@ -26,6 +27,7 @@ interface RiddleGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const RiddleGame: React.FC<RiddleGameProps> = ({
@@ -35,11 +37,12 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -54,11 +57,9 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 
 	useEffect(() => {
 		// Only reset if this is a different puzzle
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setSelectedChoice(null);
 			setFeedback(null);
@@ -67,20 +68,48 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			// Reset timer when startTime prop changes (puzzle switch)
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleSignature, propStartTime, startTime]);
 
-	// Timer effect - updates every second
+	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (completed) {
 			// Stop timer when game is completed
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -221,12 +250,11 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 
 	return (
 		<View style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.title}>Riddle</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Riddle"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 
 			<ScrollView
 				ref={scrollViewRef}
@@ -332,11 +360,12 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
@@ -474,7 +503,7 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	showAnswerButton: {
-		marginTop: 0,
+		marginTop: Spacing.xs,
 		backgroundColor: Colors.background.secondary,
 		borderRadius: ComponentStyles.button.borderRadius,
 		paddingVertical: Spacing.sm,

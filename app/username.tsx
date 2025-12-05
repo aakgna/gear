@@ -131,6 +131,17 @@ const UsernameScreen = () => {
 				style={StyleSheet.absoluteFill}
 			/>
 
+			{/* Header with Back Button */}
+			<View style={styles.header}>
+				<TouchableOpacity
+					style={styles.backButton}
+					onPress={() => router.replace("/signin")}
+					activeOpacity={0.7}
+				>
+					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
+				</TouchableOpacity>
+			</View>
+
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.keyboardView}
@@ -215,6 +226,22 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.primary,
 	},
+	header: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: Spacing.lg,
+		paddingTop: 50,
+		paddingBottom: Spacing.md,
+		zIndex: 10,
+	},
+	backButton: {
+		padding: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		backgroundColor: Colors.background.tertiary + "80",
+		borderWidth: 1,
+		borderColor: Colors.accent + "4D",
+		backdropFilter: "blur(10px)",
+	},
 	keyboardView: {
 		flex: 1,
 	},
@@ -274,7 +301,7 @@ const styles = StyleSheet.create({
 	input: {
 		backgroundColor: Colors.background.tertiary,
 		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
+		borderColor: Colors.accent + "4D",
 		borderRadius: BorderRadius.lg,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,

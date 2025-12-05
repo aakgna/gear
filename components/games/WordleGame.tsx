@@ -17,6 +17,7 @@ import {
 	Animation,
 	Layout,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 const { width } = Dimensions.get("window");
 const TILE_SIZE_FALLBACK = (width - 60) / 5;
@@ -28,6 +29,7 @@ interface WordleGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 interface TileState {
@@ -42,12 +44,13 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [guesses, setGuesses] = useState<string[]>([]);
 	const [gameWon, setGameWon] = useState(false);
 	const [gameLost, setGameLost] = useState(false);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [attempts, setAttempts] = useState(0);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -76,17 +79,16 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 	const [board, setBoard] = useState<TileState[][]>(initializeBoard);
 	const [tileSize, setTileSize] = useState(TILE_SIZE_FALLBACK);
+	const [keyStates, setKeyStates] = useState<Record<string, "absent" | "present" | "correct">>({});
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
 
 	// Reset timer when puzzle changes or startTime prop changes
 	useEffect(() => {
-		// Only reset if this is a different puzzle or startTime prop changed
-		const newStartTime = propStartTime || Date.now();
+		// Only reset if this is a different puzzle
 		if (puzzleIdRef.current !== answer) {
 			puzzleIdRef.current = answer;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setGameWon(false);
 			setGameLost(false);
 			setCurrentGuess("");
@@ -94,23 +96,54 @@ const WordleGame: React.FC<WordleGameProps> = ({
 			setAttempts(0);
 			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
 			setBoard(initializeBoard());
+			setKeyStates({}); // Reset keyboard states for new puzzle
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			// Reset timer when startTime prop changes (puzzle switch)
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			// Clear startTime if prop is removed
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [answer, propStartTime, startTime]);
 
-	// Timer effect - updates every second
+	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			// Don't start timer if startTime is not set
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (gameWon || gameLost) {
 			// Stop timer when game is completed
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -132,7 +165,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [gameWon, gameLost, startTime]);
+	}, [gameWon, gameLost, startTime, isActive]);
 
 	// Format time as MM:SS or SS
 	const formatTime = (seconds: number): string => {
@@ -154,12 +187,15 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		const result: TileState[] = [];
 		const answerLetters = answer.split("");
 		const guessLetters = guess.split("");
+		const newKeyStates = { ...keyStates };
 
 		// First pass: mark correct letters
 		for (let i = 0; i < wordLength; i++) {
 			if (guessLetters[i] === answerLetters[i]) {
 				result[i] = { letter: guessLetters[i], status: "correct" };
 				answerLetters[i] = ""; // Remove from consideration for present check
+				// Update keyboard state - correct takes precedence
+				newKeyStates[guessLetters[i]] = "correct";
 			}
 		}
 
@@ -171,10 +207,21 @@ const WordleGame: React.FC<WordleGameProps> = ({
 			if (index !== -1) {
 				result[i] = { letter: guessLetters[i], status: "present" };
 				answerLetters[index] = ""; // Remove from consideration
+				// Update keyboard state - only if not already correct
+				if (newKeyStates[guessLetters[i]] !== "correct") {
+					newKeyStates[guessLetters[i]] = "present";
+				}
 			} else {
 				result[i] = { letter: guessLetters[i], status: "absent" };
+				// Update keyboard state - only if not already correct or present
+				if (!newKeyStates[guessLetters[i]] || newKeyStates[guessLetters[i]] === "absent") {
+					newKeyStates[guessLetters[i]] = "absent";
+				}
 			}
 		}
+
+		// Update keyboard states
+		setKeyStates(newKeyStates);
 
 		return result;
 	};
@@ -224,6 +271,9 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 	const handleKeyPress = (key: string) => {
 		if (gameWon || gameLost || !validWordLength || answerRevealed) return;
+		
+		// Don't allow clicking on absent keys
+		if (isKeyDisabled(key)) return;
 
 		if (key === "ENTER") {
 			if (currentGuess.length === wordLength) {
@@ -366,6 +416,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					styles.tile,
 					{ width: tileSize, height: tileSize },
 					styles.absent,
+					{ backgroundColor: Colors.error + "40" }, // Slight red tint
 				];
 			default:
 				return [
@@ -386,19 +437,29 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	};
 
 	const getKeyStyle = (key: string) => {
-		// This would need to track key states across guesses
-		// For simplicity, using basic styling for now
+		const keyState = keyStates[key];
+		if (keyState === "absent") {
+			return [styles.key, styles.keyAbsent];
+		} else if (keyState === "present") {
+			return [styles.key, styles.keyPresent];
+		} else if (keyState === "correct") {
+			return [styles.key, styles.keyCorrect];
+		}
 		return [styles.key];
+	};
+
+	const isKeyDisabled = (key: string): boolean => {
+		// Disable absent keys
+		return keyStates[key] === "absent";
 	};
 
 	return (
 		<View style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.title}>Wordle</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Wordle"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 			{!validWordLength && (
 				<View style={styles.errorContainer}>
 					<Text style={styles.errorText}>
@@ -455,28 +516,40 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				</Animated.View>
 			</View>
 
-			{/* Virtual Keyboard */}
-			<View style={styles.keyboard}>
-				{keyboardLayout.map((row, rowIndex) => (
-					<View key={rowIndex} style={styles.keyboardRow}>
-						{row.map((key) => (
-							<TouchableOpacity
-								key={key}
-								style={[
-									getKeyStyle(key),
-									key === "ENTER" || key === "⌫"
-										? styles.wideKey
-										: styles.regularKey,
-								]}
-								onPress={() => handleKeyPress(key)}
-								activeOpacity={0.7}
-							>
-								<Text style={styles.keyText}>{key}</Text>
-							</TouchableOpacity>
-						))}
-					</View>
-				))}
-			</View>
+			{/* Virtual Keyboard - only show when game is not over */}
+			{!gameWon && !gameLost && (
+				<View style={styles.keyboard}>
+					{keyboardLayout.map((row, rowIndex) => (
+						<View key={rowIndex} style={styles.keyboardRow}>
+							{row.map((key) => {
+								const disabled = isKeyDisabled(key);
+								return (
+									<TouchableOpacity
+										key={key}
+										style={[
+											getKeyStyle(key),
+											key === "ENTER" || key === "⌫"
+												? styles.wideKey
+												: styles.regularKey,
+											disabled && styles.keyDisabled,
+										]}
+										onPress={() => handleKeyPress(key)}
+										activeOpacity={disabled ? 1 : 0.7}
+										disabled={disabled}
+									>
+										<Text style={[
+											styles.keyText,
+											disabled && styles.keyTextDisabled,
+										]}>
+											{key}
+										</Text>
+									</TouchableOpacity>
+								);
+							})}
+						</View>
+					))}
+				</View>
+			)}
 
 			{/* Show Answer Button */}
 			{!gameWon && !gameLost && !answerRevealed && (
@@ -487,6 +560,14 @@ const WordleGame: React.FC<WordleGameProps> = ({
 				>
 					<Text style={styles.showAnswerText}>Show Answer</Text>
 				</TouchableOpacity>
+			)}
+
+			{/* Show correct answer if game was lost */}
+			{gameLost && !gameWon && (
+				<View style={styles.correctAnswerContainer}>
+					<Text style={styles.correctAnswerLabel}>The correct word was:</Text>
+					<Text style={styles.correctAnswerText}>{answer}</Text>
+				</View>
 			)}
 
 			{/* View Stats Button - shown when game is completed */}
@@ -507,16 +588,19 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.xl,
 		alignItems: "center",
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
 		marginBottom: Spacing.lg,
 	},
 	title: {
@@ -565,8 +649,8 @@ const styles = StyleSheet.create({
 	},
 	row: {
 		flexDirection: "row",
-		marginBottom: 16,
-		gap: 6,
+		marginBottom: Spacing.md,
+		gap: Spacing.xs,
 	},
 	tile: {
 		borderWidth: 2,
@@ -606,7 +690,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		justifyContent: "center",
 		marginBottom: Spacing.sm,
-		gap: 4,
+		gap: Spacing.xs,
 	},
 	key: {
 		backgroundColor: Colors.background.tertiary,
@@ -631,6 +715,25 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
+	},
+	keyAbsent: {
+		backgroundColor: Colors.error + "40",
+		borderColor: Colors.error + "60",
+	},
+	keyPresent: {
+		backgroundColor: Colors.game.present + "40",
+		borderColor: Colors.game.present + "60",
+	},
+	keyCorrect: {
+		backgroundColor: Colors.game.correct + "40",
+		borderColor: Colors.game.correct + "60",
+	},
+	keyDisabled: {
+		opacity: 0.5,
+	},
+	keyTextDisabled: {
+		color: Colors.error,
+		textDecorationLine: "line-through",
 	},
 	statusContainer: {
 		marginTop: Spacing.xl,
@@ -688,8 +791,32 @@ const styles = StyleSheet.create({
 		height: 32,
 		backgroundColor: "rgba(255, 255, 255, 0.2)",
 	},
-	viewStatsButton: {
+	correctAnswerContainer: {
+		width: "100%",
+		alignItems: "center",
 		marginTop: Spacing.xl,
+		marginBottom: Spacing.lg,
+		padding: Spacing.lg,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.lg,
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
+	},
+	correctAnswerLabel: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.sm,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	correctAnswerText: {
+		fontSize: Typography.fontSize.h1,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		letterSpacing: 2,
+		textTransform: "uppercase",
+	},
+	viewStatsButton: {
+		marginTop: Spacing.md,
 		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.lg,
 		paddingVertical: Spacing.md,

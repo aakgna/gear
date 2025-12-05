@@ -16,6 +16,7 @@ import {
 	Shadows,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface SequencingGameProps {
 	inputData: SequencingData;
@@ -24,6 +25,7 @@ interface SequencingGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const SequencingGame: React.FC<SequencingGameProps> = ({
@@ -33,6 +35,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	// currentPlacement: index is slot position, value is entity index or null
 	const [currentPlacement, setCurrentPlacement] = useState<(number | null)[]>(
@@ -41,7 +44,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	const [selectedEntity, setSelectedEntity] = useState<number | null>(null);
 	const [isCorrect, setIsCorrect] = useState(false);
 	const [placementCount, setPlacementCount] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,7 +82,6 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		// Reset if puzzle changed
 		if (puzzleId && puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId;
-			setStartTime(propStartTime || Date.now());
 			setElapsedTime(0);
 			setCompleted(false);
 			setCurrentPlacement(new Array(inputData.numSlots).fill(null));
@@ -87,14 +89,27 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 			setIsCorrect(false);
 			setPlacementCount(0);
 			hasAttemptedRef.current = false;
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
+		} else if (propStartTime && startTime !== propStartTime) {
+			setStartTime(propStartTime);
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 		}
 
-		// Set up new timer
-		const newStartTime = propStartTime || Date.now();
-		setStartTime(newStartTime);
-		timerIntervalRef.current = setInterval(() => {
-			setElapsedTime(Math.floor((Date.now() - newStartTime) / 1000));
-		}, 1000);
+		// Only set up timer if startTime is provided and game is active
+		if (startTime && isActive) {
+			timerIntervalRef.current = setInterval(() => {
+				setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+			}, 1000);
+		} else if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
+		}
 
 		return () => {
 			if (timerIntervalRef.current) {
@@ -179,9 +194,12 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	};
 
 	const formatTime = (seconds: number): string => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, "0")}`;
+		if (seconds < 60) {
+			return `${seconds}s`;
+		}
+		const minutes = Math.floor(seconds / 60);
+		const remainingSeconds = seconds % 60;
+		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
 	const unplacedEntities = getUnplacedEntities();
@@ -196,20 +214,12 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	return (
 		<View style={styles.container}>
 			{/* Header */}
-			<View style={styles.header}>
-				<View style={styles.headerRow}>
-					<Ionicons
-						name="trophy"
-						size={24}
-						color={Colors.primary}
-					/>
-					<Text style={styles.title}>Sequencing</Text>
-				</View>
-				<View style={styles.headerInfo}>
-					<Text style={styles.infoText}>Placements: {placementCount}</Text>
-					<Text style={styles.infoText}>⏱️ {formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Sequencing"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+				subtitle={`Placements: ${placementCount}`}
+			/>
 
 			{/* Rules Display */}
 			<View style={styles.rulesContainer}>
@@ -314,29 +324,43 @@ const styles = StyleSheet.create({
 		padding: Spacing.md,
 	},
 	header: {
-		marginBottom: Spacing.md,
-	},
-	headerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: Spacing.xs,
-		gap: Spacing.xs,
-	},
-	title: {
-		...Typography.h2,
-		color: Colors.text,
-		flex: 1,
-	},
-	headerInfo: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
+		width: "100%",
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
-	infoText: {
-		...Typography.body,
-		color: "#CCCCCC",
-		fontSize: 16,
-		fontWeight: "500",
+	headerLeft: {
+		flex: 1,
+	},
+	title: {
+		fontSize: Typography.fontSize.h1,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.primary,
+		letterSpacing: -0.5,
+		marginBottom: Spacing.xs,
+	},
+	progressInfo: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	timerBadge: {
+		backgroundColor: Colors.accent + "20",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
+	},
+	timer: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		fontFamily: Typography.fontFamily.monospace,
 	},
 	rulesContainer: {
 		backgroundColor: Colors.surface,
@@ -350,8 +374,8 @@ const styles = StyleSheet.create({
 		...Typography.bodyBold,
 		color: "#FFFFFF",
 		marginBottom: Spacing.xs,
-		fontSize: 16,
-		fontWeight: "600",
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	rulesScroll: {
 		maxHeight: 120,
@@ -367,13 +391,13 @@ const styles = StyleSheet.create({
 	ruleText: {
 		...Typography.body,
 		color: "#FFFFFF",
-		fontSize: 14,
-		fontWeight: "500",
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	ruleTextViolated: {
 		color: "#FF4444",
-		fontWeight: "700",
-		fontSize: 15,
+		fontWeight: Typography.fontWeight.bold,
+		fontSize: Typography.fontSize.body,
 	},
 	slotsContainer: {
 		marginBottom: Spacing.md,
@@ -382,8 +406,8 @@ const styles = StyleSheet.create({
 		...Typography.bodyBold,
 		color: "#FFFFFF",
 		marginBottom: Spacing.xs,
-		fontSize: 16,
-		fontWeight: "600",
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	slotsGrid: {
 		flexDirection: "row",
@@ -426,23 +450,23 @@ const styles = StyleSheet.create({
 	slotLabel: {
 		...Typography.caption,
 		color: "#AAAAAA",
-		fontSize: 12,
+		fontSize: Typography.fontSize.small,
 		marginBottom: Spacing.xs,
-		fontWeight: "500",
+		fontWeight: Typography.fontWeight.medium,
 	},
 	slotEntity: {
 		...Typography.bodyBold,
 		color: "#FFFFFF",
-		fontSize: 16,
+		fontSize: Typography.fontSize.body,
 		textAlign: "center",
-		fontWeight: "600",
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	slotEmpty: {
 		...Typography.body,
 		color: "#888888",
-		fontSize: 13,
+		fontSize: Typography.fontSize.caption,
 		fontStyle: "italic",
-		fontWeight: "500",
+		fontWeight: Typography.fontWeight.medium,
 	},
 	poolContainer: {
 		marginBottom: Spacing.md,
@@ -470,8 +494,8 @@ const styles = StyleSheet.create({
 	entityText: {
 		...Typography.body,
 		color: "#FFFFFF",
-		fontSize: 16,
-		fontWeight: "600",
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	instructionContainer: {
 		backgroundColor: Colors.primary + "20",
@@ -483,7 +507,7 @@ const styles = StyleSheet.create({
 		...Typography.body,
 		color: Colors.primary,
 		textAlign: "center",
-		fontSize: 14,
+		fontSize: Typography.fontSize.caption,
 	},
 	completionContainer: {
 		backgroundColor: Colors.success + "20",
@@ -503,7 +527,7 @@ const styles = StyleSheet.create({
 	statsButtonText: {
 		...Typography.buttonLarge,
 		color: ComponentStyles.button.textColor,
-		fontWeight: "600",
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 });
 

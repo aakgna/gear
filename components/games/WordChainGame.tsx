@@ -23,6 +23,7 @@ import {
 	Animation,
 	Layout,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -36,6 +37,7 @@ interface WordChainGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const WordChainGame: React.FC<WordChainGameProps> = ({
@@ -45,6 +47,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const { startWord, endWord, validWords, minSteps } = inputData;
 	const wordLength = startWord.length;
@@ -56,7 +59,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	>(Array(numInputs).fill("empty"));
 	const [gameWon, setGameWon] = useState(false);
 	const [gameLost, setGameLost] = useState(false);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [attempts, setAttempts] = useState(0);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,11 +73,9 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 
 	// Reset timer when puzzle changes
 	useEffect(() => {
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId || "";
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setGameWon(false);
 			setGameLost(false);
 			setChain(Array(numInputs).fill(""));
@@ -84,18 +85,47 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleId, propStartTime, startTime, numInputs]);
 
-	// Timer effect
+	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (gameWon || gameLost) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -115,7 +145,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [gameWon, gameLost, startTime]);
+	}, [gameWon, gameLost, startTime, isActive]);
 
 	// Keyboard listeners for scrolling
 	useEffect(() => {
@@ -387,12 +417,11 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 			behavior={Platform.OS === "ios" ? "padding" : undefined}
 			keyboardVerticalOffset={0}
 		>
-			<View style={styles.header}>
-				<Text style={styles.title}>Word Chain</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Word Chain"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 
 			<ScrollView
 				ref={scrollViewRef}
@@ -515,11 +544,12 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,

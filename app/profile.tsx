@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useGameStore } from "../stores/gameStore";
 import {
 	getCurrentUser,
@@ -32,7 +33,9 @@ import {
 
 const ProfileScreen = () => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { userProfile, isAuthenticated, resetProgress } = useGameStore();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [showStats, setShowStats] = useState(false);
@@ -182,26 +185,18 @@ const ProfileScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="light" />
 
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={styles.createGameButton}
-					onPress={() => router.push("/create-game")}
-					activeOpacity={0.7}
-				>
-					<Ionicons name="add-circle" size={20} color={Colors.accent} />
-					<Text style={styles.createGameButtonText}>Create Game</Text>
-				</TouchableOpacity>
-				<View style={{ width: 24 }} /> {/* Spacer for centering */}
+			{/* Header - minimal header for spacing (Dynamic Island) */}
+			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+				{/* Minimal header for spacing - navigation moved to bottom bar */}
 			</View>
 
-			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+			<ScrollView
+				style={styles.content}
+				contentContainerStyle={{
+					paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
+				}}
+				showsVerticalScrollIndicator={false}
+			>
 				{/* User Info */}
 				<View style={styles.userSection}>
 					<View style={styles.avatarContainer}>
@@ -434,44 +429,11 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: Layout.margin,
-		paddingTop: 50,
-		paddingBottom: Spacing.md,
 		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 1,
 		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		zIndex: 10,
 		...Shadows.medium,
-	},
-	backButton: {
-		padding: Spacing.xs,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.tertiary,
-		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-	},
-	createGameButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: Colors.background.tertiary,
-		paddingHorizontal: Spacing.md,
-		paddingVertical: Spacing.sm,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
-	},
-	createGameButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.medium,
-		color: Colors.accent,
-		marginLeft: Spacing.xs,
 	},
 	content: {
 		flex: 1,
@@ -514,7 +476,7 @@ const styles = StyleSheet.create({
 		marginHorizontal: Spacing.xs,
 		alignItems: "center",
 		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.2)",
+		borderColor: Colors.accent + "33",
 		...Shadows.light,
 	},
 	statNumber: {
@@ -654,4 +616,9 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default ProfileScreen;
+// Export the component for use in MainAppContainer
+export { ProfileScreen };
+// Default export returns null - MainAppContainer handles rendering
+export default function ProfileRoute() {
+	return null;
+}

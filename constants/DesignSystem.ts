@@ -9,7 +9,7 @@ import { ViewStyle } from "react-native";
 export const Colors = {
 	// Primary Colors
 	primary: "#E8EAF6", // Light indigo for headers, icons, main text
-	accent: "#7C4DFF", // Vibrant purple for buttons, highlights, success
+	accent: "#00D4AA", // Vibrant teal for buttons, highlights, success
 	secondaryAccent: "#FFD54F", // Golden yellow for progress, hover, streaks
 	error: "#FF5252", // Bright red for wrong answers or alerts
 
@@ -27,7 +27,7 @@ export const Colors = {
 		secondary: "#B0B0B0", // Secondary text (light gray)
 		disabled: "#666666", // Disabled text (medium gray)
 		white: "#FFFFFF", // White text
-		accent: "#7C4DFF", // Accent color for highlights
+		accent: "#00D4AA", // Accent color for highlights
 	},
 
 	// Game States

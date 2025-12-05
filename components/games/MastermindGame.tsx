@@ -17,6 +17,7 @@ import {
 	Animation,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface MastermindGameProps {
 	inputData: MastermindData;
@@ -25,6 +26,7 @@ interface MastermindGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 // Color mapping from string to emoji
@@ -55,6 +57,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const [currentGuess, setCurrentGuess] = useState<(string | null)[]>(
 		new Array(6).fill(null)
@@ -64,7 +67,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	const [gameWon, setGameWon] = useState(false);
 	const [gameLost, setGameLost] = useState(false);
 	const [attemptsUsed, setAttemptsUsed] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -170,7 +173,6 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 		// Reset if puzzle changed
 		if (puzzleId && puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId;
-			setStartTime(propStartTime || Date.now());
 			setElapsedTime(0);
 			setGameWon(false);
 			setGameLost(false);
@@ -179,14 +181,27 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 			setGuessHistory([]);
 			setSelectedPosition(null);
 			hasAttemptedRef.current = false;
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
+		} else if (propStartTime && startTime !== propStartTime) {
+			setStartTime(propStartTime);
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 		}
 
-		// Set up new timer
-		const newStartTime = propStartTime || Date.now();
-		setStartTime(newStartTime);
-		timerIntervalRef.current = setInterval(() => {
-			setElapsedTime(Math.floor((Date.now() - newStartTime) / 1000));
-		}, 1000);
+		// Only set up timer if startTime is provided and game is active
+		if (startTime && isActive) {
+			timerIntervalRef.current = setInterval(() => {
+				setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+			}, 1000);
+		} else if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+			timerIntervalRef.current = null;
+		}
 
 		return () => {
 			if (timerIntervalRef.current) {
@@ -194,7 +209,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 				timerIntervalRef.current = null;
 			}
 		};
-	}, [puzzleId, propStartTime]);
+	}, [puzzleId, propStartTime, startTime, isActive]);
 
 	// Handle color selection
 	const handleColorSelect = (color: string) => {
@@ -282,9 +297,12 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	};
 
 	const formatTime = (seconds: number): string => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, "0")}`;
+		if (seconds < 60) {
+			return `${seconds}s`;
+		}
+		const minutes = Math.floor(seconds / 60);
+		const remainingSeconds = seconds % 60;
+		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
 	const isGuessComplete = currentGuess.every((c) => c !== null);
@@ -292,15 +310,12 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	return (
 		<View style={styles.container}>
 			{/* Header */}
-			<View style={styles.header}>
-				<Text style={styles.title}>Mastermind</Text>
-				<View style={styles.headerInfo}>
-					<Text style={styles.guessCount}>
-						Guesses: {attemptsUsed}/{inputData.maxGuesses}
-					</Text>
-					<Text style={styles.timer}>⏱️ {formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Mastermind"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+				subtitle={`Guesses: ${attemptsUsed}/${inputData.maxGuesses}`}
+			/>
 
 			{/* Game Won/Lost Message */}
 			{gameWon && (
@@ -439,30 +454,43 @@ const styles = StyleSheet.create({
 		padding: Spacing.md,
 	},
 	header: {
-		marginBottom: Spacing.md,
-	},
-	title: {
-		...Typography.h2,
-		color: Colors.text,
-		textAlign: "center",
-		marginBottom: Spacing.xs,
-	},
-	headerInfo: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
+		width: "100%",
+		paddingHorizontal: Spacing.xl,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
-	guessCount: {
-		...Typography.body,
-		color: "#CCCCCC",
-		fontSize: 16,
-		fontWeight: "500",
+	headerLeft: {
+		flex: 1,
+	},
+	title: {
+		fontSize: Typography.fontSize.h1,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.primary,
+		letterSpacing: -0.5,
+		marginBottom: Spacing.xs,
+	},
+	progressInfo: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	timerBadge: {
+		backgroundColor: Colors.accent + "20",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.accent + "40",
 	},
 	timer: {
-		...Typography.body,
-		color: "#CCCCCC",
-		fontSize: 16,
-		fontWeight: "500",
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		fontFamily: Typography.fontFamily.monospace,
 	},
 	resultContainer: {
 		backgroundColor: Colors.surface,
@@ -499,8 +527,8 @@ const styles = StyleSheet.create({
 		...Typography.bodyBold,
 		color: "#FFFFFF",
 		marginBottom: Spacing.xs,
-		fontSize: 16,
-		fontWeight: "600",
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	historyScroll: {
 		maxHeight: 350,
@@ -520,7 +548,7 @@ const styles = StyleSheet.create({
 	},
 	historyGuess: {
 		flexDirection: "row",
-		gap: 4,
+		gap: Spacing.xs,
 	},
 	historySlot: {
 		width: 28,
@@ -531,7 +559,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	historyEmoji: {
-		fontSize: 20,
+		fontSize: Typography.fontSize.h3,
 	},
 	feedbackContainer: {
 		paddingHorizontal: Spacing.sm,
@@ -539,8 +567,8 @@ const styles = StyleSheet.create({
 	feedbackText: {
 		...Typography.body,
 		color: "#FFFFFF",
-		fontSize: 14,
-		fontWeight: "600",
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	currentGuessSection: {
 		marginBottom: Spacing.md,
@@ -548,7 +576,7 @@ const styles = StyleSheet.create({
 	codeRow: {
 		flexDirection: "row",
 		justifyContent: "center",
-		gap: 8,
+		gap: Spacing.sm,
 	},
 	guessSlot: {
 		width: 48,
@@ -569,7 +597,7 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background,
 	},
 	slotEmoji: {
-		fontSize: 32,
+		fontSize: Typography.fontSize.h1,
 	},
 	codeSlot: {
 		width: 48,
@@ -582,7 +610,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	colorEmoji: {
-		fontSize: 32,
+		fontSize: Typography.fontSize.h1,
 	},
 	paletteSection: {
 		marginBottom: Spacing.md,
@@ -591,7 +619,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		justifyContent: "center",
-		gap: 8,
+		gap: Spacing.sm,
 	},
 	colorButton: {
 		width: 48,
@@ -603,7 +631,7 @@ const styles = StyleSheet.create({
 		...Shadows.small,
 	},
 	colorButtonEmoji: {
-		fontSize: 32,
+		fontSize: Typography.fontSize.h1,
 	},
 	submitButton: {
 		backgroundColor: ComponentStyles.button.backgroundColor,
@@ -623,7 +651,7 @@ const styles = StyleSheet.create({
 	submitButtonText: {
 		...Typography.buttonLarge,
 		color: ComponentStyles.button.textColor,
-		fontWeight: "600",
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 	statsButton: {
 		backgroundColor: ComponentStyles.button.backgroundColor,
@@ -639,7 +667,7 @@ const styles = StyleSheet.create({
 	statsButtonText: {
 		...Typography.buttonLarge,
 		color: ComponentStyles.button.textColor,
-		fontWeight: "600",
+		fontWeight: Typography.fontWeight.semiBold,
 	},
 });
 

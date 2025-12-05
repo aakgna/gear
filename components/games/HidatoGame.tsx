@@ -18,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -28,6 +29,7 @@ interface HidatoGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const HidatoGame: React.FC<HidatoGameProps> = ({
@@ -37,6 +39,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const { rows, cols, startNum, endNum, path, givens } = inputData;
 
@@ -82,7 +85,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 		col: number;
 	} | null>(null);
 	const [attempts, setAttempts] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -98,22 +101,47 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 		.join(",")}`;
 
 	useEffect(() => {
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setAnswerRevealed(false);
 			setUserGrid(initializeUserGrid());
 			setSelectedCell(null);
 			setFeedback(null);
 			hasAttemptedRef.current = false;
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
+		} else if (propStartTime && startTime !== propStartTime) {
+			setStartTime(propStartTime);
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 		}
-	}, [puzzleSignature, propStartTime]);
+	}, [puzzleSignature, propStartTime, startTime]);
 
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+				timerIntervalRef.current = null;
+			}
+			return;
+		}
+
 		if (completed || answerRevealed) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+				timerIntervalRef.current = null;
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 				timerIntervalRef.current = null;
@@ -130,7 +158,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [startTime, completed, answerRevealed]);
+	}, [startTime, completed, answerRevealed, isActive]);
 
 	const formatTime = (seconds: number): string => {
 		const mins = Math.floor(seconds / 60);
@@ -442,12 +470,11 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 				]}
 			>
 				{/* Header */}
-				<View style={styles.header}>
-					<Text style={styles.title}>Hidato</Text>
-					<View style={styles.timerBadge}>
-						<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-					</View>
-				</View>
+				<GameHeader
+					title="Hidato"
+					elapsedTime={elapsedTime}
+					showDifficulty={false}
+				/>
 
 				{/* Range Display */}
 				<View style={styles.rangeContainer}>
@@ -552,11 +579,11 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
 		marginBottom: Spacing.lg,
 	},
 	title: {
@@ -594,8 +621,8 @@ const styles = StyleSheet.create({
 	gridRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 8,
-		marginBottom: 8,
+		gap: Spacing.sm,
+		marginBottom: Spacing.sm,
 	},
 	cell: {
 		backgroundColor: Colors.background.tertiary,
@@ -632,7 +659,7 @@ const styles = StyleSheet.create({
 		borderWidth: 3,
 	},
 	cellText: {
-		fontSize: 24,
+		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.semiBold,
 		color: Colors.text.primary,
 	},

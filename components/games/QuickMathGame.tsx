@@ -22,6 +22,7 @@ import {
 	ComponentStyles,
 	Layout,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface QuickMathProps {
 	inputData: QuickMathData;
@@ -30,6 +31,7 @@ interface QuickMathProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 function evaluateExpression(expression: string): number {
@@ -47,6 +49,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const problems = useMemo(
 		() => inputData.problems.slice(0, 5),
@@ -57,7 +60,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	);
 	const [submitted, setSubmitted] = useState(false);
 	const [feedback, setFeedback] = useState<string | null>(null);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [mistakes, setMistakes] = useState(0); // Track number of incorrect submissions
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,11 +82,9 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 
 	useEffect(() => {
 		// Only reset if this is a different puzzle
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setSubmitted(false);
 			setFeedback(null);
 			setAnswers(Array(problems.length).fill(""));
@@ -92,20 +93,48 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			// Reset timer when startTime prop changes (puzzle switch)
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleSignature, problems.length, propStartTime, startTime]);
 
-	// Timer effect - updates every second
+	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (submitted) {
 			// Stop timer when game is completed
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -275,12 +304,11 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			behavior={Platform.OS === "ios" ? "padding" : undefined}
 			keyboardVerticalOffset={0}
 		>
-			<View style={styles.header}>
-				<Text style={styles.title}>Quick Math</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Quick Math"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 
 			<ScrollView
 				ref={scrollViewRef}
@@ -379,16 +407,19 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		width: "100%",
+		height: "100%",
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
@@ -412,6 +443,7 @@ const styles = StyleSheet.create({
 	},
 	scrollView: {
 		flex: 1,
+		width: "100%",
 	},
 	scrollContent: {
 		paddingHorizontal: Spacing.xl,
@@ -470,7 +502,7 @@ const styles = StyleSheet.create({
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.sm,
 		borderWidth: 2,
-		borderColor: "rgba(124, 77, 255, 0.3)",
+		borderColor: Colors.accent + "4D",
 		borderRadius: BorderRadius.md,
 		backgroundColor: Colors.background.secondary,
 		textAlign: "center",

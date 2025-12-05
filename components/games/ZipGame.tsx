@@ -18,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -28,6 +29,7 @@ interface ZipGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const ZipGame: React.FC<ZipGameProps> = ({
@@ -37,12 +39,13 @@ const ZipGame: React.FC<ZipGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const { rows, cols, cells, solution } = inputData;
 	const totalCells = rows * cols;
 	const [userPath, setUserPath] = useState<number[]>([]);
 	const [attempts, setAttempts] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -70,11 +73,9 @@ const ZipGame: React.FC<ZipGameProps> = ({
 		.join(",")}`;
 
 	useEffect(() => {
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setUserPath([]);
 			setAttempts(0);
@@ -84,18 +85,47 @@ const ZipGame: React.FC<ZipGameProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleSignature, propStartTime, startTime]);
 
-	// Timer effect
+	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (completed) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -115,7 +145,7 @@ const ZipGame: React.FC<ZipGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [completed, startTime]);
+	}, [completed, startTime, isActive]);
 
 	const formatTime = (seconds: number): string => {
 		if (seconds < 60) {
@@ -497,12 +527,11 @@ const ZipGame: React.FC<ZipGameProps> = ({
 
 	return (
 		<View style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.title}>Zip</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Zip"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 
 			<ScrollView
 				style={styles.scrollView}
@@ -586,11 +615,12 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
@@ -640,7 +670,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.md,
 		justifyContent: "center",
 		alignItems: "center",
-		margin: 1,
+		margin: Spacing.xs / 4,
 		...Shadows.light,
 	},
 	cellEmpty: {
@@ -680,13 +710,13 @@ const styles = StyleSheet.create({
 	},
 	pathIndicator: {
 		position: "absolute",
-		top: 4,
-		right: 4,
+		top: Spacing.xs,
+		right: Spacing.xs,
 		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.sm,
 		minWidth: 15,
 		height: 15,
-		paddingHorizontal: 4,
+		paddingHorizontal: Spacing.xs,
 		justifyContent: "center",
 		alignItems: "center",
 	},
@@ -696,7 +726,7 @@ const styles = StyleSheet.create({
 		borderColor: Colors.game.correct,
 	},
 	pathIndicatorText: {
-		fontSize: 8,
+		fontSize: Typography.fontSize.small,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.white,
 	},

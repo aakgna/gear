@@ -22,6 +22,7 @@ import {
 	ComponentStyles,
 	Layout,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface AliasGameProps {
 	inputData: AliasData;
@@ -30,6 +31,7 @@ interface AliasGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const AliasGame: React.FC<AliasGameProps> = ({
@@ -39,11 +41,12 @@ const AliasGame: React.FC<AliasGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const [guess, setGuess] = useState("");
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -60,11 +63,9 @@ const AliasGame: React.FC<AliasGameProps> = ({
 
 	useEffect(() => {
 		// Only reset if this is a different puzzle
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setGuess("");
 			setFeedback(null);
@@ -73,20 +74,48 @@ const AliasGame: React.FC<AliasGameProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			// Reset timer when startTime prop changes (puzzle switch)
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleSignature, propStartTime, startTime]);
 
-	// Timer effect - updates every second
+	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (completed) {
 			// Stop timer when game is completed
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -108,7 +137,7 @@ const AliasGame: React.FC<AliasGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [completed, startTime]);
+	}, [completed, startTime, isActive]);
 
 	// Format time as MM:SS or SS
 	const formatTime = (seconds: number): string => {
@@ -241,12 +270,11 @@ const AliasGame: React.FC<AliasGameProps> = ({
 			behavior={Platform.OS === "ios" ? "padding" : undefined}
 			keyboardVerticalOffset={0}
 		>
-			<View style={styles.header}>
-				<Text style={styles.title}>Alias</Text>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Alias"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+			/>
 
 			<ScrollView
 				ref={scrollViewRef}
@@ -382,11 +410,12 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,

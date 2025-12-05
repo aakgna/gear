@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -12,9 +12,10 @@ import {
 	Platform,
 	Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
 	Colors,
 	Typography,
@@ -34,6 +35,10 @@ type Difficulty = "easy" | "medium" | "hard";
 
 const CreateGameScreen = () => {
 	const router = useRouter();
+	const pathname = usePathname();
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const previousPathnameRef = useRef<string>(pathname);
 	const [gameType, setGameType] = useState<GameType>(null);
 	const [loading, setLoading] = useState(false);
 
@@ -58,6 +63,40 @@ const CreateGameScreen = () => {
 
 	// Game Idea state
 	const [gameIdea, setGameIdea] = useState("");
+
+	// Reset function to clear all form state
+	const resetFormState = () => {
+		setGameType(null);
+		setWordleWord("");
+		setRiddleQuestion("");
+		setRiddleAnswer("");
+		setNumQuestions(3);
+		setDifficulty("easy");
+		setQuickMathQuestions(Array(3).fill(""));
+		setQuickMathAnswers(Array(3).fill(""));
+		setGameIdea("");
+		setLoading(false);
+	};
+
+	// Reset state when navigating back to create-game from another screen
+	useEffect(() => {
+		const wasOnCreateGame = previousPathnameRef.current === "/create-game";
+		const isOnCreateGame = pathname === "/create-game";
+		const navigatedAway = wasOnCreateGame && !isOnCreateGame;
+		const navigatedBack = !wasOnCreateGame && isOnCreateGame;
+
+		// If we navigated away from create-game, mark it
+		if (navigatedAway) {
+			// User navigated away - state will be reset when they come back
+		}
+
+		// If we navigated back to create-game, reset the state
+		if (navigatedBack) {
+			resetFormState();
+		}
+
+		previousPathnameRef.current = pathname;
+	}, [pathname]);
 
 	const handleGameTypeSelect = (type: GameType) => {
 		setGameType(type);
@@ -670,16 +709,9 @@ const CreateGameScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="light" />
 
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Game</Text>
-				<View style={{ width: 24 }} />
+			{/* Header - minimal header for spacing (Dynamic Island) */}
+			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+				{/* Minimal header for spacing - navigation moved to bottom bar */}
 			</View>
 
 			<KeyboardAvoidingView
@@ -688,6 +720,9 @@ const CreateGameScreen = () => {
 			>
 				<ScrollView
 					style={styles.content}
+					contentContainerStyle={{
+						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
+					}}
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
@@ -697,6 +732,15 @@ const CreateGameScreen = () => {
 					{gameType === "wordle" && renderWordleForm()}
 					{gameType === "riddle" && renderRiddleForm()}
 					{gameType === "quickMath" && renderQuickMathForm()}
+
+					{!gameType && (
+						<View style={styles.infoNote}>
+							<Ionicons name="information-circle-outline" size={20} color={Colors.text.secondary} />
+							<Text style={styles.infoNoteText}>
+								Want to add a new game type? Use "Own Game" to submit your game idea, and we'll review it for future implementation.
+							</Text>
+						</View>
+					)}
 
 					{gameType && (
 						<TouchableOpacity
@@ -733,28 +777,11 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		paddingHorizontal: Layout.margin,
-		paddingTop: 50,
-		paddingBottom: Spacing.md,
 		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 1,
 		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		zIndex: 10,
 		...Shadows.medium,
-	},
-	backButton: {
-		padding: Spacing.xs,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.tertiary,
-		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
 	},
 	keyboardView: {
 		flex: 1,
@@ -799,7 +826,7 @@ const styles = StyleSheet.create({
 	},
 	gameTypeButtonActive: {
 		borderColor: Colors.accent,
-		backgroundColor: "rgba(124, 77, 255, 0.1)",
+		backgroundColor: Colors.accent + "1A",
 	},
 	gameTypeText: {
 		fontSize: Typography.fontSize.body,
@@ -867,7 +894,7 @@ const styles = StyleSheet.create({
 	},
 	selectorButtonActive: {
 		borderColor: Colors.accent,
-		backgroundColor: "rgba(124, 77, 255, 0.1)",
+		backgroundColor: Colors.accent + "1A",
 	},
 	selectorButtonText: {
 		fontSize: Typography.fontSize.body,
@@ -932,6 +959,29 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		marginLeft: Spacing.sm,
 	},
+	infoNote: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.md,
+		marginTop: Spacing.lg,
+		marginBottom: Spacing.md,
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
+		gap: Spacing.sm,
+	},
+	infoNoteText: {
+		flex: 1,
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		lineHeight: Typography.fontSize.caption * Typography.lineHeight.normal,
+	},
 });
 
-export default CreateGameScreen;
+// Export the component for use in MainAppContainer
+export { CreateGameScreen };
+// Default export returns null - MainAppContainer handles rendering
+export default function CreateGameRoute() {
+	return null;
+}

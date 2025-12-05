@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+	useState,
+	useEffect,
+	useRef,
+	useCallback,
+	useMemo,
+} from "react";
 import {
 	View,
 	FlatList,
@@ -12,9 +18,11 @@ import {
 	Image,
 	Keyboard,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
 	Colors,
 	Typography,
@@ -89,9 +97,12 @@ function deduplicateGames(games: Puzzle[]): Puzzle[] {
 
 const FeedScreen = () => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [headerHeight, setHeaderHeight] = useState(0);
+	const [feedHeight, setFeedHeight] = useState(0);
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
 	const [displayedPuzzles, setDisplayedPuzzles] = useState<Puzzle[]>([]);
 	const [allRecommendedPuzzles, setAllRecommendedPuzzles] = useState<Puzzle[]>(
@@ -106,6 +117,8 @@ const FeedScreen = () => {
 	const puzzleVisibleTimesRef = useRef<Record<string, number>>({});
 	// Track the startTime for each puzzle (calculated when it becomes visible)
 	const puzzleStartTimesRef = useRef<Record<string, number>>({});
+	// Track previous active puzzle to detect transitions
+	const previousActivePuzzleIdRef = useRef<string>("");
 	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
 	// Track initial completed games to filter on load only
 	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
@@ -123,6 +136,8 @@ const FeedScreen = () => {
 	// Infinite scroll state
 	const [isFetchingMore, setIsFetchingMore] = useState(false);
 	const [hasMoreGamesToFetch, setHasMoreGamesToFetch] = useState(true);
+	// Track if initial data load has completed to prevent reloading on refocus
+	const hasLoadedRef = useRef(false);
 
 	const { addCompletedPuzzle } = useGameStore();
 
@@ -156,10 +171,15 @@ const FeedScreen = () => {
 		};
 	}, []);
 
-	// Load user data and puzzles from Firestore
+	// Load user data and puzzles from Firestore (only once on initial mount)
+	// Since component stays mounted, this will only run once
 	useEffect(() => {
-		loadUserData(true); // Pass true to indicate initial load
-		loadPuzzlesFromFirestore();
+		// Only load if we haven't loaded yet
+		if (!hasLoadedRef.current) {
+			hasLoadedRef.current = true;
+			loadUserData(true); // Pass true to indicate initial load
+			loadPuzzlesFromFirestore();
+		}
 	}, []);
 
 	const loadUserData = async (isInitialLoad = false) => {
@@ -1211,6 +1231,7 @@ const FeedScreen = () => {
 					// Update current puzzle
 					setCurrentPuzzleId(newPuzzleId);
 					setCurrentIndex(newIndex);
+					previousActivePuzzleIdRef.current = newPuzzleId;
 
 					// Calculate startTime for new puzzle based on its elapsed time
 					const elapsedTime = puzzleElapsedTimesRef.current[newPuzzleId] || 0;
@@ -1243,6 +1264,16 @@ const FeedScreen = () => {
 			puzzleVisibleTimesRef.current[firstPuzzleId] = Date.now();
 		}
 	}, [displayedPuzzles, currentPuzzleId]);
+
+	// Handle elapsed time updates from games
+	const handleElapsedTimeUpdate = useCallback(
+		(puzzleId: string, elapsedTime: number) => {
+			// Save elapsed time to hashmap when game becomes inactive
+			puzzleElapsedTimesRef.current[puzzleId] = elapsedTime;
+			// Don't recalculate startTime here - it will be recalculated when game becomes active
+		},
+		[]
+	);
 
 	// Handle when user first interacts with a game
 	const handleGameAttempt = (puzzleId: string) => {
@@ -1316,7 +1347,20 @@ const FeedScreen = () => {
 		// and manually swipe to next game
 	};
 
-	const itemHeight = Math.max(0, SCREEN_HEIGHT - headerHeight);
+	// Calculate item height: use feed container height if available, otherwise calculate from screen
+	// This ensures we use the actual available space rather than estimates
+	const itemHeight = useMemo(() => {
+		if (feedHeight > 0) {
+			// Use the actual measured feed height - this is the most accurate
+			return feedHeight;
+		}
+		// Fallback: calculate from screen height if feed hasn't been measured yet
+		const estimatedHeaderHeight = headerHeight > 0 ? headerHeight : 100;
+		return Math.max(
+			0,
+			SCREEN_HEIGHT - estimatedHeaderHeight - BOTTOM_NAV_HEIGHT
+		);
+	}, [feedHeight, headerHeight]);
 
 	const renderPuzzleCard = ({
 		item,
@@ -1325,24 +1369,41 @@ const FeedScreen = () => {
 		item: Puzzle;
 		index: number;
 	}) => {
-		// Use stored startTime if available, otherwise calculate it
-		// This ensures consistent startTime across renders
+		// Check if this puzzle is currently active/visible
+		const isActive = currentPuzzleId === item.id;
+
+		// Calculate startTime based on saved elapsed time
+		// Only recalculate when transitioning from inactive to active
 		let puzzleStartTime = puzzleStartTimesRef.current[item.id];
-		if (!puzzleStartTime) {
+		const wasActive = previousActivePuzzleIdRef.current === item.id;
+
+		if (isActive && !wasActive) {
+			// Game just became active - recalculate startTime based on saved elapsed time
+			const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+			puzzleStartTime = Date.now() - elapsedTime * 1000;
+			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+		} else if (!puzzleStartTime) {
 			// If not set yet, calculate based on elapsed time
 			const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
 			puzzleStartTime = Date.now() - elapsedTime * 1000;
 			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
 		}
 
+		// Update previous active puzzle ref
+		if (isActive) {
+			previousActivePuzzleIdRef.current = item.id;
+		}
+
 		return (
-			<View key={item.id} style={[styles.puzzleCard, { height: itemHeight }]}>
+			<View style={[styles.puzzleCard, { height: itemHeight }]}>
 				<GameWrapper
 					key={item.id}
 					puzzle={item}
 					onComplete={handleGameComplete}
 					onAttempt={handleGameAttempt}
 					startTime={puzzleStartTime}
+					isActive={isActive}
+					onElapsedTimeUpdate={handleElapsedTimeUpdate}
 				/>
 			</View>
 		);
@@ -1351,30 +1412,10 @@ const FeedScreen = () => {
 	const renderHeader = () => {
 		return (
 			<View
-				style={styles.header}
+				style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}
 				onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
 			>
-				<Image
-					source={require("../assets/images/logo_transparent.png")}
-					style={styles.logoImage}
-				/>
-
-				<TouchableOpacity
-					style={styles.createGameButton}
-					onPress={() => router.push("/create-game")}
-					activeOpacity={0.7}
-				>
-					<Ionicons name="add-circle" size={24} color={Colors.accent} />
-					<Text style={styles.createGameButtonText}>Create Game</Text>
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					style={styles.profileButton}
-					onPress={() => router.push("/profile")}
-					activeOpacity={0.7}
-				>
-					<Ionicons name="person-circle" size={28} color={Colors.accent} />
-				</TouchableOpacity>
+				{/* Minimal header for spacing - navigation moved to bottom bar */}
 			</View>
 		);
 	};
@@ -1396,37 +1437,68 @@ const FeedScreen = () => {
 				<>
 					{/* Puzzle Feed */}
 					{displayedPuzzles.length > 0 ? (
-						<FlatList
-							ref={flatListRef}
-							data={displayedPuzzles}
-							renderItem={renderPuzzleCard}
-							keyExtractor={(item) => item.id}
-							pagingEnabled
-							showsVerticalScrollIndicator={false}
-							onViewableItemsChanged={onViewableItemsChanged}
-							viewabilityConfig={viewabilityConfig}
-							scrollEventThrottle={16}
-							style={styles.feed}
-							keyboardDismissMode="on-drag"
-							keyboardShouldPersistTaps="handled"
-							scrollEnabled={!isKeyboardVisible}
-							onEndReached={loadNextBatch}
-							onEndReachedThreshold={0.5}
-							ListFooterComponent={
-								loadingMore ? (
-									<View style={styles.loadingFooter}>
-										<ActivityIndicator size="small" color={Colors.accent} />
-									</View>
-								) : null
-							}
-						/>
+						<>
+							<View
+								style={styles.feed}
+								onLayout={(e) => {
+									const height = e.nativeEvent.layout.height;
+									if (height > 0 && height !== feedHeight) {
+										setFeedHeight(height);
+									}
+								}}
+							>
+								<FlatList
+									ref={flatListRef}
+									data={displayedPuzzles}
+									renderItem={renderPuzzleCard}
+									keyExtractor={(item) => item.id}
+									getItemLayout={
+										itemHeight > 0
+											? (data, index) => ({
+													length: itemHeight,
+													offset: itemHeight * index,
+													index,
+											  })
+											: undefined
+									}
+									key={`flatlist-${itemHeight}`}
+									pagingEnabled
+									windowSize={5}
+									initialNumToRender={3}
+									maxToRenderPerBatch={3}
+									showsVerticalScrollIndicator={false}
+									onViewableItemsChanged={onViewableItemsChanged}
+									viewabilityConfig={viewabilityConfig}
+									scrollEventThrottle={16}
+									style={{ flex: 1 }}
+									keyboardDismissMode="on-drag"
+									keyboardShouldPersistTaps="handled"
+									scrollEnabled={!isKeyboardVisible}
+									onEndReached={loadNextBatch}
+									onEndReachedThreshold={0.5}
+									removeClippedSubviews={true}
+									ListFooterComponent={
+										loadingMore ? (
+											<View style={styles.loadingFooter}>
+												<ActivityIndicator size="small" color={Colors.accent} />
+											</View>
+										) : null
+									}
+								/>
+							</View>
+
+							{/* Bottom Gradient Overlay */}
+							<LinearGradient
+								colors={["transparent", "rgba(0,0,0,0.6)"]}
+								style={styles.bottomGradient}
+								pointerEvents="none"
+							/>
+						</>
 					) : (
 						<View style={styles.loadingContainer}>
 							<Text style={styles.emptyText}>No puzzles available</Text>
 						</View>
 					)}
-
-					{/* Remove footer rendering */}
 				</>
 			)}
 		</View>
@@ -1439,49 +1511,11 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: Layout.margin,
-		paddingTop: 60,
-		paddingBottom: Spacing.md,
 		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 1,
 		borderBottomColor: "rgba(255, 255, 255, 0.1)",
 		zIndex: 10,
 		...Shadows.medium,
-	},
-	logoImage: {
-		width: 50,
-		height: 50,
-		resizeMode: "contain",
-	},
-	createGameButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: Colors.background.tertiary,
-		paddingHorizontal: Spacing.md,
-		paddingVertical: Spacing.sm,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
-	},
-	createGameButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.medium,
-		color: Colors.accent,
-		marginLeft: Spacing.xs,
-	},
-	profileButton: {
-		padding: Spacing.xs,
-		minWidth: Layout.tapTarget,
-		minHeight: Layout.tapTarget,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.tertiary,
-		borderWidth: 1,
-		borderColor: "rgba(124, 77, 255, 0.3)",
 	},
 	feed: {
 		flex: 1,
@@ -1490,6 +1524,8 @@ const styles = StyleSheet.create({
 	puzzleCard: {
 		width: SCREEN_WIDTH,
 		backgroundColor: Colors.background.primary,
+		overflow: "hidden",
+		position: "relative",
 	},
 	loadingContainer: {
 		flex: 1,
@@ -1514,6 +1550,19 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
+	bottomGradient: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		height: 100,
+		zIndex: 50,
+	},
 });
 
-export default FeedScreen;
+// Export the component for use in MainAppContainer
+export { FeedScreen };
+// Default export returns null - MainAppContainer handles rendering
+export default function FeedRoute() {
+	return null;
+}

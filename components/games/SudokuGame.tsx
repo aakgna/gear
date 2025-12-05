@@ -18,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -28,6 +29,7 @@ interface SudokuGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const SudokuGame: React.FC<SudokuGameProps> = ({
@@ -37,6 +39,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const { grid, givens } = inputData;
 	const SIZE = 9; // Sudoku is always 9x9
@@ -79,7 +82,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 		col: number;
 	} | null>(null);
 	const [attempts, setAttempts] = useState(0);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -95,11 +98,9 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 		.join(",")}`;
 
 	useEffect(() => {
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setAnswerRevealed(false);
 			setUserGrid(initializeUserGrid());
@@ -107,11 +108,43 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 			setFeedback(null);
 			setAttempts(0);
 			hasAttemptedRef.current = false;
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
+		} else if (propStartTime && startTime !== propStartTime) {
+			setStartTime(propStartTime);
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 		}
-	}, [puzzleSignature, propStartTime]);
+	}, [puzzleSignature, propStartTime, startTime]);
 
-	// Timer effect
+	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (completed || answerRevealed) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (!completed && !answerRevealed) {
 			timerIntervalRef.current = setInterval(() => {
 				setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
@@ -127,7 +160,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [completed, answerRevealed, startTime]);
+	}, [completed, answerRevealed, startTime, isActive]);
 
 	const formatTime = (seconds: number): string => {
 		const mins = Math.floor(seconds / 60);
@@ -457,12 +490,11 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 				]}
 			>
 				{/* Header */}
-				<View style={styles.header}>
-					<Text style={styles.title}>Sudoku</Text>
-					<View style={styles.timerBadge}>
-						<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-					</View>
-				</View>
+				<GameHeader
+					title="Sudoku"
+					elapsedTime={elapsedTime}
+					showDifficulty={false}
+				/>
 
 				{/* Grid */}
 				<View style={styles.gridContainer}>
@@ -559,11 +591,11 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
-		paddingBottom: Spacing.lg,
+		paddingTop: Spacing.xl,
+		paddingBottom: Spacing.md,
 		marginBottom: Spacing.lg,
 	},
 	title: {

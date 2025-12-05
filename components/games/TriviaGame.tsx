@@ -17,6 +17,7 @@ import {
 	Animation,
 	ComponentStyles,
 } from "../../constants/DesignSystem";
+import GameHeader from "../GameHeader";
 
 interface TriviaGameProps {
 	inputData: TriviaData;
@@ -25,6 +26,7 @@ interface TriviaGameProps {
 	startTime?: number;
 	puzzleId?: string;
 	onShowStats?: () => void;
+	isActive?: boolean;
 }
 
 const TriviaGame: React.FC<TriviaGameProps> = ({
@@ -34,6 +36,7 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 	startTime: propStartTime,
 	puzzleId,
 	onShowStats,
+	isActive = true,
 }) => {
 	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 	const [selectedChoices, setSelectedChoices] = useState<(string | null)[]>(
@@ -42,7 +45,7 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 	const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(
 		new Array(inputData.questions.length).fill(false)
 	);
-	const [startTime, setStartTime] = useState(propStartTime || Date.now());
+	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -56,11 +59,9 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 	const puzzleSignature = `${inputData.questions[0]?.question}-${inputData.questions.length}`;
 
 	useEffect(() => {
-		const newStartTime = propStartTime || Date.now();
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
-			setStartTime(newStartTime);
 			setCompleted(false);
 			setCurrentQuestionIndex(0);
 			setSelectedChoices(new Array(inputData.questions.length).fill(null));
@@ -69,18 +70,47 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
+			// Only set startTime if propStartTime is provided
+			if (propStartTime) {
+				setStartTime(propStartTime);
+			} else {
+				setStartTime(undefined);
+			}
 		} else if (propStartTime && startTime !== propStartTime) {
-			setElapsedTime(0);
+			// startTime prop changed - could be initial start or resume from pause
+			// Calculate elapsed time from new startTime to maintain continuity
+			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
+			setElapsedTime(newElapsed);
 			setStartTime(propStartTime);
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+		} else if (!propStartTime && startTime !== undefined) {
+			setStartTime(undefined);
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
 		}
 	}, [puzzleSignature, propStartTime, startTime, inputData.questions.length]);
 
-	// Timer effect
+	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
+		if (!startTime) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
 		if (completed) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+			}
+			return;
+		}
+
+		if (!isActive) {
+			// Pause timer when game is not active
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -239,17 +269,12 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 
 	return (
 		<View style={styles.container}>
-			<View style={styles.header}>
-				<View>
-					<Text style={styles.title}>Trivia</Text>
-					<Text style={styles.questionCounter}>
-						Question {currentQuestionIndex + 1} of {inputData.questions.length}
-					</Text>
-				</View>
-				<View style={styles.timerBadge}>
-					<Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-				</View>
-			</View>
+			<GameHeader
+				title="Trivia"
+				elapsedTime={elapsedTime}
+				showDifficulty={false}
+				subtitle={`Question ${currentQuestionIndex + 1} of ${inputData.questions.length}`}
+			/>
 
 			{/* Progress bar */}
 			<View style={styles.progressBarContainer}>
@@ -355,22 +380,24 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		alignItems: "flex-start",
 		width: "100%",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: Spacing.lg,
+		paddingTop: Spacing.xl,
 		paddingBottom: Spacing.md,
+		marginBottom: Spacing.lg,
 	},
 	title: {
 		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.primary,
 		letterSpacing: -0.5,
+		marginBottom: Spacing.xs,
 	},
 	questionCounter: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-		marginTop: Spacing.xs,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	timerBadge: {
 		backgroundColor: Colors.accent + "20",
