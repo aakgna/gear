@@ -7,6 +7,7 @@ import {
 	Animated,
 	ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, TriviaData } from "../../config/types";
 import {
 	Colors,
@@ -38,6 +39,8 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 	const [selectedChoices, setSelectedChoices] = useState<(string | null)[]>(
 		new Array(inputData.questions.length).fill(null)
@@ -284,7 +287,10 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 			<ScrollView
 				ref={scrollViewRef}
 				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				<Animated.View
@@ -431,7 +437,6 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: Spacing.xl,
-		paddingBottom: Spacing.lg,
 	},
 	questionContainer: {
 		width: "100%",

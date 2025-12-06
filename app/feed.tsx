@@ -232,6 +232,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -249,6 +250,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -268,6 +270,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -297,6 +300,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					} else {
 						console.log(
@@ -327,6 +331,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -367,6 +372,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -391,6 +397,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -410,6 +417,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -430,6 +438,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -453,6 +462,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -481,6 +491,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -510,6 +521,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -530,6 +542,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -701,6 +714,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -718,6 +732,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -737,6 +752,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -766,6 +782,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					} else {
 						console.log(
@@ -796,6 +813,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -836,6 +854,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -860,6 +879,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -879,6 +899,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -899,6 +920,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -922,6 +944,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -950,6 +973,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -979,6 +1003,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});
@@ -999,6 +1024,7 @@ const FeedScreen = () => {
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
+							username: game.username,
 						});
 					}
 				});

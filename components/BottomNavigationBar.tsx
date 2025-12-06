@@ -1,5 +1,5 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { Home, Plus, User } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -9,6 +9,7 @@ import {
 	Spacing,
 	BorderRadius,
 	Shadows,
+	Typography,
 } from "../constants/DesignSystem";
 
 const BottomNavigationBar = () => {
@@ -43,10 +44,20 @@ const BottomNavigationBar = () => {
 				activeOpacity={0.7}
 			>
 				<Home
-					size={28}
+					size={22} // Reduced from 28
 					color={isActive("/feed") ? Colors.accent : Colors.text.secondary}
 					fill={isActive("/feed") ? Colors.accent : "transparent"}
 				/>
+				<Text
+					style={[
+						styles.label,
+						{
+							color: isActive("/feed") ? Colors.accent : Colors.text.secondary,
+						},
+					]}
+				>
+					Home
+				</Text>
 			</TouchableOpacity>
 
 			{/* Create Game Button (Plus with gradient) */}
@@ -72,10 +83,22 @@ const BottomNavigationBar = () => {
 				activeOpacity={0.7}
 			>
 				<User
-					size={28}
+					size={22} // Reduced from 28
 					color={isActive("/profile") ? Colors.accent : Colors.text.secondary}
 					fill={isActive("/profile") ? Colors.accent : "transparent"}
 				/>
+				<Text
+					style={[
+						styles.label,
+						{
+							color: isActive("/profile")
+								? Colors.accent
+								: Colors.text.secondary,
+						},
+					]}
+				>
+					Profile
+				</Text>
 			</TouchableOpacity>
 		</View>
 	);
@@ -93,9 +116,9 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.secondary,
 		borderTopWidth: 1,
 		borderTopColor: "rgba(255, 255, 255, 0.1)",
-		paddingTop: Spacing.md,
+		paddingTop: Spacing.sm, // Reduced from Spacing.md
 		paddingHorizontal: Spacing.lg,
-		height: 70,
+		height: 70, // Changed back to fixed height
 		zIndex: 1000,
 		...Shadows.medium,
 	},
@@ -103,7 +126,13 @@ const styles = StyleSheet.create({
 		flex: 1,
 		alignItems: "center",
 		justifyContent: "center",
-		paddingVertical: Spacing.sm,
+		paddingVertical: 0, // Remove vertical padding
+		gap: 2, // Reduced from Spacing.xs
+	},
+	label: {
+		fontSize: Typography.fontSize.small, // Changed from caption (14 to 12)
+		fontWeight: Typography.fontWeight.medium,
+		marginTop: 0, // Removed marginTop
 	},
 	createButton: {
 		alignItems: "center",

@@ -6,7 +6,9 @@ import {
 	StyleSheet,
 	Dimensions,
 	Animated,
+	ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WordleData, GameResult } from "../../config/types";
 import {
 	Colors,
@@ -46,6 +48,8 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [currentGuess, setCurrentGuess] = useState("");
 	const [guesses, setGuesses] = useState<string[]>([]);
 	const [gameWon, setGameWon] = useState(false);
@@ -453,8 +457,18 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		return keyStates[key] === "absent";
 	};
 
+	// Calculate bottom padding to account for bottom navigation bar
+	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
+
 	return (
-		<View style={styles.container}>
+		<ScrollView 
+			style={styles.container}
+			contentContainerStyle={[
+				styles.scrollContent,
+				{ paddingBottom: bottomPadding },
+			]}
+			showsVerticalScrollIndicator={true}
+		>
 			<GameHeader
 				title="Wordle"
 				elapsedTime={elapsedTime}
@@ -580,18 +594,19 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					<Text style={styles.viewStatsButtonText}>View Stats</Text>
 				</TouchableOpacity>
 			)}
-		</View>
+		</ScrollView>
 	);
 };
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: Colors.background.primary,
+	},
+	scrollContent: {
 		paddingHorizontal: Spacing.xl,
 		paddingTop: Spacing.xl,
-		paddingBottom: Spacing.xl,
 		alignItems: "center",
-		backgroundColor: Colors.background.primary,
 	},
 	header: {
 		flexDirection: "row",

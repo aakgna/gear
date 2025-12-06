@@ -6,6 +6,7 @@ import {
 	TouchableOpacity,
 	ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { GameResult, SequencingData } from "../../config/types";
 import {
@@ -37,6 +38,8 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	// currentPlacement: index is slot position, value is entity index or null
 	const [currentPlacement, setCurrentPlacement] = useState<(number | null)[]>(
 		new Array(inputData.numSlots).fill(null)
@@ -211,8 +214,18 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		return positions[slotIdx] || `${slotIdx + 1}th`;
 	};
 
+	// Calculate bottom padding to account for bottom navigation bar
+	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
+
 	return (
-		<View style={styles.container}>
+		<ScrollView 
+			style={styles.container}
+			contentContainerStyle={[
+				styles.scrollContent,
+				{ paddingBottom: bottomPadding },
+			]}
+			showsVerticalScrollIndicator={true}
+		>
 			{/* Header */}
 			<GameHeader
 				title="Sequencing"
@@ -313,7 +326,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 					</TouchableOpacity>
 				</View>
 			)}
-		</View>
+		</ScrollView>
 	);
 };
 
@@ -321,6 +334,8 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: Colors.background,
+	},
+	scrollContent: {
 		padding: Spacing.md,
 	},
 	header: {

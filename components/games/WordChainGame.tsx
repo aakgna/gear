@@ -12,6 +12,7 @@ import {
 	Platform,
 	Keyboard,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import words from "an-array-of-english-words";
 import { WordChainData, GameResult } from "../../config/types";
 import {
@@ -49,6 +50,8 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const { startWord, endWord, validWords, minSteps } = inputData;
 	const wordLength = startWord.length;
 	const numInputs = wordLength - 1; // n letters = n-1 input fields
@@ -430,7 +433,9 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 					styles.scrollContent,
 					{
 						paddingBottom:
-							keyboardHeight > 0 ? keyboardHeight + 200 : Spacing.xl,
+							keyboardHeight > 0
+								? keyboardHeight + 200
+								: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					},
 				]}
 				showsVerticalScrollIndicator={false}

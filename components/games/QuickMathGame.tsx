@@ -11,6 +11,7 @@ import {
 	Platform,
 	Keyboard,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, QuickMathData } from "../../config/types";
 import {
 	Colors,
@@ -51,6 +52,8 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const problems = useMemo(
 		() => inputData.problems.slice(0, 5),
 		[inputData.problems]
@@ -317,7 +320,9 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 					styles.scrollContent,
 					{
 						paddingBottom:
-							keyboardHeight > 0 ? keyboardHeight + 100 : Spacing.xl,
+							keyboardHeight > 0
+								? keyboardHeight + 100
+								: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					},
 				]}
 				showsVerticalScrollIndicator={false}

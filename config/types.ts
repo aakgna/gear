@@ -33,6 +33,7 @@ export interface Puzzle {
 		| SequencingData;
 	difficulty: number;
 	createdAt: string;
+	username?: string;
 }
 
 export interface WordleData {

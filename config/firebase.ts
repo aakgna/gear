@@ -14,6 +14,8 @@ export const db = firestore();
 // Helper function to fetch games from Firestore
 export interface FirestoreGame {
 	id: string;
+	username?: string;
+	uid?: string;
 	// QuickMath structure
 	questions?: string[];
 	answers?: string[];

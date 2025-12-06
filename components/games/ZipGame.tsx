@@ -8,6 +8,7 @@ import {
 	ScrollView,
 	Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, ZipData } from "../../config/types";
 import {
 	Colors,
@@ -41,6 +42,8 @@ const ZipGame: React.FC<ZipGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const { rows, cols, cells, solution } = inputData;
 	const totalCells = rows * cols;
 	const [userPath, setUserPath] = useState<number[]>([]);
@@ -535,7 +538,10 @@ const ZipGame: React.FC<ZipGameProps> = ({
 
 			<ScrollView
 				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				<Animated.View
@@ -647,7 +653,6 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: Spacing.xl,
-		paddingBottom: Spacing.xxl,
 		alignItems: "center",
 	},
 	gridContainer: {

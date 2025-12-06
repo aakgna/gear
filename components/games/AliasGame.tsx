@@ -11,6 +11,7 @@ import {
 	Platform,
 	Keyboard,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, AliasData } from "../../config/types";
 import {
 	Colors,
@@ -43,6 +44,8 @@ const AliasGame: React.FC<AliasGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [guess, setGuess] = useState("");
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
@@ -283,7 +286,9 @@ const AliasGame: React.FC<AliasGameProps> = ({
 					styles.scrollContent,
 					{
 						paddingBottom:
-							keyboardHeight > 0 ? keyboardHeight + 100 : Spacing.xl,
+							keyboardHeight > 0
+								? keyboardHeight + 100
+								: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					},
 				]}
 				showsVerticalScrollIndicator={false}

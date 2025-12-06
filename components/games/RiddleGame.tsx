@@ -7,6 +7,7 @@ import {
 	Animated,
 	ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, RiddleData } from "../../config/types";
 import {
 	Colors,
@@ -39,6 +40,8 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
@@ -259,7 +262,10 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 			<ScrollView
 				ref={scrollViewRef}
 				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				<Animated.View
@@ -392,7 +398,6 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: Spacing.xl,
-		paddingBottom: Spacing.lg,
 	},
 	promptContainer: {
 		width: "100%",

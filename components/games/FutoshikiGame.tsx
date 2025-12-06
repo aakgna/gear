@@ -8,6 +8,7 @@ import {
 	ScrollView,
 	Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, FutoshikiData } from "../../config/types";
 import {
 	Colors,
@@ -41,6 +42,8 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const { size, grid, givens, inequalities } = inputData;
 
 	// Reconstruct 2D grid from 1D array
@@ -556,10 +559,16 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 		);
 	};
 
+	// Calculate bottom padding to account for bottom navigation bar
+	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
+
 	return (
 		<ScrollView
 			style={styles.container}
-			contentContainerStyle={styles.contentContainer}
+			contentContainerStyle={[
+				styles.contentContainer,
+				{ paddingBottom: bottomPadding },
+			]}
 			showsVerticalScrollIndicator={false}
 		>
 			<Animated.View

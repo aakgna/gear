@@ -8,6 +8,7 @@ import {
 	ScrollView,
 	Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, MagicSquareData } from "../../config/types";
 import {
 	Colors,
@@ -41,6 +42,8 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const { size, grid, magicConstant, givens } = inputData;
 
 	// Reconstruct 2D grid from 1D array
@@ -434,10 +437,16 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 		);
 	};
 
+	// Calculate bottom padding to account for bottom navigation bar
+	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
+
 	return (
 		<ScrollView
 			style={styles.container}
-			contentContainerStyle={styles.contentContainer}
+			contentContainerStyle={[
+				styles.contentContainer,
+				{ paddingBottom: bottomPadding },
+			]}
 			showsVerticalScrollIndicator={false}
 		>
 			<Animated.View

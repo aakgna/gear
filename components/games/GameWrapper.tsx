@@ -535,6 +535,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						<GameIntroScreen
 							gameType={puzzle.type}
 							difficulty={puzzle.difficulty}
+							username={puzzle.username}
 							onPlay={handlePlay}
 						/>
 					</View>

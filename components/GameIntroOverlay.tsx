@@ -24,12 +24,14 @@ import {
 interface GameIntroScreenProps {
 	gameType: PuzzleType;
 	difficulty: number;
+	username?: string;
 	onPlay: () => void;
 }
 
 const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 	gameType,
 	difficulty,
+	username,
 	onPlay,
 }) => {
 	const [showInstructions, setShowInstructions] = useState(false);
@@ -77,6 +79,9 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 						</Text>
 					</View>
 					<Text style={styles.gameTitle}>{formatGameType(gameType)}</Text>
+					{username && (
+						<Text style={styles.createdByText}>created by {username}</Text>
+					)}
 				</View>
 
 				{/* How to Play Section */}
@@ -182,6 +187,13 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		textAlign: "center",
 		letterSpacing: -0.8,
+	},
+	createdByText: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.regular,
+		color: Colors.text.secondary,
+		marginTop: Spacing.xs,
+		textAlign: "center",
 	},
 	howToPlayButton: {
 		backgroundColor: Colors.background.tertiary,

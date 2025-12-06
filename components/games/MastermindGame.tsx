@@ -7,6 +7,7 @@ import {
 	Animated,
 	ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, MastermindData } from "../../config/types";
 import {
 	Colors,
@@ -59,6 +60,8 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	onShowStats,
 	isActive = true,
 }) => {
+	const insets = useSafeAreaInsets();
+	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const [currentGuess, setCurrentGuess] = useState<(string | null)[]>(
 		new Array(6).fill(null)
 	);
@@ -218,7 +221,9 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 			newGuess[selectedPosition] = color;
 			setCurrentGuess(newGuess);
 			// Auto-advance to next empty position or deselect
-			const nextEmpty = newGuess.findIndex((c, idx) => c === null && idx > selectedPosition);
+			const nextEmpty = newGuess.findIndex(
+				(c, idx) => c === null && idx > selectedPosition
+			);
 			if (nextEmpty !== -1) {
 				setSelectedPosition(nextEmpty);
 			} else {
@@ -285,7 +290,9 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 			clearInterval(timerIntervalRef.current);
 		}
 
-		const finalTime = Math.floor((Date.now() - startTime) / 1000);
+		const finalTime = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
 
 		onComplete({
 			puzzleId: puzzleIdRef.current || "",
@@ -307,8 +314,18 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 
 	const isGuessComplete = currentGuess.every((c) => c !== null);
 
+	// Calculate bottom padding to account for bottom navigation bar
+	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
+
 	return (
-		<View style={styles.container}>
+		<ScrollView
+			style={styles.container}
+			contentContainerStyle={[
+				styles.scrollContent,
+				{ paddingBottom: bottomPadding },
+			]}
+			showsVerticalScrollIndicator={true}
+		>
 			{/* Header */}
 			<GameHeader
 				title="Mastermind"
@@ -436,14 +453,11 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 
 			{/* View Stats Button */}
 			{(gameWon || gameLost) && (
-				<TouchableOpacity
-					style={styles.statsButton}
-					onPress={onShowStats}
-				>
+				<TouchableOpacity style={styles.statsButton} onPress={onShowStats}>
 					<Text style={styles.statsButtonText}>View Stats</Text>
 				</TouchableOpacity>
 			)}
-		</View>
+		</ScrollView>
 	);
 };
 
@@ -451,6 +465,8 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: Colors.background,
+	},
+	scrollContent: {
 		padding: Spacing.md,
 	},
 	header: {
@@ -520,7 +536,6 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.xs,
 	},
 	historySection: {
-		flex: 1,
 		marginBottom: Spacing.md,
 	},
 	sectionLabel: {
@@ -645,13 +660,14 @@ const styles = StyleSheet.create({
 		...Shadows.medium,
 	},
 	submitButtonDisabled: {
-		backgroundColor: Colors.disabled,
+		backgroundColor: Colors.background.tertiary,
 		opacity: 0.6,
 	},
 	submitButtonText: {
-		...Typography.buttonLarge,
-		color: ComponentStyles.button.textColor,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.white,
+		fontWeight: Typography.fontWeight.bold,
+		letterSpacing: 0.5,
 	},
 	statsButton: {
 		backgroundColor: ComponentStyles.button.backgroundColor,
@@ -665,11 +681,11 @@ const styles = StyleSheet.create({
 		...Shadows.medium,
 	},
 	statsButtonText: {
-		...Typography.buttonLarge,
-		color: ComponentStyles.button.textColor,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.white,
+		fontWeight: Typography.fontWeight.bold,
+		letterSpacing: 0.5,
 	},
 });
 
 export default MastermindGame;
-
