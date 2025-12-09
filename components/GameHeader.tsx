@@ -51,8 +51,8 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 						style={[
 							styles.difficultyBadge,
 							{
-								backgroundColor: difficultyColor + "20",
-								borderColor: difficultyColor + "60",
+								backgroundColor: difficultyColor + "15",
+								borderColor: difficultyColor + "40",
 							},
 						]}
 					>
@@ -112,12 +112,12 @@ const styles = StyleSheet.create({
 		letterSpacing: 0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: Colors.accent + "15",
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.xs,
 		borderRadius: BorderRadius.sm,
 		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderColor: Colors.accent + "30",
 	},
 	timer: {
 		fontSize: Typography.fontSize.body,

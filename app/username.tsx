@@ -125,7 +125,7 @@ const UsernameScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
+			<StatusBar style="dark" />
 			<LinearGradient
 				colors={Colors.background.gradient as [string, string]}
 				style={StyleSheet.absoluteFill}
@@ -197,14 +197,14 @@ const UsernameScreen = () => {
 							disabled={loading || checking || !username.trim()}
 						>
 							{loading || checking ? (
-								<ActivityIndicator color={Colors.text.primary} />
+							<ActivityIndicator color={Colors.text.white} />
 							) : (
 								<>
 									<Text style={styles.submitButtonText}>Continue</Text>
 									<Ionicons
 										name="arrow-forward"
 										size={20}
-										color={Colors.text.primary}
+									color={Colors.text.white}
 										style={styles.arrowIcon}
 									/>
 								</>
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
 	backButton: {
 		padding: Spacing.xs,
 		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.tertiary + "80",
+		backgroundColor: Colors.background.primary + "E6",
 		borderWidth: 1,
 		borderColor: Colors.accent + "4D",
 		backdropFilter: "blur(10px)",
@@ -299,9 +299,9 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.md,
 	},
 	input: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderWidth: 1,
-		borderColor: Colors.accent + "4D",
+		borderColor: "#E5E5E5",
 		borderRadius: BorderRadius.lg,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.lg,
 		width: "100%",
 		marginBottom: Spacing.md,
-		...Shadows.heavy,
+		...Shadows.medium,
 	},
 	buttonDisabled: {
 		opacity: 0.7,
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
 	submitButtonText: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.primary,
+		color: Colors.text.white,
 	},
 	arrowIcon: {
 		marginLeft: Spacing.sm,

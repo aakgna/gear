@@ -3,13 +3,9 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	Animated,
 	ScrollView,
-	KeyboardAvoidingView,
-	Platform,
-	Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameResult, AliasData } from "../../config/types";
@@ -22,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 	Layout,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -46,13 +43,13 @@ const AliasGame: React.FC<AliasGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const [guess, setGuess] = useState("");
+	const gameColor = getGameColor("alias"); // Get game-specific pink color (#EC4899)
+	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
 	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
-	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
@@ -70,7 +67,7 @@ const AliasGame: React.FC<AliasGameProps> = ({
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
 			setCompleted(false);
-			setGuess("");
+			setSelectedChoice(null);
 			setFeedback(null);
 			setAttempts(0);
 			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
@@ -152,40 +149,16 @@ const AliasGame: React.FC<AliasGameProps> = ({
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
-	const handleShowAnswer = () => {
-		if (completed || answerRevealed) return;
-
-		setGuess(inputData.answer);
-		setAnswerRevealed(true);
-		setCompleted(true);
-		setFeedback("Answer revealed!");
-
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-		// Stop timer
-		if (timerIntervalRef.current) {
-			clearInterval(timerIntervalRef.current);
-		}
-		setElapsedTime(timeTaken);
-
-		// Mark as completed
-		onComplete({
-			puzzleId: puzzleId || `alias_${Date.now()}`,
-			completed: true,
-			timeTaken,
-			attempts: attempts + 1,
-			completedAt: new Date().toISOString(),
-			answerRevealed: true,
-		});
-	};
-
 	const submit = () => {
-		const normalized = guess.trim().toLowerCase();
-		if (!normalized) return;
+		if (!selectedChoice) return;
 
 		// Case-insensitive comparison
-		const isCorrect = normalized === inputData.answer.toLowerCase().trim();
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+		const isCorrect =
+			selectedChoice.toLowerCase().trim() ===
+			inputData.answer.toLowerCase().trim();
+		const timeTaken = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
 		setAttempts((a) => a + 1);
 		if (isCorrect) {
 			// Stop timer
@@ -238,41 +211,25 @@ const AliasGame: React.FC<AliasGameProps> = ({
 		}
 	};
 
-	const inputRef = useRef<TextInput>(null);
+	const handleChoiceSelect = (choice: string) => {
+		if (completed) return;
+
+		// Track first interaction
+		if (!hasAttemptedRef.current && puzzleId) {
+			hasAttemptedRef.current = true;
+			if (onAttempt) {
+				onAttempt(puzzleId);
+			}
+		}
+
+		setSelectedChoice(choice);
+		setFeedback(null);
+	};
+
 	const scrollViewRef = useRef<ScrollView>(null);
-	const inputContainerRef = useRef<View>(null);
-	const [keyboardHeight, setKeyboardHeight] = useState(0);
-	const inputYPositionRef = useRef<number>(0);
-
-	useEffect(() => {
-		const showSubscription = Keyboard.addListener("keyboardDidShow", (e) => {
-			setKeyboardHeight(e.endCoordinates.height);
-			// Scroll to input when keyboard appears
-			setTimeout(() => {
-				if (scrollViewRef.current && inputYPositionRef.current > 0) {
-					scrollViewRef.current.scrollTo({
-						y: Math.max(0, inputYPositionRef.current - 150),
-						animated: true,
-					});
-				}
-			}, 300);
-		});
-		const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-			setKeyboardHeight(0);
-		});
-
-		return () => {
-			showSubscription.remove();
-			hideSubscription.remove();
-		};
-	}, []);
 
 	return (
-		<KeyboardAvoidingView
-			style={styles.container}
-			behavior={Platform.OS === "ios" ? "padding" : undefined}
-			keyboardVerticalOffset={0}
-		>
+		<View style={styles.container}>
 			<GameHeader
 				title="Alias"
 				elapsedTime={elapsedTime}
@@ -285,15 +242,10 @@ const AliasGame: React.FC<AliasGameProps> = ({
 				contentContainerStyle={[
 					styles.scrollContent,
 					{
-						paddingBottom:
-							keyboardHeight > 0
-								? keyboardHeight + 100
-								: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
+						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					},
 				]}
 				showsVerticalScrollIndicator={false}
-				keyboardShouldPersistTaps="handled"
-				keyboardDismissMode="interactive"
 				scrollEnabled={true}
 			>
 				<Animated.View
@@ -308,10 +260,6 @@ const AliasGame: React.FC<AliasGameProps> = ({
 					]}
 				>
 					<View style={styles.definitionsCard}>
-						{/* <Text style={styles.definitionsIcon}>🔍</Text> */}
-						<Text style={styles.definitionsTitle}>
-							Find the word that matches all definitions:
-						</Text>
 						<View style={styles.definitionsList}>
 							{inputData.definitions.map((definition, index) => (
 								<View key={index} style={styles.definitionItem}>
@@ -330,71 +278,42 @@ const AliasGame: React.FC<AliasGameProps> = ({
 					</View>
 				)}
 
-				<View
-					ref={inputContainerRef}
-					style={styles.inputContainer}
-					onLayout={(e) => {
-						// Store the Y position of the input container
-						inputYPositionRef.current = e.nativeEvent.layout.y;
-					}}
-				>
-					<TextInput
-						ref={inputRef}
-						style={styles.input}
-						value={guess}
-						onChangeText={(text) => {
-							// Track first interaction (user started attempting the game)
-							if (!hasAttemptedRef.current && text.length > 0 && puzzleId) {
-								hasAttemptedRef.current = true;
+				{inputData.choices && (
+					<View style={styles.choicesContainer}>
+						{inputData.choices.map((choice, index) => {
+							const isSelected = selectedChoice === choice;
+							const correctAnswer = inputData.answer.trim().toLowerCase();
+							const isCorrect = choice.toLowerCase() === correctAnswer;
+							const showCorrect = completed && isCorrect;
+							const showWrong = completed && isSelected && !isCorrect;
 
-								// Update session tracking in feed.tsx
-								// Firestore will be updated only if user skips after attempting
-								if (onAttempt) {
-									onAttempt(puzzleId);
-								}
-							}
-
-							setGuess(text);
-						}}
-						autoCapitalize="none"
-						autoCorrect={false}
-						placeholder="Type your answer here..."
-						placeholderTextColor={Colors.text.disabled}
-						returnKeyType="done"
-						onSubmitEditing={submit}
-						editable={!completed}
-						onFocus={() => {
-							// Scroll to input when focused
-							setTimeout(() => {
-								if (scrollViewRef.current && inputYPositionRef.current > 0) {
-									scrollViewRef.current.scrollTo({
-										y: Math.max(0, inputYPositionRef.current - 150),
-										animated: true,
-									});
-								}
-							}, 300);
-						}}
-					/>
-				</View>
-
-				<TouchableOpacity
-					style={[styles.submit, completed && styles.submitDisabled]}
-					onPress={completed ? onShowStats : submit}
-					activeOpacity={0.7}
-				>
-					<Text style={styles.submitText}>
-						{completed ? "View Stats" : "Submit Answer"}
-					</Text>
-				</TouchableOpacity>
-
-				{!completed && !answerRevealed && (
-					<TouchableOpacity
-						style={styles.showAnswerButton}
-						onPress={handleShowAnswer}
-						activeOpacity={0.7}
-					>
-						<Text style={styles.showAnswerText}>Show Answer</Text>
-					</TouchableOpacity>
+							return (
+								<TouchableOpacity
+									key={index}
+									style={[
+										styles.choiceButton,
+										isSelected && !completed && styles.choiceButtonSelected,
+										showCorrect && styles.choiceButtonCorrect,
+										showWrong && styles.choiceButtonWrong,
+									]}
+									onPress={() => handleChoiceSelect(choice)}
+									activeOpacity={0.7}
+									disabled={completed}
+								>
+									<Text
+										style={[
+											styles.choiceText,
+											isSelected && !completed && styles.choiceTextSelected,
+											showCorrect && styles.choiceTextCorrect,
+											showWrong && styles.choiceTextWrong,
+										]}
+									>
+										{choice}
+									</Text>
+								</TouchableOpacity>
+							);
+						})}
+					</View>
 				)}
 
 				{feedback && !completed && (
@@ -402,8 +321,28 @@ const AliasGame: React.FC<AliasGameProps> = ({
 						<Text style={styles.feedback}>{feedback}</Text>
 					</View>
 				)}
+
+				<TouchableOpacity
+					style={[
+						styles.submit,
+						(!selectedChoice || completed) && styles.submitDisabled,
+					]}
+					onPress={completed ? onShowStats : submit}
+					activeOpacity={0.7}
+					disabled={!selectedChoice && !completed}
+				>
+					<Text style={styles.submitText}>
+						{completed ? "Submitted, View Stats" : "Submit Answer"}
+					</Text>
+				</TouchableOpacity>
+
+				{feedback && !completed && (
+					<View style={styles.feedbackContainer}>
+						<Text style={styles.feedback}>{feedback}</Text>
+					</View>
+				)}
 			</ScrollView>
-		</KeyboardAvoidingView>
+		</View>
 	);
 };
 
@@ -429,17 +368,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#EC489915", // Game-specific pink with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#EC489940",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EC4899", // Game-specific pink
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	scrollView: {
@@ -454,11 +394,11 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.xl,
 	},
 	definitionsCard: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.xl,
-		padding: Spacing.xl,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		padding: Spacing.md,
+		borderWidth: 1.5,
+		borderColor: "#E5E5E5",
 		...Shadows.medium,
 		alignItems: "center",
 	},
@@ -475,7 +415,7 @@ const styles = StyleSheet.create({
 	},
 	definitionsList: {
 		width: "100%",
-		gap: Spacing.md,
+		gap: Spacing.xxxxs,
 	},
 	definitionItem: {
 		flexDirection: "row",
@@ -485,7 +425,7 @@ const styles = StyleSheet.create({
 	definitionNumber: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EC4899", // Game-specific pink
 		marginRight: Spacing.md,
 		minWidth: 24,
 	},
@@ -497,17 +437,18 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	hintContainer: {
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#EC489910", // Game-specific pink with opacity
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginBottom: Spacing.xl,
-		borderWidth: 1,
-		borderColor: Colors.accent + "30",
+		borderWidth: 1.5,
+		borderColor: "#EC489930",
+		...Shadows.light,
 	},
 	hintLabel: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EC4899", // Game-specific pink
 		marginBottom: Spacing.xs,
 	},
 	hint: {
@@ -516,23 +457,54 @@ const styles = StyleSheet.create({
 		lineHeight: Typography.fontSize.body * 1.5,
 		fontStyle: "italic",
 	},
-	inputContainer: {
-		marginBottom: Spacing.lg,
+	choicesContainer: {
+		marginBottom: Spacing.md,
+		gap: Spacing.sm,
 	},
-	input: {
-		width: "100%",
-		borderWidth: 2,
-		borderColor: "rgba(124, 77, 255, 0.3)",
-		borderRadius: BorderRadius.lg,
+	choiceButton: {
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,
-		backgroundColor: Colors.background.tertiary,
-		fontSize: Typography.fontSize.h3,
-		textAlign: "center",
-		color: Colors.text.primary,
-		minHeight: 56,
-		fontWeight: Typography.fontWeight.medium,
+		borderWidth: 2,
+		borderColor: "#E5E5E5",
 		...Shadows.light,
+		minHeight: 56,
+		justifyContent: "center",
+	},
+	choiceButtonSelected: {
+		backgroundColor: "#EC489920", // Game-specific pink with opacity
+		borderColor: "#EC4899", // Game-specific pink
+		borderWidth: 2.5,
+		...Shadows.medium,
+	},
+	choiceButtonCorrect: {
+		backgroundColor: Colors.game.correct + "50",
+		borderColor: Colors.game.correct,
+		borderWidth: 3,
+	},
+	choiceButtonWrong: {
+		backgroundColor: Colors.error + "20",
+		borderColor: Colors.error,
+		borderWidth: 3,
+	},
+	choiceText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		textAlign: "center",
+		fontWeight: Typography.fontWeight.medium,
+	},
+	choiceTextSelected: {
+		color: "#EC4899", // Game-specific pink
+		fontWeight: Typography.fontWeight.bold,
+	},
+	choiceTextCorrect: {
+		color: Colors.game.correct,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	choiceTextWrong: {
+		color: Colors.error,
+		fontWeight: Typography.fontWeight.bold,
 	},
 	submit: {
 		backgroundColor: ComponentStyles.button.backgroundColor,
@@ -553,23 +525,6 @@ const styles = StyleSheet.create({
 	},
 	submitDisabled: {
 		opacity: 0.6,
-	},
-	showAnswerButton: {
-		marginTop: Spacing.md,
-		backgroundColor: Colors.background.secondary,
-		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.xl,
-		alignItems: "center",
-		justifyContent: "center",
-		width: "100%",
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
-	},
-	showAnswerText: {
-		color: Colors.text.secondary,
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
 	},
 	feedbackContainer: {
 		marginTop: Spacing.lg,

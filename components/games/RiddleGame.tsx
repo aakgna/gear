@@ -18,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 	Layout,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -42,6 +43,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("riddle"); // Get game-specific orange color (#F59E0B)
 	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
@@ -404,11 +406,11 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.lg,
 	},
 	promptCard: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
-		padding: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		padding: Spacing.xl,
+		borderWidth: 1.5,
+		borderColor: "#E5E5E5",
 		...Shadows.medium,
 		alignItems: "center",
 	},
@@ -420,17 +422,18 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	hintContainer: {
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#F59E0B10", // Game-specific orange with opacity
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		marginBottom: Spacing.lg,
-		borderWidth: 1,
-		borderColor: Colors.accent + "30",
+		borderWidth: 1.5,
+		borderColor: "#F59E0B30",
+		...Shadows.light,
 	},
 	hintLabel: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific orange
 		marginBottom: Spacing.xs,
 	},
 	hint: {
@@ -444,23 +447,25 @@ const styles = StyleSheet.create({
 		gap: Spacing.sm,
 	},
 	choiceButton: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,
 		borderWidth: 2,
-		borderColor: "rgba(124, 77, 255, 0.3)",
+		borderColor: "#E5E5E5",
 		...Shadows.light,
-		minHeight: 44,
+		minHeight: 56,
 		justifyContent: "center",
 	},
 	choiceButtonSelected: {
-		backgroundColor: Colors.primary + "20",
-		borderColor: Colors.primary,
+		backgroundColor: "#F59E0B20", // Game-specific orange with opacity
+		borderColor: "#F59E0B", // Game-specific orange
+		borderWidth: 2.5,
+		...Shadows.medium,
 	},
 	choiceButtonCorrect: {
-		backgroundColor: "#10b98150",
-		borderColor: "#10b981",
+		backgroundColor: Colors.game.correct + "50",
+		borderColor: Colors.game.correct,
 		borderWidth: 3,
 	},
 	choiceButtonWrong: {
@@ -475,11 +480,11 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	choiceTextSelected: {
-		color: Colors.primary,
+		color: "#F59E0B", // Game-specific orange
 		fontWeight: Typography.fontWeight.bold,
 	},
 	choiceTextCorrect: {
-		color: "#10b981",
+		color: Colors.game.correct,
 		fontWeight: Typography.fontWeight.bold,
 	},
 	choiceTextWrong: {
@@ -487,11 +492,11 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	submit: {
-		backgroundColor: ComponentStyles.button.backgroundColor,
+		backgroundColor: "#F59E0B", // Game-specific orange
 		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
-		minHeight: 48,
+		minHeight: 52,
 		alignItems: ComponentStyles.button.alignItems,
 		justifyContent: ComponentStyles.button.justifyContent,
 		width: "100%",
@@ -541,21 +546,21 @@ const styles = StyleSheet.create({
 	completionContainer: {
 		marginTop: Spacing.xl,
 		padding: Spacing.xxl,
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#F59E0B10", // Game-specific orange with opacity
 		borderRadius: BorderRadius.xl,
 		alignItems: "center",
-		borderWidth: 2,
-		borderColor: Colors.accent,
-		...Shadows.large,
+		borderWidth: 2.5,
+		borderColor: "#F59E0B", // Game-specific orange
+		...Shadows.heavy,
 	},
 	completionEmoji: {
-		fontSize: 48,
-		marginBottom: Spacing.sm,
+		fontSize: 56,
+		marginBottom: Spacing.md,
 	},
 	completionText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific orange
 		marginBottom: Spacing.lg,
 		letterSpacing: -0.5,
 	},

@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
 	},
 	primaryButtonDisabled: {
 		backgroundColor: Colors.background.tertiary,
-		opacity: 0.6,
+		opacity: 0.5,
 	},
 	primaryButtonText: {
 		fontSize: Typography.fontSize.body,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.md,
 		borderRadius: BorderRadius.lg,
 		borderWidth: 1,
-		borderColor: Colors.text.disabled,
+		borderColor: "#E5E5E5",
 		gap: Spacing.xs,
 	},
 	secondaryButtonText: {

@@ -67,12 +67,12 @@ const BottomNavigationBar = () => {
 				activeOpacity={0.7}
 			>
 				<LinearGradient
-					colors={[Colors.accent, "#00B894"]}
+					colors={[Colors.accent, "#FF1744"]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
 					style={styles.gradientButton}
 				>
-					<Plus size={32} color={Colors.text.primary} strokeWidth={2.5} />
+					<Plus size={32} color={Colors.text.white} strokeWidth={2.5} />
 				</LinearGradient>
 			</TouchableOpacity>
 
@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		justifyContent: "space-around",
 		alignItems: "center",
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderTopWidth: 1,
-		borderTopColor: "rgba(255, 255, 255, 0.1)",
+		borderTopColor: "#E5E5E5",
 		paddingTop: Spacing.sm, // Reduced from Spacing.md
 		paddingHorizontal: Spacing.lg,
 		height: 70, // Changed back to fixed height

@@ -22,6 +22,7 @@ import {
 	Animation,
 	ComponentStyles,
 	Layout,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -37,8 +38,10 @@ interface QuickMathProps {
 
 function evaluateExpression(expression: string): number {
 	// PEMDAS is respected by JS eval for + - * / and parentheses when sanitized.
+	// Replace × with * and ÷ with / for evaluation
 	// We only allow digits, spaces, parentheses and the operators + - * /.
-	const safe = expression.replace(/[^0-9+\-*/()\s.]/g, "");
+	let safe = expression.replace(/×/g, "*").replace(/÷/g, "/");
+	safe = safe.replace(/[^0-9+\-*/()\s.]/g, "");
 	// eslint-disable-next-line no-eval
 	return Math.round((eval(safe) as number) * 1000) / 1000;
 }
@@ -54,10 +57,12 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("quickMath"); // Get game-specific red color (#EF4444)
 	const problems = useMemo(
 		() => inputData.problems.slice(0, 5),
 		[inputData.problems]
 	);
+	
 	const [answers, setAnswers] = useState<string[]>(
 		Array(problems.length).fill("")
 	);
@@ -71,12 +76,6 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
 	const shakeAnimation = useRef(new Animated.Value(0)).current;
 	const successScale = useRef(new Animated.Value(1)).current;
-
-	// Use answers from Firestore instead of evaluating expressions
-	const correctAnswers = useMemo(
-		() => inputData.answers.slice(0, 5),
-		[inputData.answers]
-	);
 
 	// Reset timer when puzzle changes (using a unique identifier from inputData)
 	const puzzleSignature = `${inputData.problems.join(
@@ -183,10 +182,38 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			}
 		}
 
-		// Allow numeric including negative and decimal
+		// Filter to only allow digits, minus sign, and decimal point
+		let filtered = value.replace(/[^0-9\-.]/g, "");
+		
+		// Handle minus sign - only allow at the start
+		if (filtered.includes("-")) {
+			const minusIndex = filtered.indexOf("-");
+			if (minusIndex !== 0) {
+				filtered = filtered.replace(/-/g, "");
+			} else {
+				// Remove any other minus signs
+				filtered = "-" + filtered.replace(/-/g, "");
+			}
+		}
+		
+		// Handle decimal point - only allow one, and limit to one decimal place
+		const decimalIndex = filtered.indexOf(".");
+		if (decimalIndex !== -1) {
+			// Remove any additional decimal points
+			const parts = filtered.split(".");
+			if (parts.length > 2) {
+				filtered = parts[0] + "." + parts.slice(1).join("");
+			}
+			
+			// Limit to one digit after decimal point
+			if (parts.length >= 2 && parts[1].length > 1) {
+				filtered = parts[0] + "." + parts[1].substring(0, 1);
+			}
+		}
+		
 		setAnswers((prev) => {
 			const next = [...prev];
-			next[idx] = value;
+			next[idx] = filtered;
 			return next;
 		});
 	};
@@ -207,17 +234,35 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 
 		for (let i = 0; i < problems.length; i++) {
 			const got = answers[i].trim();
-			// Parse comma-separated answers from Firestore
-			const validAnswers = correctAnswers[i]
-				.split(",")
-				.map((ans) => ans.trim());
-
-			// Check if user's answer matches any of the valid answers
-			const isCorrect = validAnswers.includes(got);
-
-			if (isCorrect) {
-				correct++;
-			} else {
+			
+			// Extract the expression part (before the = sign if present)
+			const expression = problems[i].split("=")[0].trim();
+			
+			try {
+				// Evaluate the expression
+				const result = evaluateExpression(expression);
+				
+				// Round to tenths place (one decimal place)
+				const roundedResult = Math.round(result * 10) / 10;
+				
+				// Parse user's answer and round to tenths place
+				const userAnswerNum = parseFloat(got);
+				if (isNaN(userAnswerNum)) {
+					allCorrect = false;
+					continue;
+				}
+				const roundedUserAnswer = Math.round(userAnswerNum * 10) / 10;
+				
+				// Compare rounded values with small tolerance for floating point precision
+				const isCorrect = Math.abs(roundedResult - roundedUserAnswer) < 0.05;
+				
+				if (isCorrect) {
+					correct++;
+				} else {
+					allCorrect = false;
+				}
+			} catch (error) {
+				// If evaluation fails, mark as incorrect
 				allCorrect = false;
 			}
 		}
@@ -358,10 +403,8 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 									ref={(ref) => (inputRefs.current[idx] = ref)}
 									style={styles.answerInput}
 									value={answers[idx]}
-									onChangeText={(t) =>
-										handleChange(idx, t.replace(/[^0-9\-+.]/g, ""))
-									}
-									keyboardType="numeric" // Changed from "numbers-and-punctuation"
+									onChangeText={(t) => handleChange(idx, t)}
+									keyboardType="numeric"
 									returnKeyType="done"
 									placeholderTextColor={Colors.text.disabled}
 									placeholder="?"
@@ -433,17 +476,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#EF444415", // Game-specific red with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#EF444440",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EF4444", // Game-specific red
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	scrollView: {
@@ -468,27 +512,28 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
-		...Shadows.light,
+		borderWidth: 1.5,
+		borderColor: "#E5E5E5",
+		...Shadows.medium,
 		gap: Spacing.sm,
 	},
 	problemNumberBadge: {
-		width: 32,
-		height: 32,
-		borderRadius: BorderRadius.full,
-		backgroundColor: Colors.accent + "20",
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		width: 36,
+		height: 36,
+		borderRadius: BorderRadius.md,
+		backgroundColor: "#EF444415", // Game-specific red with opacity
+		borderWidth: 1.5,
+		borderColor: "#EF444440",
 		justifyContent: "center",
 		alignItems: "center",
+		...Shadows.light,
 	},
 	problemNumber: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EF4444", // Game-specific red
 	},
 	problemText: {
 		fontSize: Typography.fontSize.h3,
@@ -503,26 +548,27 @@ const styles = StyleSheet.create({
 		marginHorizontal: Spacing.xs,
 	},
 	answerInput: {
-		width: 90,
+		width: 100,
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.sm,
-		borderWidth: 2,
-		borderColor: Colors.accent + "4D",
+		borderWidth: 2.5,
+		borderColor: "#EF444460", // Game-specific red with opacity
 		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		textAlign: "center",
 		fontSize: Typography.fontSize.h3,
 		color: Colors.text.primary,
 		fontWeight: Typography.fontWeight.bold,
-		minHeight: 48,
+		minHeight: 52,
+		...Shadows.light,
 	},
 	submit: {
 		marginTop: Spacing.xl,
-		backgroundColor: ComponentStyles.button.backgroundColor,
+		backgroundColor: "#EF4444", // Game-specific red
 		borderRadius: ComponentStyles.button.borderRadius,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
-		minHeight: ComponentStyles.button.minHeight,
+		minHeight: 52,
 		alignItems: ComponentStyles.button.alignItems,
 		justifyContent: ComponentStyles.button.justifyContent,
 		width: "100%",
@@ -554,21 +600,21 @@ const styles = StyleSheet.create({
 	completionContainer: {
 		marginTop: Spacing.xl,
 		padding: Spacing.xxl,
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#EF444410", // Game-specific red with opacity
 		borderRadius: BorderRadius.xl,
 		alignItems: "center",
-		borderWidth: 2,
-		borderColor: Colors.accent,
-		...Shadows.large,
+		borderWidth: 2.5,
+		borderColor: "#EF4444", // Game-specific red
+		...Shadows.heavy,
 	},
 	completionEmoji: {
-		fontSize: 48,
-		marginBottom: Spacing.sm,
+		fontSize: 56,
+		marginBottom: Spacing.md,
 	},
 	completionText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#EF4444", // Game-specific red
 		marginBottom: Spacing.lg,
 		letterSpacing: -0.5,
 	},

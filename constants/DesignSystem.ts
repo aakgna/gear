@@ -1,41 +1,42 @@
 /**
  * Design System for GEAR - Logic Puzzle App
- * Clean, minimal, modern UI with cognitive minimalism principles
+ * Light theme inspired by TikTok with unique vibrant twist
  */
 
 import { ViewStyle } from "react-native";
+import { PuzzleType } from "../config/types";
 
-// Color System - Dark Theme
+// Color System - Light Theme (TikTok-inspired)
 export const Colors = {
-	// Primary Colors
-	primary: "#E8EAF6", // Light indigo for headers, icons, main text
-	accent: "#00D4AA", // Vibrant teal for buttons, highlights, success
-	secondaryAccent: "#FFD54F", // Golden yellow for progress, hover, streaks
-	error: "#FF5252", // Bright red for wrong answers or alerts
+	// Primary Colors - Unique vibrant twist
+	primary: "#161823", // Deep dark blue-gray for headers, icons, main text
+	accent: "#FE2C55", // Vibrant pink-red (TikTok-inspired but unique)
+	secondaryAccent: "#25F4EE", // Cyan for secondary actions, highlights
+	error: "#FF3040", // Bright red for wrong answers or alerts
 
-	// Background - Dark Theme
+	// Background - Light Theme
 	background: {
-		primary: "#121212", // Deep black
-		secondary: "#1E1E1E", // Dark gray
-		tertiary: "#2C2C2C", // Medium dark gray for cards
-		gradient: ["#1A1A2E", "#16213E"] as const, // Dark gradient
+		primary: "#FFFFFF", // Pure white
+		secondary: "#F8F8F8", // Light gray for sections
+		tertiary: "#F2F2F2", // Slightly darker gray for cards
+		gradient: ["#FFFFFF", "#F5F5F5"] as const, // Light gradient
 	},
 
-	// Text Colors - Dark Theme
+	// Text Colors - Light Theme
 	text: {
-		primary: "#FFFFFF", // Primary text (white)
-		secondary: "#B0B0B0", // Secondary text (light gray)
-		disabled: "#666666", // Disabled text (medium gray)
-		white: "#FFFFFF", // White text
-		accent: "#00D4AA", // Accent color for highlights
+		primary: "#161823", // Dark text (almost black)
+		secondary: "#8E8E93", // Medium gray for secondary text
+		disabled: "#C7C7CC", // Light gray for disabled text
+		white: "#FFFFFF", // White text (for dark backgrounds)
+		accent: "#FE2C55", // Accent color for highlights
 	},
 
 	// Game States
 	game: {
-		correct: "#4CAF50", // Green for correct answers
-		incorrect: "#FF5252", // Red for incorrect
-		present: "#FFD54F", // Yellow for "present" state (Wordle)
-		absent: "#424242", // Dark gray for absent
+		correct: "#00C896", // Green for correct answers
+		incorrect: "#FF3040", // Red for incorrect
+		present: "#FFD93D", // Yellow for "present" state (Wordle)
+		absent: "#E5E5E5", // Light gray for absent
 	},
 };
 
@@ -68,6 +69,9 @@ export const Typography = {
 
 // Spacing System (8px multiples)
 export const Spacing = {
+	xxxxs: 0,
+	xxxs: 1,
+	xxs: 2,
 	xs: 4,
 	sm: 8,
 	md: 16,
@@ -85,7 +89,7 @@ export const BorderRadius = {
 	pill: 9999,
 };
 
-// Shadows - Enhanced for dark theme
+// Shadows - Light theme with subtle depth
 export const Shadows: {
 	light: ViewStyle;
 	medium: ViewStyle;
@@ -94,31 +98,31 @@ export const Shadows: {
 } = {
 	light: {
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.3,
-		shadowRadius: 4,
-		elevation: 3, // Android
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.08,
+		shadowRadius: 3,
+		elevation: 2, // Android
 	},
 	medium: {
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.4,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.12,
 		shadowRadius: 8,
-		elevation: 6,
+		elevation: 4,
 	},
 	heavy: {
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.5,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.16,
 		shadowRadius: 16,
-		elevation: 10,
+		elevation: 8,
 	},
 	glow: {
 		shadowColor: Colors.accent,
 		shadowOffset: { width: 0, height: 0 },
-		shadowOpacity: 0.6,
+		shadowOpacity: 0.4,
 		shadowRadius: 12,
-		elevation: 8,
+		elevation: 6,
 	},
 };
 
@@ -132,7 +136,7 @@ export const Animation = {
 	easing: "cubic-bezier(0.4, 0, 0.2, 1)", // iOS feel
 };
 
-// Component Styles - Dark Theme
+// Component Styles - Light Theme
 export const ComponentStyles: {
 	puzzleCard: ViewStyle;
 	button: ViewStyle;
@@ -142,11 +146,11 @@ export const ComponentStyles: {
 } = {
 	// Puzzle Card
 	puzzleCard: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.xl,
 		padding: Spacing.md,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.medium,
 	},
 
@@ -166,12 +170,12 @@ export const ComponentStyles: {
 	input: {
 		borderRadius: BorderRadius.md,
 		borderWidth: 1,
-		borderColor: Colors.text.disabled,
+		borderColor: "#E5E5E5",
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.md,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 	},
 
 	// Progress Bar
@@ -183,11 +187,11 @@ export const ComponentStyles: {
 
 	// Card
 	card: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.08)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.light,
 	},
 };
@@ -198,4 +202,31 @@ export const Layout = {
 	padding: Spacing.md, // 16px
 	verticalRhythm: Spacing.sm, // 8px multiples
 	tapTarget: 44, // Minimum tap target size
+};
+
+// Game-Specific Color Themes
+// Each game gets a unique color to create visual distinction and variety
+export const GameColors: Record<PuzzleType, string> = {
+	wordle: "#3B82F6", // Vibrant blue
+	sudoku: "#8B5CF6", // Deep purple
+	riddle: "#F59E0B", // Orange
+	trivia: "#14B8A6", // Teal
+	quickMath: "#EF4444", // Red
+	wordChain: "#10B981", // Green
+	alias: "#EC4899", // Pink
+	futoshiki: "#6366F1", // Indigo
+	magicSquare: "#06B6D4", // Cyan
+	hidato: "#F59E0B", // Amber
+	sequencing: "#8B5CF6", // Violet
+	mastermind: "#F43F5E", // Rose
+	zip: "#10B981", // Emerald
+};
+
+/**
+ * Get the game-specific accent color for a given puzzle type
+ * @param gameType - The type of puzzle/game
+ * @returns The unique color for that game type
+ */
+export const getGameColor = (gameType: PuzzleType): string => {
+	return GameColors[gameType] || Colors.accent; // Fallback to default accent if type not found
 };

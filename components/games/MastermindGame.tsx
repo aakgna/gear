@@ -17,6 +17,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -48,7 +49,11 @@ const COLOR_EMOJI: Record<string, string> = {
 
 interface GuessHistory {
 	guess: string[];
-	feedback: { correctPosition: number; correctColor: number };
+	feedback: {
+		correctPosition: number;
+		correctColor: number;
+		correctPositions: boolean[]; // Array indicating which positions are correct
+	};
 }
 
 const MastermindGame: React.FC<MastermindGameProps> = ({
@@ -62,11 +67,12 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("mastermind"); // Get game-specific rose color (#F43F5E)
+	const codeLength = inputData.secretCode.length;
 	const [currentGuess, setCurrentGuess] = useState<(string | null)[]>(
-		new Array(6).fill(null)
+		new Array(codeLength).fill(null)
 	);
 	const [guessHistory, setGuessHistory] = useState<GuessHistory[]>([]);
-	const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
 	const [gameWon, setGameWon] = useState(false);
 	const [gameLost, setGameLost] = useState(false);
 	const [attemptsUsed, setAttemptsUsed] = useState(0);
@@ -76,34 +82,59 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false);
+	const rainbowRotation = useRef(new Animated.Value(0)).current;
 
 	const availableColors = getAvailableColors(inputData.secretCode);
+
+	// Start rainbow border animation
+	useEffect(() => {
+		const animation = Animated.loop(
+			Animated.timing(rainbowRotation, {
+				toValue: 1,
+				duration: 2000, // 2 seconds for full rotation
+				useNativeDriver: true,
+			}),
+			{ iterations: -1 } // Infinite iterations
+		);
+		animation.start();
+
+		return () => {
+			animation.stop();
+			rainbowRotation.setValue(0);
+		};
+	}, [rainbowRotation]);
 
 	// Calculate feedback for a guess
 	const calculateFeedback = (
 		guess: string[],
 		secret: string[]
-	): { correctPosition: number; correctColor: number } => {
+	): {
+		correctPosition: number;
+		correctColor: number;
+		correctPositions: boolean[];
+	} => {
 		let correctPosition = 0;
 		let correctColor = 0;
+		const correctPositions = new Array(secret.length).fill(false);
 
 		// Track which positions are already matched
-		const secretUsed = new Array(6).fill(false);
-		const guessUsed = new Array(6).fill(false);
+		const secretUsed = new Array(secret.length).fill(false);
+		const guessUsed = new Array(secret.length).fill(false);
 
 		// First pass: count correct positions
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < secret.length; i++) {
 			if (guess[i] === secret[i]) {
 				correctPosition++;
+				correctPositions[i] = true;
 				secretUsed[i] = true;
 				guessUsed[i] = true;
 			}
 		}
 
 		// Second pass: count correct colors in wrong positions
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < secret.length; i++) {
 			if (!guessUsed[i]) {
-				for (let j = 0; j < 6; j++) {
+				for (let j = 0; j < secret.length; j++) {
 					if (!secretUsed[j] && guess[i] === secret[j]) {
 						correctColor++;
 						secretUsed[j] = true;
@@ -113,7 +144,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 			}
 		}
 
-		return { correctPosition, correctColor };
+		return { correctPosition, correctColor, correctPositions };
 	};
 
 	// Get available colors based on secret code (to determine difficulty)
@@ -180,9 +211,8 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 			setGameWon(false);
 			setGameLost(false);
 			setAttemptsUsed(0);
-			setCurrentGuess(new Array(6).fill(null));
+			setCurrentGuess(new Array(inputData.secretCode.length).fill(null));
 			setGuessHistory([]);
-			setSelectedPosition(null);
 			hasAttemptedRef.current = false;
 			// Only set startTime if propStartTime is provided
 			if (propStartTime) {
@@ -214,37 +244,31 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 		};
 	}, [puzzleId, propStartTime, startTime, isActive]);
 
-	// Handle color selection
+	// Handle color selection (Wordle-like: click color to fill next empty slot)
 	const handleColorSelect = (color: string) => {
-		if (selectedPosition !== null && !gameWon && !gameLost) {
-			const newGuess = [...currentGuess];
-			newGuess[selectedPosition] = color;
+		if (gameWon || gameLost) return;
+
+		const newGuess = [...currentGuess];
+		// Find first empty position
+		const firstEmpty = newGuess.findIndex((c) => c === null);
+		if (firstEmpty !== -1) {
+			newGuess[firstEmpty] = color;
 			setCurrentGuess(newGuess);
-			// Auto-advance to next empty position or deselect
-			const nextEmpty = newGuess.findIndex(
-				(c, idx) => c === null && idx > selectedPosition
-			);
-			if (nextEmpty !== -1) {
-				setSelectedPosition(nextEmpty);
-			} else {
-				setSelectedPosition(null);
-			}
 		}
 	};
 
-	// Handle position selection (select or clear)
-	const handlePositionSelect = (index: number) => {
+	// Handle clear (X button) - removes last filled position
+	const handleClear = () => {
 		if (gameWon || gameLost) return;
 
-		if (currentGuess[index] !== null) {
-			// Clear the position
-			const newGuess = [...currentGuess];
-			newGuess[index] = null;
-			setCurrentGuess(newGuess);
-			setSelectedPosition(index);
-		} else {
-			// Select the position
-			setSelectedPosition(index);
+		const newGuess = [...currentGuess];
+		// Find last filled position
+		for (let i = newGuess.length - 1; i >= 0; i--) {
+			if (newGuess[i] !== null) {
+				newGuess[i] = null;
+				setCurrentGuess(newGuess);
+				break;
+			}
 		}
 	};
 
@@ -268,7 +292,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 		setAttemptsUsed(attemptsUsed + 1);
 
 		// Check for win
-		if (feedback.correctPosition === 6) {
+		if (feedback.correctPosition === inputData.secretCode.length) {
 			setGameWon(true);
 			handleGameComplete(true, attemptsUsed + 1);
 		} else if (attemptsUsed + 1 >= inputData.maxGuesses) {
@@ -278,8 +302,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 		}
 
 		// Reset current guess
-		setCurrentGuess(new Array(6).fill(null));
-		setSelectedPosition(null);
+		setCurrentGuess(new Array(inputData.secretCode.length).fill(null));
 	};
 
 	const handleGameComplete = (won: boolean, attempts: number) => {
@@ -374,17 +397,97 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 					{guessHistory.map((entry, idx) => (
 						<View key={idx} style={styles.historyRow}>
 							<View style={styles.historyGuess}>
-								{entry.guess.map((color, colorIdx) => (
-									<View key={colorIdx} style={styles.historySlot}>
-										<Text style={styles.historyEmoji}>
-											{COLOR_EMOJI[color]}
-										</Text>
-									</View>
-								))}
+								{entry.guess.map((color, colorIdx) => {
+									const isCorrect = entry.feedback.correctPositions[colorIdx];
+									const rotate = rainbowRotation.interpolate({
+										inputRange: [0, 1],
+										outputRange: ["0deg", "360deg"],
+									});
+
+									// Rainbow colors for the border - more segments for smoother effect
+									const rainbowColors = [
+										"#FF0000", // Red
+										"#FF4000", // Red-Orange
+										"#FF7F00", // Orange
+										"#FFBF00", // Orange-Yellow
+										"#FFFF00", // Yellow
+										"#80FF00", // Yellow-Green
+										"#00FF00", // Green
+										"#00FF80", // Green-Cyan
+										"#00FFFF", // Cyan
+										"#0080FF", // Cyan-Blue
+										"#0000FF", // Blue
+										"#4000FF", // Blue-Indigo
+										"#8000FF", // Indigo
+										"#BF00FF", // Indigo-Violet
+										"#FF00FF", // Violet
+										"#FF0080", // Violet-Red
+									];
+
+									return (
+										<View key={colorIdx} style={styles.historySlotContainer}>
+											{isCorrect && (
+												<Animated.View
+													style={[
+														styles.rainbowBorderContainer,
+														{
+															transform: [{ rotate }],
+														},
+													]}
+												>
+													{rainbowColors.map((rainbowColor, idx) => {
+														const segmentAngle = 360 / rainbowColors.length;
+														const angle = segmentAngle * idx - 90; // Start from top
+														const radius = 14; // Border radius
+														const center = 16; // Center of 32x32 container
+
+														// Calculate position on the circle for the segment
+														const radian = (angle * Math.PI) / 180;
+														// Position segment at the border
+														const x = center + radius * Math.cos(radian);
+														const y = center + radius * Math.sin(radian);
+
+														// Create larger, more visible segments
+														const segmentLength = 4; // Longer segments for better visibility
+														const segmentWidth = 4; // Wider segments
+
+														return (
+															<View
+																key={idx}
+																style={[
+																	styles.rainbowSegment,
+																	{
+																		backgroundColor: rainbowColor,
+																		left: x - segmentWidth / 2,
+																		top: y - segmentLength / 2,
+																		width: segmentWidth,
+																		height: segmentLength,
+																		transform: [{ rotate: `${angle + 90}deg` }],
+																	},
+																]}
+															/>
+														);
+													})}
+												</Animated.View>
+											)}
+											<View
+												style={[
+													styles.historySlot,
+													isCorrect && styles.correctPositionSlot,
+												]}
+											>
+												<Text style={styles.historyEmoji}>
+													{COLOR_EMOJI[color]}
+												</Text>
+											</View>
+										</View>
+									);
+								})}
 							</View>
 							<View style={styles.feedbackContainer}>
 								<Text style={styles.feedbackText}>
-									{entry.feedback.correctPosition} correct
+									{entry.feedback.correctPosition} correct position
+									{entry.feedback.correctPosition !== 1 ? "s" : ""}
 								</Text>
 							</View>
 						</View>
@@ -398,19 +501,14 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 					<Text style={styles.sectionLabel}>Current Guess:</Text>
 					<View style={styles.codeRow}>
 						{currentGuess.map((color, idx) => (
-							<TouchableOpacity
+							<View
 								key={idx}
-								style={[
-									styles.guessSlot,
-									selectedPosition === idx && styles.selectedSlot,
-									color && styles.filledSlot,
-								]}
-								onPress={() => handlePositionSelect(idx)}
+								style={[styles.guessSlot, color && styles.filledSlot]}
 							>
 								<Text style={styles.slotEmoji}>
 									{color ? COLOR_EMOJI[color] : ""}
 								</Text>
-							</TouchableOpacity>
+							</View>
 						))}
 					</View>
 				</View>
@@ -424,15 +522,31 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 						{availableColors.map((color, idx) => (
 							<TouchableOpacity
 								key={idx}
-								style={styles.colorButton}
+								style={[
+									styles.colorButton,
+									isGuessComplete && styles.colorButtonDisabled,
+								]}
 								onPress={() => handleColorSelect(color)}
-								disabled={selectedPosition === null}
+								disabled={isGuessComplete}
 							>
 								<Text style={styles.colorButtonEmoji}>
 									{COLOR_EMOJI[color]}
 								</Text>
 							</TouchableOpacity>
 						))}
+						{/* Clear/Back Button (X) */}
+						<TouchableOpacity
+							style={[
+								styles.colorButton,
+								styles.clearButton,
+								!currentGuess.some((c) => c !== null) &&
+									styles.colorButtonDisabled,
+							]}
+							onPress={handleClear}
+							disabled={!currentGuess.some((c) => c !== null)}
+						>
+							<Text style={styles.clearButtonText}>✕</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 			)}
@@ -464,7 +578,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background,
+		backgroundColor: Colors.background.primary,
 	},
 	scrollContent: {
 		padding: Spacing.md,
@@ -495,34 +609,37 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#F43F5E15", // Game-specific rose with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#F43F5E40",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F43F5E", // Game-specific rose
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	resultContainer: {
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		padding: Spacing.md,
 		borderRadius: BorderRadius.lg,
 		marginBottom: Spacing.md,
-		...Shadows.small,
+		...Shadows.light,
 	},
 	successText: {
-		...Typography.h3,
-		color: Colors.success,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.game.correct,
 		textAlign: "center",
 		marginBottom: Spacing.sm,
 	},
 	failureText: {
-		...Typography.h3,
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.error,
 		textAlign: "center",
 		marginBottom: Spacing.sm,
@@ -531,26 +648,25 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	secretCodeLabel: {
-		...Typography.body,
-		color: Colors.textSecondary,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 		marginBottom: Spacing.xs,
 	},
 	historySection: {
 		marginBottom: Spacing.md,
 	},
 	sectionLabel: {
-		...Typography.bodyBold,
-		color: "#FFFFFF",
-		marginBottom: Spacing.xs,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xs,
 	},
 	historyScroll: {
 		maxHeight: 350,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.sm,
-		...Shadows.small,
+		...Shadows.light,
 	},
 	historyRow: {
 		flexDirection: "row",
@@ -559,19 +675,45 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.sm,
 		paddingBottom: Spacing.sm,
 		borderBottomWidth: 1,
-		borderBottomColor: Colors.border,
+		borderBottomColor: "#E5E5E5",
 	},
 	historyGuess: {
 		flexDirection: "row",
 		gap: Spacing.xs,
 	},
+	historySlotContainer: {
+		width: 32,
+		height: 32,
+		justifyContent: "center",
+		alignItems: "center",
+		position: "relative",
+	},
+	rainbowBorderContainer: {
+		position: "absolute",
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		overflow: "visible", // Allow segments to be visible outside
+	},
+	rainbowSegment: {
+		position: "absolute",
+		width: 4,
+		height: 4,
+		borderRadius: 2,
+		zIndex: 0,
+	},
 	historySlot: {
 		width: 28,
 		height: 28,
-		backgroundColor: Colors.background,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.sm,
 		justifyContent: "center",
 		alignItems: "center",
+		position: "relative",
+		zIndex: 1,
+	},
+	correctPositionSlot: {
+		backgroundColor: Colors.game.correct + "20",
 	},
 	historyEmoji: {
 		fontSize: Typography.fontSize.h3,
@@ -580,10 +722,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.sm,
 	},
 	feedbackText: {
-		...Typography.body,
-		color: "#FFFFFF",
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
 	},
 	currentGuessSection: {
 		marginBottom: Spacing.md,
@@ -596,20 +737,16 @@ const styles = StyleSheet.create({
 	guessSlot: {
 		width: 48,
 		height: 48,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 2,
-		borderColor: Colors.border,
+		borderColor: "#E5E5E5",
 		justifyContent: "center",
 		alignItems: "center",
-		...Shadows.small,
-	},
-	selectedSlot: {
-		borderColor: Colors.primary,
-		borderWidth: 3,
+		...Shadows.light,
 	},
 	filledSlot: {
-		backgroundColor: Colors.background,
+		backgroundColor: Colors.background.primary,
 	},
 	slotEmoji: {
 		fontSize: Typography.fontSize.h1,
@@ -617,10 +754,10 @@ const styles = StyleSheet.create({
 	codeSlot: {
 		width: 48,
 		height: 48,
-		backgroundColor: Colors.background,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 2,
-		borderColor: Colors.border,
+		borderColor: "#E5E5E5",
 		justifyContent: "center",
 		alignItems: "center",
 	},
@@ -639,14 +776,27 @@ const styles = StyleSheet.create({
 	colorButton: {
 		width: 48,
 		height: 48,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		justifyContent: "center",
 		alignItems: "center",
-		...Shadows.small,
+		...Shadows.light,
 	},
 	colorButtonEmoji: {
 		fontSize: Typography.fontSize.h1,
+	},
+	colorButtonDisabled: {
+		opacity: 0.4,
+	},
+	clearButton: {
+		backgroundColor: Colors.error + "20",
+		borderWidth: 2,
+		borderColor: Colors.error,
+	},
+	clearButtonText: {
+		fontSize: Typography.fontSize.h2,
+		color: Colors.error,
+		fontWeight: Typography.fontWeight.bold,
 	},
 	submitButton: {
 		backgroundColor: ComponentStyles.button.backgroundColor,

@@ -73,7 +73,7 @@ const SignInScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
+			<StatusBar style="dark" />
 			<LinearGradient
 				colors={Colors.background.gradient as [string, string]}
 				style={StyleSheet.absoluteFill}
@@ -103,13 +103,13 @@ const SignInScreen = () => {
 						disabled={loading}
 					>
 						{loading ? (
-							<ActivityIndicator color={Colors.text.primary} />
+						<ActivityIndicator color={Colors.text.white} />
 						) : (
 							<>
 								<Ionicons
 									name="logo-google"
 									size={24}
-									color={Colors.text.primary}
+									color={Colors.text.white}
 								/>
 								<Text style={styles.googleButtonText}>
 									Continue with Google
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.lg,
 		width: "100%",
 		marginBottom: Spacing.lg,
-		...Shadows.heavy,
+		...Shadows.medium,
 	},
 	buttonDisabled: {
 		opacity: 0.7,
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
 	googleButtonText: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.primary,
+		color: Colors.text.white,
 		marginLeft: Spacing.md,
 	},
 	privacyText: {

@@ -16,6 +16,7 @@ import {
 	BorderRadius,
 	Shadows,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -40,6 +41,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("sequencing"); // Get game-specific violet color (#8B5CF6)
 	// currentPlacement: index is slot position, value is entity index or null
 	const [currentPlacement, setCurrentPlacement] = useState<(number | null)[]>(
 		new Array(inputData.numSlots).fill(null)
@@ -364,30 +366,31 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#8B5CF615", // Game-specific violet with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#8B5CF640",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#8B5CF6", // Game-specific violet
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	rulesContainer: {
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.sm,
 		marginBottom: Spacing.md,
-		...Shadows.small,
+		...Shadows.light,
 		maxHeight: 150,
 	},
 	rulesTitle: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		marginBottom: Spacing.xs,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
@@ -405,12 +408,12 @@ const styles = StyleSheet.create({
 	},
 	ruleText: {
 		...Typography.body,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.medium,
 	},
 	ruleTextViolated: {
-		color: "#FF4444",
+		color: Colors.error,
 		fontWeight: Typography.fontWeight.bold,
 		fontSize: Typography.fontSize.body,
 	},
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
 	},
 	sectionLabel: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		marginBottom: Spacing.xs,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
@@ -439,46 +442,46 @@ const styles = StyleSheet.create({
 		minWidth: 120,
 		minHeight: 80,
 		padding: Spacing.md,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 3,
-		borderColor: "#666666",
+		borderColor: "#E5E5E5",
 		alignItems: "center",
 		justifyContent: "center",
 		...Shadows.medium,
 	},
 	slotFilled: {
-		backgroundColor: "#1a1a1a",
+		backgroundColor: Colors.background.tertiary,
 		borderColor: Colors.primary,
 		borderWidth: 3,
 	},
 	slotValid: {
-		borderColor: "#4CAF50",
-		backgroundColor: "#4CAF50" + "30",
+		borderColor: Colors.game.correct,
+		backgroundColor: Colors.game.correct + "30",
 		borderWidth: 4,
 	},
 	slotInvalid: {
-		borderColor: "#FF4444",
-		backgroundColor: "#FF4444" + "30",
+		borderColor: Colors.error,
+		backgroundColor: Colors.error + "30",
 		borderWidth: 4,
 	},
 	slotLabel: {
 		...Typography.caption,
-		color: "#AAAAAA",
+		color: Colors.text.secondary,
 		fontSize: Typography.fontSize.small,
 		marginBottom: Spacing.xs,
 		fontWeight: Typography.fontWeight.medium,
 	},
 	slotEntity: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.body,
 		textAlign: "center",
 		fontWeight: Typography.fontWeight.semiBold,
 	},
 	slotEmpty: {
 		...Typography.body,
-		color: "#888888",
+		color: Colors.text.secondary,
 		fontSize: Typography.fontSize.caption,
 		fontStyle: "italic",
 		fontWeight: Typography.fontWeight.medium,
@@ -494,10 +497,10 @@ const styles = StyleSheet.create({
 	entityButton: {
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.lg,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 3,
-		borderColor: "#666666",
+		borderColor: "#E5E5E5",
 		...Shadows.medium,
 		minHeight: 50,
 	},
@@ -508,7 +511,7 @@ const styles = StyleSheet.create({
 	},
 	entityText: {
 		...Typography.body,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
 	},

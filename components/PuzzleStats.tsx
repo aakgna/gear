@@ -192,11 +192,11 @@ const PuzzleStats: React.FC<PuzzleStatsProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		padding: Spacing.xl,
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.xl,
 		marginTop: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.medium,
 	},
 	title: {
@@ -213,12 +213,13 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	statCard: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginBottom: Spacing.md,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
+		...Shadows.light,
 	},
 	statRow: {
 		flexDirection: "row",

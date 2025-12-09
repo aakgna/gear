@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
 	View,
 	Text,
@@ -53,13 +53,73 @@ const CreateGameScreen = () => {
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 
 	// Quick Math state
-	const [numQuestions, setNumQuestions] = useState<3 | 5>(3);
+	const [numQuestions, setNumQuestions] = useState<3 | 4>(3);
 	const [quickMathQuestions, setQuickMathQuestions] = useState<string[]>(
 		Array(3).fill("")
 	);
-	const [quickMathAnswers, setQuickMathAnswers] = useState<string[]>(
-		Array(3).fill("")
+
+	// Function to evaluate math expressions
+	const evaluateExpression = (expression: string): number => {
+		// Replace × with * and ÷ with / for evaluation
+		let safe = expression.replace(/×/g, "*").replace(/÷/g, "/");
+		// Only allow digits, spaces, parentheses and the operators + - * /.
+		safe = safe.replace(/[^0-9+\-*/()\s.]/g, "");
+		try {
+			// eslint-disable-next-line no-eval
+			return Math.round((eval(safe) as number) * 1000) / 1000;
+		} catch {
+			return 0;
+		}
+	};
+
+	// Track which questions have validation errors
+	const [quickMathErrors, setQuickMathErrors] = useState<boolean[]>(
+		Array(3).fill(false)
 	);
+
+	// Validate and evaluate answers from questions
+	const quickMathAnswers = useMemo(() => {
+		const errors: boolean[] = [];
+		const answers = quickMathQuestions.map((question, index) => {
+			if (!question.trim()) {
+				errors[index] = false; // Empty is not an error until validation
+				return "";
+			}
+			// Extract the expression part (before the = sign if present)
+			const expression = question.split("=")[0].trim();
+			if (!expression) {
+				errors[index] = true; // Empty expression is an error
+				return "";
+			}
+			try {
+				const result = evaluateExpression(expression);
+				// Check if result is valid (not NaN, not Infinity)
+				if (isNaN(result) || !isFinite(result)) {
+					errors[index] = true;
+					return "";
+				}
+				// Check if result is positive (as per requirements)
+				if (result <= 0) {
+					errors[index] = true;
+					return "";
+				}
+				errors[index] = false;
+				// Format the result - remove trailing zeros for whole numbers, keep one decimal place if needed
+				if (result % 1 === 0) {
+					return result.toString();
+				} else {
+					// Round to one decimal place for display
+					return (Math.round(result * 10) / 10).toString();
+				}
+			} catch {
+				errors[index] = true;
+				return "";
+			}
+		});
+		// Update errors state
+		setQuickMathErrors(errors);
+		return answers;
+	}, [quickMathQuestions]);
 
 	// Game Idea state
 	const [gameIdea, setGameIdea] = useState("");
@@ -73,7 +133,7 @@ const CreateGameScreen = () => {
 		setNumQuestions(3);
 		setDifficulty("easy");
 		setQuickMathQuestions(Array(3).fill(""));
-		setQuickMathAnswers(Array(3).fill(""));
+		setQuickMathErrors(Array(3).fill(false));
 		setGameIdea("");
 		setLoading(false);
 	};
@@ -107,7 +167,7 @@ const CreateGameScreen = () => {
 		setNumQuestions(3);
 		setDifficulty("easy");
 		setQuickMathQuestions(Array(3).fill(""));
-		setQuickMathAnswers(Array(3).fill(""));
+		setQuickMathErrors(Array(3).fill(false));
 		setGameIdea("");
 	};
 
@@ -139,22 +199,16 @@ const CreateGameScreen = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [difficulty, gameType]); // Only run when difficulty or gameType changes, not when wordleWord changes
 
-	const handleNumQuestionsChange = (num: 3 | 5) => {
+	const handleNumQuestionsChange = (num: 3 | 4) => {
 		setNumQuestions(num);
 		setQuickMathQuestions(Array(num).fill(""));
-		setQuickMathAnswers(Array(num).fill(""));
+		setQuickMathErrors(Array(num).fill(false));
 	};
 
 	const handleQuickMathQuestionChange = (index: number, value: string) => {
 		const newQuestions = [...quickMathQuestions];
 		newQuestions[index] = value;
 		setQuickMathQuestions(newQuestions);
-	};
-
-	const handleQuickMathAnswerChange = (index: number, value: string) => {
-		const newAnswers = [...quickMathAnswers];
-		newAnswers[index] = value;
-		setQuickMathAnswers(newAnswers);
 	};
 
 	const getWordleLengthRange = (): { min: number; max: number } => {
@@ -205,16 +259,48 @@ const CreateGameScreen = () => {
 	};
 
 	const validateQuickMath = (): boolean => {
+		// Check for empty questions
 		for (let i = 0; i < numQuestions; i++) {
 			if (!quickMathQuestions[i]?.trim()) {
 				Alert.alert("Validation Error", `Please enter question ${i + 1}.`);
 				return false;
 			}
-			if (!quickMathAnswers[i]?.trim()) {
-				Alert.alert("Validation Error", `Please enter answer ${i + 1}.`);
+		}
+
+		// Check for validation errors (invalid expressions, non-positive answers, etc.)
+		const hasErrors = quickMathErrors.some((error, index) => {
+			return error && index < numQuestions;
+		});
+
+		if (hasErrors) {
+			const errorIndices: number[] = [];
+			quickMathErrors.forEach((error, index) => {
+				if (error && index < numQuestions) {
+					errorIndices.push(index + 1);
+				}
+			});
+			Alert.alert(
+				"Validation Error",
+				`The following questions have errors:\n${errorIndices.join(
+					", "
+				)}\n\nPlease fix:\n- Invalid expressions\n- Non-positive answers\n- Division by zero or other calculation errors`
+			);
+			return false;
+		}
+
+		// Final check that all answers were successfully evaluated
+		for (let i = 0; i < numQuestions; i++) {
+			if (!quickMathAnswers[i] || quickMathAnswers[i] === "") {
+				Alert.alert(
+					"Validation Error",
+					`Question ${
+						i + 1
+					} could not be evaluated. Please check the expression.`
+				);
 				return false;
 			}
 		}
+
 		return true;
 	};
 
@@ -333,7 +419,6 @@ const CreateGameScreen = () => {
 							setNumQuestions(3);
 							setDifficulty("easy");
 							setQuickMathQuestions(Array(3).fill(""));
-							setQuickMathAnswers(Array(3).fill(""));
 						},
 					},
 				]);
@@ -630,8 +715,8 @@ const CreateGameScreen = () => {
 		<View style={styles.section}>
 			<Text style={styles.sectionTitle}>Create Quick Math Game</Text>
 			<Text style={styles.description}>
-				Choose the number of questions and difficulty, then enter your questions
-				and answers.
+				Choose the number of questions and difficulty, then enter your math
+				expressions. Answers will be automatically calculated and displayed.
 			</Text>
 
 			{/* Number of Questions */}
@@ -657,17 +742,17 @@ const CreateGameScreen = () => {
 					<TouchableOpacity
 						style={[
 							styles.selectorButton,
-							numQuestions === 5 && styles.selectorButtonActive,
+							numQuestions === 4 && styles.selectorButtonActive,
 						]}
-						onPress={() => handleNumQuestionsChange(5)}
+						onPress={() => handleNumQuestionsChange(4)}
 					>
 						<Text
 							style={[
 								styles.selectorButtonText,
-								numQuestions === 5 && styles.selectorButtonTextActive,
+								numQuestions === 4 && styles.selectorButtonTextActive,
 							]}
 						>
-							5
+							4
 						</Text>
 					</TouchableOpacity>
 				</View>
@@ -678,36 +763,55 @@ const CreateGameScreen = () => {
 
 			{/* Questions and Answers */}
 			<Text style={styles.label}>Questions & Answers</Text>
-			{Array.from({ length: numQuestions }).map((_, index) => (
-				<View key={index} style={styles.questionAnswerRow}>
-					<Text style={styles.questionNumber}>Q{index + 1}</Text>
-					<View style={styles.questionAnswerContainer}>
-						<TextInput
-							style={styles.questionInput}
-							placeholder={`Question ${index + 1} (e.g., 5 + 3)`}
-							placeholderTextColor={Colors.text.disabled}
-							value={quickMathQuestions[index]}
-							onChangeText={(text) =>
-								handleQuickMathQuestionChange(index, text)
-							}
-						/>
-						<TextInput
-							style={styles.answerInput}
-							placeholder={`Answer ${index + 1}`}
-							placeholderTextColor={Colors.text.disabled}
-							value={quickMathAnswers[index]}
-							onChangeText={(text) => handleQuickMathAnswerChange(index, text)}
-							keyboardType="numeric"
-						/>
+			{Array.from({ length: numQuestions }).map((_, index) => {
+				const hasError =
+					quickMathErrors[index] && quickMathQuestions[index]?.trim();
+				return (
+					<View key={index} style={styles.questionAnswerRow}>
+						<Text style={styles.questionNumber}>Q{index + 1}</Text>
+						<View style={styles.questionAnswerContainer}>
+							<TextInput
+								style={[
+									styles.questionInput,
+									hasError && styles.questionInputError,
+								]}
+								placeholder={`Question ${index + 1} (e.g., 5 + 3)`}
+								placeholderTextColor={Colors.text.disabled}
+								value={quickMathQuestions[index]}
+								onChangeText={(text) =>
+									handleQuickMathQuestionChange(index, text)
+								}
+							/>
+							<View
+								style={[
+									styles.answerDisplay,
+									hasError && styles.answerDisplayError,
+								]}
+							>
+								<Text
+									style={[
+										styles.answerText,
+										hasError && styles.answerTextError,
+									]}
+								>
+									{quickMathAnswers[index] || "?"}
+								</Text>
+							</View>
+						</View>
+						{hasError && (
+							<Text style={styles.errorText}>
+								Invalid expression or non-positive answer
+							</Text>
+						)}
 					</View>
-				</View>
-			))}
+				);
+			})}
 		</View>
 	);
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
+			<StatusBar style="dark" />
 
 			{/* Header - minimal header for spacing (Dynamic Island) */}
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
@@ -735,9 +839,14 @@ const CreateGameScreen = () => {
 
 					{!gameType && (
 						<View style={styles.infoNote}>
-							<Ionicons name="information-circle-outline" size={20} color={Colors.text.secondary} />
+							<Ionicons
+								name="information-circle-outline"
+								size={20}
+								color={Colors.text.secondary}
+							/>
 							<Text style={styles.infoNoteText}>
-								Want to add a new game type? Use "Own Game" to submit your game idea, and we'll review it for future implementation.
+								Want to add a new game type? Use "Own Game" to submit your game
+								idea, and we'll review it for future implementation.
 							</Text>
 						</View>
 					)}
@@ -774,14 +883,14 @@ const CreateGameScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 	},
 	header: {
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		borderBottomColor: "#E5E5E5",
 		zIndex: 10,
-		...Shadows.medium,
+		...Shadows.light,
 	},
 	keyboardView: {
 		flex: 1,
@@ -816,17 +925,17 @@ const styles = StyleSheet.create({
 	gameTypeButton: {
 		width:
 			(Dimensions.get("window").width - Layout.margin * 2 - Spacing.md * 2) / 3, // Exactly 3 columns: (screen width - container padding - gaps) / 3
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		alignItems: "center",
 		borderWidth: 2,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 		...Shadows.light,
 	},
 	gameTypeButtonActive: {
 		borderColor: Colors.accent,
-		backgroundColor: Colors.accent + "1A",
+		backgroundColor: Colors.accent + "15",
 	},
 	gameTypeText: {
 		fontSize: Typography.fontSize.body,
@@ -838,13 +947,13 @@ const styles = StyleSheet.create({
 		color: Colors.accent,
 	},
 	input: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
 		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 		marginBottom: Spacing.xs,
 		...Shadows.light,
 	},
@@ -885,16 +994,16 @@ const styles = StyleSheet.create({
 	},
 	selectorButton: {
 		flex: 1,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		alignItems: "center",
 		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 	},
 	selectorButtonActive: {
 		borderColor: Colors.accent,
-		backgroundColor: Colors.accent + "1A",
+		backgroundColor: Colors.accent + "15",
 	},
 	selectorButtonText: {
 		fontSize: Typography.fontSize.body,
@@ -919,25 +1028,62 @@ const styles = StyleSheet.create({
 	},
 	questionInput: {
 		flex: 2,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
 		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 		...Shadows.light,
+	},
+	questionInputError: {
+		borderColor: Colors.error,
+		borderWidth: 2,
+		backgroundColor: Colors.error + "10",
 	},
 	answerInput: {
 		flex: 1,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
 		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 		...Shadows.light,
+	},
+	answerDisplay: {
+		flex: 1,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.md,
+		borderWidth: 1,
+		borderColor: "#E5E5E5",
+		justifyContent: "center",
+		alignItems: "center",
+		...Shadows.light,
+	},
+	answerText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.bold,
+		textAlign: "center",
+	},
+	answerDisplayError: {
+		borderColor: Colors.error,
+		borderWidth: 2,
+		backgroundColor: Colors.error + "10",
+	},
+	answerTextError: {
+		color: Colors.error,
+	},
+	errorText: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.error,
+		marginTop: Spacing.xs,
+		marginLeft: Spacing.sm,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	submitButton: {
 		flexDirection: "row",
@@ -951,7 +1097,7 @@ const styles = StyleSheet.create({
 		...Shadows.heavy,
 	},
 	submitButtonDisabled: {
-		opacity: 0.6,
+		opacity: 0.5,
 	},
 	submitButtonText: {
 		fontSize: Typography.fontSize.body,
@@ -962,13 +1108,13 @@ const styles = StyleSheet.create({
 	infoNote: {
 		flexDirection: "row",
 		alignItems: "flex-start",
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		marginTop: Spacing.lg,
 		marginBottom: Spacing.md,
 		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderColor: "#E5E5E5",
 		gap: Spacing.sm,
 	},
 	infoNoteText: {

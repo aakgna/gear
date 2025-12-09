@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "ThinkTok",
 		"slug": "gear",
-		"version": "1.0.12",
+		"version": "1.0.13",
 		"orientation": "portrait",
 		"icon": "./assets/images/logo.png",
 		"scheme": "thinktok",
@@ -48,7 +48,7 @@
 					"image": "./assets/images/logo_transparent.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
-					"backgroundColor": "#1a1b32"
+					"backgroundColor": "#FFFFFF"
 				}
 			]
 		],

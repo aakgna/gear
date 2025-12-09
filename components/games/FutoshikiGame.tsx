@@ -18,6 +18,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -44,6 +45,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("futoshiki"); // Get game-specific indigo color (#6366F1)
 	const { size, grid, givens, inequalities } = inputData;
 
 	// Reconstruct 2D grid from 1D array
@@ -699,17 +701,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#6366F115", // Game-specific indigo with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#6366F140",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#6366F1", // Game-specific indigo
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	gridContainer: {
@@ -748,17 +751,17 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	cellSelected: {
-		borderColor: Colors.accent,
+		borderColor: "#6366F1", // Game-specific indigo
 		borderWidth: 3,
-		backgroundColor: Colors.accent + "40",
+		backgroundColor: "#6366F140",
 	},
 	cellCompleted: {
 		backgroundColor: Colors.game.correct + "40",
 		borderColor: Colors.game.correct,
 	},
 	cellRevealed: {
-		backgroundColor: Colors.accent + "20",
-		borderColor: Colors.accent + "60",
+		backgroundColor: "#6366F120", // Game-specific indigo with opacity
+		borderColor: "#6366F160",
 	},
 	cellText: {
 		fontSize: Typography.fontSize.h2,
@@ -806,9 +809,10 @@ const styles = StyleSheet.create({
 	},
 	numberButtonActive: {
 		opacity: 1,
-		backgroundColor: Colors.accent + "40",
-		borderWidth: 2,
-		borderColor: Colors.accent,
+		backgroundColor: "#6366F140", // Game-specific indigo with opacity
+		borderWidth: 2.5,
+		borderColor: "#6366F1", // Game-specific indigo
+		...Shadows.medium,
 	},
 	numberButtonText: {
 		fontSize: Typography.fontSize.h3,
@@ -840,7 +844,7 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	checkButton: {
-		backgroundColor: Colors.accent,
+		backgroundColor: "#6366F1", // Game-specific indigo
 		...Shadows.medium,
 	},
 	showAnswerButton: {
@@ -871,10 +875,11 @@ const styles = StyleSheet.create({
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#6366F1", // Game-specific indigo
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
+		minHeight: 52,
 		alignItems: "center",
 		justifyContent: "center",
 		...Shadows.medium,

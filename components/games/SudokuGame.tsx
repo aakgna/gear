@@ -18,6 +18,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -46,6 +47,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const { grid, givens } = inputData;
 	const SIZE = 9; // Sudoku is always 9x9
+	const gameColor = getGameColor("sudoku"); // Get game-specific purple color (#8B5CF6)
 
 	// Reconstruct 2D grid from 1D array
 	const reconstructGrid = (flatGrid: number[]): number[][] => {
@@ -614,21 +616,23 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#8B5CF615", // Game-specific purple with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#8B5CF640",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#8B5CF6", // Game-specific purple
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	gridContainer: {
 		marginBottom: Spacing.xl,
+		paddingVertical: Spacing.md,
 	},
 	gridRow: {
 		flexDirection: "row",
@@ -636,26 +640,30 @@ const styles = StyleSheet.create({
 	},
 	cell: {
 		backgroundColor: Colors.background.tertiary,
-		borderColor: Colors.text.primary + "40",
+		borderColor: "#E5E5E5",
 		alignItems: "center",
 		justifyContent: "center",
+		borderWidth: 1.5,
 		...Shadows.light,
 	},
 	cellGiven: {
-		backgroundColor: "#4CAF5030", // Light green with opacity (30 = ~19% opacity)
-		borderColor: Colors.text.secondary + "40",
+		backgroundColor: Colors.game.correct + "25", // Light green with opacity
+		borderColor: Colors.text.secondary + "50",
 	},
 	cellSelected: {
-		borderColor: Colors.accent,
-		backgroundColor: Colors.accent + "40",
+		borderColor: "#8B5CF6", // Game-specific purple
+		backgroundColor: "#8B5CF640",
+		borderWidth: 2.5,
 	},
 	cellCompleted: {
-		backgroundColor: Colors.game.correct + "40",
+		backgroundColor: Colors.game.correct + "50",
 		borderColor: Colors.game.correct,
+		borderWidth: 2,
 	},
 	cellRevealed: {
-		backgroundColor: Colors.accent + "20",
-		borderColor: Colors.accent + "60",
+		backgroundColor: "#8B5CF620", // Game-specific purple with opacity
+		borderColor: "#8B5CF660",
+		borderWidth: 2,
 	},
 	cellEvenBox: {
 		backgroundColor: Colors.background.tertiary + "80",
@@ -670,7 +678,8 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	cellTextRevealed: {
-		color: Colors.accent,
+		color: "#8B5CF6", // Game-specific purple
+		fontWeight: Typography.fontWeight.bold,
 	},
 	numberInputContainer: {
 		flexDirection: "row",
@@ -681,20 +690,23 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.md,
 	},
 	numberButton: {
-		width: 50,
-		height: 50,
+		width: 56,
+		height: 56,
 		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		alignItems: "center",
 		justifyContent: "center",
 		borderWidth: 2,
-		borderColor: Colors.text.secondary + "40",
-		opacity: 0.5,
+		borderColor: "#E5E5E5",
+		opacity: 0.6,
+		...Shadows.light,
 	},
 	numberButtonActive: {
 		opacity: 1,
-		borderColor: Colors.accent,
-		backgroundColor: Colors.accent + "20",
+		borderColor: "#8B5CF6", // Game-specific purple
+		backgroundColor: "#8B5CF620",
+		borderWidth: 2.5,
+		...Shadows.medium,
 	},
 	numberButtonText: {
 		fontSize: Typography.fontSize.h3,
@@ -710,17 +722,19 @@ const styles = StyleSheet.create({
 	},
 	actionButton: {
 		paddingHorizontal: Spacing.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		borderRadius: BorderRadius.md,
-		minWidth: 100,
+		minWidth: 110,
+		minHeight: 48,
 		alignItems: "center",
+		justifyContent: "center",
 		...Shadows.medium,
 	},
 	clearButton: {
 		backgroundColor: Colors.background.secondary,
 	},
 	checkButton: {
-		backgroundColor: Colors.accent,
+		backgroundColor: "#8B5CF6", // Game-specific purple
 	},
 	showAnswerButton: {
 		backgroundColor: Colors.text.secondary,
@@ -748,12 +762,13 @@ const styles = StyleSheet.create({
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#8B5CF6", // Game-specific purple
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
+		minHeight: 48,
 		...Shadows.medium,
 	},
 	viewStatsButtonText: {

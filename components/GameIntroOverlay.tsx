@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
 	StyleSheet,
 	TouchableOpacity,
 	ScrollView,
+	Animated,
+	Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { PuzzleType } from "../config/types";
@@ -19,7 +21,964 @@ import {
 	Spacing,
 	BorderRadius,
 	Shadows,
+	getGameColor,
 } from "../constants/DesignSystem";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Animation component for each game type
+const GameIntroAnimation: React.FC<{
+	gameType: PuzzleType;
+	gameColor: string;
+}> = ({ gameType, gameColor }) => {
+	const anims = useRef<Animated.Value[]>([]).current;
+
+	useEffect(() => {
+		// Initialize animations based on game type
+		const animationCount = getAnimationCount(gameType);
+		for (let i = 0; i < animationCount; i++) {
+			if (!anims[i]) {
+				anims[i] = new Animated.Value(0);
+			}
+		}
+
+		// Start animations
+		const animations = createAnimations(gameType, anims, gameColor);
+		Animated.loop(Animated.parallel(animations)).start();
+
+		return () => {
+			animations.forEach((anim) => anim.stop());
+		};
+	}, [gameType, gameColor]);
+
+	return (
+		<View style={styles.animationContainer}>
+			{renderAnimation(gameType, anims, gameColor)}
+		</View>
+	);
+};
+
+const getAnimationCount = (gameType: PuzzleType): number => {
+	switch (gameType) {
+		case "wordle":
+			return 6;
+		case "sudoku":
+			return 9;
+		case "riddle":
+			return 3;
+		case "trivia":
+			return 4;
+		case "quickMath":
+			return 6;
+		case "wordChain":
+			return 4;
+		case "alias":
+			return 5;
+		case "futoshiki":
+			return 6;
+		case "magicSquare":
+			return 9;
+		case "hidato":
+			return 8;
+		case "sequencing":
+			return 5;
+		case "mastermind":
+			return 6;
+		case "zip":
+			return 7;
+		default:
+			return 4;
+	}
+};
+
+const createAnimations = (
+	gameType: PuzzleType,
+	anims: Animated.Value[],
+	gameColor: string
+): Animated.CompositeAnimation[] => {
+	const animations: Animated.CompositeAnimation[] = [];
+
+	anims.forEach((anim, index) => {
+		const delay = index * 150;
+		const duration = 3000 + Math.random() * 2000;
+
+		animations.push(
+			Animated.sequence([
+				Animated.delay(delay),
+				Animated.loop(
+					Animated.sequence([
+						Animated.timing(anim, {
+							toValue: 1,
+							duration,
+							useNativeDriver: true,
+						}),
+						Animated.timing(anim, {
+							toValue: 0,
+							duration,
+							useNativeDriver: true,
+						}),
+					])
+				),
+			])
+		);
+	});
+
+	return animations;
+};
+
+const renderAnimation = (
+	gameType: PuzzleType,
+	anims: Animated.Value[],
+	gameColor: string
+): React.ReactNode => {
+	switch (gameType) {
+		case "wordle":
+			return renderWordleAnimation(anims, gameColor);
+		case "sudoku":
+			return renderSudokuAnimation(anims, gameColor);
+		case "riddle":
+			return renderRiddleAnimation(anims, gameColor);
+		case "trivia":
+			return renderTriviaAnimation(anims, gameColor);
+		case "quickMath":
+			return renderQuickMathAnimation(anims, gameColor);
+		case "wordChain":
+			return renderWordChainAnimation(anims, gameColor);
+		case "alias":
+			return renderAliasAnimation(anims, gameColor);
+		case "futoshiki":
+			return renderFutoshikiAnimation(anims, gameColor);
+		case "magicSquare":
+			return renderMagicSquareAnimation(anims, gameColor);
+		case "hidato":
+			return renderHidatoAnimation(anims, gameColor);
+		case "sequencing":
+			return renderSequencingAnimation(anims, gameColor);
+		case "mastermind":
+			return renderMastermindAnimation(anims, gameColor);
+		case "zip":
+			return renderZipAnimation(anims, gameColor);
+		default:
+			return null;
+	}
+};
+
+// Wordle: Floating letter tiles
+const renderWordleAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const letters = ["W", "O", "R", "D", "L", "E"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.3 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.15 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.6 },
+	];
+
+	return letters.map((letter, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const rotate =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: ["0deg", "15deg", "0deg"],
+			}) || "0deg";
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [1, 1.15, 1],
+			}) || 1;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.wordleTile,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "50",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { rotate }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.wordleLetter, { color: gameColor }]}>
+					{letter}
+				</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Sudoku: Grid cells filling with numbers
+const renderSudokuAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+	const gridSize = 3;
+	const cellSize = 30;
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.35 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.35 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.35 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.75 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return numbers.map((num, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const opacity = anims[i] || new Animated.Value(0);
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0.5, 1],
+			}) || 0.5;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.sudokuCell,
+					{
+						left: startPositions[i].x,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						opacity,
+						transform: [{ translateX }, { translateY }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.sudokuNumber, { color: gameColor }]}>{num}</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Riddle: Question marks pulsing
+const renderRiddleAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.1 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+	];
+
+	return startPositions.map((startPos, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [1, 1.4, 1],
+			}) || 1;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.6, 1, 0.6],
+			}) || 0.6;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.riddleMark,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						transform: [{ translateX }, { translateY }, { scale }],
+						opacity,
+					},
+				]}
+			>
+				<Text style={[styles.riddleText, { color: gameColor }]}>?</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Trivia: Quiz cards flipping
+const renderTriviaAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.7, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.65 },
+	];
+
+	return startPositions.map((startPos, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const rotate =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: ["0deg", "180deg", "360deg"],
+			}) || "0deg";
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [1, 1.3, 1],
+			}) || 1;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.triviaCard,
+					{
+						left: startPositions[i].x - 25,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "70",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { rotate }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.triviaIcon, { color: gameColor }]}>★</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// QuickMath: Numbers floating and equations
+const renderQuickMathAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const equations = ["2+2", "3×3", "5-1", "8÷2", "4+4", "6×2"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.3 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.35 },
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return equations.map((eq, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.5, 1, 0.5],
+			}) || 0.5;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.mathEquation,
+					{
+						left: startPositions[i].x - 30,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }],
+						opacity,
+					},
+				]}
+			>
+				<Text style={[styles.mathText, { color: gameColor }]}>{eq}</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// WordChain: Words chaining together
+const renderWordChainAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const words = ["CAT", "TAP", "PAN", "NET"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.35, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.65, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.2 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.65 },
+	];
+
+	return words.map((word, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.8, 1.3, 0.8],
+			}) || 0.8;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.wordChainItem,
+					{
+						left: startPositions[i].x - 35,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.wordChainText, { color: gameColor }]}>{word}</Text>
+				{i < words.length - 1 && (
+					<Text style={[styles.chainArrow, { color: gameColor }]}>→</Text>
+				)}
+			</Animated.View>
+		);
+	});
+};
+
+// Alias: Words appearing and connecting
+const renderAliasAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const words = ["WORD", "MEAN", "GUESS", "CLUE", "HINT"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.7, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.3 },
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return words.map((word, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.3, 0.7, 1],
+				outputRange: [0, 1, 1, 0],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.3, 0.7, 1],
+				outputRange: [0.5, 1.2, 1, 0.5],
+			}) || 0.5;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.aliasWord,
+					{
+						left: startPositions[i].x - 40,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						opacity,
+						transform: [{ translateX }, { translateY }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.aliasText, { color: gameColor }]}>{word}</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Futoshiki: Grid with inequality symbols
+const renderFutoshikiAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const cells = [1, 2, 3, 4, 5, 6];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.7, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.3 },
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.75 },
+		{ x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.65 },
+	];
+
+	return cells.map((num, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.8, 1.2, 0.8],
+			}) || 0.8;
+		const rotate =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: ["0deg", "360deg"],
+			}) || "0deg";
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.futoshikiCell,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }, { rotate }],
+					},
+				]}
+			>
+				<Text style={[styles.futoshikiNumber, { color: gameColor }]}>
+					{num}
+				</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// MagicSquare: Numbers arranging in square
+const renderMagicSquareAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const numbers = [2, 7, 6, 9, 5, 1, 4, 3, 8];
+	const gridSize = 3;
+	const cellSize = 28;
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.05 },
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.35 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.35 },
+		{ x: SCREEN_WIDTH * 0.45, y: SCREEN_HEIGHT * 0.35 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.55, y: SCREEN_HEIGHT * 0.75 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return numbers.map((num, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const opacity = anims[i] || new Animated.Value(0);
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, 1],
+			}) || 0;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.magicSquareCell,
+					{
+						left: startPositions[i].x,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "65",
+						borderColor: gameColor,
+						opacity,
+						transform: [{ translateX }, { translateY }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.magicSquareNumber, { color: gameColor }]}>
+					{num}
+				</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Hidato: Path connecting numbers
+const renderHidatoAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const path = [1, 2, 3, 4, 5, 6, 7, 8];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.7, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.75 },
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.7 },
+	];
+
+	return path.map((num, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.7, 1.3, 0.7],
+			}) || 0.7;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.5, 1, 0.5],
+			}) || 0.5;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.hidatoCell,
+					{
+						left: startPositions[i].x - 18,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "65",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }],
+						opacity,
+					},
+				]}
+			>
+				<Text style={[styles.hidatoNumber, { color: gameColor }]}>{num}</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Sequencing: Items sliding into sequence
+const renderSequencingAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const items = ["1st", "2nd", "3rd", "4th", "5th"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.3 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.25 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return items.map((item, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.8, 1.2, 0.8],
+			}) || 0.8;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.sequencingItem,
+					{
+						left: startPositions[i].x - 30,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "60",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }],
+					},
+				]}
+			>
+				<Text style={[styles.sequencingText, { color: gameColor }]}>
+					{item}
+				</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Mastermind: Color pegs appearing
+const renderMastermindAnimation = (
+	anims: Animated.Value[],
+	gameColor: string
+) => {
+	const colors = ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.75, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.2 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return colors.map((color, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.3, 0.7, 1],
+				outputRange: [0, 1.4, 1, 0.8],
+			}) || 0;
+		const rotate =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: ["0deg", "360deg"],
+			}) || "0deg";
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.mastermindPeg,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						transform: [{ translateX }, { translateY }, { scale }, { rotate }],
+					},
+				]}
+			>
+				<Text style={styles.mastermindEmoji}>{color}</Text>
+			</Animated.View>
+		);
+	});
+};
+
+// Zip: Path connecting cells
+const renderZipAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const cells = [1, 2, 3, 4, 5, 6, 7];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.15 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.3, y: SCREEN_HEIGHT * 0.25 },
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.2 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.5 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.75 },
+	];
+
+	return cells.map((num, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.6, 1.3, 0.6],
+			}) || 0.6;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.3, 0.7, 1],
+				outputRange: [0.4, 1, 1, 0.4],
+			}) || 0.4;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.zipCell,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "65",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }],
+						opacity,
+					},
+				]}
+			>
+				<Text style={[styles.zipNumber, { color: gameColor }]}>{num}</Text>
+			</Animated.View>
+		);
+	});
+};
 
 interface GameIntroScreenProps {
 	gameType: PuzzleType;
@@ -39,6 +998,7 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 	const instructions = gameInstructions[gameType];
 	const difficultyLabel = getDifficultyLabel(difficulty);
 	const difficultyColor = getDifficultyColor(difficulty);
+	const gameColor = getGameColor(gameType); // Get game-specific color
 
 	const formatGameType = (type: PuzzleType): string => {
 		const formatted = type
@@ -57,6 +1017,9 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 
 	return (
 		<View style={styles.container}>
+			{/* Animated Background */}
+			<GameIntroAnimation gameType={gameType} gameColor={gameColor} />
+
 			<ScrollView
 				style={styles.scrollView}
 				contentContainerStyle={styles.scrollContent}
@@ -86,16 +1049,12 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 
 				{/* How to Play Section */}
 				<TouchableOpacity
-					style={styles.howToPlayButton}
+					style={[styles.howToPlayButton, { borderColor: gameColor + "40" }]}
 					onPress={() => setShowInstructions(!showInstructions)}
 					activeOpacity={0.7}
 				>
 					<View style={styles.howToPlayHeader}>
-						<Ionicons
-							name="help-circle-outline"
-							size={22}
-							color={Colors.accent}
-						/>
+						<Ionicons name="help-circle-outline" size={22} color={gameColor} />
 						<Text style={styles.howToPlayText}>How to Play</Text>
 						<Ionicons
 							name={showInstructions ? "chevron-up" : "chevron-down"}
@@ -112,22 +1071,38 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 						<View style={styles.instructionsContent}>
 							{instructions.instructions.map((instruction, index) => (
 								<View key={index} style={styles.instructionItem}>
-									<View style={styles.instructionNumber}>
-										<Text style={styles.instructionNumberText}>
+									<View
+										style={[
+											styles.instructionNumber,
+											{ backgroundColor: gameColor + "30" },
+										]}
+									>
+										<Text
+											style={[
+												styles.instructionNumberText,
+												{ color: gameColor },
+											]}
+										>
 											{index + 1}
 										</Text>
 									</View>
 									<Text style={styles.instructionText}>{instruction}</Text>
 								</View>
 							))}
-							<View style={styles.exampleContainer}>
+							<View
+								style={[
+									styles.exampleContainer,
+									{
+										backgroundColor: gameColor + "15",
+										borderLeftColor: gameColor,
+									},
+								]}
+							>
 								<View style={styles.exampleHeader}>
-									<Ionicons
-										name="bulb-outline"
-										size={16}
-										color={Colors.accent}
-									/>
-									<Text style={styles.exampleLabel}>Example</Text>
+									<Ionicons name="bulb-outline" size={16} color={gameColor} />
+									<Text style={[styles.exampleLabel, { color: gameColor }]}>
+										Example
+									</Text>
 								</View>
 								<Text style={styles.exampleText}>{instructions.example}</Text>
 							</View>
@@ -137,12 +1112,14 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 
 				{/* Play Button */}
 				<TouchableOpacity
-					style={styles.playButton}
+					style={[styles.playButton, { backgroundColor: gameColor }]}
 					onPress={onPlay}
 					activeOpacity={0.85}
 				>
-					<Ionicons name="play" size={28} color={Colors.text.primary} />
-					<Text style={styles.playButtonText}>Start Game</Text>
+					<Ionicons name="play" size={28} color={Colors.text.white} />
+					<Text style={[styles.playButtonText, { color: Colors.text.white }]}>
+						Start Game
+					</Text>
 				</TouchableOpacity>
 			</ScrollView>
 		</View>
@@ -158,6 +1135,7 @@ const styles = StyleSheet.create({
 	},
 	scrollView: {
 		flex: 1,
+		zIndex: 1,
 	},
 	scrollContent: {
 		padding: Spacing.xl,
@@ -196,12 +1174,13 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	howToPlayButton: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginBottom: Spacing.lg,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		...Shadows.light,
+		// borderColor will be set inline with gameColor
 	},
 	howToPlayHeader: {
 		flexDirection: "row",
@@ -218,12 +1197,13 @@ const styles = StyleSheet.create({
 		marginLeft: Spacing.sm,
 	},
 	instructionsContainer: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginBottom: Spacing.xl,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 1.5,
+		borderColor: "#E5E5E5",
+		...Shadows.light,
 	},
 	instructionsContent: {
 		gap: Spacing.md,
@@ -234,18 +1214,18 @@ const styles = StyleSheet.create({
 		gap: Spacing.md,
 	},
 	instructionNumber: {
-		width: 26,
-		height: 26,
-		borderRadius: 13,
-		backgroundColor: Colors.accent + "30",
+		width: 28,
+		height: 28,
+		borderRadius: 14,
 		alignItems: "center",
 		justifyContent: "center",
 		marginTop: 2,
+		// backgroundColor and color will be set inline with gameColor
 	},
 	instructionNumberText: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		// color will be set inline with gameColor
 	},
 	instructionText: {
 		flex: 1,
@@ -256,10 +1236,9 @@ const styles = StyleSheet.create({
 	exampleContainer: {
 		marginTop: Spacing.sm,
 		padding: Spacing.md,
-		backgroundColor: Colors.accent + "15",
 		borderRadius: BorderRadius.md,
 		borderLeftWidth: 4,
-		borderLeftColor: Colors.accent,
+		// backgroundColor and borderLeftColor will be set inline with gameColor
 	},
 	exampleHeader: {
 		flexDirection: "row",
@@ -270,9 +1249,9 @@ const styles = StyleSheet.create({
 	exampleLabel: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
 		textTransform: "uppercase",
 		letterSpacing: 1,
+		// color will be set inline with gameColor
 	},
 	exampleText: {
 		fontSize: Typography.fontSize.body,
@@ -284,19 +1263,208 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.lg,
 		paddingVertical: Spacing.xl,
 		paddingHorizontal: Spacing.xl,
 		marginTop: Spacing.md,
+		minHeight: 56,
 		...Shadows.medium,
 		gap: Spacing.sm,
+		// backgroundColor will be set inline with gameColor
 	},
 	playButtonText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
 		letterSpacing: 0.5,
+		// color will be set inline
+	},
+	animationContainer: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		zIndex: 0,
+		pointerEvents: "none",
+		overflow: "hidden",
+	},
+	wordleTile: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	wordleLetter: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	sudokuCell: {
+		position: "absolute",
+		width: 30,
+		height: 30,
+		borderRadius: BorderRadius.sm,
+		borderWidth: 1.5,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	sudokuNumber: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	riddleMark: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	riddleText: {
+		fontSize: 48,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	triviaCard: {
+		position: "absolute",
+		width: 50,
+		height: 50,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.medium,
+	},
+	triviaIcon: {
+		fontSize: 24,
+	},
+	mathEquation: {
+		position: "absolute",
+		paddingHorizontal: Spacing.sm,
+		paddingVertical: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	mathText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	wordChainItem: {
+		position: "absolute",
+		paddingHorizontal: Spacing.sm,
+		paddingVertical: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		flexDirection: "row",
+		alignItems: "center",
+		...Shadows.light,
+	},
+	wordChainText: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	chainArrow: {
+		fontSize: Typography.fontSize.body,
+		marginLeft: Spacing.xs,
+	},
+	aliasWord: {
+		position: "absolute",
+		paddingHorizontal: Spacing.sm,
+		paddingVertical: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	aliasText: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	futoshikiCell: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		borderRadius: BorderRadius.sm,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	futoshikiNumber: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	magicSquareCell: {
+		position: "absolute",
+		width: 28,
+		height: 28,
+		borderRadius: BorderRadius.sm,
+		borderWidth: 1.5,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	magicSquareNumber: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	hidatoCell: {
+		position: "absolute",
+		width: 36,
+		height: 36,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	hidatoNumber: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	sequencingItem: {
+		position: "absolute",
+		paddingHorizontal: Spacing.sm,
+		paddingVertical: Spacing.xs,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	sequencingText: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	mastermindPeg: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	mastermindEmoji: {
+		fontSize: 32,
+	},
+	zipCell: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		alignItems: "center",
+		justifyContent: "center",
+		...Shadows.light,
+	},
+	zipNumber: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
 	},
 });
 

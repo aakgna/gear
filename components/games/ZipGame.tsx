@@ -18,6 +18,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -44,6 +45,7 @@ const ZipGame: React.FC<ZipGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("zip"); // Get game-specific emerald color (#10B981)
 	const { rows, cols, cells, solution } = inputData;
 	const totalCells = rows * cols;
 	const [userPath, setUserPath] = useState<number[]>([]);
@@ -635,17 +637,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#10B98115", // Game-specific emerald with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#10B98140",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#10B981", // Game-specific emerald
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	scrollView: {
@@ -683,20 +686,20 @@ const styles = StyleSheet.create({
 		borderColor: "rgba(255, 255, 255, 0.2)",
 	},
 	cellInPath: {
-		backgroundColor: Colors.accent + "40",
-		borderColor: Colors.accent,
+		backgroundColor: "#10B98140", // Game-specific emerald with opacity
+		borderColor: "#10B981", // Game-specific emerald
 	},
 	cellStart: {
 		backgroundColor: Colors.game.correct + "40",
 		borderColor: Colors.game.correct,
 	},
 	cellEnd: {
-		backgroundColor: Colors.accent + "60",
-		borderColor: Colors.accent,
+		backgroundColor: "#10B98160", // Game-specific emerald with opacity
+		borderColor: "#10B981", // Game-specific emerald
 	},
 	cellRevealed: {
-		backgroundColor: Colors.accent + "20",
-		borderColor: Colors.accent + "60",
+		backgroundColor: "#10B98120", // Game-specific emerald with opacity
+		borderColor: "#10B98160",
 	},
 	cellCompleted: {
 		backgroundColor: Colors.game.correct + "40",
@@ -708,7 +711,8 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 	},
 	cellNumberInPath: {
-		color: Colors.accent,
+		color: "#10B981", // Game-specific emerald
+		fontWeight: Typography.fontWeight.bold,
 	},
 	cellNumberCompleted: {
 		color: Colors.text.white,
@@ -717,7 +721,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		top: Spacing.xs,
 		right: Spacing.xs,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#10B981", // Game-specific emerald
 		borderRadius: BorderRadius.sm,
 		minWidth: 15,
 		height: 15,
@@ -764,7 +768,7 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	statsButton: {
-		backgroundColor: Colors.accent,
+		backgroundColor: "#10B981", // Game-specific emerald
 		...Shadows.medium,
 	},
 	buttonText: {

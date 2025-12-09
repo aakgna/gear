@@ -18,6 +18,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -44,6 +45,7 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("magicSquare"); // Get game-specific cyan color (#06B6D4)
 	const { size, grid, magicConstant, givens } = inputData;
 
 	// Reconstruct 2D grid from 1D array
@@ -580,17 +582,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#06B6D415", // Game-specific cyan with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#06B6D440",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#06B6D4", // Game-specific cyan
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	magicConstantContainer: {
@@ -608,7 +611,7 @@ const styles = StyleSheet.create({
 	magicConstantValue: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#06B6D4", // Game-specific cyan
 	},
 	gridContainer: {
 		marginBottom: Spacing.xl,
@@ -633,17 +636,17 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	cellSelected: {
-		borderColor: Colors.accent,
+		borderColor: "#06B6D4", // Game-specific cyan
 		borderWidth: 3,
-		backgroundColor: Colors.accent + "40",
+		backgroundColor: "#06B6D440",
 	},
 	cellCompleted: {
 		backgroundColor: Colors.game.correct + "40",
 		borderColor: Colors.game.correct,
 	},
 	cellRevealed: {
-		backgroundColor: Colors.accent + "20",
-		borderColor: Colors.accent + "60",
+		backgroundColor: "#06B6D420", // Game-specific cyan with opacity
+		borderColor: "#06B6D460",
 	},
 	cellText: {
 		fontSize: Typography.fontSize.h2,
@@ -655,7 +658,8 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	cellTextRevealed: {
-		color: Colors.accent,
+		color: "#06B6D4", // Game-specific cyan
+		fontWeight: Typography.fontWeight.bold,
 	},
 	numberInputContainer: {
 		flexDirection: "row",
@@ -666,24 +670,28 @@ const styles = StyleSheet.create({
 		maxWidth: SCREEN_WIDTH - Spacing.xl * 2,
 	},
 	numberButton: {
-		width: 50,
-		height: 50,
+		width: 56,
+		height: 56,
 		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 2,
-		borderColor: Colors.accent,
+		borderColor: "#E5E5E5",
 		alignItems: "center",
 		justifyContent: "center",
-		opacity: 0.5,
+		opacity: 0.6,
+		...Shadows.light,
 	},
 	numberButtonActive: {
 		opacity: 1,
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#06B6D420", // Game-specific cyan with opacity
+		borderColor: "#06B6D4", // Game-specific cyan
+		borderWidth: 2.5,
+		...Shadows.medium,
 	},
 	numberButtonText: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#06B6D4", // Game-specific cyan
 	},
 	actionButtonsContainer: {
 		flexDirection: "row",
@@ -706,7 +714,7 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	checkButton: {
-		backgroundColor: Colors.accent,
+		backgroundColor: "#06B6D4", // Game-specific cyan
 		...Shadows.medium,
 	},
 	showAnswerButton: {
@@ -737,12 +745,13 @@ const styles = StyleSheet.create({
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#06B6D4", // Game-specific cyan
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
+		minHeight: 52,
 		...Shadows.medium,
 	},
 	viewStatsButtonText: {

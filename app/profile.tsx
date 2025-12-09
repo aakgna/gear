@@ -183,7 +183,7 @@ const ProfileScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
+			<StatusBar style="dark" />
 
 			{/* Header - minimal header for spacing (Dynamic Island) */}
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
@@ -426,14 +426,14 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 	},
 	header: {
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		borderBottomColor: "#E5E5E5",
 		zIndex: 10,
-		...Shadows.medium,
+		...Shadows.light,
 	},
 	content: {
 		flex: 1,
@@ -442,12 +442,12 @@ const styles = StyleSheet.create({
 	userSection: {
 		alignItems: "center",
 		paddingVertical: Spacing.xl,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.xl,
 		marginTop: Spacing.lg,
 		marginBottom: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.medium,
 	},
 	avatarContainer: {
@@ -470,13 +470,13 @@ const styles = StyleSheet.create({
 	},
 	statCard: {
 		flex: 1,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginHorizontal: Spacing.xs,
 		alignItems: "center",
-		borderWidth: 1,
-		borderColor: Colors.accent + "33",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.light,
 	},
 	statNumber: {
@@ -505,14 +505,14 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 	},
 	badge: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.md,
 		width: "48%",
 		alignItems: "center",
 		marginBottom: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.light,
 	},
 	badgeEmoji: {
@@ -531,12 +531,12 @@ const styles = StyleSheet.create({
 	actionButton: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		marginBottom: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.light,
 	},
 	actionButtonText: {
@@ -566,11 +566,11 @@ const styles = StyleSheet.create({
 	},
 	statsSection: {
 		marginBottom: Spacing.xl,
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		borderWidth: 0,
+		borderColor: "transparent",
 		...Shadows.light,
 	},
 	statsSubsection: {
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingVertical: Spacing.sm,
 		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255, 255, 255, 0.05)",
+		borderBottomColor: "#F0F0F0",
 	},
 	statRowLabel: {
 		fontSize: Typography.fontSize.body,

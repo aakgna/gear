@@ -18,6 +18,7 @@ import {
 	Shadows,
 	Animation,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -44,6 +45,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("hidato"); // Get game-specific amber color (#F59E0B)
 	const { rows, cols, startNum, endNum, path, givens } = inputData;
 
 	// Create solution grid from path
@@ -602,17 +604,18 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#F59E0B15", // Game-specific amber with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#F59E0B40",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific amber
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	rangeContainer: {
@@ -636,7 +639,7 @@ const styles = StyleSheet.create({
 	cell: {
 		backgroundColor: Colors.background.tertiary,
 		borderWidth: 2,
-		borderColor: "rgba(255, 255, 255, 0.2)",
+		borderColor: "#E5E5E5",
 		borderRadius: BorderRadius.sm,
 		alignItems: "center",
 		justifyContent: "center",
@@ -647,24 +650,24 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	cellSelected: {
-		borderColor: Colors.accent,
+		borderColor: "#F59E0B", // Game-specific amber
 		borderWidth: 3,
-		backgroundColor: Colors.accent + "40",
+		backgroundColor: "#F59E0B40",
 	},
 	cellCompleted: {
 		backgroundColor: Colors.game.correct + "40",
 		borderColor: Colors.game.correct,
 	},
 	cellRevealed: {
-		backgroundColor: Colors.accent + "20",
-		borderColor: Colors.accent + "60",
+		backgroundColor: "#F59E0B20", // Game-specific amber with opacity
+		borderColor: "#F59E0B60",
 	},
 	cellStart: {
 		borderColor: Colors.game.correct,
 		borderWidth: 3,
 	},
 	cellEnd: {
-		borderColor: Colors.accent,
+		borderColor: "#F59E0B", // Game-specific amber
 		borderWidth: 3,
 	},
 	cellText: {
@@ -677,14 +680,15 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	cellTextRevealed: {
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific amber
+		fontWeight: Typography.fontWeight.bold,
 	},
 	cellTextStart: {
 		color: Colors.game.correct,
 		fontWeight: Typography.fontWeight.bold,
 	},
 	cellTextEnd: {
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific amber
 		fontWeight: Typography.fontWeight.bold,
 	},
 	numberInputContainer: {
@@ -696,24 +700,28 @@ const styles = StyleSheet.create({
 		maxWidth: SCREEN_WIDTH - Spacing.xl * 2,
 	},
 	numberButton: {
-		width: 50,
-		height: 50,
+		width: 56,
+		height: 56,
 		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 2,
-		borderColor: Colors.accent,
+		borderColor: "#E5E5E5",
 		alignItems: "center",
 		justifyContent: "center",
-		opacity: 0.5,
+		opacity: 0.6,
+		...Shadows.light,
 	},
 	numberButtonActive: {
 		opacity: 1,
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#F59E0B20", // Game-specific amber with opacity
+		borderColor: "#F59E0B", // Game-specific amber
+		borderWidth: 2.5,
+		...Shadows.medium,
 	},
 	numberButtonText: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific amber
 	},
 	actionButtonsContainer: {
 		flexDirection: "row",
@@ -736,7 +744,7 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	checkButton: {
-		backgroundColor: Colors.accent,
+		backgroundColor: "#F59E0B", // Game-specific amber
 		...Shadows.medium,
 	},
 	showAnswerButton: {
@@ -767,12 +775,13 @@ const styles = StyleSheet.create({
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#F59E0B", // Game-specific amber
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
+		minHeight: 52,
 		...Shadows.medium,
 	},
 	viewStatsButtonText: {

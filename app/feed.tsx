@@ -383,14 +383,14 @@ const FeedScreen = () => {
 					difficulty
 				);
 				wordChainGames.forEach((game) => {
-					if (game.startWord && game.endWord && game.validWords) {
+					if (game.startWord && game.endWord && game.answer) {
 						allPuzzles.push({
 							id: `wordchain_${difficulty}_${game.id}`,
 							type: "wordChain",
 							data: {
 								startWord: game.startWord,
 								endWord: game.endWord,
-								validWords: game.validWords,
+								answer: game.answer,
 								minSteps: game.minSteps || 3,
 								hint: game.hint,
 							} as WordChainData,
@@ -405,13 +405,14 @@ const FeedScreen = () => {
 				// Fetch Alias
 				const aliasGames = await fetchGamesFromFirestore("alias", difficulty);
 				aliasGames.forEach((game) => {
-					if (game.definitions && game.answer) {
+					if (game.definitions && game.answer && game.choices) {
 						allPuzzles.push({
 							id: `alias_${difficulty}_${game.id}`,
 							type: "alias",
 							data: {
 								definitions: game.definitions,
 								answer: game.answer,
+								choices: game.choices,
 								hint: game.hint,
 							} as AliasData,
 							difficulty:
@@ -865,14 +866,14 @@ const FeedScreen = () => {
 					difficulty
 				);
 				wordChainGames.forEach((game) => {
-					if (game.startWord && game.endWord && game.validWords) {
+					if (game.startWord && game.endWord && game.answer) {
 						newGames.push({
 							id: `wordchain_${difficulty}_${game.id}`,
 							type: "wordChain",
 							data: {
 								startWord: game.startWord,
 								endWord: game.endWord,
-								validWords: game.validWords,
+								answer: game.answer,
 								minSteps: game.minSteps || 3,
 								hint: game.hint,
 							} as WordChainData,
@@ -1448,7 +1449,7 @@ const FeedScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
+			<StatusBar style="dark" />
 
 			{/* Header */}
 			{renderHeader()}
@@ -1513,9 +1514,9 @@ const FeedScreen = () => {
 								/>
 							</View>
 
-							{/* Bottom Gradient Overlay */}
+							{/* Bottom Gradient Overlay - Light theme with subtle fade */}
 							<LinearGradient
-								colors={["transparent", "rgba(0,0,0,0.6)"]}
+								colors={["transparent", "rgba(255,255,255,0.8)"]}
 								style={styles.bottomGradient}
 								pointerEvents="none"
 							/>
@@ -1537,11 +1538,11 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.primary,
 	},
 	header: {
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+		borderBottomColor: "#E5E5E5",
 		zIndex: 10,
-		...Shadows.medium,
+		...Shadows.light,
 	},
 	feed: {
 		flex: 1,

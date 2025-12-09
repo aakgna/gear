@@ -59,7 +59,7 @@ export interface RiddleData {
 export interface WordChainData {
 	startWord: string; // From Firestore 'startWord' field
 	endWord: string; // From Firestore 'endWord' field
-	validWords: string[]; // From Firestore 'validWords' array - all valid intermediate words
+	answer: string[]; // From Firestore 'answer' array - the specific sequence of words from start to end
 	minSteps: number; // Minimum steps required
 	hint?: string;
 }
@@ -67,6 +67,7 @@ export interface WordChainData {
 export interface AliasData {
 	definitions: string[]; // Array of cryptic definitions (3-5 items)
 	answer: string; // The single word that fits all definitions
+	choices: string[]; // MCQ choices (includes correct answer, shuffled)
 	hint?: string;
 }
 
