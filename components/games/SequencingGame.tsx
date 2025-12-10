@@ -70,10 +70,12 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		if (currentPlacement.some((idx) => idx === null)) {
 			return false;
 		}
-		
+
 		// Compare current placement to solution
 		// Solution is array of entity indices in correct order (0-based)
-		return JSON.stringify(currentPlacement) === JSON.stringify(inputData.solution);
+		return (
+			JSON.stringify(currentPlacement) === JSON.stringify(inputData.solution)
+		);
 	};
 
 	// Setup timer and puzzleId tracking
@@ -128,7 +130,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	useEffect(() => {
 		const correct = validatePlacement();
 		setIsCorrect(correct);
-		
+
 		// Check completion
 		if (!completed && correct) {
 			handleGameComplete();
@@ -187,7 +189,9 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 			clearInterval(timerIntervalRef.current);
 		}
 
-		const finalTime = Math.floor((Date.now() - startTime) / 1000);
+		const finalTime = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
 
 		onComplete({
 			puzzleId: puzzleIdRef.current || "",
@@ -220,7 +224,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
 
 	return (
-		<ScrollView 
+		<ScrollView
 			style={styles.container}
 			contentContainerStyle={[
 				styles.scrollContent,
@@ -242,9 +246,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				<ScrollView style={styles.rulesScroll}>
 					{inputData.rules.map((rule, idx) => (
 						<View key={idx} style={styles.ruleItem}>
-							<Text style={styles.ruleText}>
-								• {rule.description}
-							</Text>
+							<Text style={styles.ruleText}>• {rule.description}</Text>
 						</View>
 					))}
 				</ScrollView>
@@ -252,36 +254,52 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 
 			{/* Slots */}
 			<View style={styles.slotsContainer}>
-				<Text style={styles.sectionLabel}>Slots:</Text>
-				<View style={styles.slotsGrid}>
+				<Text style={styles.sectionLabel}>Slots (flow: left → right):</Text>
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={true}
+					contentContainerStyle={styles.slotsScrollContent}
+				>
 					{currentPlacement.map((entityIdx, slotIdx) => {
-						// Check if this slot has the correct entity
-						const slotIsCorrect = allSlotsFilled && entityIdx === inputData.solution[slotIdx];
-						const slotIsIncorrect = allSlotsFilled && !slotIsCorrect && entityIdx !== null;
-						
+						const slotIsCorrect =
+							allSlotsFilled && entityIdx === inputData.solution[slotIdx];
+						const slotIsIncorrect =
+							allSlotsFilled && !slotIsCorrect && entityIdx !== null;
+						const isLastSlot = slotIdx === currentPlacement.length - 1;
+
 						return (
-						<TouchableOpacity
-							key={slotIdx}
-							style={[
-								styles.slot,
-								entityIdx !== null && styles.slotFilled,
-								slotIsCorrect && styles.slotValid,
-								slotIsIncorrect && styles.slotInvalid,
-							]}
-							onPress={() => handleSlotTap(slotIdx)}
-						>
-							<Text style={styles.slotLabel}>{getSlotLabel(slotIdx)}</Text>
-							{entityIdx !== null ? (
-								<Text style={styles.slotEntity}>
-									{inputData.entities[entityIdx]}
-								</Text>
-							) : (
-								<Text style={styles.slotEmpty}>Empty</Text>
-							)}
-						</TouchableOpacity>
+							<React.Fragment key={slotIdx}>
+								<TouchableOpacity
+									style={[
+										styles.slot,
+										entityIdx !== null && styles.slotFilled,
+										slotIsCorrect && styles.slotValid,
+										slotIsIncorrect && styles.slotInvalid,
+									]}
+									onPress={() => handleSlotTap(slotIdx)}
+								>
+									<Text style={styles.slotLabel}>{getSlotLabel(slotIdx)}</Text>
+									{entityIdx !== null ? (
+										<Text style={styles.slotEntity}>
+											{inputData.entities[entityIdx]}
+										</Text>
+									) : (
+										<Text style={styles.slotEmpty}>Empty</Text>
+									)}
+								</TouchableOpacity>
+								{!isLastSlot && (
+									<View style={styles.arrowContainer}>
+										<Ionicons
+											name="arrow-forward"
+											size={24}
+											color={Colors.text.secondary}
+										/>
+									</View>
+								)}
+							</React.Fragment>
 						);
 					})}
-				</View>
+				</ScrollView>
 			</View>
 
 			{/* Entity Pool */}
@@ -320,10 +338,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 			{completed && (
 				<View style={styles.completionContainer}>
 					<Text style={styles.completionText}>🎉 Puzzle Complete!</Text>
-					<TouchableOpacity
-						style={styles.statsButton}
-						onPress={onShowStats}
-					>
+					<TouchableOpacity style={styles.statsButton} onPress={onShowStats}>
 						<Text style={styles.statsButtonText}>View Stats</Text>
 					</TouchableOpacity>
 				</View>
@@ -427,10 +442,16 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
 	},
-	slotsGrid: {
+	slotsScrollContent: {
 		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: Spacing.sm,
+		alignItems: "center",
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.xs,
+	},
+	arrowContainer: {
+		paddingHorizontal: Spacing.xs,
+		justifyContent: "center",
+		alignItems: "center",
 	},
 	slotsCalendar: {
 		// Calendar-style layout (could be enhanced)
@@ -439,9 +460,10 @@ const styles = StyleSheet.create({
 		// Podium-style layout (could be enhanced)
 	},
 	slot: {
-		minWidth: 120,
+		minWidth: 80,
+		width: 80,
 		minHeight: 80,
-		padding: Spacing.md,
+		padding: Spacing.sm,
 		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 3,
@@ -550,4 +572,3 @@ const styles = StyleSheet.create({
 });
 
 export default SequencingGame;
-
