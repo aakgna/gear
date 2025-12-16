@@ -572,16 +572,6 @@ const ZipGame: React.FC<ZipGameProps> = ({
 						<Text style={styles.buttonText}>Clear</Text>
 					</TouchableOpacity>
 
-					{!completed && !answerRevealed && (
-						<TouchableOpacity
-							style={[styles.button, styles.showAnswerButton]}
-							onPress={handleShowAnswer}
-							activeOpacity={0.7}
-						>
-							<Text style={styles.buttonText}>Show Answer</Text>
-						</TouchableOpacity>
-					)}
-
 					{completed && (
 						<TouchableOpacity
 							style={[styles.button, styles.statsButton]}
@@ -592,6 +582,17 @@ const ZipGame: React.FC<ZipGameProps> = ({
 						</TouchableOpacity>
 					)}
 				</View>
+
+				{/* Show Answer Button */}
+				{!completed && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
+				)}
 
 				{feedback && (
 					<View
@@ -763,9 +764,16 @@ const styles = StyleSheet.create({
 		borderColor: Colors.text.secondary + "40",
 	},
 	showAnswerButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.xs,
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
 	},
 	statsButton: {
 		backgroundColor: "#10B981", // Game-specific emerald

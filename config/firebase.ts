@@ -177,14 +177,17 @@ export const saveGameToFirestore = async (
 		| "futoshiki"
 		| "magicSquare"
 		| "hidato"
-		| "sudoku",
+		| "sudoku"
+		| "trivia"
+		| "mastermind"
+		| "sequencing",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
 		answers?: string[];
 		qna?: string;
 		question?: string;
-		answer?: string;
+		answer?: string | string[];
 		startWord?: string;
 		endWord?: string;
 		validWords?: string[];
@@ -209,8 +212,23 @@ export const saveGameToFirestore = async (
 		endNum?: number;
 		path?: Array<{ row: number; col: number; value?: number }>;
 		hint?: string;
+		choices?: string[];
+		secretCode?: string[];
+		maxGuesses?: number;
+		theme?: "people" | "appointments" | "runners";
+		numSlots?: number;
+		entities?: string[];
+		rules?: Array<{
+			type: string;
+			entity1?: string;
+			entity2?: string;
+			position?: number;
+			minDistance?: number;
+			description: string;
+		}>;
 	},
-	userId: string
+	userId: string,
+	username?: string
 ): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -224,13 +242,19 @@ export const saveGameToFirestore = async (
 			.collection(difficulty);
 
 		// Add metadata including difficulty
-		const gameDoc = {
+		const gameDoc: any = {
 			...gameData,
 			difficulty,
 			createdBy: userId,
+			uid: userId,
 			createdAt: firestore.FieldValue.serverTimestamp(),
 			approved: false, // Games need approval before appearing in main feed
 		};
+		
+		// Add username if provided
+		if (username) {
+			gameDoc.username = username;
+		}
 
 		console.log("Attempting to save game:", {
 			gameType,

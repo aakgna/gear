@@ -80,7 +80,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 
 	const [board, setBoard] = useState<TileState[][]>(initializeBoard);
 	const [tileSize, setTileSize] = useState(50);
-	const [keyboardHeight, setKeyboardHeight] = useState(180);
+	const [keyboardHeight, setKeyboardHeight] = useState(400);
 	const [keyStates, setKeyStates] = useState<
 		Record<string, "absent" | "present" | "correct">
 	>({});
@@ -406,7 +406,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 		const headerEstimate = 60; // Reduced
 		const bottomNavEstimate = 70;
 		const safeAreaEstimate = 40; // Reduced
-		const estimatedKeyboardHeight = 100; // Very compact keyboard
+		const estimatedKeyboardHeight = 200; // Increased from 100 to match NYT Wordle ratio
 
 		const availableHeight =
 			screenHeight - headerEstimate - bottomNavEstimate - safeAreaEstimate;
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
 	keyboardRow: {
 		flexDirection: "row",
 		justifyContent: "center",
-		marginBottom: 2,
+		marginBottom: 6, // Increased from 2
 		gap: 2,
 		paddingHorizontal: 0, // Remove horizontal padding
 	},
@@ -699,12 +699,12 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.tertiary,
 		borderWidth: 1.5,
 		borderColor: "#E5E5E5",
-		paddingVertical: 2, // More compact
+		paddingVertical: 8, // Increased from 2
 		paddingHorizontal: 2,
 		borderRadius: BorderRadius.sm,
 		alignItems: "center",
 		justifyContent: "center",
-		minHeight: 35, // Smaller keys
+		minHeight: 50, // Increased from 35 to match NYT Wordle
 		...Shadows.light,
 	},
 	regularKey: {

@@ -60,7 +60,7 @@ export default function RootLayout() {
 						{/* Main app routes - these will be handled by MainAppContainer */}
 						<Stack.Screen name="feed" options={{ headerShown: false }} />
 						<Stack.Screen name="profile" options={{ headerShown: false }} />
-						<Stack.Screen name="create-game" options={{ headerShown: false }} />
+						{/* create-game folder with sub-routes - let Expo Router handle automatically */}
 					</Stack>
 					{/* MainAppContainer - keeps all main screens mounted */}
 					{isMainAppRoute && (

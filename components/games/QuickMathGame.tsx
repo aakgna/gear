@@ -67,6 +67,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		Array(problems.length).fill("")
 	);
 	const [submitted, setSubmitted] = useState(false);
+	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
@@ -88,6 +89,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			puzzleIdRef.current = puzzleSignature;
 			setElapsedTime(0);
 			setSubmitted(false);
+			setAnswerRevealed(false);
 			setFeedback(null);
 			setAnswers(Array(problems.length).fill(""));
 			setMistakes(0);
@@ -127,7 +129,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			return;
 		}
 
-		if (submitted) {
+		if (submitted || answerRevealed) {
 			// Stop timer when game is completed
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
@@ -158,7 +160,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [submitted, startTime]);
+	}, [submitted, answerRevealed, startTime]);
 
 	// Format time as MM:SS or SS
 	const formatTime = (seconds: number): string => {
@@ -228,7 +230,9 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 			return;
 		}
 
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+		const timeTaken = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
 		let correct = 0;
 		let allCorrect = true;
 
@@ -326,6 +330,37 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		}
 	};
 
+	const handleShowAnswer = () => {
+		if (submitted || answerRevealed) return;
+
+		// Fill in all answers from inputData.answers
+		if (inputData.answers && inputData.answers.length === problems.length) {
+			setAnswers([...inputData.answers]);
+		}
+		setAnswerRevealed(true);
+		setSubmitted(true);
+
+		// Stop timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+		}
+		const timeTaken = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
+		setElapsedTime(timeTaken);
+
+		// Mark as completed with answer revealed
+		onComplete({
+			puzzleId: puzzleId || `quickmath_${Date.now()}`,
+			completed: true,
+			timeTaken,
+			accuracy: 100,
+			mistakes,
+			completedAt: new Date().toISOString(),
+			answerRevealed: true,
+		});
+	};
+
 	const inputRefs = useRef<(TextInput | null)[]>([]);
 	const scrollViewRef = useRef<ScrollView>(null);
 	const inputRowRefs = useRef<(View | null)[]>([]);
@@ -404,11 +439,11 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 									style={styles.answerInput}
 									value={answers[idx]}
 									onChangeText={(t) => handleChange(idx, t)}
-									keyboardType="numeric"
+									keyboardType="default"
 									returnKeyType="done"
 									placeholderTextColor={Colors.text.disabled}
 									placeholder="?"
-									editable={!submitted}
+									editable={!submitted && !answerRevealed}
 									onFocus={() => {
 										// Scroll to input when focused
 										setTimeout(() => {
@@ -441,6 +476,16 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 						{submitted ? "Submitted, View Stats" : "Submit Answers"}
 					</Text>
 				</TouchableOpacity>
+
+				{!submitted && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
+				)}
 
 				{feedback && !submitted && (
 					<View style={styles.feedbackContainer}>
@@ -582,6 +627,18 @@ const styles = StyleSheet.create({
 	},
 	submitDisabled: {
 		opacity: 0.6,
+	},
+	showAnswerButton: {
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.xs,
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
 	},
 	feedbackContainer: {
 		marginTop: Spacing.lg,

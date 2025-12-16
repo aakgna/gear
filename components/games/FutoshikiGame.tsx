@@ -642,12 +642,6 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 						>
 							<Text style={styles.actionButtonText}>Check</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={[styles.actionButton, styles.showAnswerButton]}
-							onPress={handleShowAnswer}
-						>
-							<Text style={styles.actionButtonText}>Show Answer</Text>
-						</TouchableOpacity>
 					</View>
 				)}
 
@@ -656,6 +650,17 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedbackText}>{feedback}</Text>
 					</View>
+				)}
+
+				{/* Show Answer Button */}
+				{!completed && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
 				)}
 
 				{/* View Stats Button - shown when game is completed */}
@@ -848,9 +853,16 @@ const styles = StyleSheet.create({
 		...Shadows.medium,
 	},
 	showAnswerButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.xs,
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
 	},
 	actionButtonText: {
 		fontSize: Typography.fontSize.body,

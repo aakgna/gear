@@ -541,17 +541,6 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 					</View>
 				</Animated.View>
 
-				{/* Show Answer Button */}
-				{!gameWon && !gameLost && !answerRevealed && (
-					<TouchableOpacity
-						style={styles.showAnswerButton}
-						onPress={handleShowAnswer}
-						activeOpacity={0.7}
-					>
-						<Text style={styles.showAnswerText}>Show Answer</Text>
-					</TouchableOpacity>
-				)}
-
 				{/* Submit Button */}
 				{!gameWon && !gameLost && !answerRevealed && (
 					<TouchableOpacity
@@ -573,6 +562,17 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 						>
 							Submit Chain
 						</Text>
+					</TouchableOpacity>
+				)}
+
+				{/* Show Answer Button */}
+				{!gameWon && !gameLost && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
 					</TouchableOpacity>
 				)}
 
@@ -713,21 +713,16 @@ const styles = StyleSheet.create({
 		color: Colors.text.white,
 	},
 	showAnswerButton: {
-		marginTop: Spacing.md,
-		backgroundColor: Colors.background.secondary,
-		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.lg,
-		paddingHorizontal: Spacing.xl,
+		marginTop: Spacing.sm,
 		alignItems: "center",
 		justifyContent: "center",
-		width: "100%",
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
+		paddingVertical: Spacing.xs,
 	},
 	showAnswerText: {
 		color: Colors.text.secondary,
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
 	},
 	submitButton: {
 		marginTop: Spacing.md,

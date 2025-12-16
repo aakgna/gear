@@ -50,7 +50,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
-	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
@@ -146,35 +145,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		const minutes = Math.floor(seconds / 60);
 		const remainingSeconds = seconds % 60;
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-	};
-
-	const handleShowAnswer = () => {
-		if (completed || answerRevealed) return;
-
-		const correctAnswer = inputData.answer.trim().toLowerCase();
-
-		setSelectedChoice(correctAnswer);
-		setAnswerRevealed(true);
-		setCompleted(true);
-		setFeedback("Answer revealed!");
-
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-		// Stop timer
-		if (timerIntervalRef.current) {
-			clearInterval(timerIntervalRef.current);
-		}
-		setElapsedTime(timeTaken);
-
-		// Mark as completed
-		onComplete({
-			puzzleId: puzzleId || `riddle_${Date.now()}`,
-			completed: true,
-			timeTaken,
-			attempts: attempts + 1,
-			completedAt: new Date().toISOString(),
-			answerRevealed: true,
-		});
 	};
 
 	const submit = () => {
@@ -345,16 +315,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 						{completed ? "Submitted, View Stats" : "Submit Answer"}
 					</Text>
 				</TouchableOpacity>
-
-				{!completed && !answerRevealed && (
-					<TouchableOpacity
-						style={styles.showAnswerButton}
-						onPress={handleShowAnswer}
-						activeOpacity={0.7}
-					>
-						<Text style={styles.showAnswerText}>Show Answer</Text>
-					</TouchableOpacity>
-				)}
 			</ScrollView>
 		</View>
 	);
@@ -511,23 +471,6 @@ const styles = StyleSheet.create({
 	},
 	submitDisabled: {
 		opacity: 0.5,
-	},
-	showAnswerButton: {
-		marginTop: Spacing.xs,
-		backgroundColor: Colors.background.secondary,
-		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.xl,
-		alignItems: "center",
-		justifyContent: "center",
-		width: "100%",
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
-	},
-	showAnswerText: {
-		color: Colors.text.secondary,
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
 	},
 	feedbackContainer: {
 		marginBottom: Spacing.md,

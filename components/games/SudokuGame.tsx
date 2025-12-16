@@ -557,12 +557,6 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 						>
 							<Text style={styles.actionButtonText}>Check</Text>
 						</TouchableOpacity>
-						<TouchableOpacity
-							style={[styles.actionButton, styles.showAnswerButton]}
-							onPress={handleShowAnswer}
-						>
-							<Text style={styles.actionButtonText}>Show Answer</Text>
-						</TouchableOpacity>
 					</View>
 				)}
 
@@ -571,6 +565,17 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedbackText}>{feedback}</Text>
 					</View>
+				)}
+
+				{/* Show Answer Button */}
+				{!completed && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
 				)}
 
 				{/* View Stats Button - shown when game is completed */}
@@ -737,7 +742,16 @@ const styles = StyleSheet.create({
 		backgroundColor: "#8B5CF6", // Game-specific purple
 	},
 	showAnswerButton: {
-		backgroundColor: Colors.text.secondary,
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.xs,
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
 	},
 	actionButtonDisabled: {
 		opacity: 0.5,
