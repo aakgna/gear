@@ -11,6 +11,7 @@ import {
 	Dimensions,
 	Share,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import {
 	Puzzle,
@@ -79,7 +80,8 @@ const createConfettiParticles = (): ConfettiParticle[] => {
 			id: i,
 			x: Math.random() * SCREEN_WIDTH,
 			y: -20 - Math.random() * 100,
-			color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+			color:
+				CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
 			rotation: Math.random() * 360,
 			scale: 0.5 + Math.random() * 0.5,
 		});
@@ -109,20 +111,24 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
-	
+
 	// Check if this puzzle was completed before
 	const globalCompletedResult = completedGameResults.get(puzzle.id);
 	const [completedResult, setCompletedResult] = useState<GameResult | null>(
 		globalCompletedResult || null
 	);
-	
+
 	// Determine initial state based on game progress
 	// If intro was dismissed (game started), start with game shown, not intro
 	// If game was completed, don't show intro
 	const introDismissed = dismissedIntros.has(puzzle.id);
 	const gameWasCompleted = !!globalCompletedResult;
-	const [showIntro, setShowIntro] = useState(!introDismissed && !gameWasCompleted);
-	const [gameStarted, setGameStarted] = useState(introDismissed || gameWasCompleted);
+	const [showIntro, setShowIntro] = useState(
+		!introDismissed && !gameWasCompleted
+	);
+	const [gameStarted, setGameStarted] = useState(
+		introDismissed || gameWasCompleted
+	);
 	const [actualStartTime, setActualStartTime] = useState<number | undefined>(
 		undefined
 	);
@@ -133,7 +139,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Animation states
 	const [showConfetti, setShowConfetti] = useState(false);
-	const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
+	const [confettiParticles, setConfettiParticles] = useState<
+		ConfettiParticle[]
+	>([]);
 	const failurePulseAnim = useRef(new Animated.Value(0)).current;
 	const confettiAnims = useRef<Animated.Value[]>([]).current;
 
@@ -193,7 +201,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	React.useEffect(() => {
 		if (previousPuzzleIdRef.current !== puzzle.id) {
 			previousPuzzleIdRef.current = puzzle.id;
-			
+
 			// Check if this puzzle has a completed result stored
 			const storedResult = completedGameResults.get(puzzle.id);
 			if (storedResult) {
@@ -217,7 +225,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Track elapsed time changes and report when becoming inactive
 	React.useEffect(() => {
-		if (previousIsActiveRef.current && !isActive && gameStarted && actualStartTime) {
+		if (
+			previousIsActiveRef.current &&
+			!isActive &&
+			gameStarted &&
+			actualStartTime
+		) {
 			// Game just became inactive - calculate and save elapsed time
 			// Calculate elapsed time from actualStartTime (same as game components use)
 			const now = Date.now();
@@ -227,7 +240,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			if (onElapsedTimeUpdate) {
 				onElapsedTimeUpdate(puzzle.id, currentElapsed);
 			}
-		} else if (!previousIsActiveRef.current && isActive && gameStarted && actualStartTime) {
+		} else if (
+			!previousIsActiveRef.current &&
+			isActive &&
+			gameStarted &&
+			actualStartTime
+		) {
 			// Game just became active - mark the time it became active
 			lastActiveTimeRef.current = Date.now();
 		}
@@ -270,9 +288,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		// Trigger appropriate animation based on result
 		if (result.completed && !result.answerRevealed) {
 			// User won without revealing answer - celebrate!
+			// Trigger haptic feedback for success
+			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 			triggerSuccessAnimation();
 		} else if (result.answerRevealed) {
 			// User gave up or lost - subtle failure feedback
+			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			triggerFailureAnimation();
 		}
 
@@ -306,10 +327,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			// Store result for stats display (but don't show yet)
 			setCompletedResult(updatedResult);
-			
+
 			// Store globally so it persists across tab switches
 			completedGameResults.set(puzzle.id, updatedResult);
-			
+
 			// Remove from dismissed intros since it's now completed
 			dismissedIntros.delete(puzzle.id);
 		}
@@ -361,13 +382,15 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 		try {
 			const gameUrl = `thinktok://game/${puzzle.id}`;
-			let message = `I just completed ${formatGameType(puzzle.type)} on ThinkTok!\n\n`;
+			let message = `I just completed ${formatGameType(
+				puzzle.type
+			)} on ThinkTok!\n\n`;
 			message += `Time: ${formatTime(completedResult.timeTaken)}\n`;
-			
+
 			if (completedResult.attempts !== undefined) {
 				message += `Tries: ${completedResult.attempts}\n`;
 			}
-			
+
 			message += `\nCan you beat my score?\n\n${gameUrl}`;
 
 			await Share.share({
@@ -381,7 +404,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const renderGame = () => {
 		// Use actualStartTime if game has started, otherwise don't pass startTime
 		const gameStartTime = gameStarted ? actualStartTime : undefined;
-		
+
 		switch (puzzle.type) {
 			case "wordle":
 				return (
@@ -422,46 +445,46 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						isActive={isActive && gameStarted}
 					/>
 				);
-		case "trivia":
-			return (
-				<TriviaGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "mastermind":
-			return (
-				<MastermindGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "sequencing":
-			return (
-				<SequencingGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "wordChain":
+			case "trivia":
+				return (
+					<TriviaGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+					/>
+				);
+			case "mastermind":
+				return (
+					<MastermindGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+					/>
+				);
+			case "sequencing":
+				return (
+					<SequencingGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+					/>
+				);
+			case "wordChain":
 				return (
 					<WordChainGame
 						key={puzzle.id}
@@ -569,114 +592,118 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	return (
 		<Animated.View
-			style={[
-				styles.container,
-				{ backgroundColor: failurePulseColor },
-			]}
+			style={[styles.container, { backgroundColor: failurePulseColor }]}
 		>
-				{/* Confetti Overlay */}
-				{showConfetti && (
-					<View style={styles.confettiContainer} pointerEvents="none">
-						{confettiParticles.map((particle, index) => {
-							const anim = confettiAnims[index];
-							if (!anim) return null;
+			{/* Confetti Overlay */}
+			{showConfetti && (
+				<View style={styles.confettiContainer} pointerEvents="none">
+					{confettiParticles.map((particle, index) => {
+						const anim = confettiAnims[index];
+						if (!anim) return null;
 
-							const translateY = anim.interpolate({
-								inputRange: [0, 1],
-								outputRange: [particle.y, SCREEN_HEIGHT + 50],
-							});
+						const translateY = anim.interpolate({
+							inputRange: [0, 1],
+							outputRange: [particle.y, SCREEN_HEIGHT + 50],
+						});
 
-							const rotate = anim.interpolate({
-								inputRange: [0, 1],
-								outputRange: [`${particle.rotation}deg`, `${particle.rotation + 720}deg`],
-							});
+						const rotate = anim.interpolate({
+							inputRange: [0, 1],
+							outputRange: [
+								`${particle.rotation}deg`,
+								`${particle.rotation + 720}deg`,
+							],
+						});
 
-							const opacity = anim.interpolate({
-								inputRange: [0, 0.8, 1],
-								outputRange: [1, 1, 0],
-							});
+						const opacity = anim.interpolate({
+							inputRange: [0, 0.8, 1],
+							outputRange: [1, 1, 0],
+						});
 
-							return (
-								<Animated.View
-									key={particle.id}
-									style={[
-										styles.confettiParticle,
-										{
-											left: particle.x,
-											backgroundColor: particle.color,
-											transform: [
-												{ translateY },
-												{ rotate },
-												{ scale: particle.scale },
-											],
-											opacity,
-										},
-									]}
-								/>
-							);
-						})}
-					</View>
-				)}
-
-				{/* Game Intro Screen or Game Container */}
-				{showIntro ? (
-					<View style={styles.gameContainer}>
-						<GameIntroScreen
-							gameType={puzzle.type}
-							difficulty={puzzle.difficulty}
-							username={puzzle.username}
-							onPlay={handlePlay}
-						/>
-					</View>
-				) : (
-					gameStarted && (
-						<View
-							style={[
-								styles.gameContainer,
-								showStats && styles.gameContainerWithStats,
-							]}
-						>
-							{renderGame()}
-						</View>
-					)
-				)}
-
-				{/* Stats Container - always visible when shown, fixed at bottom */}
-				{showStats && completedResult && (
-					<View style={styles.statsContainer}>
-						<View style={styles.statsHeader}>
-							<Text style={styles.statsHeaderText}>Comparison Stats</Text>
-							<View style={styles.statsHeaderActions}>
-								<TouchableOpacity
-									onPress={handleShare}
-									style={styles.shareButton}
-								>
-									<Ionicons name="share-outline" size={24} color={Colors.accent} />
-								</TouchableOpacity>
-								<TouchableOpacity
-									onPress={() => setShowStats(false)}
-									style={styles.closeButton}
-								>
-									<Ionicons name="close" size={24} color={Colors.text.primary} />
-								</TouchableOpacity>
-							</View>
-						</View>
-						<ScrollView
-							style={styles.statsScrollView}
-							contentContainerStyle={styles.statsContent}
-							showsVerticalScrollIndicator={true}
-						>
-							<PuzzleStats
-								stats={puzzleStats}
-								puzzleType={puzzle.type}
-								loading={loadingStats}
-								userTime={completedResult.timeTaken}
-								userAttempts={completedResult.attempts}
-								userMistakes={completedResult.mistakes}
+						return (
+							<Animated.View
+								key={particle.id}
+								style={[
+									styles.confettiParticle,
+									{
+										left: particle.x,
+										backgroundColor: particle.color,
+										transform: [
+											{ translateY },
+											{ rotate },
+											{ scale: particle.scale },
+										],
+										opacity,
+									},
+								]}
 							/>
-						</ScrollView>
+						);
+					})}
+				</View>
+			)}
+
+			{/* Game Intro Screen or Game Container */}
+			{showIntro ? (
+				<View style={styles.gameContainer}>
+					<GameIntroScreen
+						gameType={puzzle.type}
+						difficulty={puzzle.difficulty}
+						username={puzzle.username}
+						onPlay={handlePlay}
+					/>
+				</View>
+			) : (
+				gameStarted && (
+					<View
+						style={[
+							styles.gameContainer,
+							showStats && styles.gameContainerWithStats,
+						]}
+					>
+						{renderGame()}
 					</View>
-				)}
+				)
+			)}
+
+			{/* Stats Container - always visible when shown, fixed at bottom */}
+			{showStats && completedResult && (
+				<View style={styles.statsContainer}>
+					<View style={styles.statsHeader}>
+						<Text style={styles.statsHeaderText}>Comparison Stats</Text>
+						<View style={styles.statsHeaderActions}>
+							<TouchableOpacity
+								onPress={handleShare}
+								style={styles.shareButton}
+							>
+								<Ionicons
+									name="share-outline"
+									size={24}
+									color={Colors.accent}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								onPress={() => setShowStats(false)}
+								style={styles.closeButton}
+							>
+								<Ionicons name="close" size={24} color={Colors.text.primary} />
+							</TouchableOpacity>
+						</View>
+					</View>
+					<ScrollView
+						style={styles.statsScrollView}
+						contentContainerStyle={styles.statsContent}
+						showsVerticalScrollIndicator={true}
+					>
+						<PuzzleStats
+							stats={puzzleStats}
+							puzzleType={puzzle.type}
+							loading={loadingStats}
+							userTime={completedResult.timeTaken}
+							userAttempts={completedResult.attempts}
+							userMistakes={completedResult.mistakes}
+						/>
+					</ScrollView>
+				</View>
+			)}
 		</Animated.View>
 	);
 };
