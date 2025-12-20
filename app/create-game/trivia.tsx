@@ -158,7 +158,7 @@ const CreateTriviaPage = () => {
 				const shuffledChoices = q.choices.map((c) => c.trim()).sort(() => Math.random() - 0.5);
 				
 				return {
-					question: q.question.trim(),
+				question: q.question.trim(),
 					answer: correctAnswer,
 					choices: shuffledChoices,
 				};
@@ -214,10 +214,10 @@ const CreateTriviaPage = () => {
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
-				<Text style={styles.sectionTitle}>Create Trivia Game</Text>
-				<Text style={styles.description}>
+					<Text style={styles.sectionTitle}>Create Trivia Game</Text>
+					<Text style={styles.description}>
 					Create multiple-choice trivia questions. Enter 4 choices and mark the correct one.
-				</Text>
+					</Text>
 
 					{/* Difficulty Selector */}
 					<View style={styles.selectorContainer}>
@@ -249,24 +249,24 @@ const CreateTriviaPage = () => {
 						</Text>
 					</View>
 
-				{/* Questions */}
-				{questions.map((q, qIndex) => (
-					<View key={qIndex} style={styles.questionContainer}>
-						<Text style={styles.questionNumber}>Question {qIndex + 1}</Text>
+					{/* Questions */}
+					{questions.map((q, qIndex) => (
+						<View key={qIndex} style={styles.questionContainer}>
+							<Text style={styles.questionNumber}>Question {qIndex + 1}</Text>
 						<Text style={styles.inputLabel}>Question</Text>
-						<TextInput
-							style={[styles.input, styles.textArea]}
-							placeholder="Enter question..."
-							placeholderTextColor={Colors.text.disabled}
-							value={q.question}
+							<TextInput
+								style={[styles.input, styles.textArea]}
+								placeholder="Enter question..."
+								placeholderTextColor={Colors.text.disabled}
+								value={q.question}
 							onChangeText={(text) => handleQuestionChange(qIndex, text)}
-							multiline
-							numberOfLines={2}
-						/>
+								multiline
+								numberOfLines={2}
+							/>
 						<Text style={styles.inputLabel}>
 							Answer Choices (mark correct answer)
 						</Text>
-						{q.choices.map((choice, cIndex) => (
+							{q.choices.map((choice, cIndex) => (
 							<View key={cIndex} style={styles.answerRow}>
 								<TouchableOpacity
 									style={styles.radioButton}
@@ -297,9 +297,9 @@ const CreateTriviaPage = () => {
 									}
 								/>
 							</View>
-						))}
-					</View>
-				))}
+							))}
+						</View>
+					))}
 
 					<TouchableOpacity
 						style={[

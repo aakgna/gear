@@ -140,10 +140,10 @@ const CreateMastermindPage = () => {
 				"Success",
 				"Your Mastermind game has been created successfully!",
 				[
-					{
-						text: "OK",
-						onPress: () => router.back(),
-					},
+				{
+					text: "OK",
+					onPress: () => router.back(),
+				},
 				]
 			);
 		} catch (error: any) {

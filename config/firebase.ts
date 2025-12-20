@@ -270,6 +270,30 @@ export const saveGameToFirestore = async (
 			documentId: docRef.id,
 			path: docRef.path,
 		});
+
+		// Also save to creator's createdGames subcollection
+		const createdGameRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("createdGames")
+			.doc(docRef.id);
+
+		await createdGameRef.set({
+			gameId: docRef.id,
+			gameType,
+			difficulty,
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			playCount: 0,
+		});
+
+		// Increment user's createdGamesCount
+		const userRef = db.collection("users").doc(userId);
+		await userRef.update({
+			createdGamesCount: firestore.FieldValue.increment(1),
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		console.log(`Game added to creator's createdGames: ${docRef.id}`);
 	} catch (error: any) {
 		console.error("Error saving game to Firestore:", error);
 		console.error("Error details:", {

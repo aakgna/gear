@@ -42,6 +42,8 @@ export default function RootLayout() {
 	// Routes that use MainAppContainer (main app screens that stay mounted)
 	const mainAppRoutes = ["/feed", "/profile", "/create-game"];
 	const isMainAppRoute = mainAppRoutes.includes(pathname);
+	// Routes where we should keep MainAppContainer mounted (includes user profiles)
+	const shouldKeepMainAppMounted = isMainAppRoute || pathname?.startsWith("/user/");
 	// Auth routes that use Stack navigation
 	const authRoutes = ["/", "/index", "/signin", "/username"];
 
@@ -60,10 +62,36 @@ export default function RootLayout() {
 						{/* Main app routes - these will be handled by MainAppContainer */}
 						<Stack.Screen name="feed" options={{ headerShown: false }} />
 						<Stack.Screen name="profile" options={{ headerShown: false }} />
+						{/* User profile routes - these render on top of MainAppContainer */}
+						<Stack.Screen 
+							name="user/[username]" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
+						{/* Search and notifications routes */}
+						<Stack.Screen 
+							name="search-friends" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
+						<Stack.Screen 
+							name="notifications" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
 						{/* create-game folder with sub-routes - let Expo Router handle automatically */}
 					</Stack>
 					{/* MainAppContainer - keeps all main screens mounted */}
-					{isMainAppRoute && (
+					{shouldKeepMainAppMounted && (
 						<View
 							style={{
 								position: "absolute",
@@ -71,7 +99,8 @@ export default function RootLayout() {
 								left: 0,
 								right: 0,
 								bottom: 0,
-								zIndex: 10,
+								zIndex: isMainAppRoute ? 10 : 0, // Lower z-index when on user profile
+								pointerEvents: isMainAppRoute ? "auto" : "none", // Disable touches when on user profile
 							}}
 						>
 							<MainAppContainer />

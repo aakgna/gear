@@ -33,6 +33,7 @@ import {
 } from "../constants/DesignSystem";
 import {
 	Puzzle,
+	PuzzleType,
 	GameResult,
 	QuickMathData,
 	WordleData,
@@ -59,6 +60,7 @@ import {
 	decrementGameSkipped,
 	batchCheckGameHistory,
 	migrateUserArraysToHistory,
+	db,
 } from "../config/firebase";
 import {
 	getSimpleRecommendations,
@@ -72,6 +74,7 @@ import {
 	addAttemptedGame,
 	moveFromSkippedToAttempted,
 } from "../config/auth";
+import { fetchFollowingFeed } from "../config/social";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -98,8 +101,13 @@ function deduplicateGames(games: Puzzle[]): Puzzle[] {
 const FeedScreen = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const flatListRef = useRef<FlatList>(null);
-	const [currentIndex, setCurrentIndex] = useState(0);
+	// Separate state for each tab to maintain independent scroll positions
+	const [currentIndexForYou, setCurrentIndexForYou] = useState(0);
+	const [currentIndexFollowing, setCurrentIndexFollowing] = useState(0);
+	const [currentPuzzleIdForYou, setCurrentPuzzleIdForYou] =
+		useState<string>("");
+	const [currentPuzzleIdFollowing, setCurrentPuzzleIdFollowing] =
+		useState<string>("");
 	const [headerHeight, setHeaderHeight] = useState(0);
 	const [feedHeight, setFeedHeight] = useState(0);
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -117,9 +125,13 @@ const FeedScreen = () => {
 	const puzzleVisibleTimesRef = useRef<Record<string, number>>({});
 	// Track the startTime for each puzzle (calculated when it becomes visible)
 	const puzzleStartTimesRef = useRef<Record<string, number>>({});
-	// Track previous active puzzle to detect transitions
-	const previousActivePuzzleIdRef = useRef<string>("");
-	const [currentPuzzleId, setCurrentPuzzleId] = useState<string>("");
+	// Track previous active puzzle to detect transitions (separate for each tab)
+	const previousActivePuzzleIdRef = useRef<
+		Record<"forYou" | "following", string>
+	>({
+		forYou: "",
+		following: "",
+	});
 	// Track initial completed games to filter on load only
 	const initialCompletedGamesRef = useRef<Set<string>>(new Set());
 	// Track completed puzzles during this session
@@ -138,6 +150,25 @@ const FeedScreen = () => {
 	const [hasMoreGamesToFetch, setHasMoreGamesToFetch] = useState(true);
 	// Track if initial data load has completed to prevent reloading on refocus
 	const hasLoadedRef = useRef(false);
+	// Feed tabs state
+	const [activeTab, setActiveTab] = useState<"forYou" | "following">("forYou");
+	const [followingPuzzles, setFollowingPuzzles] = useState<Puzzle[]>([]);
+	const [loadingFollowing, setLoadingFollowing] = useState(false);
+	// Separate refs for each FlatList
+	const forYouFlatListRef = useRef<FlatList<Puzzle>>(null);
+	const followingFlatListRef = useRef<FlatList<Puzzle>>(null);
+
+	// Computed current state based on active tab (must be after activeTab declaration)
+	const currentIndex =
+		activeTab === "forYou" ? currentIndexForYou : currentIndexFollowing;
+	const currentPuzzleId =
+		activeTab === "forYou" ? currentPuzzleIdForYou : currentPuzzleIdFollowing;
+	const setCurrentIndex =
+		activeTab === "forYou" ? setCurrentIndexForYou : setCurrentIndexFollowing;
+	const setCurrentPuzzleId =
+		activeTab === "forYou"
+			? setCurrentPuzzleIdForYou
+			: setCurrentPuzzleIdFollowing;
 
 	const { addCompletedPuzzle } = useGameStore();
 
@@ -179,8 +210,354 @@ const FeedScreen = () => {
 			hasLoadedRef.current = true;
 			loadUserData(true); // Pass true to indicate initial load
 			loadPuzzlesFromFirestore();
+			loadFollowingFeed();
 		}
 	}, []);
+
+	// Load following feed
+	const loadFollowingFeed = async () => {
+		const user = getCurrentUser();
+		if (!user) return;
+
+		setLoadingFollowing(true);
+		try {
+			const followingGames = await fetchFollowingFeed(user.uid, 50);
+
+			// Verify we only have games from followed users (safety check)
+			// Get list of followed users to verify
+			const followingSnapshot = await db
+				.collection("users")
+				.doc(user.uid)
+				.collection("following")
+				.get();
+			const followedUids = new Set(followingSnapshot.docs.map((doc) => doc.id));
+
+			// Filter out completed games first using batch check
+			const gameIds = followingGames.map(
+				(g) => `${g.gameType}_${g.difficulty}_${g.gameId}`
+			);
+			const completedGameIds = await batchCheckGameHistory(
+				user.uid,
+				gameIds,
+				"completed"
+			);
+
+			// Transform following games to Puzzle format
+			// We need to fetch the actual game data from Firestore
+			const puzzles: Puzzle[] = [];
+
+			for (const game of followingGames) {
+				// Safety check: Only include games from users we follow
+				if (game.createdBy && !followedUids.has(game.createdBy)) {
+					console.warn(
+						`[Following Feed] Skipping game from unfollowed user: ${game.createdBy}`
+					);
+					continue;
+				}
+
+				// Skip if user has already completed this game
+				const gameId = `${game.gameType}_${game.difficulty}_${game.gameId}`;
+				if (completedGameIds.has(gameId)) {
+					continue;
+				}
+				try {
+					const gameDoc = await db
+						.collection("games")
+						.doc(game.gameType)
+						.collection(game.difficulty)
+						.doc(game.gameId)
+						.get();
+
+					// Fix exists check to handle both function and property cases
+					const exists =
+						typeof gameDoc.exists === "function"
+							? gameDoc.exists()
+							: gameDoc.exists;
+					if (!exists) continue;
+
+					const gameData = gameDoc.data();
+					if (!gameData) continue;
+
+					// Transform based on game type (comprehensive handling like loadPuzzlesFromFirestore)
+					let puzzleData: any = {};
+					let puzzleType: PuzzleType = game.gameType as PuzzleType;
+					let isValid = false;
+
+					// Handle QuickMath
+					if (
+						game.gameType === "quickMath" &&
+						gameData.questions &&
+						gameData.answers
+					) {
+						puzzleData = {
+							problems: gameData.questions,
+							answers: gameData.answers,
+						} as QuickMathData;
+						isValid = true;
+					}
+					// Handle Wordle
+					else if (game.gameType === "wordle" && gameData.qna) {
+						puzzleData = {
+							answer: gameData.qna.toUpperCase(),
+						} as WordleData;
+						isValid = true;
+					}
+					// Handle Riddle
+					else if (
+						game.gameType === "riddle" &&
+						gameData.question &&
+						gameData.answer &&
+						gameData.choices
+					) {
+						puzzleData = {
+							prompt: gameData.question,
+							answer: gameData.answer,
+							choices: gameData.choices,
+						} as RiddleData;
+						isValid = true;
+					}
+					// Handle Trivia
+					else if (
+						game.gameType === "trivia" &&
+						gameData.questions &&
+						Array.isArray(gameData.questions)
+					) {
+						puzzleData = {
+							questions: gameData.questions as any,
+						} as TriviaData;
+						isValid = true;
+					}
+					// Handle Mastermind
+					else if (
+						game.gameType === "mastermind" &&
+						gameData.secretCode &&
+						Array.isArray(gameData.secretCode) &&
+						gameData.maxGuesses
+					) {
+						puzzleData = {
+							secretCode: gameData.secretCode,
+							maxGuesses: gameData.maxGuesses,
+						} as MastermindData;
+						isValid = true;
+					}
+					// Handle Sequencing
+					else if (
+						game.gameType === "sequencing" &&
+						gameData.theme &&
+						gameData.numSlots &&
+						gameData.entities &&
+						Array.isArray(gameData.entities) &&
+						gameData.rules &&
+						Array.isArray(gameData.rules) &&
+						gameData.solution &&
+						Array.isArray(gameData.solution)
+					) {
+						puzzleData = {
+							theme: gameData.theme as "people" | "appointments" | "runners",
+							numSlots: gameData.numSlots,
+							entities: gameData.entities,
+							rules: gameData.rules.map((r: any) => ({
+								type: r.type,
+								entity1: r.entity1,
+								entity2: r.entity2,
+								position: r.position,
+								minDistance: r.minDistance,
+								description: r.description,
+							})),
+							solution: gameData.solution,
+						} as SequencingData;
+						isValid = true;
+					}
+					// Handle WordChain
+					else if (
+						game.gameType === "wordChain" &&
+						gameData.startWord &&
+						gameData.endWord &&
+						gameData.answer
+					) {
+						// Ensure answer is an array (it might be stored as string or array in Firestore)
+						const answerArray = Array.isArray(gameData.answer)
+							? gameData.answer
+							: typeof gameData.answer === "string"
+							? [gameData.answer]
+							: [];
+
+						puzzleData = {
+							startWord: gameData.startWord,
+							endWord: gameData.endWord,
+							answer: answerArray,
+							minSteps: gameData.minSteps || 3,
+							hint: gameData.hint,
+						} as WordChainData;
+						isValid = true;
+					}
+					// Handle Alias
+					else if (
+						game.gameType === "alias" &&
+						gameData.definitions &&
+						gameData.answer &&
+						gameData.choices
+					) {
+						puzzleData = {
+							definitions: gameData.definitions,
+							answer: gameData.answer,
+							choices: gameData.choices,
+							hint: gameData.hint,
+						} as AliasData;
+						isValid = true;
+					}
+					// Handle Zip
+					else if (
+						game.gameType === "zip" &&
+						gameData.rows &&
+						gameData.cols &&
+						gameData.cells &&
+						gameData.solution
+					) {
+						puzzleData = {
+							rows: gameData.rows,
+							cols: gameData.cols,
+							cells: gameData.cells,
+							solution: gameData.solution,
+						} as ZipData;
+						isValid = true;
+					}
+					// Handle Futoshiki
+					else if (
+						game.gameType === "futoshiki" &&
+						gameData.size &&
+						gameData.grid &&
+						gameData.givens &&
+						gameData.inequalities
+					) {
+						puzzleData = {
+							size: gameData.size,
+							grid: gameData.grid,
+							givens: gameData.givens,
+							inequalities: gameData.inequalities,
+						} as FutoshikiData;
+						isValid = true;
+					}
+					// Handle Magic Square
+					else if (
+						game.gameType === "magicSquare" &&
+						gameData.size &&
+						gameData.grid &&
+						gameData.magicConstant !== undefined &&
+						gameData.givens
+					) {
+						puzzleData = {
+							size: gameData.size,
+							grid: gameData.grid,
+							magicConstant: gameData.magicConstant,
+							givens: gameData.givens,
+						} as MagicSquareData;
+						isValid = true;
+					}
+					// Handle Hidato
+					else if (
+						game.gameType === "hidato" &&
+						gameData.rows &&
+						gameData.cols &&
+						gameData.startNum !== undefined &&
+						gameData.endNum !== undefined &&
+						gameData.path &&
+						gameData.givens
+					) {
+						puzzleData = {
+							rows: gameData.rows,
+							cols: gameData.cols,
+							startNum: gameData.startNum,
+							endNum: gameData.endNum,
+							path: gameData.path,
+							givens: gameData.givens,
+						} as HidatoData;
+						isValid = true;
+					}
+					// Handle Sudoku
+					else if (
+						game.gameType === "sudoku" &&
+						gameData.grid &&
+						gameData.givens
+					) {
+						puzzleData = {
+							grid: gameData.grid,
+							givens: gameData.givens,
+						} as SudokuData;
+						isValid = true;
+					}
+
+					// Only add puzzle if valid
+					if (!isValid) {
+						continue;
+					}
+
+					puzzles.push({
+						id: `${game.gameType}_${game.difficulty}_${game.gameId}`,
+						type: puzzleType,
+						data: puzzleData,
+						difficulty:
+							game.difficulty === "easy"
+								? 1
+								: game.difficulty === "medium"
+								? 2
+								: 3,
+						createdAt:
+							game.createdAt?.toDate?.()?.toISOString() ||
+							new Date().toISOString(),
+						username: gameData.username,
+					});
+				} catch (error) {
+					console.error(`Error loading game ${game.gameId}:`, error);
+				}
+			}
+
+			setFollowingPuzzles(puzzles);
+		} catch (error) {
+			console.error("Error loading following feed:", error);
+		} finally {
+			setLoadingFollowing(false);
+		}
+	};
+
+	// Get the correct flatListRef based on active tab
+	const flatListRef =
+		activeTab === "forYou" ? forYouFlatListRef : followingFlatListRef;
+
+	// Handle tab press - if already on the tab, scroll to top and reload
+	const handleForYouTabPress = async () => {
+		if (activeTab === "forYou") {
+			// Already on this tab - scroll to top and reload
+			if (forYouFlatListRef.current) {
+				forYouFlatListRef.current.scrollToOffset({ offset: 0, animated: true });
+			}
+			// Reset state and reload
+			setCurrentIndexForYou(0);
+			setCurrentPuzzleIdForYou("");
+			setLoading(true);
+			await loadPuzzlesFromFirestore();
+		} else {
+			setActiveTab("forYou");
+		}
+	};
+
+	const handleFollowingTabPress = async () => {
+		if (activeTab === "following") {
+			// Already on this tab - scroll to top and reload
+			if (followingFlatListRef.current) {
+				followingFlatListRef.current.scrollToOffset({
+					offset: 0,
+					animated: true,
+				});
+			}
+			// Reset state and reload
+			setCurrentIndexFollowing(0);
+			setCurrentPuzzleIdFollowing("");
+			await loadFollowingFeed();
+		} else {
+			setActiveTab("following");
+		}
+	};
 
 	const loadUserData = async (isInitialLoad = false) => {
 		const user = getCurrentUser();
@@ -384,13 +761,20 @@ const FeedScreen = () => {
 				);
 				wordChainGames.forEach((game) => {
 					if (game.startWord && game.endWord && game.answer) {
+						// Ensure answer is an array (it might be stored as string or array in Firestore)
+						const answerArray = Array.isArray(game.answer)
+							? game.answer
+							: typeof game.answer === "string"
+							? [game.answer]
+							: [];
+
 						allPuzzles.push({
 							id: `wordchain_${difficulty}_${game.id}`,
 							type: "wordChain",
 							data: {
 								startWord: game.startWord,
 								endWord: game.endWord,
-								answer: game.answer,
+								answer: answerArray,
 								minSteps: game.minSteps || 3,
 								hint: game.hint,
 							} as WordChainData,
@@ -867,13 +1251,20 @@ const FeedScreen = () => {
 				);
 				wordChainGames.forEach((game) => {
 					if (game.startWord && game.endWord && game.answer) {
+						// Ensure answer is an array (it might be stored as string or array in Firestore)
+						const answerArray = Array.isArray(game.answer)
+							? game.answer
+							: typeof game.answer === "string"
+							? [game.answer]
+							: [];
+
 						newGames.push({
 							id: `wordchain_${difficulty}_${game.id}`,
 							type: "wordChain",
 							data: {
 								startWord: game.startWord,
 								endWord: game.endWord,
-								answer: game.answer,
+								answer: answerArray,
 								minSteps: game.minSteps || 3,
 								hint: game.hint,
 							} as WordChainData,
@@ -1100,8 +1491,13 @@ const FeedScreen = () => {
 		}
 	};
 
-	// Load next batch for infinite scroll
+	// Load next batch for infinite scroll (only for "For You" tab)
 	const loadNextBatch = useCallback(async () => {
+		// Don't load more games if we're on the Following tab
+		if (activeTab === "following") {
+			return;
+		}
+
 		if (
 			loadingMore ||
 			displayedPuzzles.length >= allRecommendedPuzzles.length
@@ -1157,6 +1553,7 @@ const FeedScreen = () => {
 
 		setLoadingMore(false);
 	}, [
+		activeTab,
 		displayedPuzzles,
 		allRecommendedPuzzles,
 		loadingMore,
@@ -1171,30 +1568,36 @@ const FeedScreen = () => {
 				const newIndex = viewableItems[0].index ?? 0;
 				const newPuzzleId = viewableItems[0].item?.id;
 
-				if (newPuzzleId && newPuzzleId !== currentPuzzleId) {
+				// Get current state for the active tab
+				const currentTabPuzzleId =
+					activeTab === "forYou"
+						? currentPuzzleIdForYou
+						: currentPuzzleIdFollowing;
+
+				if (newPuzzleId && newPuzzleId !== currentTabPuzzleId) {
 					// Handle skip tracking for the previous puzzle
-					if (currentPuzzleId) {
+					if (currentTabPuzzleId) {
 						// Save elapsed time for current puzzle before switching away
-						if (puzzleVisibleTimesRef.current[currentPuzzleId]) {
+						if (puzzleVisibleTimesRef.current[currentTabPuzzleId]) {
 							const timeVisible =
-								Date.now() - puzzleVisibleTimesRef.current[currentPuzzleId];
+								Date.now() - puzzleVisibleTimesRef.current[currentTabPuzzleId];
 							const additionalElapsed = Math.floor(timeVisible / 1000);
 							// Add to existing elapsed time
-							puzzleElapsedTimesRef.current[currentPuzzleId] =
-								(puzzleElapsedTimesRef.current[currentPuzzleId] || 0) +
+							puzzleElapsedTimesRef.current[currentTabPuzzleId] =
+								(puzzleElapsedTimesRef.current[currentTabPuzzleId] || 0) +
 								additionalElapsed;
 						}
 
 						// Check if the puzzle was completed, attempted, or already skipped
 						const wasCompleted =
-							completedPuzzlesRef.current.has(currentPuzzleId);
+							completedPuzzlesRef.current.has(currentTabPuzzleId);
 						const wasAttempted =
-							attemptedPuzzlesRef.current.has(currentPuzzleId);
+							attemptedPuzzlesRef.current.has(currentTabPuzzleId);
 						const wasAlreadySkipped =
-							skippedPuzzlesRef.current.has(currentPuzzleId);
+							skippedPuzzlesRef.current.has(currentTabPuzzleId);
 
 						console.log(
-							`[SKIP CHECK] Puzzle: ${currentPuzzleId}, wasCompleted: ${wasCompleted}, wasAttempted: ${wasAttempted}, wasAlreadySkipped: ${wasAlreadySkipped}`
+							`[SKIP CHECK] Puzzle: ${currentTabPuzzleId}, wasCompleted: ${wasCompleted}, wasAttempted: ${wasAttempted}, wasAlreadySkipped: ${wasAlreadySkipped}`
 						);
 
 						const user = getCurrentUser();
@@ -1202,19 +1605,19 @@ const FeedScreen = () => {
 						if (!wasCompleted && wasAttempted && !wasAlreadySkipped) {
 							// User attempted but didn't complete - mark as attempted
 							console.log(
-								`[ATTEMPTED] User attempted but didn't complete: ${currentPuzzleId}`
+								`[ATTEMPTED] User attempted but didn't complete: ${currentTabPuzzleId}`
 							);
-							skippedPuzzlesRef.current.add(currentPuzzleId); // Still mark as "left" so we don't track again
+							skippedPuzzlesRef.current.add(currentTabPuzzleId); // Still mark as "left" so we don't track again
 
 							// Call addAttemptedGame to update user stats
 							if (user) {
 								console.log(
 									`[ATTEMPTED] Calling addAttemptedGame for user ${user.uid}`
 								);
-								addAttemptedGame(user.uid, currentPuzzleId)
+								addAttemptedGame(user.uid, currentTabPuzzleId)
 									.then(() => {
 										console.log(
-											`[ATTEMPTED] Successfully tracked attempted game: ${currentPuzzleId}`
+											`[ATTEMPTED] Successfully tracked attempted game: ${currentTabPuzzleId}`
 										);
 									})
 									.catch((error) => {
@@ -1228,7 +1631,7 @@ const FeedScreen = () => {
 							}
 
 							// Track attempted at global game level
-							trackGameAttempted(currentPuzzleId).catch((error) => {
+							trackGameAttempted(currentTabPuzzleId).catch((error) => {
 								console.error(
 									"[ATTEMPTED] Error tracking game attempted globally:",
 									error
@@ -1236,17 +1639,17 @@ const FeedScreen = () => {
 							});
 						} else if (!wasCompleted && !wasAttempted && !wasAlreadySkipped) {
 							// User never interacted - mark as skipped
-							skippedPuzzlesRef.current.add(currentPuzzleId);
+							skippedPuzzlesRef.current.add(currentTabPuzzleId);
 
 							// Call addSkippedGame to update user stats
 							if (user) {
-								addSkippedGame(user.uid, currentPuzzleId).catch((error) => {
+								addSkippedGame(user.uid, currentTabPuzzleId).catch((error) => {
 									console.error("Error adding skipped game:", error);
 								});
 							}
 
 							// Track skipped at global game level
-							trackGameSkipped(currentPuzzleId).catch((error) => {
+							trackGameSkipped(currentTabPuzzleId).catch((error) => {
 								console.error(
 									"[SKIPPED] Error tracking game skipped globally:",
 									error
@@ -1255,10 +1658,16 @@ const FeedScreen = () => {
 						}
 					}
 
-					// Update current puzzle
-					setCurrentPuzzleId(newPuzzleId);
-					setCurrentIndex(newIndex);
-					previousActivePuzzleIdRef.current = newPuzzleId;
+					// Update current puzzle for the active tab
+					if (activeTab === "forYou") {
+						setCurrentPuzzleIdForYou(newPuzzleId);
+						setCurrentIndexForYou(newIndex);
+						previousActivePuzzleIdRef.current.forYou = newPuzzleId;
+					} else {
+						setCurrentPuzzleIdFollowing(newPuzzleId);
+						setCurrentIndexFollowing(newIndex);
+						previousActivePuzzleIdRef.current.following = newPuzzleId;
+					}
 
 					// Calculate startTime for new puzzle based on its elapsed time
 					const elapsedTime = puzzleElapsedTimesRef.current[newPuzzleId] || 0;
@@ -1270,7 +1679,7 @@ const FeedScreen = () => {
 				}
 			}
 		},
-		[currentPuzzleId, currentIndex]
+		[activeTab, currentPuzzleIdForYou, currentPuzzleIdFollowing]
 	);
 
 	const viewabilityConfig = useRef({
@@ -1396,13 +1805,19 @@ const FeedScreen = () => {
 		item: Puzzle;
 		index: number;
 	}) => {
-		// Check if this puzzle is currently active/visible
-		const isActive = currentPuzzleId === item.id;
+		// Check if this puzzle is currently active/visible for the current tab
+		const currentTabPuzzleId =
+			activeTab === "forYou" ? currentPuzzleIdForYou : currentPuzzleIdFollowing;
+		const isActive = currentTabPuzzleId === item.id;
 
 		// Calculate startTime based on saved elapsed time
 		// Only recalculate when transitioning from inactive to active
 		let puzzleStartTime = puzzleStartTimesRef.current[item.id];
-		const wasActive = previousActivePuzzleIdRef.current === item.id;
+		const previousActiveId =
+			activeTab === "forYou"
+				? previousActivePuzzleIdRef.current.forYou
+				: previousActivePuzzleIdRef.current.following;
+		const wasActive = previousActiveId === item.id;
 
 		if (isActive && !wasActive) {
 			// Game just became active - recalculate startTime based on saved elapsed time
@@ -1416,9 +1831,13 @@ const FeedScreen = () => {
 			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
 		}
 
-		// Update previous active puzzle ref
+		// Update previous active puzzle ref for the current tab
 		if (isActive) {
-			previousActivePuzzleIdRef.current = item.id;
+			if (activeTab === "forYou") {
+				previousActivePuzzleIdRef.current.forYou = item.id;
+			} else {
+				previousActivePuzzleIdRef.current.following = item.id;
+			}
 		}
 
 		return (
@@ -1438,12 +1857,47 @@ const FeedScreen = () => {
 
 	const renderHeader = () => {
 		return (
-			<View
-				style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}
-				onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
-			>
-				{/* Minimal header for spacing - navigation moved to bottom bar */}
-			</View>
+			<>
+				<View
+					style={[styles.header, { paddingTop: insets.top }]}
+					onLayout={(e) => {
+						const height = e.nativeEvent.layout.height;
+						if (height > 0 && height !== headerHeight) {
+							setHeaderHeight(height);
+						}
+					}}
+				></View>
+
+				{/* Tabs */}
+				<View style={styles.tabContainer}>
+					<TouchableOpacity
+						style={[styles.tab, activeTab === "forYou" && styles.activeTab]}
+						onPress={handleForYouTabPress}
+					>
+						<Text
+							style={[
+								styles.tabText,
+								activeTab === "forYou" && styles.activeTabText,
+							]}
+						>
+							For You
+						</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[styles.tab, activeTab === "following" && styles.activeTab]}
+						onPress={handleFollowingTabPress}
+					>
+						<Text
+							style={[
+								styles.tabText,
+								activeTab === "following" && styles.activeTabText,
+							]}
+						>
+							Following
+						</Text>
+					</TouchableOpacity>
+				</View>
+			</>
 		);
 	};
 
@@ -1461,72 +1915,169 @@ const FeedScreen = () => {
 					<Text style={styles.loadingText}>Loading puzzles...</Text>
 				</View>
 			) : (
-				<>
-					{/* Puzzle Feed */}
-					{displayedPuzzles.length > 0 ? (
-						<>
-							<View
-								style={styles.feed}
-								onLayout={(e) => {
-									const height = e.nativeEvent.layout.height;
-									if (height > 0 && height !== feedHeight) {
-										setFeedHeight(height);
-									}
+				<View style={styles.feedContainer}>
+					{/* For You Feed - always mounted, visibility controlled by zIndex/opacity */}
+					<View
+						style={[
+							styles.feedAbsolute,
+							{
+								zIndex: activeTab === "forYou" ? 1 : 0,
+								opacity: activeTab === "forYou" ? 1 : 0,
+							},
+						]}
+						pointerEvents={activeTab === "forYou" ? "auto" : "none"}
+						onLayout={(e) => {
+							const height = e.nativeEvent.layout.height;
+							if (height > 0 && height !== feedHeight) {
+								setFeedHeight(height);
+							}
+						}}
+					>
+						{displayedPuzzles.length > 0 ? (
+							<FlatList
+								ref={forYouFlatListRef}
+								data={displayedPuzzles}
+								renderItem={renderPuzzleCard}
+								keyExtractor={(item) => item.id}
+								getItemLayout={
+									itemHeight > 0
+										? (data, index) => ({
+												length: itemHeight,
+												offset: itemHeight * index,
+												index,
+										  })
+										: undefined
+								}
+								pagingEnabled
+								windowSize={5}
+								initialNumToRender={3}
+								maxToRenderPerBatch={3}
+								showsVerticalScrollIndicator={false}
+								onViewableItemsChanged={onViewableItemsChanged}
+								viewabilityConfig={viewabilityConfig}
+								scrollEventThrottle={16}
+								style={{ flex: 1 }}
+								keyboardDismissMode="on-drag"
+								keyboardShouldPersistTaps="handled"
+								scrollEnabled={!isKeyboardVisible && activeTab === "forYou"}
+								onEndReached={loadNextBatch}
+								onEndReachedThreshold={0.5}
+								removeClippedSubviews={false}
+								onScrollToIndexFailed={(info) => {
+									const wait = new Promise((resolve) =>
+										setTimeout(resolve, 500)
+									);
+									wait.then(() => {
+										if (
+											forYouFlatListRef.current &&
+											info.index < displayedPuzzles.length
+										) {
+											forYouFlatListRef.current.scrollToIndex({
+												index: info.index,
+												animated: false,
+											});
+										}
+									});
 								}}
-							>
-								<FlatList
-									ref={flatListRef}
-									data={displayedPuzzles}
-									renderItem={renderPuzzleCard}
-									keyExtractor={(item) => item.id}
-									getItemLayout={
-										itemHeight > 0
-											? (data, index) => ({
-													length: itemHeight,
-													offset: itemHeight * index,
-													index,
-											  })
-											: undefined
-									}
-									key={`flatlist-${itemHeight}`}
-									pagingEnabled
-									windowSize={5}
-									initialNumToRender={3}
-									maxToRenderPerBatch={3}
-									showsVerticalScrollIndicator={false}
-									onViewableItemsChanged={onViewableItemsChanged}
-									viewabilityConfig={viewabilityConfig}
-									scrollEventThrottle={16}
-									style={{ flex: 1 }}
-									keyboardDismissMode="on-drag"
-									keyboardShouldPersistTaps="handled"
-									scrollEnabled={!isKeyboardVisible}
-									onEndReached={loadNextBatch}
-									onEndReachedThreshold={0.5}
-									removeClippedSubviews={true}
-									ListFooterComponent={
-										loadingMore ? (
-											<View style={styles.loadingFooter}>
-												<ActivityIndicator size="small" color={Colors.accent} />
-											</View>
-										) : null
-									}
-								/>
-							</View>
-
-							{/* Bottom Gradient Overlay - Light theme with subtle fade */}
-							<LinearGradient
-								colors={["transparent", "rgba(255,255,255,0.8)"]}
-								style={styles.bottomGradient}
-								pointerEvents="none"
+								ListFooterComponent={
+									loadingMore ? (
+										<View style={styles.loadingFooter}>
+											<ActivityIndicator size="small" color={Colors.accent} />
+										</View>
+									) : null
+								}
 							/>
-						</>
-					) : (
-						<View style={styles.loadingContainer}>
-							<Text style={styles.emptyText}>No puzzles available</Text>
-						</View>
-					)}
-				</>
+						) : (
+							<View style={styles.loadingContainer}>
+								<Text style={styles.emptyText}>No puzzles available</Text>
+							</View>
+						)}
+					</View>
+
+					{/* Following Feed - always mounted, visibility controlled by zIndex/opacity */}
+					<View
+						style={[
+							styles.feedAbsolute,
+							{
+								zIndex: activeTab === "following" ? 1 : 0,
+								opacity: activeTab === "following" ? 1 : 0,
+							},
+						]}
+						pointerEvents={activeTab === "following" ? "auto" : "none"}
+					>
+						{followingPuzzles.length > 0 ? (
+							<FlatList
+								ref={followingFlatListRef}
+								data={followingPuzzles}
+								renderItem={renderPuzzleCard}
+								keyExtractor={(item) => item.id}
+								getItemLayout={
+									itemHeight > 0
+										? (data, index) => ({
+												length: itemHeight,
+												offset: itemHeight * index,
+												index,
+										  })
+										: undefined
+								}
+								pagingEnabled
+								windowSize={5}
+								initialNumToRender={3}
+								maxToRenderPerBatch={3}
+								showsVerticalScrollIndicator={false}
+								onViewableItemsChanged={onViewableItemsChanged}
+								viewabilityConfig={viewabilityConfig}
+								scrollEventThrottle={16}
+								style={{ flex: 1 }}
+								keyboardDismissMode="on-drag"
+								keyboardShouldPersistTaps="handled"
+								scrollEnabled={!isKeyboardVisible && activeTab === "following"}
+								removeClippedSubviews={false}
+								onScrollToIndexFailed={(info) => {
+									const wait = new Promise((resolve) =>
+										setTimeout(resolve, 500)
+									);
+									wait.then(() => {
+										if (
+											followingFlatListRef.current &&
+											info.index < followingPuzzles.length
+										) {
+											followingFlatListRef.current.scrollToIndex({
+												index: info.index,
+												animated: false,
+											});
+										}
+									});
+								}}
+								ListFooterComponent={
+									<View style={styles.emptyContainer}>
+										<Text style={styles.emptyText}>
+											Your Followers haven't made anything new
+										</Text>
+									</View>
+								}
+							/>
+						) : loadingFollowing ? (
+							<View style={styles.loadingContainer}>
+								<ActivityIndicator size="large" color={Colors.accent} />
+								<Text style={styles.loadingText}>Loading...</Text>
+							</View>
+						) : (
+							<View style={styles.emptyContainer}>
+								<Text style={styles.emptyText}>
+									Your Followers haven't made anything new
+								</Text>
+							</View>
+						)}
+					</View>
+
+					{/* Bottom Gradient Overlay - Light theme with subtle fade */}
+					<LinearGradient
+						colors={["transparent", "rgba(255,255,255,0.8)"]}
+						style={styles.bottomGradient}
+						pointerEvents="none"
+					/>
+				</View>
 			)}
 		</View>
 	);
@@ -1542,10 +2093,55 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: "#E5E5E5",
 		zIndex: 10,
+		paddingHorizontal: Layout.margin,
+		paddingBottom: Spacing.sm,
 		...Shadows.light,
+	},
+	headerTitle: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		textAlign: "center",
+	},
+	tabContainer: {
+		flexDirection: "row",
+		backgroundColor: Colors.background.primary,
+		borderBottomWidth: 1,
+		borderBottomColor: "#E5E5E5",
+	},
+	tab: {
+		flex: 1,
+		paddingVertical: Spacing.xs,
+		alignItems: "center",
+		borderBottomWidth: 2,
+		borderBottomColor: "transparent",
+	},
+	activeTab: {
+		borderBottomColor: Colors.accent,
+	},
+	tabText: {
+		fontSize: Typography.fontSize.small,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.secondary,
+	},
+	activeTabText: {
+		color: Colors.accent,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	feedContainer: {
+		flex: 1,
+		position: "relative",
 	},
 	feed: {
 		flex: 1,
+		backgroundColor: Colors.background.primary,
+	},
+	feedAbsolute: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 		backgroundColor: Colors.background.primary,
 	},
 	puzzleCard: {
@@ -1571,6 +2167,12 @@ const styles = StyleSheet.create({
 		color: Colors.text.secondary,
 		textAlign: "center",
 		fontWeight: Typography.fontWeight.medium,
+	},
+	emptyContainer: {
+		padding: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		minHeight: 200,
 	},
 	loadingFooter: {
 		padding: Spacing.lg,

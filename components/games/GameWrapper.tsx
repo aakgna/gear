@@ -9,6 +9,7 @@ import {
 	TouchableOpacity,
 	Animated,
 	Dimensions,
+	Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -42,6 +43,13 @@ import {
 } from "../../constants/DesignSystem";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Global tracker for dismissed intro screens (per puzzle ID)
+// This persists across tab switches and component re-renders
+const dismissedIntros = new Set<string>();
+
+// Global storage for completed game results (persists across tab switches)
+const completedGameResults = new Map<string, GameResult>();
 
 // Confetti particle component
 interface ConfettiParticle {
@@ -101,11 +109,20 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
+	
+	// Check if this puzzle was completed before
+	const globalCompletedResult = completedGameResults.get(puzzle.id);
 	const [completedResult, setCompletedResult] = useState<GameResult | null>(
-		null
+		globalCompletedResult || null
 	);
-	const [showIntro, setShowIntro] = useState(true);
-	const [gameStarted, setGameStarted] = useState(false);
+	
+	// Determine initial state based on game progress
+	// If intro was dismissed (game started), start with game shown, not intro
+	// If game was completed, don't show intro
+	const introDismissed = dismissedIntros.has(puzzle.id);
+	const gameWasCompleted = !!globalCompletedResult;
+	const [showIntro, setShowIntro] = useState(!introDismissed && !gameWasCompleted);
+	const [gameStarted, setGameStarted] = useState(introDismissed || gameWasCompleted);
 	const [actualStartTime, setActualStartTime] = useState<number | undefined>(
 		undefined
 	);
@@ -172,15 +189,29 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		]).start();
 	};
 
-	// Reset intro state when puzzle changes
+	// Update intro state when puzzle changes
 	React.useEffect(() => {
 		if (previousPuzzleIdRef.current !== puzzle.id) {
 			previousPuzzleIdRef.current = puzzle.id;
-			setShowIntro(true);
-			setGameStarted(false);
-			setActualStartTime(undefined);
+			
+			// Check if this puzzle has a completed result stored
+			const storedResult = completedGameResults.get(puzzle.id);
+			if (storedResult) {
+				// Game was completed, show the game with stats available
+				setCompletedResult(storedResult);
+				setShowIntro(false);
+				setGameStarted(true);
+			} else {
+				// Check if intro has been dismissed for this puzzle (game in progress)
+				const introDismissed = dismissedIntros.has(puzzle.id);
+				setShowIntro(!introDismissed);
+				setGameStarted(introDismissed);
+				if (!introDismissed) {
+					setActualStartTime(undefined);
+					elapsedTimeRef.current = 0;
+				}
+			}
 			previousIsActiveRef.current = isActive;
-			elapsedTimeRef.current = 0;
 		}
 	}, [puzzle.id, isActive]);
 
@@ -206,6 +237,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	// Handle play button click
 	const handlePlay = () => {
 		const now = Date.now();
+		// Mark intro as dismissed for this puzzle globally
+		dismissedIntros.add(puzzle.id);
 		setActualStartTime(now);
 		setShowIntro(false);
 		setGameStarted(true);
@@ -273,6 +306,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			// Store result for stats display (but don't show yet)
 			setCompletedResult(updatedResult);
+			
+			// Store globally so it persists across tab switches
+			completedGameResults.set(puzzle.id, updatedResult);
+			
+			// Remove from dismissed intros since it's now completed
+			dismissedIntros.delete(puzzle.id);
 		}
 
 		// Still call the original onComplete callback
@@ -288,6 +327,56 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		const stats = await fetchPuzzleStats(puzzle.id);
 		setPuzzleStats(stats);
 		setLoadingStats(false);
+	};
+
+	// Format time helper
+	const formatTime = (seconds: number): string => {
+		if (seconds < 60) {
+			return `${seconds}s`;
+		}
+		const minutes = Math.floor(seconds / 60);
+		const remainingSeconds = seconds % 60;
+		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+	};
+
+	// Format game type helper
+	const formatGameType = (type: string): string => {
+		const formatted = type
+			.replace(/([A-Z])/g, " $1")
+			.replace(/^./, (str) => str.toUpperCase())
+			.trim();
+
+		const specialCases: Record<string, string> = {
+			quickMath: "Quick Math",
+			wordChain: "Word Chain",
+			magicSquare: "Magic Square",
+		};
+
+		return specialCases[type] || formatted;
+	};
+
+	// Handle share
+	const handleShare = async () => {
+		if (!completedResult) return;
+
+		try {
+			const gameUrl = `thinktok://game/${puzzle.id}`;
+			let message = `I just completed ${formatGameType(puzzle.type)} on ThinkTok!\n\n`;
+			message += `Time: ${formatTime(completedResult.timeTaken)}\n`;
+			
+			if (completedResult.attempts !== undefined) {
+				message += `Tries: ${completedResult.attempts}\n`;
+			}
+			
+			message += `\nCan you beat my score?\n\n${gameUrl}`;
+
+			await Share.share({
+				message,
+				url: gameUrl,
+			});
+		} catch (error: any) {
+			console.error("Error sharing:", error);
+		}
 	};
 	const renderGame = () => {
 		// Use actualStartTime if game has started, otherwise don't pass startTime
@@ -557,12 +646,20 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 					<View style={styles.statsContainer}>
 						<View style={styles.statsHeader}>
 							<Text style={styles.statsHeaderText}>Comparison Stats</Text>
-							<TouchableOpacity
-								onPress={() => setShowStats(false)}
-								style={styles.closeButton}
-							>
-								<Ionicons name="close" size={24} color={Colors.text.primary} />
-							</TouchableOpacity>
+							<View style={styles.statsHeaderActions}>
+								<TouchableOpacity
+									onPress={handleShare}
+									style={styles.shareButton}
+								>
+									<Ionicons name="share-outline" size={24} color={Colors.accent} />
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={() => setShowStats(false)}
+									style={styles.closeButton}
+								>
+									<Ionicons name="close" size={24} color={Colors.text.primary} />
+								</TouchableOpacity>
+							</View>
 						</View>
 						<ScrollView
 							style={styles.statsScrollView}
@@ -618,6 +715,14 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
+	},
+	statsHeaderActions: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.sm,
+	},
+	shareButton: {
+		padding: Spacing.xs,
 	},
 	closeButton: {
 		padding: Spacing.xs,

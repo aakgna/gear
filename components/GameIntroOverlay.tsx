@@ -8,6 +8,7 @@ import {
 	Animated,
 	Dimensions,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PuzzleType } from "../config/types";
 import {
@@ -993,6 +994,7 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 	username,
 	onPlay,
 }) => {
+	const router = useRouter();
 	const [showInstructions, setShowInstructions] = useState(false);
 
 	const instructions = gameInstructions[gameType];
@@ -1043,7 +1045,12 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 					</View>
 					<Text style={styles.gameTitle}>{formatGameType(gameType)}</Text>
 					{username && (
-						<Text style={styles.createdByText}>created by {username}</Text>
+						<TouchableOpacity
+							onPress={() => router.push(`/user/${username}`)}
+							activeOpacity={0.7}
+						>
+							<Text style={styles.createdByText}>created by @{username}</Text>
+						</TouchableOpacity>
 					)}
 				</View>
 

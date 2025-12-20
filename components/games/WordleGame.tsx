@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
 		width: "100%",
 		alignItems: "center",
 		marginBottom: 0,
-		marginTop: "10%",
+		marginTop: "2%",
 		paddingVertical: 0, // Remove all padding
 	},
 	board: {

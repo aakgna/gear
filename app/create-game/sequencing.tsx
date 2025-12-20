@@ -315,7 +315,7 @@ const CreateSequencingPage = () => {
 											]}
 										>
 											{entity}
-										</Text>
+						</Text>
 									</TouchableOpacity>
 								);
 							})}

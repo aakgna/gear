@@ -10,7 +10,7 @@ const MainAppContainer = () => {
 
 	return (
 		<View style={styles.container}>
-			{/* Feed Screen - always mounted */}
+			{/* Feed Screen - always mounted, visible only on feed route */}
 			<View
 				style={[
 					styles.screen,
@@ -20,7 +20,7 @@ const MainAppContainer = () => {
 				<FeedScreen />
 			</View>
 
-			{/* Profile Screen - always mounted */}
+			{/* Profile Screen - always mounted, visible only on profile route */}
 			<View
 				style={[
 					styles.screen,
@@ -30,7 +30,7 @@ const MainAppContainer = () => {
 				<ProfileScreen />
 			</View>
 
-			{/* Create Game Screen - always mounted */}
+			{/* Create Game Screen - always mounted, visible only on create-game route */}
 			<View
 				style={[
 					styles.screen,

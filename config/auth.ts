@@ -40,6 +40,13 @@ export interface UserData {
 		medium?: DifficultyStats;
 		hard?: DifficultyStats;
 	};
+	// Social fields
+	followerCount?: number;
+	followingCount?: number;
+	createdGamesCount?: number;
+	bio?: string;
+	profilePicture?: string;
+	unreadNotificationCount?: number;
 }
 
 // Configure Google Sign-In (call this once at app startup)
@@ -130,15 +137,36 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 				streakCount: 0,
 				statsByCategory: {},
 				statsByDifficulty: {},
+				followerCount: 0,
+				followingCount: 0,
+				createdGamesCount: 0,
+				unreadNotificationCount: 0,
 				createdAt: firestore.FieldValue.serverTimestamp(),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
 		} else {
-			// Existing user - update email if changed
-			await userRef.update({
+			// Existing user - update email if changed and ensure counts are initialized
+			const updateData: any = {
 				email: firebaseUser.email || "",
 				updatedAt: firestore.FieldValue.serverTimestamp(),
-			});
+			};
+			
+			const existingData = userDoc.data();
+			// Initialize counts if they don't exist
+			if (existingData?.followerCount === undefined) {
+				updateData.followerCount = 0;
+			}
+			if (existingData?.followingCount === undefined) {
+				updateData.followingCount = 0;
+			}
+			if (existingData?.createdGamesCount === undefined) {
+				updateData.createdGamesCount = 0;
+			}
+			if (existingData?.unreadNotificationCount === undefined) {
+				updateData.unreadNotificationCount = 0;
+			}
+			
+			await userRef.update(updateData);
 		}
 	} catch (error: any) {
 		console.error("Error creating/updating user document:", error);

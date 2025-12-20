@@ -3,27 +3,18 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	TouchableOpacity,
 	ScrollView,
-	Alert,
+	TouchableOpacity,
 	ActivityIndicator,
+	FlatList,
 	Dimensions,
 	Image,
-	TouchableWithoutFeedback,
 	RefreshControl,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useGameStore } from "../stores/gameStore";
-import {
-	getCurrentUser,
-	getUserData,
-	signOut,
-	deleteAccount,
-	UserData,
-} from "../config/auth";
 import {
 	Colors,
 	Typography,
@@ -32,14 +23,22 @@ import {
 	Shadows,
 	Layout,
 	getGameColor,
-} from "../constants/DesignSystem";
-import { fetchGameHistory, GameHistoryEntry } from "../config/firebase";
+} from "../../constants/DesignSystem";
 import {
+	getUserByUsername,
+	fetchUserProfile,
 	fetchCreatedGames,
+	fetchFollowers,
+	fetchFollowing,
+	followUser,
+	unfollowUser,
+	isFollowing,
+	UserPublicProfile,
 	GameSummary,
-	getUnreadNotificationCount,
-} from "../config/social";
-import { PuzzleType } from "../config/types";
+} from "../../config/social";
+import { getCurrentUser } from "../../config/auth";
+import { fetchGameHistory, GameHistoryEntry } from "../../config/firebase";
+import { PuzzleType } from "../../config/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BOTTOM_NAV_HEIGHT = 70;
@@ -80,48 +79,79 @@ const getGameIcon = (gameType: string): keyof typeof Ionicons.glyphMap => {
 	return iconMap[gameType] || "game-controller-outline";
 };
 
-const ProfileScreen = () => {
+const formatTime = (seconds: number): string => {
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainingSeconds = seconds % 60;
+	return `${minutes}m ${remainingSeconds}s`;
+};
+
+const CreatorProfileScreen = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { userProfile, isAuthenticated, resetProgress } = useGameStore();
-	const [userData, setUserData] = useState<UserData | null>(null);
+	const { username } = useLocalSearchParams<{ username: string }>();
+	const [profile, setProfile] = useState<UserPublicProfile | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState<TabType>("created");
 	const [createdGames, setCreatedGames] = useState<GameSummary[]>([]);
 	const [completedGames, setCompletedGames] = useState<GameHistoryEntry[]>([]);
 	const [attemptedGames, setAttemptedGames] = useState<GameHistoryEntry[]>([]);
+	const [isFollowingUser, setIsFollowingUser] = useState(false);
+	const [isOwnProfile, setIsOwnProfile] = useState(false);
+	const [loadingFollow, setLoadingFollow] = useState(false);
 	const [loadingGames, setLoadingGames] = useState(false);
-	const [deletingAccount, setDeletingAccount] = useState(false);
-	const [showMenu, setShowMenu] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
-	const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
 
 	useEffect(() => {
-		loadUserData();
-	}, []);
+		loadProfile();
+		// Reset loaded tabs when username changes
+		setLoadedTabs(new Set());
+	}, [username]);
 
-	const loadUserData = async () => {
-		const user = getCurrentUser();
-		if (user) {
-			const data = await getUserData(user.uid);
-			setUserData(data);
-			// Load notification count
-			const count = await getUnreadNotificationCount(user.uid);
-			setUnreadNotificationCount(count);
+	const loadProfile = async () => {
+		if (!username) return;
+
+		setLoading(true);
+		try {
+			// Try to get user by username
+			let userProfile = await getUserByUsername(username);
+
+			if (!userProfile) {
+				// If not found, show error
+				console.error("User not found");
+				setLoading(false);
+				return;
+			}
+
+			setProfile(userProfile);
+			setIsOwnProfile(currentUser?.uid === userProfile.uid);
+
+			// Check if current user follows this profile
+			if (currentUser && !isOwnProfile) {
+				const following = await isFollowing(currentUser.uid, userProfile.uid);
+				console.log(`[loadProfile] isFollowing check for ${currentUser.uid} -> ${userProfile.uid}: ${following}`);
+				setIsFollowingUser(following);
+			} else if (isOwnProfile) {
+				// Reset following state for own profile
+				setIsFollowingUser(false);
+			}
+
 			// Load initial tab (created) on first load
 			if (activeTab === "created" && !loadedTabs.has("created")) {
 				await loadTabData("created", false);
 			}
+		} catch (error) {
+			console.error("Error loading profile:", error);
+		} finally {
+			setLoading(false);
 		}
-		setLoading(false);
 	};
 
 	const loadTabData = async (tab: TabType, forceReload = false) => {
-		const user = getCurrentUser();
-		if (!user || !userData) return;
+		if (!profile) return;
 
 		// If tab is already loaded and not forcing reload, skip
 		if (!forceReload && loadedTabs.has(tab)) {
@@ -131,23 +161,25 @@ const ProfileScreen = () => {
 		setLoadingGames(true);
 		try {
 			if (tab === "created") {
-				const games = await fetchCreatedGames(user.uid, 50);
+				const games = await fetchCreatedGames(profile.uid, 50);
 				setCreatedGames(games);
 			} else if (tab === "completed") {
-				const history = await fetchGameHistory(user.uid, {
+				const history = await fetchGameHistory(profile.uid, {
 					action: "completed",
 					limit: 50,
 				});
 				setCompletedGames(history);
 			} else if (tab === "attempted") {
-				const attempted = await fetchGameHistory(user.uid, {
+				// Fetch both attempted and skipped
+				const attempted = await fetchGameHistory(profile.uid, {
 					action: "attempted",
 					limit: 50,
 				});
-				const skipped = await fetchGameHistory(user.uid, {
+				const skipped = await fetchGameHistory(profile.uid, {
 					action: "skipped",
 					limit: 50,
 				});
+				// Combine and sort by timestamp
 				const combined = [...attempted, ...skipped].sort(
 					(a, b) => b.timestamp.getTime() - a.timestamp.getTime()
 				);
@@ -164,61 +196,94 @@ const ProfileScreen = () => {
 
 	// Load tab data when tab changes (only if not already loaded)
 	useEffect(() => {
-		if (userData && !loadedTabs.has(activeTab)) {
+		if (profile && !loadedTabs.has(activeTab)) {
 			loadTabData(activeTab, false);
 		}
-	}, [activeTab, userData]);
+	}, [activeTab, profile]);
 
 	const handleRefresh = async () => {
 		setRefreshing(true);
-		// Reload user data
-		const user = getCurrentUser();
-		if (user) {
-			const data = await getUserData(user.uid);
-			setUserData(data);
-			// Reload notification count
-			const count = await getUnreadNotificationCount(user.uid);
-			setUnreadNotificationCount(count);
-		}
+		// Reload profile
+		await loadProfile();
 		// Force reload current tab
 		await loadTabData(activeTab, true);
 		setRefreshing(false);
 	};
 
-	// Function to update local state after follow/unfollow (called from other screens)
-	const updateFollowingCount = (increment: number) => {
-		if (userData) {
-			setUserData({
-				...userData,
-				followingCount: Math.max(0, (userData.followingCount || 0) + increment),
-			});
+	const handleFollow = async () => {
+		if (!currentUser || !profile || isOwnProfile) return;
+
+		setLoadingFollow(true);
+		try {
+			if (isFollowingUser) {
+				await unfollowUser(currentUser.uid, profile.uid);
+				setIsFollowingUser(false);
+				// Update follower count immediately
+				setProfile({
+					...profile,
+					followerCount: Math.max(0, (profile.followerCount || 0) - 1),
+				});
+				// Refresh profile data to get accurate counts
+				await loadProfile();
+			} else {
+				// Check if already following before attempting
+				const alreadyFollowing = await isFollowing(currentUser.uid, profile.uid);
+				if (alreadyFollowing) {
+					setIsFollowingUser(true);
+					return;
+				}
+				console.log(`[handleFollow] Calling followUser(${currentUser.uid}, ${profile.uid})`);
+				await followUser(currentUser.uid, profile.uid);
+				console.log(`[handleFollow] followUser completed`);
+				
+				// Small delay to ensure Firestore has propagated the change
+				await new Promise(resolve => setTimeout(resolve, 500));
+				
+				// Verify the follow was successful
+				console.log(`[handleFollow] Verifying follow relationship...`);
+				const verifyFollowing = await isFollowing(currentUser.uid, profile.uid);
+				console.log(`[handleFollow] Verification result: ${verifyFollowing}`);
+				if (!verifyFollowing) {
+					console.error("[handleFollow] Follow action completed but relationship not found - retrying check");
+					// Retry once more after a longer delay
+					await new Promise(resolve => setTimeout(resolve, 1000));
+					const retryFollowing = await isFollowing(currentUser.uid, profile.uid);
+					console.log(`[handleFollow] Retry verification result: ${retryFollowing}`);
+					if (!retryFollowing) {
+						console.error("[handleFollow] Follow relationship still not found after retry");
+						console.error(`[handleFollow] Checking Firestore path: users/${currentUser.uid}/following/${profile.uid}`);
+					}
+					setIsFollowingUser(retryFollowing);
+				} else {
+					setIsFollowingUser(true);
+				}
+				
+				// Update follower count immediately
+				setProfile({
+					...profile,
+					followerCount: (profile.followerCount || 0) + 1,
+				});
+				// Refresh profile data to get accurate counts
+				await loadProfile();
+			}
+		} catch (error: any) {
+			console.error("Error following/unfollowing:", error);
+			// Don't show error to user for "already following" - it's handled gracefully
+			if (error.message && error.message.includes("Already following")) {
+				setIsFollowingUser(true);
+			}
+		} finally {
+			setLoadingFollow(false);
 		}
 	};
 
-	const handleLogout = async () => {
-		Alert.alert("Logout", "Are you sure you want to logout?", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Logout",
-				style: "destructive",
-				onPress: async () => {
-					try {
-						await signOut();
-						resetProgress();
-						router.replace("/signin");
-					} catch (error) {
-						Alert.alert("Error", "Failed to sign out. Please try again.");
-					}
-				},
-			},
-		]);
-	};
-
 	const handleGamePress = (game: GameSummary | GameHistoryEntry) => {
+		// Navigate to game - construct puzzle ID
 		const gameId = "gameId" in game ? game.gameId : game.gameId;
 		const gameType = "gameType" in game ? game.gameType : game.category || "";
-		const difficulty =
-			"difficulty" in game ? game.difficulty : game.difficulty || "";
+		const difficulty = "difficulty" in game ? game.difficulty : game.difficulty || "";
+
+		// Construct puzzle ID: {gameType}_{difficulty}_{gameId}
 		const puzzleId = `${gameType}_${difficulty}_${gameId}`;
 		router.push(`/feed?gameId=${puzzleId}`);
 	};
@@ -239,13 +304,12 @@ const ProfileScreen = () => {
 				onPress={() => handleGamePress(item)}
 				activeOpacity={0.7}
 			>
-				<View
-					style={[
-						styles.gameIconContainer,
-						{ backgroundColor: gameColor + "20" },
-					]}
-				>
-					<Ionicons name={getGameIcon(gameType)} size={32} color={gameColor} />
+				<View style={[styles.gameIconContainer, { backgroundColor: gameColor + "20" }]}>
+					<Ionicons
+						name={getGameIcon(gameType)}
+						size={32}
+						color={gameColor}
+					/>
 				</View>
 				<Text style={styles.gameTypeText} numberOfLines={1}>
 					{formatGameType(gameType)}
@@ -257,87 +321,43 @@ const ProfileScreen = () => {
 		);
 	};
 
-	const handleDeleteAccount = () => {
-		Alert.alert(
-			"Delete Account",
-			"Are you sure you want to delete your account? This action cannot be undone. All your data, including game history and statistics, will be permanently deleted.",
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Delete",
-					style: "destructive",
-					onPress: async () => {
-						// Double confirmation
-						Alert.alert(
-							"Final Confirmation",
-							"This will permanently delete your account and all data. Are you absolutely sure?",
-							[
-								{ text: "Cancel", style: "cancel" },
-								{
-									text: "Yes, Delete",
-									style: "destructive",
-									onPress: async () => {
-										setDeletingAccount(true);
-										try {
-											const user = getCurrentUser();
-											if (!user) {
-												Alert.alert(
-													"Error",
-													"No user found. Please sign in again."
-												);
-												return;
-											}
-
-											await deleteAccount(user.uid, userData?.username);
-											resetProgress();
-											Alert.alert(
-												"Account Deleted",
-												"Your account has been successfully deleted.",
-												[
-													{
-														text: "OK",
-														onPress: () => router.replace("/signin"),
-													},
-												]
-											);
-										} catch (error: any) {
-											console.error("Error deleting account:", error);
-											Alert.alert(
-												"Error",
-												error.message ||
-													"Failed to delete account. Please try again."
-											);
-										} finally {
-											setDeletingAccount(false);
-										}
-									},
-								},
-							]
-						);
-					},
-				},
-			]
-		);
-	};
-
-	const formatTime = (seconds: number) => {
-		if (seconds < 60) return `${seconds}s`;
-		const minutes = Math.floor(seconds / 60);
-		const remainingSeconds = seconds % 60;
-		return `${minutes}m ${remainingSeconds}s`;
-	};
-
 	if (loading) {
 		return (
 			<View style={styles.container}>
 				<StatusBar style="dark" />
 				<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-					<View style={styles.headerSpacer} />
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={() => router.back()}
+					>
+						<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+					</TouchableOpacity>
 					<Text style={styles.headerTitle}>Profile</Text>
 					<View style={styles.headerSpacer} />
 				</View>
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color={Colors.accent} />
+				</View>
+			</View>
+		);
+	}
+
+	if (!profile) {
+		return (
+			<View style={styles.container}>
+				<StatusBar style="dark" />
+				<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={() => router.back()}
+					>
+						<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>Profile</Text>
+					<View style={styles.headerSpacer} />
+				</View>
+				<View style={styles.loadingContainer}>
+					<Text style={styles.errorText}>User not found</Text>
 				</View>
 			</View>
 		);
@@ -349,92 +369,17 @@ const ProfileScreen = () => {
 
 			{/* Header */}
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<View style={styles.headerSpacer} />
-				<Text style={styles.headerTitle}>
-					@{userData?.username || "username"}
-				</Text>
-				<View style={styles.headerActions}>
-					<TouchableOpacity
-						style={styles.headerButton}
-						onPress={() => router.push("/search-friends")}
-					>
-						<Ionicons
-							name="search-outline"
-							size={24}
-							color={Colors.text.primary}
-						/>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={styles.headerButton}
-						onPress={() => router.push("/notifications")}
-					>
-						<Ionicons
-							name="notifications-outline"
-							size={24}
-							color={Colors.text.primary}
-						/>
-						{unreadNotificationCount > 0 && (
-							<View style={styles.badge}>
-								<Text style={styles.badgeText}>
-									{unreadNotificationCount > 99
-										? "99+"
-										: unreadNotificationCount}
-								</Text>
-							</View>
-						)}
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={styles.menuButton}
-						onPress={() => setShowMenu(!showMenu)}
-					>
-						<Ionicons
-							name="ellipsis-horizontal"
-							size={24}
-							color={Colors.text.primary}
-						/>
-					</TouchableOpacity>
-				</View>
+				<TouchableOpacity
+					style={styles.backButton}
+					onPress={() => router.back()}
+				>
+					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>@{profile.username}</Text>
+				<TouchableOpacity style={styles.menuButton}>
+					<Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
+				</TouchableOpacity>
 			</View>
-
-			{/* Menu Dropdown */}
-			{showMenu && (
-				<>
-					<TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
-						<View style={styles.menuOverlay} />
-					</TouchableWithoutFeedback>
-					<View style={styles.menuDropdown}>
-						<TouchableOpacity
-							style={styles.menuItem}
-							onPress={() => {
-								setShowMenu(false);
-								handleLogout();
-							}}
-						>
-							<Ionicons name="log-out-outline" size={20} color={Colors.error} />
-							<Text style={[styles.menuItemText, { color: Colors.error }]}>
-								Logout
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.menuItem}
-							onPress={() => {
-								setShowMenu(false);
-								handleDeleteAccount();
-							}}
-							disabled={deletingAccount}
-						>
-							{deletingAccount ? (
-								<ActivityIndicator size="small" color={Colors.error} />
-							) : (
-								<Ionicons name="trash-outline" size={20} color={Colors.error} />
-							)}
-							<Text style={[styles.menuItemText, { color: Colors.error }]}>
-								{deletingAccount ? "Deleting..." : "Delete Account"}
-							</Text>
-						</TouchableOpacity>
-					</View>
-				</>
-			)}
 
 			<ScrollView
 				style={styles.content}
@@ -454,9 +399,9 @@ const ProfileScreen = () => {
 				{/* Profile Header */}
 				<View style={styles.profileHeader}>
 					<View style={styles.avatarContainer}>
-						{userData?.profilePicture ? (
+						{profile.profilePicture ? (
 							<Image
-								source={{ uri: userData.profilePicture }}
+								source={{ uri: profile.profilePicture }}
 								style={styles.avatar}
 							/>
 						) : (
@@ -464,27 +409,25 @@ const ProfileScreen = () => {
 						)}
 					</View>
 
-					<Text style={styles.usernameText}>
-						@{userData?.username || userProfile?.username || "username"}
-					</Text>
+					<Text style={styles.usernameText}>@{profile.username}</Text>
 
-					{/* Stats Row - Following, Followers, Games Created */}
+					{/* Stats Row 1 - Following, Followers, Games Created */}
 					<View style={styles.statsRow}>
 						<TouchableOpacity style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{userData?.followingCount || 0}
+								{profile.followingCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Following</Text>
 						</TouchableOpacity>
 						<TouchableOpacity style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{userData?.followerCount || 0}
+								{profile.followerCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Followers</Text>
 						</TouchableOpacity>
 						<View style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{userData?.createdGamesCount || 0}
+								{profile.createdGamesCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Games</Text>
 						</View>
@@ -494,38 +437,63 @@ const ProfileScreen = () => {
 					<View style={styles.statsRow}>
 						<View style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{userData?.totalGamesPlayed || 0}
+								{profile.totalGamesPlayed || 0}
 							</Text>
 							<Text style={styles.statLabel}>Completed</Text>
 						</View>
 						<View style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{userData?.streakCount || 0}
+								{profile.streakCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Streak</Text>
 						</View>
 						<View style={styles.statItem}>
 							<Text style={styles.statNumber}>
-								{formatTime(userData?.averageTimePerGame || 0)}
+								{formatTime(profile.averageTimePerGame || 0)}
 							</Text>
 							<Text style={styles.statLabel}>Avg Time</Text>
 						</View>
 					</View>
 
-					{/* Edit Profile Button */}
-					<TouchableOpacity
-						style={styles.editButton}
-						onPress={() => {
-							// Could navigate to edit profile screen in future
-							// For now, just close menu if open
-							setShowMenu(false);
-						}}
-					>
-						<Text style={styles.editButtonText}>Edit Profile</Text>
-					</TouchableOpacity>
+					{/* Follow/Edit Button */}
+					{isOwnProfile ? (
+						<TouchableOpacity
+							style={styles.editButton}
+							onPress={() => router.push("/profile")}
+						>
+							<Text style={styles.editButtonText}>Edit Profile</Text>
+						</TouchableOpacity>
+					) : (
+						<TouchableOpacity
+							style={[
+								styles.followButton,
+								isFollowingUser && styles.followingButton,
+							]}
+							onPress={handleFollow}
+							disabled={loadingFollow}
+						>
+							{loadingFollow ? (
+								<ActivityIndicator
+									size="small"
+									color={isFollowingUser ? Colors.text.primary : Colors.text.white}
+								/>
+							) : (
+								<Text
+									style={[
+										styles.followButtonText,
+										isFollowingUser && styles.followingButtonText,
+									]}
+								>
+									{isFollowingUser ? "Following" : "Follow"}
+								</Text>
+							)}
+						</TouchableOpacity>
+					)}
 
 					{/* Bio */}
-					{userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
+					{profile.bio && (
+						<Text style={styles.bioText}>{profile.bio}</Text>
+					)}
 				</View>
 
 				{/* Tabs */}
@@ -622,11 +590,10 @@ const styles = StyleSheet.create({
 		paddingBottom: Spacing.sm,
 		borderBottomWidth: 1,
 		borderBottomColor: "#E5E5E5",
-		zIndex: 10,
 		...Shadows.light,
 	},
-	headerSpacer: {
-		width: 40,
+	backButton: {
+		padding: Spacing.xs,
 	},
 	headerTitle: {
 		fontSize: Typography.fontSize.h3,
@@ -635,65 +602,11 @@ const styles = StyleSheet.create({
 		flex: 1,
 		textAlign: "center",
 	},
-	headerActions: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.xs,
-	},
-	headerButton: {
-		padding: Spacing.xs,
-		position: "relative",
+	headerSpacer: {
+		width: 40,
 	},
 	menuButton: {
 		padding: Spacing.xs,
-	},
-	badge: {
-		position: "absolute",
-		top: 4,
-		right: 4,
-		backgroundColor: Colors.error,
-		borderRadius: 10,
-		minWidth: 20,
-		height: 20,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 4,
-		borderWidth: 2,
-		borderColor: Colors.background.primary,
-	},
-	badgeText: {
-		color: Colors.text.white,
-		fontSize: 10,
-		fontWeight: Typography.fontWeight.bold,
-	},
-	menuOverlay: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		zIndex: 99,
-	},
-	menuDropdown: {
-		position: "absolute",
-		top: 60,
-		right: Layout.margin,
-		backgroundColor: Colors.background.primary,
-		borderRadius: BorderRadius.md,
-		padding: Spacing.xs,
-		zIndex: 100,
-		...Shadows.medium,
-		minWidth: 150,
-	},
-	menuItem: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: Spacing.md,
-		gap: Spacing.sm,
-	},
-	menuItemText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.medium,
 	},
 	content: {
 		flex: 1,
@@ -702,6 +615,10 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
+	},
+	errorText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 	},
 	profileHeader: {
 		alignItems: "center",
@@ -742,6 +659,28 @@ const styles = StyleSheet.create({
 	statLabel: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
+	},
+	followButton: {
+		backgroundColor: Colors.accent,
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.xl,
+		borderRadius: BorderRadius.md,
+		minWidth: 120,
+		alignItems: "center",
+		marginBottom: Spacing.md,
+	},
+	followingButton: {
+		backgroundColor: Colors.background.secondary,
+		borderWidth: 1,
+		borderColor: Colors.text.secondary,
+	},
+	followButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.white,
+	},
+	followingButtonText: {
+		color: Colors.text.primary,
 	},
 	editButton: {
 		backgroundColor: Colors.background.secondary,
@@ -840,9 +779,5 @@ const styles = StyleSheet.create({
 	},
 });
 
-// Export the component for use in MainAppContainer
-export { ProfileScreen };
-// Default export returns null - MainAppContainer handles rendering
-export default function ProfileRoute() {
-	return null;
-}
+export default CreatorProfileScreen;
+

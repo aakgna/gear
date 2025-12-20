@@ -114,14 +114,14 @@ const CreateFutoshikiPage = () => {
 	const handleCellPress = (row: number, col: number) => {
 		if (step === 1) {
 			// Step 1: Fill grid
-			setSelectedCell({ row, col });
+				setSelectedCell({ row, col });
 		} else if (step === 3) {
 			// Step 3: Toggle givens
 			const key = `${row},${col}`;
 			const newGivens = new Set(givens);
 			if (newGivens.has(key)) {
 				newGivens.delete(key);
-			} else {
+		} else {
 				newGivens.add(key);
 			}
 			setGivens(newGivens);
@@ -449,10 +449,10 @@ const CreateFutoshikiPage = () => {
 				"Success",
 				"Your Futoshiki game has been created successfully!",
 				[
-					{
-						text: "OK",
-						onPress: () => router.back(),
-					},
+				{
+					text: "OK",
+					onPress: () => router.back(),
+				},
 				]
 			);
 		} catch (error: any) {
@@ -514,33 +514,33 @@ const CreateFutoshikiPage = () => {
 
 				{/* Difficulty Selector */}
 				{step === 1 && (
-					<View style={styles.selectorContainer}>
-						<Text style={styles.label}>Difficulty</Text>
-						<View style={styles.selectorRow}>
-							{(["easy", "medium", "hard"] as Difficulty[]).map((diff) => (
-								<TouchableOpacity
-									key={diff}
+				<View style={styles.selectorContainer}>
+					<Text style={styles.label}>Difficulty</Text>
+					<View style={styles.selectorRow}>
+						{(["easy", "medium", "hard"] as Difficulty[]).map((diff) => (
+							<TouchableOpacity
+								key={diff}
+								style={[
+									styles.selectorButton,
+									difficulty === diff && styles.selectorButtonActive,
+								]}
+								onPress={() => setDifficulty(diff)}
+							>
+								<Text
 									style={[
-										styles.selectorButton,
-										difficulty === diff && styles.selectorButtonActive,
-									]}
-									onPress={() => setDifficulty(diff)}
-								>
-									<Text
-										style={[
-											styles.selectorButtonText,
+										styles.selectorButtonText,
 											difficulty === diff && styles.selectorButtonTextActive,
-										]}
-									>
-										{diff.charAt(0).toUpperCase() + diff.slice(1)}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-						<Text style={styles.helperText}>
-							Grid size: {size}x{size}
-						</Text>
+									]}
+								>
+									{diff.charAt(0).toUpperCase() + diff.slice(1)}
+								</Text>
+							</TouchableOpacity>
+						))}
 					</View>
+					<Text style={styles.helperText}>
+							Grid size: {size}x{size}
+					</Text>
+				</View>
 				)}
 
 				{/* Grid */}
@@ -554,10 +554,10 @@ const CreateFutoshikiPage = () => {
 						{grid.map((row, rowIndex) => (
 							<React.Fragment key={rowIndex}>
 								<View style={styles.gridRow}>
-									{row.map((cell, colIndex) => {
-										const isSelected =
-											selectedCell?.row === rowIndex &&
-											selectedCell?.col === colIndex;
+								{row.map((cell, colIndex) => {
+									const isSelected =
+										selectedCell?.row === rowIndex &&
+										selectedCell?.col === colIndex;
 										const isGiven = givens.has(`${rowIndex},${colIndex}`);
 										const rightIneq =
 											colIndex < size - 1
@@ -567,61 +567,61 @@ const CreateFutoshikiPage = () => {
 														rowIndex,
 														colIndex + 1
 												  )
-												: null;
-										return (
-											<React.Fragment key={colIndex}>
-												<TouchableOpacity
-													style={[
-														styles.cell,
-														{
+										: null;
+									return (
+										<React.Fragment key={colIndex}>
+											<TouchableOpacity
+												style={[
+													styles.cell,
+													{
 															width: cellSizeClamped,
 															height: cellSizeClamped,
 															backgroundColor: isGiven
 																? "#4CAF5020"
 																: isSelected
-																? Colors.accent + "20"
-																: Colors.background.secondary,
+															? Colors.accent + "20"
+															: Colors.background.secondary,
 															borderColor: isGiven
 																? "#4CAF50"
 																: isSelected
-																? Colors.accent
-																: "#E5E5E5",
-														},
-													]}
-													onPress={() => handleCellPress(rowIndex, colIndex)}
-													activeOpacity={0.7}
+															? Colors.accent
+															: "#E5E5E5",
+													},
+												]}
+												onPress={() => handleCellPress(rowIndex, colIndex)}
+												activeOpacity={0.7}
 													disabled={step === 2}
-												>
-													<Text
-														style={[
-															styles.cellText,
+											>
+												<Text
+													style={[
+														styles.cellText,
 															(isSelected || isGiven) &&
 																styles.cellTextSelected,
-														]}
-													>
-														{cell !== null ? cell.toString() : ""}
-													</Text>
-												</TouchableOpacity>
-												{colIndex < size - 1 && (
-													<TouchableOpacity
-														style={[
-															styles.inequalitySpace,
+													]}
+												>
+													{cell !== null ? cell.toString() : ""}
+												</Text>
+											</TouchableOpacity>
+											{colIndex < size - 1 && (
+												<TouchableOpacity
+													style={[
+														styles.inequalitySpace,
 															step === 2 && styles.inequalitySpaceActive,
-															{
+														{
 																width: cellSizeClamped * gapRatio,
 																height: cellSizeClamped,
-															},
-														]}
-														onPress={() =>
+														},
+													]}
+													onPress={() =>
 															handleInequalitySpacePress(
 																rowIndex,
 																colIndex,
 																"right"
 															)
-														}
-														activeOpacity={0.7}
+													}
+													activeOpacity={0.7}
 														disabled={step !== 2}
-													>
+												>
 														<Text
 															style={[
 																styles.inequalityText,
@@ -629,47 +629,47 @@ const CreateFutoshikiPage = () => {
 															]}
 														>
 															{rightIneq || (step === 2 ? "·" : " ")}
-														</Text>
-													</TouchableOpacity>
-												)}
-											</React.Fragment>
-										);
-									})}
-								</View>
+													</Text>
+												</TouchableOpacity>
+											)}
+										</React.Fragment>
+									);
+								})}
+							</View>
 
 								{rowIndex < size - 1 && (
 									<View style={styles.gridRow}>
-										{row.map((_, colIndex) => {
-											const downIneq = getInequality(
-												rowIndex,
-												colIndex,
-												rowIndex + 1,
-												colIndex
-											);
-											return (
+									{row.map((_, colIndex) => {
+										const downIneq = getInequality(
+											rowIndex,
+											colIndex,
+											rowIndex + 1,
+											colIndex
+										);
+										return (
 												<React.Fragment key={`down-${rowIndex}-${colIndex}`}>
-													<View
-														style={[
-															styles.inequalitySpace,
+												<View
+													style={[
+														styles.inequalitySpace,
 															step === 2 && styles.inequalitySpaceActive,
-															{
+														{
 																width: cellSizeClamped,
 																height: cellSizeClamped * gapRatio,
-															},
-														]}
-													>
-														<TouchableOpacity
-															style={styles.inequalitySpaceTouchable}
-															onPress={() =>
+														},
+													]}
+												>
+													<TouchableOpacity
+														style={styles.inequalitySpaceTouchable}
+														onPress={() =>
 																handleInequalitySpacePress(
 																	rowIndex,
 																	colIndex,
 																	"down"
 																)
-															}
-															activeOpacity={0.7}
+														}
+														activeOpacity={0.7}
 															disabled={step !== 2}
-														>
+													>
 															<Text
 																style={[
 																	styles.inequalityTextVertical,
@@ -677,24 +677,24 @@ const CreateFutoshikiPage = () => {
 																]}
 															>
 																{downIneq || (step === 2 ? "·" : " ")}
-															</Text>
-														</TouchableOpacity>
-													</View>
-													{colIndex < size - 1 && (
-														<View
-															style={[
-																styles.inequalitySpace,
-																{
+														</Text>
+													</TouchableOpacity>
+												</View>
+												{colIndex < size - 1 && (
+													<View
+														style={[
+															styles.inequalitySpace,
+															{
 																	width: cellSizeClamped * gapRatio,
 																	height: cellSizeClamped * gapRatio,
-																},
-															]}
-														/>
-													)}
-												</React.Fragment>
-											);
-										})}
-									</View>
+															},
+														]}
+													/>
+												)}
+											</React.Fragment>
+										);
+									})}
+								</View>
 								)}
 							</React.Fragment>
 						))}
@@ -743,37 +743,37 @@ const CreateFutoshikiPage = () => {
 						<Text style={styles.nextButtonText}>
 							{step === 1 ? "Next: Add Inequalities" : "Next: Select Givens"}
 						</Text>
-						<Ionicons
+								<Ionicons
 							name="arrow-forward"
-							size={20}
-							color={Colors.text.primary}
-						/>
-					</TouchableOpacity>
+									size={20}
+									color={Colors.text.primary}
+								/>
+							</TouchableOpacity>
 				)}
 
 				{/* Submit Button */}
 				{step === 3 && (
-					<TouchableOpacity
-						style={[
-							styles.submitButton,
-							loading && styles.submitButtonDisabled,
-						]}
-						onPress={handleSubmit}
-						disabled={loading}
-					>
-						{loading ? (
-							<ActivityIndicator size="small" color={Colors.text.primary} />
-						) : (
-							<>
-								<Ionicons
-									name="checkmark-circle"
-									size={24}
-									color={Colors.text.primary}
-								/>
-								<Text style={styles.submitButtonText}>Create Game</Text>
-							</>
-						)}
-					</TouchableOpacity>
+				<TouchableOpacity
+					style={[
+						styles.submitButton,
+						loading && styles.submitButtonDisabled,
+					]}
+					onPress={handleSubmit}
+					disabled={loading}
+				>
+					{loading ? (
+						<ActivityIndicator size="small" color={Colors.text.primary} />
+					) : (
+						<>
+							<Ionicons
+								name="checkmark-circle"
+								size={24}
+								color={Colors.text.primary}
+							/>
+							<Text style={styles.submitButtonText}>Create Game</Text>
+						</>
+					)}
+				</TouchableOpacity>
 				)}
 			</ScrollView>
 		</View>
