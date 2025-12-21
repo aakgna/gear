@@ -530,18 +530,6 @@ const ProfileScreen = () => {
 						</View>
 					</View>
 
-					{/* Edit Profile Button */}
-					<TouchableOpacity
-						style={styles.editButton}
-						onPress={() => {
-							// Could navigate to edit profile screen in future
-							// For now, just close menu if open
-							setShowMenu(false);
-						}}
-					>
-						<Text style={styles.editButtonText}>Edit Profile</Text>
-					</TouchableOpacity>
-
 					{/* Bio */}
 					{userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
 				</View>
@@ -760,22 +748,6 @@ const styles = StyleSheet.create({
 	statLabel: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-	},
-	editButton: {
-		backgroundColor: Colors.background.secondary,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.md,
-		minWidth: 120,
-		alignItems: "center",
-		marginBottom: Spacing.md,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary,
-	},
-	editButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.primary,
 	},
 	bioText: {
 		fontSize: Typography.fontSize.body,
