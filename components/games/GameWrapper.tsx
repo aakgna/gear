@@ -136,6 +136,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const previousIsActiveRef = React.useRef<boolean>(isActive);
 	const elapsedTimeRef = React.useRef<number>(0);
 	const lastActiveTimeRef = React.useRef<number | null>(null);
+	const completionProcessedRef = React.useRef<boolean>(false);
 
 	// Animation states
 	const [showConfetti, setShowConfetti] = useState(false);
@@ -201,6 +202,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	React.useEffect(() => {
 		if (previousPuzzleIdRef.current !== puzzle.id) {
 			previousPuzzleIdRef.current = puzzle.id;
+			// Reset completion processed flag when puzzle changes
+			completionProcessedRef.current = false;
 
 			// Check if this puzzle has a completed result stored
 			const storedResult = completedGameResults.get(puzzle.id);
@@ -283,6 +286,15 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Enhanced onComplete that also tracks completion and prepares stats
 	const handleComplete = async (result: GameResult) => {
+		// Prevent duplicate processing
+		if (completionProcessedRef.current) {
+			console.log(
+				"[GameWrapper] Completion already processed, skipping duplicate call"
+			);
+			onComplete(result);
+			return;
+		}
+
 		const user = getCurrentUser();
 
 		// Trigger appropriate animation based on result
@@ -298,6 +310,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		}
 
 		if (user && result.completed) {
+			// Mark as processed to prevent duplicate calls
+			completionProcessedRef.current = true;
+
 			// Update result with actual puzzle ID
 			const updatedResult = {
 				...result,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -12,7 +12,7 @@ import {
 	TouchableWithoutFeedback,
 	RefreshControl,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -82,6 +82,7 @@ const getGameIcon = (gameType: string): keyof typeof Ionicons.glyphMap => {
 
 const ProfileScreen = () => {
 	const router = useRouter();
+	const pathname = usePathname();
 	const insets = useSafeAreaInsets();
 	const { userProfile, isAuthenticated, resetProgress } = useGameStore();
 	const [userData, setUserData] = useState<UserData | null>(null);
@@ -155,6 +156,17 @@ const ProfileScreen = () => {
 			}
 			// Mark tab as loaded
 			setLoadedTabs((prev) => new Set(prev).add(tab));
+
+			// Restore scroll position after data loads
+			if (scrollViewRef.current && tab === activeTab) {
+				const scrollY = scrollPositionsRef.current[tab];
+				// Use double requestAnimationFrame to ensure content is rendered
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
+					});
+				});
+			}
 		} catch (error) {
 			console.error("Error loading tab data:", error);
 		} finally {
@@ -166,8 +178,45 @@ const ProfileScreen = () => {
 	useEffect(() => {
 		if (userData && !loadedTabs.has(activeTab)) {
 			loadTabData(activeTab, false);
+		} else if (loadedTabs.has(activeTab)) {
+			// Tab already loaded, just restore scroll position
+			if (scrollViewRef.current) {
+				const scrollY = scrollPositionsRef.current[activeTab];
+				requestAnimationFrame(() => {
+					scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
+				});
+			}
 		}
 	}, [activeTab, userData]);
+
+	// Track scroll position for each tab
+	const scrollViewRef = useRef<ScrollView>(null);
+	const scrollPositionsRef = useRef<Record<TabType, number>>({
+		created: 0,
+		completed: 0,
+		attempted: 0,
+	});
+	const previousPathnameRef = useRef<string>("");
+
+	// Restore scroll position when returning from play-game (but don't reload data)
+	useEffect(() => {
+		// Only restore scroll if we're coming back from play-game (pathname changed from play-game to profile)
+		if (
+			pathname === "/profile" &&
+			previousPathnameRef.current.startsWith("/play-game/") &&
+			scrollViewRef.current
+		) {
+			// Restore scroll position for current tab
+			const scrollY = scrollPositionsRef.current[activeTab];
+			if (scrollY > 0) {
+				// Use requestAnimationFrame to ensure ScrollView is ready
+				requestAnimationFrame(() => {
+					scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
+				});
+			}
+		}
+		previousPathnameRef.current = pathname || "";
+	}, [pathname, activeTab]);
 
 	const handleRefresh = async () => {
 		setRefreshing(true);
@@ -216,11 +265,34 @@ const ProfileScreen = () => {
 
 	const handleGamePress = (game: GameSummary | GameHistoryEntry) => {
 		const gameId = game.gameId;
-		const gameType = "gameType" in game ? game.gameType : game.category || "";
-		const difficulty =
-			"difficulty" in game ? game.difficulty : game.difficulty || "";
-		const puzzleId = `${gameType}_${difficulty}_${gameId}`;
-		router.push(`/feed?gameId=${puzzleId}`);
+
+		// Check if gameId is already a full puzzleId (format: gameType_difficulty_actualId)
+		// GameHistoryEntry stores the full puzzleId, while GameSummary stores just the document ID
+		const parts = gameId.split("_");
+		let puzzleId: string;
+
+		if (parts.length >= 3) {
+			// Already a full puzzleId (GameHistoryEntry case)
+			puzzleId = gameId;
+		} else {
+			// Need to construct puzzleId (GameSummary case)
+			const gameType = "gameType" in game ? game.gameType : game.category || "";
+			const difficulty =
+				"difficulty" in game ? game.difficulty : game.difficulty || "";
+			puzzleId = `${gameType}_${difficulty}_${gameId}`;
+		}
+
+		console.log("[Profile] Navigating to play-game with puzzleId:", puzzleId);
+		console.log("[Profile] Game details:", {
+			gameId,
+			puzzleId,
+			isFullPuzzleId: parts.length >= 3,
+		});
+		// Use href format for Expo Router dynamic routes
+		router.push({
+			pathname: "/play-game/[gameId]",
+			params: { gameId: puzzleId },
+		} as any);
 	};
 
 	const renderGameCard = (
@@ -232,6 +304,33 @@ const ProfileScreen = () => {
 		const gameColor = getGameColor(gameType as PuzzleType);
 		const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm * 2) / 3;
 
+		// Extract document ID from gameId
+		// For GameHistoryEntry, gameId is full puzzleId (gameType_difficulty_docId)
+		// For GameSummary, gameId is just the document ID
+		let documentId = item.gameId;
+		const parts = item.gameId.split("_");
+		if (parts.length >= 3) {
+			// Full puzzleId, extract the last part(s) which is the document ID
+			documentId = parts.slice(2).join("_");
+		}
+
+		// Truncate ID to match game name width (approximately)
+		// Game name is typically 6-12 characters, so truncate ID to similar visual width
+		const gameName = formatGameType(gameType);
+		const maxIdLength = Math.max(6, Math.min(12, gameName.length + 2));
+		const truncatedId =
+			documentId.length > maxIdLength
+				? `${documentId.substring(0, maxIdLength)}...`
+				: documentId;
+
+		// Check if this is a GameHistoryEntry with completionCount (only show on completed tab)
+		const isGameHistoryEntry = "action" in item;
+		const showCompletionCount =
+			activeTab === "completed" &&
+			isGameHistoryEntry &&
+			item.completionCount !== undefined &&
+			item.completionCount > 0;
+
 		return (
 			<TouchableOpacity
 				key={index}
@@ -239,6 +338,13 @@ const ProfileScreen = () => {
 				onPress={() => handleGamePress(item)}
 				activeOpacity={0.7}
 			>
+				{showCompletionCount && (
+					<View style={styles.completionBadge}>
+						<Text style={styles.completionBadgeText}>
+							{item.completionCount}
+						</Text>
+					</View>
+				)}
 				<View
 					style={[
 						styles.gameIconContainer,
@@ -249,6 +355,9 @@ const ProfileScreen = () => {
 				</View>
 				<Text style={styles.gameTypeText} numberOfLines={1}>
 					{formatGameType(gameType)}
+				</Text>
+				<Text style={styles.gameIdText} numberOfLines={1}>
+					ID: {truncatedId}
 				</Text>
 				{"playCount" in item && item.playCount > 0 && (
 					<Text style={styles.playCountText}>{item.playCount} plays</Text>
@@ -437,11 +546,18 @@ const ProfileScreen = () => {
 			)}
 
 			<ScrollView
+				ref={scrollViewRef}
 				style={styles.content}
 				contentContainerStyle={{
 					paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 				}}
 				showsVerticalScrollIndicator={false}
+				onScroll={(event) => {
+					// Track scroll position for current tab
+					const scrollY = event.nativeEvent.contentOffset.y;
+					scrollPositionsRef.current[activeTab] = scrollY;
+				}}
+				scrollEventThrottle={16}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -795,6 +911,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		borderWidth: 2,
 		...Shadows.light,
+		position: "relative",
 	},
 	gameIconContainer: {
 		width: 60,
@@ -810,10 +927,35 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		textAlign: "center",
 	},
+	gameIdText: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
+		opacity: 0.9,
+		marginTop: 2,
+		textAlign: "center",
+	},
 	playCountText: {
 		fontSize: Typography.fontSize.small,
 		color: Colors.text.secondary,
 		marginTop: Spacing.xs,
+	},
+	completionBadge: {
+		position: "absolute",
+		top: 4,
+		right: 4,
+		backgroundColor: Colors.accent,
+		borderRadius: 10,
+		minWidth: 20,
+		height: 20,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 6,
+		zIndex: 1,
+	},
+	completionBadgeText: {
+		color: Colors.text.white,
+		fontSize: 11,
+		fontWeight: Typography.fontWeight.bold,
 	},
 	loadingGamesContainer: {
 		padding: Spacing.xl,

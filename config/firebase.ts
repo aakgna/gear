@@ -87,6 +87,7 @@ export interface GameHistoryEntry {
 	category?: string;
 	migrated?: boolean;
 	answerRevealed?: boolean; // true if user used "Show Answer" feature
+	completionCount?: number; // Number of times this game has been completed by the user
 }
 
 export const fetchGamesFromFirestore = async (
@@ -882,36 +883,118 @@ export const addGameHistory = async (
 
 		const parsed = parseGameIdForHistory(gameId);
 
-		const historyData: any = {
-			gameId,
-			action,
-			timestamp: metadata.timestamp
-				? firestore.Timestamp.fromDate(metadata.timestamp)
-				: firestore.FieldValue.serverTimestamp(),
-			updatedAt: firestore.FieldValue.serverTimestamp(),
-		};
+		// Use transaction to ensure atomicity when updating completionCount
+		if (action === "completed") {
+			await db.runTransaction(async (transaction) => {
+				const existingDoc = await transaction.get(historyRef);
+				const existingData = existingDoc.exists ? existingDoc.data() : null;
 
-		if (parsed) {
-			historyData.category = parsed.category;
-			historyData.difficulty = parsed.difficulty;
+				const historyData: any = {
+					gameId,
+					action,
+					timestamp: metadata.timestamp
+						? firestore.Timestamp.fromDate(metadata.timestamp)
+						: firestore.FieldValue.serverTimestamp(),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				};
+
+				if (parsed) {
+					historyData.category = parsed.category;
+					historyData.difficulty = parsed.difficulty;
+				}
+
+				if (metadata.timeTaken !== undefined) {
+					historyData.timeTaken = metadata.timeTaken;
+				}
+
+				if (metadata.attempts !== undefined) {
+					historyData.attempts = metadata.attempts;
+				}
+
+				if (metadata.migrated) {
+					historyData.migrated = true;
+				}
+
+				// Handle completionCount: increment if completing again, set to 1 if first completion
+				// Also check if this completion was just processed (within last 5 seconds) to prevent duplicates
+				const now = metadata.timestamp ? metadata.timestamp.getTime() : Date.now();
+				let lastUpdate = 0;
+				if (existingData?.updatedAt) {
+					// Handle Firestore Timestamp
+					if (typeof existingData.updatedAt.toMillis === 'function') {
+						lastUpdate = existingData.updatedAt.toMillis();
+					} else if (typeof existingData.updatedAt.getTime === 'function') {
+						lastUpdate = existingData.updatedAt.getTime();
+					} else if (typeof existingData.updatedAt === 'number') {
+						lastUpdate = existingData.updatedAt;
+					}
+				}
+				const timeSinceLastUpdate = now - lastUpdate;
+				const isRecentUpdate = timeSinceLastUpdate < 5000 && timeSinceLastUpdate >= 0; // 5 seconds
+
+				if (existingData && existingData.completionCount !== undefined && existingData.completionCount > 0) {
+					// Already completed before
+					if (isRecentUpdate && existingData.action === "completed") {
+						// Very recent completion, likely a duplicate call - don't increment
+						console.log(
+							`[addGameHistory] Duplicate completion detected (${timeSinceLastUpdate}ms ago), keeping count at ${existingData.completionCount}`
+						);
+						historyData.completionCount = existingData.completionCount;
+					} else {
+						// Increment count
+						historyData.completionCount = existingData.completionCount + 1;
+					}
+				} else {
+					// First completion
+					historyData.completionCount = 1;
+				}
+
+				transaction.set(historyRef, historyData, { merge: true });
+				console.log(
+					`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId}), completionCount: ${historyData.completionCount}`
+				);
+			});
+		} else {
+			// For non-completed actions, use regular set with merge
+			const existingDoc = await historyRef.get();
+			const existingData = existingDoc.exists ? existingDoc.data() : null;
+
+			const historyData: any = {
+				gameId,
+				action,
+				timestamp: metadata.timestamp
+					? firestore.Timestamp.fromDate(metadata.timestamp)
+					: firestore.FieldValue.serverTimestamp(),
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			};
+
+			if (parsed) {
+				historyData.category = parsed.category;
+				historyData.difficulty = parsed.difficulty;
+			}
+
+			if (metadata.timeTaken !== undefined) {
+				historyData.timeTaken = metadata.timeTaken;
+			}
+
+			if (metadata.attempts !== undefined) {
+				historyData.attempts = metadata.attempts;
+			}
+
+			if (metadata.migrated) {
+				historyData.migrated = true;
+			}
+
+			// Preserve existing completionCount when action is not "completed"
+			if (existingData && existingData.completionCount !== undefined) {
+				historyData.completionCount = existingData.completionCount;
+			}
+
+			await historyRef.set(historyData, { merge: true });
+			console.log(
+				`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId})`
+			);
 		}
-
-		if (metadata.timeTaken !== undefined) {
-			historyData.timeTaken = metadata.timeTaken;
-		}
-
-		if (metadata.attempts !== undefined) {
-			historyData.attempts = metadata.attempts;
-		}
-
-		if (metadata.migrated) {
-			historyData.migrated = true;
-		}
-
-		await historyRef.set(historyData, { merge: true });
-		console.log(
-			`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId})`
-		);
 	} catch (error) {
 		console.error("[addGameHistory] Error:", error);
 		throw error;
@@ -1004,6 +1087,7 @@ export const fetchGameHistory = async (
 				difficulty: data.difficulty,
 				category: data.category,
 				migrated: data.migrated,
+				completionCount: data.completionCount,
 			});
 		});
 

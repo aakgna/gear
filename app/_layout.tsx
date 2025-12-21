@@ -36,21 +36,24 @@ export default function RootLayout() {
 		return null;
 	}
 
-	// Routes that should show the bottom navigation bar
-	const routesWithBottomNav = ["/feed", "/profile", "/create-game"];
-	const shouldShowBottomNav = routesWithBottomNav.includes(pathname) || pathname?.startsWith("/create-game/");
 	// Routes that use MainAppContainer (main app screens that stay mounted)
 	const mainAppRoutes = ["/feed", "/profile", "/create-game"];
 	const isMainAppRoute = mainAppRoutes.includes(pathname);
 	// Check if we're on a create-game sub-route (like /create-game/wordle)
 	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
-	// Check if we're on an overlay route (user profiles, followers-following, search, notifications)
+	// Check if we're on a play-game route (games opened from profile)
+	const isPlayGameRoute = pathname?.startsWith("/play-game/");
+	// Check if we're on an overlay route (user profiles, followers-following, search, notifications, play-game)
 	// Note: pathname might include query params, so we check with startsWith
 	const isOverlayRoute = pathname?.startsWith("/user/") || 
 		pathname?.startsWith("/followers-following") ||
 		pathname?.startsWith("/search-friends") ||
-		pathname?.startsWith("/notifications");
-	// Routes where we should keep MainAppContainer mounted (includes user profiles, create-game sub-routes, and overlay routes)
+		pathname?.startsWith("/notifications") ||
+		isPlayGameRoute;
+	// Routes that should show the bottom navigation bar
+	const routesWithBottomNav = ["/feed", "/profile", "/create-game"];
+	const shouldShowBottomNav = (routesWithBottomNav.includes(pathname) || pathname?.startsWith("/create-game/")) && !isPlayGameRoute;
+	// Routes where we should keep MainAppContainer mounted (includes user profiles, create-game sub-routes, play-game, and overlay routes)
 	const shouldKeepMainAppMounted = isMainAppRoute || isOverlayRoute || isCreateGameSubRoute;
 	// Auth routes that use Stack navigation
 	const authRoutes = ["/", "/index", "/signin", "/username"];
@@ -99,6 +102,15 @@ export default function RootLayout() {
 						{/* Followers/Following list route */}
 						<Stack.Screen 
 							name="followers-following" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
+						{/* Play game route - opens on top of profile */}
+						<Stack.Screen 
+							name="play-game/[gameId]" 
 							options={{ 
 								headerShown: false,
 								presentation: "card",

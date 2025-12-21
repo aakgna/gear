@@ -256,13 +256,29 @@ export const updateUserStats = async (
 		const { category, difficulty } = parseGameId(gameId);
 
 		// Get current stats or initialize defaults
-		const currentTotalGames = userData.totalGamesPlayed || 0;
-		const currentTotalTime = userData.totalPlayTime || 0;
+		// Sanitize to ensure they are numbers (handle corrupted data)
+		const currentTotalGames =
+			typeof userData.totalGamesPlayed === "number" &&
+			isFinite(userData.totalGamesPlayed)
+				? userData.totalGamesPlayed
+				: 0;
+		const currentTotalTime =
+			typeof userData.totalPlayTime === "number" &&
+			isFinite(userData.totalPlayTime)
+				? userData.totalPlayTime
+				: 0;
 
 		// Calculate new totals
+		// Ensure timeTaken is a valid number
+		const sanitizedTimeTaken =
+			typeof timeTaken === "number" && isFinite(timeTaken) && timeTaken >= 0
+				? timeTaken
+				: 0;
+
 		const newTotalGames = currentTotalGames + 1;
-		const newTotalTime = currentTotalTime + timeTaken;
-		const newAverageTime = Math.round(newTotalTime / newTotalGames);
+		const newTotalTime = Number(currentTotalTime) + Number(sanitizedTimeTaken);
+		const newAverageTime =
+			newTotalGames > 0 ? Math.round(newTotalTime / newTotalGames) : 0;
 
 		// Calculate streak
 		const now = new Date();
@@ -378,11 +394,12 @@ export const updateUserStats = async (
 		}
 
 		// Prepare update object
+		// Explicitly ensure all numeric values are numbers (not strings)
 		const updateData: any = {
-			totalGamesPlayed: newTotalGames,
-			totalPlayTime: newTotalTime,
-			averageTimePerGame: newAverageTime,
-			streakCount: newStreak,
+			totalGamesPlayed: Number(newTotalGames),
+			totalPlayTime: Number(newTotalTime),
+			averageTimePerGame: Number(newAverageTime),
+			streakCount: Number(newStreak),
 			lastPlayedAt: firestore.FieldValue.serverTimestamp(),
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		};
@@ -401,6 +418,19 @@ export const updateUserStats = async (
 				...(currentDifficultyStats || {}),
 				...difficultyStatsUpdate,
 			};
+		}
+
+		// Final safety check: ensure totalPlayTime is a number before updating
+		if (
+			typeof updateData.totalPlayTime !== "number" ||
+			!isFinite(updateData.totalPlayTime)
+		) {
+			console.error(
+				`[updateUserStats] Invalid totalPlayTime value: ${
+					updateData.totalPlayTime
+				}, type: ${typeof updateData.totalPlayTime}. Resetting to 0.`
+			);
+			updateData.totalPlayTime = 0;
 		}
 
 		// Update Firestore
