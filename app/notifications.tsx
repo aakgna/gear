@@ -26,6 +26,7 @@ import {
 	fetchNotifications,
 	markNotificationAsRead,
 	markAllNotificationsAsRead,
+	deleteNotification,
 	followUser,
 	isFollowing,
 	Notification,
@@ -186,6 +187,18 @@ const NotificationsScreen = () => {
 		}
 	};
 
+	const handleDeleteNotification = async (notification: Notification) => {
+		if (!currentUser) return;
+
+		try {
+			await deleteNotification(currentUser.uid, notification.id);
+			// Remove from local state
+			setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+		} catch (error) {
+			console.error("Error deleting notification:", error);
+		}
+	};
+
 	const renderNotification = ({ item: notification }: { item: Notification }) => {
 		if (notification.type !== "follow") return null;
 
@@ -196,6 +209,7 @@ const NotificationsScreen = () => {
 			<TouchableOpacity
 				style={[styles.notificationItem, isUnread && styles.unreadItem]}
 				onPress={() => handleNotificationPress(notification)}
+				activeOpacity={0.7}
 			>
 				<TouchableOpacity
 					onPress={() => {
@@ -228,17 +242,28 @@ const NotificationsScreen = () => {
 						{formatTimestamp(notification.createdAt)}
 					</Text>
 				</View>
-				{!isFollowingUser && (
+				<View style={styles.rightActions}>
+					{!isFollowingUser && (
+						<TouchableOpacity
+							style={styles.followBackButton}
+							onPress={(e) => {
+								e.stopPropagation();
+								handleFollowBack(notification);
+							}}
+						>
+							<Text style={styles.followBackText}>Follow Back</Text>
+						</TouchableOpacity>
+					)}
 					<TouchableOpacity
-						style={styles.followBackButton}
+						style={styles.trashIconButton}
 						onPress={(e) => {
 							e.stopPropagation();
-							handleFollowBack(notification);
+							handleDeleteNotification(notification);
 						}}
 					>
-						<Text style={styles.followBackText}>Follow Back</Text>
+						<Ionicons name="trash-outline" size={22} color={Colors.text.secondary} />
 					</TouchableOpacity>
-				)}
+				</View>
 			</TouchableOpacity>
 		);
 	};
@@ -405,6 +430,15 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.semiBold,
 		color: Colors.text.white,
+	},
+	rightActions: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.sm,
+	},
+	trashIconButton: {
+		padding: Spacing.xs,
+		marginLeft: Spacing.xs,
 	},
 });
 

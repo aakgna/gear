@@ -38,12 +38,20 @@ export default function RootLayout() {
 
 	// Routes that should show the bottom navigation bar
 	const routesWithBottomNav = ["/feed", "/profile", "/create-game"];
-	const shouldShowBottomNav = routesWithBottomNav.includes(pathname);
+	const shouldShowBottomNav = routesWithBottomNav.includes(pathname) || pathname?.startsWith("/create-game/");
 	// Routes that use MainAppContainer (main app screens that stay mounted)
 	const mainAppRoutes = ["/feed", "/profile", "/create-game"];
 	const isMainAppRoute = mainAppRoutes.includes(pathname);
-	// Routes where we should keep MainAppContainer mounted (includes user profiles)
-	const shouldKeepMainAppMounted = isMainAppRoute || pathname?.startsWith("/user/");
+	// Check if we're on a create-game sub-route (like /create-game/wordle)
+	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
+	// Check if we're on an overlay route (user profiles, followers-following, search, notifications)
+	// Note: pathname might include query params, so we check with startsWith
+	const isOverlayRoute = pathname?.startsWith("/user/") || 
+		pathname?.startsWith("/followers-following") ||
+		pathname?.startsWith("/search-friends") ||
+		pathname?.startsWith("/notifications");
+	// Routes where we should keep MainAppContainer mounted (includes user profiles, create-game sub-routes, and overlay routes)
+	const shouldKeepMainAppMounted = isMainAppRoute || isOverlayRoute || isCreateGameSubRoute;
 	// Auth routes that use Stack navigation
 	const authRoutes = ["/", "/index", "/signin", "/username"];
 
@@ -88,6 +96,15 @@ export default function RootLayout() {
 								gestureEnabled: true,
 							}} 
 						/>
+						{/* Followers/Following list route */}
+						<Stack.Screen 
+							name="followers-following" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
 						{/* create-game folder with sub-routes - let Expo Router handle automatically */}
 					</Stack>
 					{/* MainAppContainer - keeps all main screens mounted */}
@@ -99,8 +116,8 @@ export default function RootLayout() {
 								left: 0,
 								right: 0,
 								bottom: 0,
-								zIndex: isMainAppRoute ? 10 : 0, // Lower z-index when on user profile
-								pointerEvents: isMainAppRoute ? "auto" : "none", // Disable touches when on user profile
+								zIndex: isMainAppRoute ? 10 : 0, // Lower z-index when on overlay routes (user profiles, followers-following, create-game sub-routes)
+								pointerEvents: isMainAppRoute ? "auto" : "none", // Disable touches when on overlay routes
 							}}
 						>
 							<MainAppContainer />

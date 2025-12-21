@@ -413,13 +413,27 @@ const CreatorProfileScreen = () => {
 
 					{/* Stats Row 1 - Following, Followers, Games Created */}
 					<View style={styles.statsRow}>
-						<TouchableOpacity style={styles.statItem}>
+						<TouchableOpacity
+							style={styles.statItem}
+							onPress={() =>
+								router.push(
+									`/followers-following?type=following&userId=${profile.uid}&username=${profile.username || ""}`
+								)
+							}
+						>
 							<Text style={styles.statNumber}>
 								{profile.followingCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Following</Text>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.statItem}>
+						<TouchableOpacity
+							style={styles.statItem}
+							onPress={() =>
+								router.push(
+									`/followers-following?type=followers&userId=${profile.uid}&username=${profile.username || ""}`
+								)
+							}
+						>
 							<Text style={styles.statNumber}>
 								{profile.followerCount || 0}
 							</Text>

@@ -564,8 +564,14 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			// Increment skipped count
 			const newSkipped = currentSkipped + 1;
+			
+			// Update entire stats object (Firestore doesn't support dot notation in transactions)
+			const updatedStats = {
+				...existingStats,
+				skipped: newSkipped,
+			};
 			transaction.update(gameRef, {
-				"stats.skipped": newSkipped,
+				stats: updatedStats,
 			});
 
 			finalCount = newSkipped;
@@ -620,8 +626,14 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 
 			// Increment attempted count
 			const newAttempted = currentAttempted + 1;
+			
+			// Update entire stats object (Firestore doesn't support dot notation in transactions)
+			const updatedStats = {
+				...existingStats,
+				attempted: newAttempted,
+			};
 			transaction.update(gameRef, {
-				"stats.attempted": newAttempted,
+				stats: updatedStats,
 			});
 
 			finalCount = newAttempted;
@@ -677,8 +689,14 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 
 			// Increment completed count
 			const newCompleted = currentCompleted + 1;
+			
+			// Update entire stats object (Firestore doesn't support dot notation in transactions)
+			const updatedStats = {
+				...existingStats,
+				completed: newCompleted,
+			};
 			transaction.update(gameRef, {
-				"stats.completed": newCompleted,
+				stats: updatedStats,
 			});
 
 			finalCount = newCompleted;
@@ -736,8 +754,14 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			// Decrement skipped count (but don't go below 0)
 			const newSkipped = Math.max(0, currentSkipped - 1);
+			
+			// Update entire stats object (Firestore doesn't support dot notation in transactions)
+			const updatedStats = {
+				...existingStats,
+				skipped: newSkipped,
+			};
 			transaction.update(gameRef, {
-				"stats.skipped": newSkipped,
+				stats: updatedStats,
 			});
 
 			oldCount = currentSkipped;

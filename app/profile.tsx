@@ -215,7 +215,7 @@ const ProfileScreen = () => {
 	};
 
 	const handleGamePress = (game: GameSummary | GameHistoryEntry) => {
-		const gameId = "gameId" in game ? game.gameId : game.gameId;
+		const gameId = game.gameId;
 		const gameType = "gameType" in game ? game.gameType : game.category || "";
 		const difficulty =
 			"difficulty" in game ? game.difficulty : game.difficulty || "";
@@ -470,13 +470,31 @@ const ProfileScreen = () => {
 
 					{/* Stats Row - Following, Followers, Games Created */}
 					<View style={styles.statsRow}>
-						<TouchableOpacity style={styles.statItem}>
+						<TouchableOpacity
+							style={styles.statItem}
+							onPress={() =>
+								router.push(
+									`/followers-following?type=following&username=${
+										userData?.username || ""
+									}`
+								)
+							}
+						>
 							<Text style={styles.statNumber}>
 								{userData?.followingCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Following</Text>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.statItem}>
+						<TouchableOpacity
+							style={styles.statItem}
+							onPress={() =>
+								router.push(
+									`/followers-following?type=followers&username=${
+										userData?.username || ""
+									}`
+								)
+							}
+						>
 							<Text style={styles.statNumber}>
 								{userData?.followerCount || 0}
 							</Text>
