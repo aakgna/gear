@@ -150,7 +150,7 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 				email: firebaseUser.email || "",
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			};
-			
+
 			const existingData = userDoc.data();
 			// Initialize counts if they don't exist
 			if (existingData?.followerCount === undefined) {
@@ -165,7 +165,7 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 			if (existingData?.unreadNotificationCount === undefined) {
 				updateData.unreadNotificationCount = 0;
 			}
-			
+
 			await userRef.update(updateData);
 		}
 	} catch (error: any) {
@@ -872,22 +872,14 @@ export const checkUsernameAvailability = async (
 ): Promise<boolean> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		const usernamesRef = db.collection("usernames");
+		const lowerUsername = username.toLowerCase();
+		const usernameRef = db.collection("usernames").doc(lowerUsername);
 
-		// Query all documents in usernames collection
-		const snapshot = await usernamesRef.get();
+		// Check if document exists - handle both property and method cases
+		const doc = await usernameRef.get();
+		const exists = typeof doc.exists === "function" ? doc.exists() : doc.exists;
 
-		// Check if username exists in any document's names array
-		for (const doc of snapshot.docs) {
-			const data = doc.data();
-			if (data.names && Array.isArray(data.names)) {
-				if (data.names.includes(username.toLowerCase())) {
-					return false; // Username is taken
-				}
-			}
-		}
-
-		return true; // Username is available
+		return !exists; // Username is available if document doesn't exist
 	} catch (error: any) {
 		console.error("Error checking username availability:", error);
 		throw new Error("Failed to check username availability");
@@ -903,64 +895,35 @@ export const saveUsername = async (
 		const firestore = require("@react-native-firebase/firestore").default;
 		const lowerUsername = username.toLowerCase();
 
-		// First, check availability again (double-check)
-		const isAvailable = await checkUsernameAvailability(lowerUsername);
-		if (!isAvailable) {
-			throw new Error("Username is already taken");
-		}
-
-		// Update user document with username
+		// Use a transaction to ensure atomicity
+		const usernameRef = db.collection("usernames").doc(lowerUsername);
 		const userRef = db.collection("users").doc(userId);
-		await userRef.update({
-			username: lowerUsername,
-			updatedAt: firestore.FieldValue.serverTimestamp(),
-		});
 
-		// Add username to usernames collection
-		// Find a document with less than 1000 names (or no count field), or create a new one
-		const usernamesRef = db.collection("usernames");
-
-		// Try to find a document with count < 1000
-		let snapshot = await usernamesRef.where("count", "<", 1000).limit(1).get();
-
-		// If no document found with count field, get any document
-		if (snapshot.empty) {
-			snapshot = await usernamesRef.limit(1).get();
-		}
-
-		if (!snapshot.empty) {
-			// Add to existing document
-			const doc = snapshot.docs[0];
-			const data = doc.data();
-			const currentCount = data.count || data.names?.length || 0;
-
-			// Only add if document has less than 1000 names
-			if (currentCount < 1000) {
-				await doc.ref.update({
-					names: firestore.FieldValue.arrayUnion(lowerUsername),
-					count: firestore.FieldValue.increment(1),
-					updatedAt: firestore.FieldValue.serverTimestamp(),
-				});
-			} else {
-				// Current document is full, create new one
-				const newDocRef = usernamesRef.doc();
-				await newDocRef.set({
-					names: [lowerUsername],
-					count: 1,
-					createdAt: firestore.FieldValue.serverTimestamp(),
-					updatedAt: firestore.FieldValue.serverTimestamp(),
-				});
+		await db.runTransaction(async (transaction) => {
+			// Check if username is already taken - handle both property and method cases
+			const usernameDoc = await transaction.get(usernameRef);
+			const exists =
+				typeof usernameDoc.exists === "function"
+					? usernameDoc.exists()
+					: usernameDoc.exists;
+			if (exists) {
+				throw new Error("Username is already taken");
 			}
-		} else {
-			// Create new document
-			const newDocRef = usernamesRef.doc();
-			await newDocRef.set({
-				names: [lowerUsername],
-				count: 1,
+
+			// Create username document with username as document ID
+			transaction.set(usernameRef, {
+				userId: userId,
+				username: lowerUsername,
 				createdAt: firestore.FieldValue.serverTimestamp(),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
-		}
+
+			// Update user document with username
+			transaction.update(userRef, {
+				username: lowerUsername,
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			});
+		});
 	} catch (error: any) {
 		console.error("Error saving username:", error);
 		if (error.message === "Username is already taken") {
@@ -988,25 +951,11 @@ export const deleteAccount = async (
 		const userRef = db.collection("users").doc(userId);
 		await userRef.delete();
 
-		// 3. Remove username from usernames collection if it exists
+		// 3. Delete username document if it exists
 		if (username) {
 			const lowerUsername = username.toLowerCase();
-			const usernamesRef = db.collection("usernames");
-			const snapshot = await usernamesRef.get();
-
-			for (const doc of snapshot.docs) {
-				const data = doc.data();
-				if (data.names && Array.isArray(data.names)) {
-					if (data.names.includes(lowerUsername)) {
-						await doc.ref.update({
-							names: firestore.FieldValue.arrayRemove(lowerUsername),
-							count: firestore.FieldValue.increment(-1),
-							updatedAt: firestore.FieldValue.serverTimestamp(),
-						});
-						break; // Username found and removed, exit loop
-					}
-				}
-			}
+			const usernameRef = db.collection("usernames").doc(lowerUsername);
+			await usernameRef.delete();
 		}
 
 		// 4. Delete Firebase Auth account (this automatically signs out the user)
