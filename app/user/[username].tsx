@@ -278,14 +278,30 @@ const CreatorProfileScreen = () => {
 	};
 
 	const handleGamePress = (game: GameSummary | GameHistoryEntry) => {
-		// Navigate to game - construct puzzle ID
-		const gameId = "gameId" in game ? game.gameId : game.gameId;
-		const gameType = "gameType" in game ? game.gameType : game.category || "";
-		const difficulty = "difficulty" in game ? game.difficulty : game.difficulty || "";
+		const gameId = game.gameId;
 
-		// Construct puzzle ID: {gameType}_{difficulty}_{gameId}
-		const puzzleId = `${gameType}_${difficulty}_${gameId}`;
-		router.push(`/feed?gameId=${puzzleId}`);
+		// Check if gameId is already a full puzzleId (format: gameType_difficulty_actualId)
+		// GameHistoryEntry stores the full puzzleId, while GameSummary stores just the document ID
+		const parts = gameId.split("_");
+		let puzzleId: string;
+
+		if (parts.length >= 3) {
+			// Already a full puzzleId (GameHistoryEntry case)
+			puzzleId = gameId;
+		} else {
+			// Need to construct puzzleId (GameSummary case)
+			const gameType = "gameType" in game ? game.gameType : game.category || "";
+			const difficulty =
+				"difficulty" in game ? game.difficulty : game.difficulty || "";
+			puzzleId = `${gameType}_${difficulty}_${gameId}`;
+		}
+
+		console.log("[UserProfile] Navigating to play-game with puzzleId:", puzzleId);
+		// Use href format for Expo Router dynamic routes
+		router.push({
+			pathname: "/play-game/[gameId]",
+			params: { gameId: puzzleId },
+		} as any);
 	};
 
 	const renderGameCard = (

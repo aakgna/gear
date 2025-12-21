@@ -39,6 +39,7 @@ import {
 	GameSummary,
 	getUnreadNotificationCount,
 } from "../config/social";
+import { fetchConversations } from "../config/messaging";
 import { PuzzleType } from "../config/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -96,6 +97,7 @@ const ProfileScreen = () => {
 	const [showMenu, setShowMenu] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 	const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+	const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
@@ -112,6 +114,13 @@ const ProfileScreen = () => {
 			// Load notification count
 			const count = await getUnreadNotificationCount(user.uid);
 			setUnreadNotificationCount(count);
+			// Load unread message count
+			const conversations = await fetchConversations(user.uid);
+			const totalUnread = conversations.reduce(
+				(sum, conv) => sum + (conv.unreadCount || 0),
+				0
+			);
+			setUnreadMessageCount(totalUnread);
 			// Load initial tab (created) on first load
 			if (activeTab === "created" && !loadedTabs.has("created")) {
 				await loadTabData("created", false);
@@ -196,14 +205,17 @@ const ProfileScreen = () => {
 		completed: 0,
 		attempted: 0,
 	});
-	const previousPathnameRef = useRef<string>("");
+	const previousPathnameRef = useRef<string>(pathname || "");
 
 	// Restore scroll position when returning from play-game (but don't reload data)
+	// Also refresh notification/message counts when returning from notifications/inbox
 	useEffect(() => {
+		const previousPath = previousPathnameRef.current;
+
 		// Only restore scroll if we're coming back from play-game (pathname changed from play-game to profile)
 		if (
 			pathname === "/profile" &&
-			previousPathnameRef.current.startsWith("/play-game/") &&
+			previousPath.startsWith("/play-game/") &&
 			scrollViewRef.current
 		) {
 			// Restore scroll position for current tab
@@ -215,8 +227,70 @@ const ProfileScreen = () => {
 				});
 			}
 		}
+
+		// Refresh notification count when returning from notifications screen
+		if (
+			pathname === "/profile" &&
+			previousPath === "/notifications" &&
+			currentUser
+		) {
+			console.log(
+				"[Profile] Refreshing notification count after returning from notifications"
+			);
+			const refreshNotificationCount = async () => {
+				const count = await getUnreadNotificationCount(currentUser.uid);
+				console.log("[Profile] New notification count:", count);
+				setUnreadNotificationCount(count);
+			};
+			refreshNotificationCount();
+		}
+
+		// Refresh message count when returning from inbox or chat screens
+		if (
+			pathname === "/profile" &&
+			(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
+			currentUser
+		) {
+			console.log(
+				"[Profile] Refreshing message count after returning from inbox/chat"
+			);
+			const refreshMessageCount = async () => {
+				const conversations = await fetchConversations(currentUser.uid);
+				const totalUnread = conversations.reduce(
+					(sum, conv) => sum + (conv.unreadCount || 0),
+					0
+				);
+				console.log("[Profile] New message count:", totalUnread);
+				setUnreadMessageCount(totalUnread);
+			};
+			refreshMessageCount();
+		}
+
+		// Also refresh counts whenever we're on profile (in case navigation detection fails)
+		// This ensures counts are always fresh when viewing profile
+		if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
+			console.log("[Profile] Profile screen focused, refreshing counts");
+			const refreshAllCounts = async () => {
+				const notifCount = await getUnreadNotificationCount(currentUser.uid);
+				const conversations = await fetchConversations(currentUser.uid);
+				const messageCount = conversations.reduce(
+					(sum, conv) => sum + (conv.unreadCount || 0),
+					0
+				);
+				console.log(
+					"[Profile] Refreshed counts - notifications:",
+					notifCount,
+					"messages:",
+					messageCount
+				);
+				setUnreadNotificationCount(notifCount);
+				setUnreadMessageCount(messageCount);
+			};
+			refreshAllCounts();
+		}
+
 		previousPathnameRef.current = pathname || "";
-	}, [pathname, activeTab]);
+	}, [pathname, activeTab, currentUser]);
 
 	const handleRefresh = async () => {
 		setRefreshing(true);
@@ -228,6 +302,13 @@ const ProfileScreen = () => {
 			// Reload notification count
 			const count = await getUnreadNotificationCount(user.uid);
 			setUnreadNotificationCount(count);
+			// Reload unread message count
+			const conversations = await fetchConversations(user.uid);
+			const totalUnread = conversations.reduce(
+				(sum, conv) => sum + (conv.unreadCount || 0),
+				0
+			);
+			setUnreadMessageCount(totalUnread);
 		}
 		// Force reload current tab
 		await loadTabData(activeTab, true);
@@ -488,6 +569,23 @@ const ProfileScreen = () => {
 									{unreadNotificationCount > 99
 										? "99+"
 										: unreadNotificationCount}
+								</Text>
+							</View>
+						)}
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.headerButton}
+						onPress={() => router.push("/inbox")}
+					>
+						<Ionicons
+							name="chatbubbles-outline"
+							size={24}
+							color={Colors.text.primary}
+						/>
+						{unreadMessageCount > 0 && (
+							<View style={styles.badge}>
+								<Text style={styles.badgeText}>
+									{unreadMessageCount > 99 ? "99+" : unreadMessageCount}
 								</Text>
 							</View>
 						)}

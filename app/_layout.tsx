@@ -43,12 +43,14 @@ export default function RootLayout() {
 	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
 	// Check if we're on a play-game route (games opened from profile)
 	const isPlayGameRoute = pathname?.startsWith("/play-game/");
-	// Check if we're on an overlay route (user profiles, followers-following, search, notifications, play-game)
+	// Check if we're on an overlay route (user profiles, followers-following, search, notifications, play-game, inbox, chat)
 	// Note: pathname might include query params, so we check with startsWith
 	const isOverlayRoute = pathname?.startsWith("/user/") || 
 		pathname?.startsWith("/followers-following") ||
 		pathname?.startsWith("/search-friends") ||
 		pathname?.startsWith("/notifications") ||
+		pathname?.startsWith("/inbox") ||
+		pathname?.startsWith("/chat/") ||
 		isPlayGameRoute;
 	// Routes that should show the bottom navigation bar
 	const routesWithBottomNav = ["/feed", "/profile", "/create-game"];
@@ -102,6 +104,24 @@ export default function RootLayout() {
 						{/* Followers/Following list route */}
 						<Stack.Screen 
 							name="followers-following" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
+						{/* Inbox route - messages/conversations */}
+						<Stack.Screen 
+							name="inbox" 
+							options={{ 
+								headerShown: false,
+								presentation: "card",
+								gestureEnabled: true,
+							}} 
+						/>
+						{/* Chat route - individual conversations */}
+						<Stack.Screen 
+							name="chat/[conversationId]" 
 							options={{ 
 								headerShown: false,
 								presentation: "card",

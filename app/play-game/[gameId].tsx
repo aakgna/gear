@@ -314,6 +314,8 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				gameData.createdAt?.toDate?.()?.toISOString() ||
 				new Date().toISOString(),
 			username: gameData.username,
+			uid: gameData.uid || gameData.createdBy, // Add creator user ID (try both uid and createdBy)
+			profilePicture: gameData.profilePicture || null, // Add creator profile picture
 		};
 	} catch (error) {
 		console.error(
@@ -385,8 +387,7 @@ const PlayGameScreen = () => {
 			await addCompletedGame(user.uid, gameId, result);
 			await trackGameCompleted(gameId);
 
-			// Navigate back to profile
-			router.back();
+			// Don't auto-navigate - let user stay to view social features and use back button manually
 		} catch (error) {
 			console.error("Error handling game completion:", error);
 		}
@@ -468,6 +469,7 @@ const PlayGameScreen = () => {
 					onComplete={handleComplete}
 					onAttempt={handleAttempt}
 					isActive={true}
+					forceShowIntro={true}
 				/>
 			</View>
 		</View>

@@ -505,7 +505,9 @@ const FeedScreen = () => {
 						createdAt:
 							game.createdAt?.toDate?.()?.toISOString() ||
 							new Date().toISOString(),
-						username: gameData.username,
+						username: gameData.username || game.username,
+						uid: game.createdBy || game.uid,
+						profilePicture: gameData.profilePicture || null,
 					});
 				} catch (error) {
 					console.error(`Error loading game ${game.gameId}:`, error);
@@ -610,6 +612,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -628,6 +632,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -648,6 +654,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -678,6 +686,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					} else {
 						console.log(
@@ -709,6 +719,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -750,6 +762,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -782,6 +796,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -803,6 +819,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -824,6 +842,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -848,6 +868,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -877,6 +899,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -907,6 +931,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});
@@ -928,6 +954,8 @@ const FeedScreen = () => {
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
 							username: game.username,
+							uid: game.uid,
+							profilePicture: null,
 						});
 					}
 				});

@@ -1,5 +1,5 @@
 // Social features: follow/unfollow, fetch followers/following, creator profiles
-import { db } from "./firebase";
+import { db, docExists } from "./firebase";
 
 export interface UserSummary {
 	uid: string;
@@ -58,9 +58,7 @@ export const followUser = async (
 		const currentUserRef = db.collection("users").doc(currentUid);
 		const currentUserDoc = await currentUserRef.get();
 		const currentUserData = currentUserDoc.data();
-		const currentUserExists = typeof currentUserDoc.exists === 'function' 
-			? currentUserDoc.exists() 
-			: currentUserDoc.exists;
+		const currentUserExists = docExists(currentUserDoc);
 		console.log(`[followUser] Current user doc exists: ${currentUserExists}`);
 		console.log(`[followUser] Current user data:`, JSON.stringify(currentUserData, null, 2));
 
@@ -85,9 +83,7 @@ export const followUser = async (
 
 		// Check if already following
 		const currentFollowingDoc = await currentUserFollowingRef.get();
-		const alreadyExists = typeof currentFollowingDoc.exists === 'function' 
-			? currentFollowingDoc.exists() 
-			: currentFollowingDoc.exists;
+		const alreadyExists = docExists(currentFollowingDoc);
 		console.log(`[followUser] Already following check: ${alreadyExists}`);
 		if (alreadyExists) {
 			// Already following, return silently (not an error)
@@ -178,18 +174,14 @@ export const followUser = async (
 		// Verify the follow relationship was created
 		console.log(`[followUser] Verifying follow relationship...`);
 		const verifyFollowingDoc = await currentUserFollowingRef.get();
-		const followingExists = typeof verifyFollowingDoc.exists === 'function' 
-			? verifyFollowingDoc.exists() 
-			: verifyFollowingDoc.exists;
+		const followingExists = docExists(verifyFollowingDoc);
 		console.log(`[followUser] Verification - following doc exists: ${followingExists}`);
 		if (followingExists) {
 			console.log(`[followUser] Verification - following doc data:`, JSON.stringify(verifyFollowingDoc.data(), null, 2));
 		}
 		
 		const verifyFollowersDoc = await targetUserFollowersRef.get();
-		const followersExists = typeof verifyFollowersDoc.exists === 'function' 
-			? verifyFollowersDoc.exists() 
-			: verifyFollowersDoc.exists;
+		const followersExists = docExists(verifyFollowersDoc);
 		console.log(`[followUser] Verification - followers doc exists: ${followersExists}`);
 		if (followersExists) {
 			console.log(`[followUser] Verification - followers doc data:`, JSON.stringify(verifyFollowersDoc.data(), null, 2));
@@ -248,9 +240,7 @@ export const unfollowUser = async (
 
 		// Check if following
 		const currentFollowingDoc = await currentUserFollowingRef.get();
-		const isCurrentlyFollowing = typeof currentFollowingDoc.exists === 'function' 
-			? currentFollowingDoc.exists() 
-			: currentFollowingDoc.exists;
+		const isCurrentlyFollowing = docExists(currentFollowingDoc);
 		if (!isCurrentlyFollowing) {
 			throw new Error("Not following this user");
 		}
@@ -318,8 +308,8 @@ export const isFollowing = async (
 		const doc = await followingRef.get();
 		
 		// Check if document exists - handle both property and method cases
-		const exists = typeof doc.exists === 'function' ? doc.exists() : doc.exists;
-		console.log(`[isFollowing] Document exists (type: ${typeof doc.exists}): ${exists}`);
+		const exists = docExists(doc);
+		console.log(`[isFollowing] Document exists: ${exists}`);
 		console.log(`[isFollowing] Document snapshot:`, doc);
 		
 		if (exists) {
@@ -376,8 +366,7 @@ export const fetchFollowers = async (
 			);
 
 			userDocs.forEach((userDoc) => {
-				const exists = typeof userDoc.exists === 'function' ? userDoc.exists() : userDoc.exists;
-				if (exists) {
+				if (docExists(userDoc)) {
 					const data = userDoc.data();
 					users.push({
 						uid: userDoc.id,
@@ -441,8 +430,7 @@ export const fetchFollowing = async (
 			);
 
 			userDocs.forEach((userDoc) => {
-				const exists = typeof userDoc.exists === 'function' ? userDoc.exists() : userDoc.exists;
-				if (exists) {
+				if (docExists(userDoc)) {
 					const data = userDoc.data();
 					users.push({
 						uid: userDoc.id,
@@ -561,8 +549,7 @@ export const fetchUserProfile = async (
 	try {
 		const userDoc = await db.collection("users").doc(uid).get();
 
-		const exists = typeof userDoc.exists === 'function' ? userDoc.exists() : userDoc.exists;
-		if (!exists) {
+		if (!docExists(userDoc)) {
 			return null;
 		}
 
@@ -699,7 +686,7 @@ export const markNotificationAsRead = async (
 			.doc(notificationId);
 
 		const notificationDoc = await notificationRef.get();
-		if (!notificationDoc.exists) {
+		if (!docExists(notificationDoc)) {
 			throw new Error("Notification not found");
 		}
 
@@ -767,18 +754,46 @@ export const markAllNotificationsAsRead = async (uid: string): Promise<void> => 
 };
 
 // Get unread notification count
+// This function recalculates the count from actual notifications to ensure accuracy
 export const getUnreadNotificationCount = async (uid: string): Promise<number> => {
 	try {
-		const userDoc = await db.collection("users").doc(uid).get();
-		const exists = typeof userDoc.exists === 'function' ? userDoc.exists() : userDoc.exists;
-		if (!exists) {
-			return 0;
+		// Recalculate from actual notifications to ensure accuracy
+		const snapshot = await db
+			.collection("users")
+			.doc(uid)
+			.collection("notifications")
+			.where("read", "==", false)
+			.get();
+
+		const actualCount = snapshot.size;
+
+		// Update the cached count field to keep it in sync
+		const userRef = db.collection("users").doc(uid);
+		const userDoc = await userRef.get();
+		if (docExists(userDoc)) {
+			const cachedCount = userDoc.data()?.unreadNotificationCount || 0;
+			if (cachedCount !== actualCount) {
+				console.log(`[getUnreadNotificationCount] Syncing count: cached=${cachedCount}, actual=${actualCount}`);
+				await userRef.update({
+					unreadNotificationCount: actualCount,
+					updatedAt: require("@react-native-firebase/firestore").default.FieldValue.serverTimestamp(),
+				});
+			}
 		}
 
-		const data = userDoc.data();
-		return data?.unreadNotificationCount || 0;
+		return actualCount;
 	} catch (error: any) {
 		console.error("[getUnreadNotificationCount] Error:", error);
+		// Fallback to cached count if query fails
+		try {
+			const userDoc = await db.collection("users").doc(uid).get();
+			if (docExists(userDoc)) {
+				const data = userDoc.data();
+				return data?.unreadNotificationCount || 0;
+			}
+		} catch (fallbackError) {
+			console.error("[getUnreadNotificationCount] Fallback error:", fallbackError);
+		}
 		return 0;
 	}
 };
@@ -797,7 +812,7 @@ export const deleteNotification = async (
 			.doc(notificationId);
 
 		const notificationDoc = await notificationRef.get();
-		if (!notificationDoc.exists) {
+		if (!docExists(notificationDoc)) {
 			throw new Error("Notification not found");
 		}
 
@@ -820,6 +835,452 @@ export const deleteNotification = async (
 	} catch (error: any) {
 		console.error("[deleteNotification] Error:", error);
 		throw error;
+	}
+};
+
+// ============================================================================
+// GAME COMMENTS FUNCTIONS
+// ============================================================================
+
+import { GameComment } from "./types";
+export { GameComment };
+import { parsePuzzleId } from "./firebase";
+
+// Add a comment to a game
+export const addGameComment = async (
+	gameId: string,
+	userId: string,
+	text: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			throw new Error("Invalid gameId format");
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		// Get user data
+		const userDoc = await db.collection("users").doc(userId).get();
+		const userData = userDoc.data();
+
+		// Add comment
+		const commentsRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("comments");
+
+		await commentsRef.add({
+			userId,
+			username: userData?.username || "",
+			profilePicture: userData?.profilePicture || null,
+			text: text.trim(),
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			likes: 0,
+			likedBy: [],
+		});
+
+		// Increment comment count using FieldValue.increment for atomicity
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		await gameRef.set(
+			{
+				stats: {
+					commentCount: firestore.FieldValue.increment(1),
+				},
+			},
+			{ merge: true }
+		);
+	} catch (error: any) {
+		console.error("[addGameComment] Error:", error);
+		throw error;
+	}
+};
+
+// Fetch comments for a game
+export const fetchGameComments = async (
+	gameId: string,
+	limit: number = 50
+): Promise<GameComment[]> => {
+	try {
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			return [];
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const commentsRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("comments");
+
+		const snapshot = await commentsRef
+			.orderBy("createdAt", "desc")
+			.limit(limit)
+			.get();
+
+		const comments: GameComment[] = [];
+		snapshot.forEach((doc) => {
+			const data = doc.data();
+			comments.push({
+				id: doc.id,
+				userId: data.userId,
+				username: data.username || "",
+				profilePicture: data.profilePicture || null,
+				text: data.text,
+				createdAt: data.createdAt?.toDate() || new Date(),
+				likes: data.likes || 0,
+				likedBy: data.likedBy || [],
+			});
+		});
+
+		return comments.reverse(); // Show oldest first
+	} catch (error: any) {
+		console.error("[fetchGameComments] Error:", error);
+		return [];
+	}
+};
+
+// Like a comment
+export const likeGameComment = async (
+	gameId: string,
+	commentId: string,
+	userId: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			throw new Error("Invalid gameId format");
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const commentRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("comments")
+			.doc(commentId);
+
+		const commentDoc = await commentRef.get();
+		if (!docExists(commentDoc)) {
+			throw new Error("Comment not found");
+		}
+
+		const commentData = commentDoc.data();
+		const likedBy = commentData?.likedBy || [];
+
+		if (likedBy.includes(userId)) {
+			// Already liked, do nothing
+			return;
+		}
+
+		// Add user to likedBy and increment likes
+		await commentRef.update({
+			likedBy: firestore.FieldValue.arrayUnion(userId),
+			likes: firestore.FieldValue.increment(1),
+		});
+	} catch (error: any) {
+		console.error("[likeGameComment] Error:", error);
+		throw error;
+	}
+};
+
+// Unlike a comment
+export const unlikeGameComment = async (
+	gameId: string,
+	commentId: string,
+	userId: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			throw new Error("Invalid gameId format");
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const commentRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("comments")
+			.doc(commentId);
+
+		const commentDoc = await commentRef.get();
+		if (!docExists(commentDoc)) {
+			throw new Error("Comment not found");
+		}
+
+		const commentData = commentDoc.data();
+		const likedBy = commentData?.likedBy || [];
+
+		if (!likedBy.includes(userId)) {
+			// Not liked, do nothing
+			return;
+		}
+
+		// Remove user from likedBy and decrement likes
+		await commentRef.update({
+			likedBy: firestore.FieldValue.arrayRemove(userId),
+			likes: firestore.FieldValue.increment(-1),
+		});
+	} catch (error: any) {
+		console.error("[unlikeGameComment] Error:", error);
+		throw error;
+	}
+};
+
+// ============================================================================
+// GAME LIKES FUNCTIONS
+// ============================================================================
+
+// Like a game
+export const likeGame = async (
+	gameId: string,
+	userId: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			throw new Error("Invalid gameId format");
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const likesRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("likes")
+			.doc(userId);
+
+		const likeDoc = await likesRef.get();
+		if (docExists(likeDoc)) {
+			// Already liked
+			return;
+		}
+
+		// Add like document
+		await likesRef.set({
+			createdAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		// Increment like count in game stats using FieldValue.increment for atomicity
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		await gameRef.set(
+			{
+				stats: {
+					likeCount: firestore.FieldValue.increment(1),
+				},
+			},
+			{ merge: true }
+		);
+	} catch (error: any) {
+		console.error("[likeGame] Error:", error);
+		throw error;
+	}
+};
+
+// Unlike a game
+export const unlikeGame = async (
+	gameId: string,
+	userId: string
+): Promise<void> => {
+	try {
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			throw new Error("Invalid gameId format");
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const likesRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("likes")
+			.doc(userId);
+
+		const likeDoc = await likesRef.get();
+		if (!docExists(likeDoc)) {
+			// Not liked
+			return;
+		}
+
+		// Remove like
+		await likesRef.delete();
+
+		// Decrement like count in game stats using FieldValue.increment for atomicity
+		const firestore = require("@react-native-firebase/firestore").default;
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		await gameRef.set(
+			{
+				stats: {
+					likeCount: firestore.FieldValue.increment(-1),
+				},
+			},
+			{ merge: true }
+		);
+	} catch (error: any) {
+		console.error("[unlikeGame] Error:", error);
+		throw error;
+	}
+};
+
+// Check if a game is liked by a user
+export const checkGameLiked = async (
+	gameId: string,
+	userId: string
+): Promise<boolean> => {
+	try {
+		const parsed = parsePuzzleId(gameId);
+		if (!parsed) return false;
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		const likeRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId)
+			.collection("likes")
+			.doc(userId);
+
+		const likeDoc = await likeRef.get();
+		return docExists(likeDoc);
+	} catch (error: any) {
+		console.error("[checkGameLiked] Error:", error);
+		return false;
+	}
+};
+
+// Get like count for a game
+export const getGameLikeCount = async (gameId: string): Promise<number> => {
+	try {
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			return 0;
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		// Read from stats field first (more efficient)
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		const gameDoc = await gameRef.get();
+		if (docExists(gameDoc)) {
+			const gameData = gameDoc.data();
+			const likeCount = gameData?.stats?.likeCount;
+			console.log("[getGameLikeCount] Stats likeCount:", likeCount, "for", gameId);
+			if (typeof likeCount === "number" && likeCount >= 0) {
+				return likeCount;
+			}
+		}
+
+		// Fallback: count likes collection and update stats
+		console.log("[getGameLikeCount] No stats found, counting collection for", gameId);
+		const likesRef = gameRef.collection("likes");
+		const snapshot = await likesRef.get();
+		const count = snapshot.size;
+
+		// Update stats for next time
+		const firestore = require("@react-native-firebase/firestore").default;
+		await gameRef.set(
+			{ stats: { likeCount: count } },
+			{ merge: true }
+		);
+
+		return count;
+	} catch (error: any) {
+		console.error("[getGameLikeCount] Error:", error);
+		return 0;
+	}
+};
+
+// Get comment count for a game
+export const getGameCommentCount = async (gameId: string): Promise<number> => {
+	try {
+		const parsed = parsePuzzleId(gameId);
+
+		if (!parsed) {
+			return 0;
+		}
+
+		const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+		// Read from stats field first (more efficient)
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		const gameDoc = await gameRef.get();
+		if (docExists(gameDoc)) {
+			const gameData = gameDoc.data();
+			const commentCount = gameData?.stats?.commentCount;
+			console.log("[getGameCommentCount] Stats commentCount:", commentCount, "for", gameId);
+			if (typeof commentCount === "number" && commentCount >= 0) {
+				return commentCount;
+			}
+		}
+
+		// Fallback: count comments collection and update stats
+		console.log("[getGameCommentCount] No stats found, counting collection for", gameId);
+		const commentsRef = gameRef.collection("comments");
+		const snapshot = await commentsRef.get();
+		const count = snapshot.size;
+
+		// Update stats for next time
+		const firestore = require("@react-native-firebase/firestore").default;
+		await gameRef.set(
+			{ stats: { commentCount: count } },
+			{ merge: true }
+		);
+
+		return count;
+	} catch (error: any) {
+		console.error("[getGameCommentCount] Error:", error);
+		return 0;
 	}
 };
 

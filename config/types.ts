@@ -34,6 +34,8 @@ export interface Puzzle {
 	difficulty: number;
 	createdAt: string;
 	username?: string;
+	uid?: string; // Creator user ID
+	profilePicture?: string | null; // Creator profile picture
 }
 
 export interface WordleData {
@@ -195,4 +197,49 @@ export interface PuzzleStats {
 	averageTime: number;
 	fastestTime: number;
 	bestAttempts?: number; // for wordle/riddle - lowest number of tries
+	likeCount?: number; // Number of likes on the game
+}
+
+// Comment types
+export interface GameComment {
+	id: string;
+	userId: string;
+	username: string;
+	profilePicture?: string | null;
+	text: string;
+	createdAt: Date;
+	likes: number;
+	likedBy?: string[]; // Array of user IDs who liked this comment
+}
+
+// Message types
+export interface GameShare {
+	gameId: string;
+	gameType: string;
+	difficulty: string;
+}
+
+export interface Message {
+	id: string;
+	senderId: string;
+	senderUsername: string;
+	senderProfilePicture?: string | null;
+	text: string;
+	gameShare?: GameShare | null;
+	createdAt: Date;
+	read: boolean;
+}
+
+export interface Conversation {
+	id: string;
+	participants: string[];
+	lastMessage?: {
+		text: string;
+		senderId: string;
+		timestamp: Date;
+	};
+	lastRead?: { [userId: string]: Date };
+	createdAt: Date;
+	updatedAt: Date;
+	unreadCount?: number; // Computed field for current user
 }

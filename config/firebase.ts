@@ -11,6 +11,15 @@ import { PuzzleCompletion, PuzzleStats } from "./types";
 // from GoogleService-Info.plist (iOS) and google-services.json (Android)
 export const db = firestore();
 
+// Helper to check document existence - handles both property and method access
+// for compatibility with different React Native Firebase versions
+export const docExists = (doc: any): boolean => {
+	if (typeof doc.exists === 'function') {
+		return doc.exists() === true;
+	}
+	return doc.exists === true;
+};
+
 // Helper function to fetch games from Firestore
 export interface FirestoreGame {
 	id: string;
@@ -363,7 +372,7 @@ export const saveGameIdeaToFirestore = async (
 // Parse puzzleId to extract gameType, difficulty, and gameId
 // Format: {gameType}_{difficulty}_{gameId}
 // Note: puzzleId uses lowercase (e.g., "quickmath"), but Firestore uses camelCase (e.g., "quickMath")
-const parsePuzzleId = (
+export const parsePuzzleId = (
 	puzzleId: string
 ): { gameType: string; difficulty: string; gameId: string } | null => {
 	const parts = puzzleId.split("_");
@@ -431,7 +440,7 @@ export const savePuzzleCompletion = async (
 		await db.runTransaction(async (transaction) => {
 			const gameDoc = await transaction.get(gameRef);
 
-			if (!gameDoc.exists) {
+			if (!docExists(gameDoc)) {
 				console.warn(
 					`Game document not found: ${gameType}/${difficulty}/${gameId}`
 				);
@@ -547,7 +556,7 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 		await db.runTransaction(async (transaction) => {
 			const gameDoc = await transaction.get(gameRef);
 
-			if (!gameDoc.exists) {
+			if (!docExists(gameDoc)) {
 				console.warn(
 					`[trackGameSkipped] Game document not found: ${gameType}/${difficulty}/${gameId}`
 				);
@@ -609,7 +618,7 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 		await db.runTransaction(async (transaction) => {
 			const gameDoc = await transaction.get(gameRef);
 
-			if (!gameDoc.exists) {
+			if (!docExists(gameDoc)) {
 				console.warn(
 					`[trackGameAttempted] Game document not found: ${gameType}/${difficulty}/${gameId}`
 				);
@@ -672,7 +681,7 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 		await db.runTransaction(async (transaction) => {
 			const gameDoc = await transaction.get(gameRef);
 
-			if (!gameDoc.exists) {
+			if (!docExists(gameDoc)) {
 				console.warn(
 					`[trackGameCompleted] Game document not found: ${gameType}/${difficulty}/${gameId}`
 				);
@@ -737,7 +746,7 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 		await db.runTransaction(async (transaction) => {
 			const gameDoc = await transaction.get(gameRef);
 
-			if (!gameDoc.exists) {
+			if (!docExists(gameDoc)) {
 				console.warn(
 					`[decrementGameSkipped] Game document not found: ${gameType}/${difficulty}/${gameId}`
 				);
@@ -799,7 +808,7 @@ export const fetchPuzzleStats = async (
 
 		const gameDoc = await gameRef.get();
 
-		if (!gameDoc.exists) {
+		if (!docExists(gameDoc)) {
 			return null;
 		}
 
@@ -887,7 +896,7 @@ export const addGameHistory = async (
 		if (action === "completed") {
 			await db.runTransaction(async (transaction) => {
 				const existingDoc = await transaction.get(historyRef);
-				const existingData = existingDoc.exists ? existingDoc.data() : null;
+				const existingData = docExists(existingDoc) ? existingDoc.data() : null;
 
 				const historyData: any = {
 					gameId,
@@ -957,7 +966,7 @@ export const addGameHistory = async (
 		} else {
 			// For non-completed actions, use regular set with merge
 			const existingDoc = await historyRef.get();
-			const existingData = existingDoc.exists ? existingDoc.data() : null;
+			const existingData = docExists(existingDoc) ? existingDoc.data() : null;
 
 			const historyData: any = {
 				gameId,
@@ -1016,7 +1025,7 @@ export const checkGameHistory = async (
 
 		const doc = await historyRef.get();
 
-		if (!doc.exists) {
+		if (!docExists(doc)) {
 			return false;
 		}
 

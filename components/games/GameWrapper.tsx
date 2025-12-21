@@ -33,6 +33,9 @@ import HidatoGame from "./HidatoGame";
 import SudokuGame from "./SudokuGame";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
+import GameSocialOverlay from "../GameSocialOverlay";
+import CommentsModal from "../CommentsModal";
+import ShareToDMModal from "../ShareToDMModal";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
 import {
@@ -97,6 +100,7 @@ interface GameWrapperProps {
 	startTime?: number;
 	isActive?: boolean;
 	onElapsedTimeUpdate?: (puzzleId: string, elapsedTime: number) => void;
+	forceShowIntro?: boolean; // Force show intro regardless of dismissal state
 }
 
 const GameWrapper: React.FC<GameWrapperProps> = ({
@@ -107,27 +111,33 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	startTime,
 	isActive = true,
 	onElapsedTimeUpdate,
+	forceShowIntro = false,
 }) => {
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
+	const [showCommentsModal, setShowCommentsModal] = useState(false);
+	const [showShareModal, setShowShareModal] = useState(false);
 
 	// Check if this puzzle was completed before
 	const globalCompletedResult = completedGameResults.get(puzzle.id);
 	const [completedResult, setCompletedResult] = useState<GameResult | null>(
 		globalCompletedResult || null
 	);
+	// Track if completion happened in current session (for showing social overlay)
+	const [completedInSession, setCompletedInSession] = useState(false);
 
 	// Determine initial state based on game progress
 	// If intro was dismissed (game started), start with game shown, not intro
 	// If game was completed, don't show intro
+	// Unless forceShowIntro is true (when playing from profile page)
 	const introDismissed = dismissedIntros.has(puzzle.id);
 	const gameWasCompleted = !!globalCompletedResult;
 	const [showIntro, setShowIntro] = useState(
-		!introDismissed && !gameWasCompleted
+		forceShowIntro || (!introDismissed && !gameWasCompleted)
 	);
 	const [gameStarted, setGameStarted] = useState(
-		introDismissed || gameWasCompleted
+		!forceShowIntro && (introDismissed || gameWasCompleted)
 	);
 	const [actualStartTime, setActualStartTime] = useState<number | undefined>(
 		undefined
@@ -204,6 +214,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			previousPuzzleIdRef.current = puzzle.id;
 			// Reset completion processed flag when puzzle changes
 			completionProcessedRef.current = false;
+			// Reset session completion flag when puzzle changes
+			setCompletedInSession(false);
 
 			// Check if this puzzle has a completed result stored
 			const storedResult = completedGameResults.get(puzzle.id);
@@ -342,6 +354,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			// Store result for stats display (but don't show yet)
 			setCompletedResult(updatedResult);
+			// Mark as completed in this session (for social overlay)
+			setCompletedInSession(true);
 
 			// Store globally so it persists across tab switches
 			completedGameResults.set(puzzle.id, updatedResult);
@@ -675,6 +689,24 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						]}
 					>
 						{renderGame()}
+						{/* Social Overlay - only show when game is completed in this session */}
+						{(() => {
+							console.log(
+								"[GameWrapper] Checking social overlay conditions - completedInSession:",
+								completedInSession,
+								"completedResult:",
+								!!completedResult
+							);
+							return completedInSession && completedResult;
+						})() && (
+							<GameSocialOverlay
+								key={`social-${puzzle.id}`}
+								puzzle={puzzle}
+								gameId={puzzle.id}
+								onCommentPress={() => setShowCommentsModal(true)}
+								onSharePress={() => setShowShareModal(true)}
+							/>
+						)}
 					</View>
 				)
 			)}
@@ -719,6 +751,20 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 					</ScrollView>
 				</View>
 			)}
+
+			{/* Comments Modal */}
+			<CommentsModal
+				visible={showCommentsModal}
+				gameId={puzzle.id}
+				onClose={() => setShowCommentsModal(false)}
+			/>
+
+			{/* Share to DM Modal */}
+			<ShareToDMModal
+				visible={showShareModal}
+				gameId={puzzle.id}
+				onClose={() => setShowShareModal(false)}
+			/>
 		</Animated.View>
 	);
 };
