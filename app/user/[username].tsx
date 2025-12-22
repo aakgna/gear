@@ -284,7 +284,7 @@ const CreatorProfileScreen = () => {
 			puzzleId = gameId;
 		} else {
 			// Need to construct puzzleId (GameSummary case)
-			const gameType = "gameType" in game ? game.gameType : game.category || "";
+		const gameType = "gameType" in game ? game.gameType : game.category || "";
 			const difficulty =
 				"difficulty" in game ? game.difficulty : game.difficulty || "";
 			puzzleId = `${gameType}_${difficulty}_${gameId}`;
