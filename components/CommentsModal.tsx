@@ -205,7 +205,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 						/>
 					)}
 					<View style={styles.commentContent}>
-						<Text style={styles.commentUsername}>@{item.username}</Text>
+						<Text style={styles.commentUsername}>{item.username}</Text>
 						<Text style={styles.commentText}>{item.text}</Text>
 						<View style={styles.commentFooter}>
 							<Text style={styles.commentTime}>

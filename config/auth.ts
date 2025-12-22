@@ -460,8 +460,6 @@ export const addCompletedGame = async (
 		// Update stats only if answer was not revealed
 		if (timeTaken !== undefined && !answerRevealed) {
 			await updateUserStats(userId, gameId, timeTaken);
-		} else if (answerRevealed) {
-			console.log("[Stats] Answer was revealed - skipping user stats update");
 		}
 	} catch (error) {
 		console.error("Error adding completed game:", error);
@@ -620,24 +618,14 @@ export const moveFromSkippedToAttempted = async (
 	gameId: string
 ): Promise<boolean> => {
 	try {
-		console.log(
-			`[moveFromSkippedToAttempted] Checking if ${gameId} was previously skipped`
-		);
 		const { checkGameHistory, updateGameHistory } = require("./firebase");
 
 		// Check if this game was previously skipped using gameHistory
 		const wasSkipped = await checkGameHistory(userId, gameId, "skipped");
 
 		if (!wasSkipped) {
-			console.log(
-				`[moveFromSkippedToAttempted] Game ${gameId} was not previously skipped`
-			);
 			return false;
 		}
-
-		console.log(
-			`[moveFromSkippedToAttempted] Game ${gameId} was previously skipped, moving to attempted`
-		);
 
 		// Update gameHistory document to change action from "skipped" to "attempted"
 		await updateGameHistory(userId, gameId, {
@@ -685,10 +673,6 @@ export const moveFromSkippedToAttempted = async (
 				...currentCatStats,
 				skipped,
 			};
-
-			console.log(
-				`[moveFromSkippedToAttempted] Decremented category ${category} skipped from ${currentCatStats.skipped} to ${skipped}`
-			);
 		}
 
 		// Decrement difficulty skipped count
@@ -710,17 +694,10 @@ export const moveFromSkippedToAttempted = async (
 				...currentDiffStats,
 				skipped,
 			};
-
-			console.log(
-				`[moveFromSkippedToAttempted] Decremented difficulty ${difficulty} skipped from ${currentDiffStats.skipped} to ${skipped}`
-			);
 		}
 
 		// Update Firestore
 		await userRef.update(updateData);
-		console.log(
-			`[moveFromSkippedToAttempted] Successfully moved ${gameId} from skipped to attempted`
-		);
 
 		return true;
 	} catch (error) {
@@ -732,7 +709,6 @@ export const moveFromSkippedToAttempted = async (
 // Update attempted stats when user first interacts with a game
 const updateAttemptedStats = async (userId: string, gameId: string) => {
 	try {
-		console.log(`[updateAttemptedStats] Starting for gameId: ${gameId}`);
 		const firestore = require("@react-native-firebase/firestore").default;
 		const userRef = db.collection("users").doc(userId);
 		const userDoc = await userRef.get();
@@ -744,9 +720,6 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 
 		const userData = userDoc.data() as UserData;
 		const { category, difficulty } = parseGameId(gameId);
-		console.log(
-			`[updateAttemptedStats] Parsed gameId - category: ${category}, difficulty: ${difficulty}`
-		);
 
 		// Update attempted stats by category
 		const currentCategoryStats = userData.statsByCategory || {};
@@ -845,10 +818,6 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 				...(currentCategoryStats || {}),
 				...categoryStatsUpdate,
 			};
-			console.log(
-				`[updateAttemptedStats] Category stats update:`,
-				JSON.stringify(updateData["statsByCategory"], null, 2)
-			);
 		}
 
 		// Merge difficulty stats
@@ -857,20 +826,10 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 				...(currentDifficultyStats || {}),
 				...difficultyStatsUpdate,
 			};
-			console.log(
-				`[updateAttemptedStats] Difficulty stats update:`,
-				JSON.stringify(updateData["statsByDifficulty"], null, 2)
-			);
 		}
-
-		console.log(
-			`[updateAttemptedStats] Updating Firestore with data:`,
-			JSON.stringify(updateData, null, 2)
-		);
 
 		// Update Firestore
 		await userRef.update(updateData);
-		console.log(`[updateAttemptedStats] Successfully updated Firestore`);
 	} catch (error) {
 		console.error(
 			"[updateAttemptedStats] Error updating attempted stats:",

@@ -153,7 +153,7 @@ const InboxScreen = () => {
 					<View style={styles.conversationDetails}>
 						<View style={styles.conversationHeader}>
 							<Text style={styles.username}>
-								@{otherParticipant?.username || "user"}
+								{otherParticipant?.username || "user"}
 							</Text>
 							{item.lastMessage && (
 								<Text style={styles.timestamp}>

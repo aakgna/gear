@@ -100,7 +100,7 @@ const ShareToDMModal: React.FC<ShareToDMModalProps> = ({
 						/>
 					)}
 					<View style={styles.userDetails}>
-						<Text style={styles.username}>@{item.username || "user"}</Text>
+						<Text style={styles.username}>{item.username || "user"}</Text>
 						{item.bio && (
 							<Text style={styles.bio} numberOfLines={1}>
 								{item.bio}

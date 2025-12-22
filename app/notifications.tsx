@@ -234,7 +234,7 @@ const NotificationsScreen = () => {
 				<View style={styles.notificationContent}>
 					<Text style={styles.notificationText}>
 						<Text style={styles.username}>
-							@{notification.fromUsername}
+							{notification.fromUsername}
 						</Text>
 						{" followed you"}
 					</Text>

@@ -92,7 +92,6 @@ function deduplicateGames(games: Puzzle[]): Puzzle[] {
 	});
 
 	if (duplicateCount > 0) {
-		console.log(`[Dedupe] Removed ${duplicateCount} duplicate games`);
 	}
 
 	return Array.from(seen.values());
@@ -662,20 +661,8 @@ const FeedScreen = () => {
 
 				// Fetch Trivia
 				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
-				console.log(
-					`[Trivia] Fetched ${triviaGames.length} trivia games for ${difficulty}`
-				);
-				if (triviaGames.length > 0) {
-					console.log(
-						"[Trivia] First game:",
-						JSON.stringify(triviaGames[0], null, 2)
-					);
-				}
 				triviaGames.forEach((game) => {
 					if (game.questions && Array.isArray(game.questions)) {
-						console.log(
-							`[Trivia] Adding game ${game.id} with ${game.questions.length} questions`
-						);
 						allPuzzles.push({
 							id: `trivia_${difficulty}_${game.id}`,
 							type: "trivia",
@@ -689,11 +676,6 @@ const FeedScreen = () => {
 							uid: game.uid,
 							profilePicture: null,
 						});
-					} else {
-						console.log(
-							`[Trivia] Skipping game ${game.id} - invalid questions field:`,
-							game.questions
-						);
 					}
 				});
 
@@ -972,8 +954,6 @@ const FeedScreen = () => {
 			puzzleElapsedTimesRef.current = initialElapsedTimes;
 
 			// Generate recommendations and show immediately (no filtering yet!)
-			console.log("[Feed] Generating recommendations from all games...");
-
 			// Get simple recommendations from ALL games (no upfront filtering)
 			const recommended = getSimpleRecommendations(
 				allPuzzles,
@@ -995,10 +975,6 @@ const FeedScreen = () => {
 			const BATCH_SIZE = 15;
 			const firstBatch = uniqueInterleaved.slice(0, BATCH_SIZE);
 			setDisplayedPuzzles(firstBatch);
-
-			console.log(
-				`[Feed] Displaying first ${firstBatch.length} games immediately`
-			);
 
 			// Now filter displayed games in background (non-blocking)
 			const user = getCurrentUser();
@@ -1030,10 +1006,6 @@ const FeedScreen = () => {
 
 		const gameIds = uncheckedGames.map((g) => g.id);
 
-		console.log(
-			`[LazyFilter] Checking ${gameIds.length} games for completion status...`
-		);
-
 		// Fast check - only these specific games (not all 500!)
 		const completedIds = await batchCheckGameHistory(
 			user.uid,
@@ -1054,7 +1026,6 @@ const FeedScreen = () => {
 
 		// Remove completed games from display
 		if (completedIds.size > 0) {
-			console.log(`[LazyFilter] Removing ${completedIds.size} completed games`);
 			setDisplayedPuzzles((prev) =>
 				prev.filter((p) => !completedIds.has(p.id))
 			);
@@ -1065,7 +1036,6 @@ const FeedScreen = () => {
 	const fetchMoreGamesFromFirestore = async () => {
 		if (isFetchingMore || !hasMoreGamesToFetch) return;
 
-		console.log("[Prefetch] Starting background fetch of more games...");
 		setIsFetchingMore(true);
 
 		try {
@@ -1081,10 +1051,6 @@ const FeedScreen = () => {
 				...allRecommendedPuzzles.map((p) => p.id),
 			]);
 
-			console.log(
-				`[Prefetch] Currently have ${existingGameIds.size} unique games in pool`
-			);
-
 			// Fetch ONLY completed games from gameHistory
 			// (We want to allow previously skipped games to appear again)
 			const { fetchGameHistory } = require("../config/firebase");
@@ -1095,10 +1061,6 @@ const FeedScreen = () => {
 			// Create set of completed games (permanently exclude these)
 			const completedGameIds = new Set(
 				completedHistory.map((h: any) => h.gameId)
-			);
-
-			console.log(
-				`[Prefetch] User has completed ${completedGameIds.size} games (will exclude these)`
 			);
 
 			const newGames: Puzzle[] = [];
@@ -1172,20 +1134,8 @@ const FeedScreen = () => {
 
 				// Fetch Trivia
 				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
-				console.log(
-					`[Trivia Prefetch] Fetched ${triviaGames.length} trivia games for ${difficulty}`
-				);
-				if (triviaGames.length > 0) {
-					console.log(
-						"[Trivia Prefetch] First game:",
-						JSON.stringify(triviaGames[0], null, 2)
-					);
-				}
 				triviaGames.forEach((game) => {
 					if (game.questions && Array.isArray(game.questions)) {
-						console.log(
-							`[Trivia Prefetch] Adding game ${game.id} with ${game.questions.length} questions`
-						);
 						newGames.push({
 							id: `trivia_${difficulty}_${game.id}`,
 							type: "trivia",
@@ -1197,11 +1147,6 @@ const FeedScreen = () => {
 							createdAt: new Date().toISOString(),
 							username: game.username,
 						});
-					} else {
-						console.log(
-							`[Trivia Prefetch] Skipping game ${game.id} - invalid questions field:`,
-							game.questions
-						);
 					}
 				});
 
@@ -1451,14 +1396,9 @@ const FeedScreen = () => {
 			}
 
 			if (newGames.length === 0) {
-				console.log("[Prefetch] No more games available in Firestore");
 				setHasMoreGamesToFetch(false);
 				return;
 			}
-
-			console.log(
-				`[Prefetch] Fetched ${newGames.length} raw games from Firestore`
-			);
 
 			// Filter out games that:
 			// 1. We already have in our current pool (avoid immediate duplicates)
@@ -1470,16 +1410,9 @@ const FeedScreen = () => {
 			);
 
 			if (freshGames.length === 0) {
-				console.log(
-					"[Prefetch] No new games found - user may have completed everything!"
-				);
 				setHasMoreGamesToFetch(false);
 				return;
 			}
-
-			console.log(
-				`[Prefetch] ${freshGames.length} fresh games after filtering (not in current pool, not completed)`
-			);
 
 			// Add fresh games to puzzles pool
 			setPuzzles((prev) => [...prev, ...freshGames]);
@@ -1500,18 +1433,8 @@ const FeedScreen = () => {
 				// Filter out any games that somehow already exist
 				const newUnique = interleaved.filter((g) => !existingIds.has(g.id));
 
-				if (newUnique.length < interleaved.length) {
-					console.log(
-						`[Dedupe] Filtered ${
-							interleaved.length - newUnique.length
-						} duplicates during prefetch append`
-					);
-				}
-
 				return [...prev, ...newUnique];
 			});
-
-			console.log(`[Prefetch] Added fresh recommended games to pool`);
 		} catch (error) {
 			console.error("[Prefetch] Error fetching more games:", error);
 		} finally {
@@ -1537,7 +1460,6 @@ const FeedScreen = () => {
 		const percentageViewed =
 			displayedPuzzles.length / allRecommendedPuzzles.length;
 		if (percentageViewed >= 0.9 && !isFetchingMore && hasMoreGamesToFetch) {
-			console.log("[Prefetch] At 90%, fetching more games in background...");
 			fetchMoreGamesFromFirestore(); // Don't await - background operation
 		}
 
@@ -1550,8 +1472,6 @@ const FeedScreen = () => {
 		);
 
 		if (nextBatch.length > 0) {
-			console.log(`[Feed] Loading next ${nextBatch.length} games`);
-
 			// Check completion for this batch only
 			await filterDisplayedGamesInBackground(nextBatch);
 
@@ -1565,13 +1485,7 @@ const FeedScreen = () => {
 				const displayedIds = new Set(displayedPuzzles.map((p) => p.id));
 				const uniqueBatch = filtered.filter((g) => !displayedIds.has(g.id));
 
-				if (uniqueBatch.length < filtered.length) {
-					console.log(
-						`[Dedupe] Filtered ${
-							filtered.length - uniqueBatch.length
-						} duplicates from batch`
-					);
-				}
+				// Deduplication handled silently
 
 				if (uniqueBatch.length > 0) {
 					setDisplayedPuzzles([...displayedPuzzles, ...uniqueBatch]);
@@ -1624,29 +1538,17 @@ const FeedScreen = () => {
 						const wasAlreadySkipped =
 							skippedPuzzlesRef.current.has(currentTabPuzzleId);
 
-						console.log(
-							`[SKIP CHECK] Puzzle: ${currentTabPuzzleId}, wasCompleted: ${wasCompleted}, wasAttempted: ${wasAttempted}, wasAlreadySkipped: ${wasAlreadySkipped}`
-						);
-
 						const user = getCurrentUser();
 
 						if (!wasCompleted && wasAttempted && !wasAlreadySkipped) {
 							// User attempted but didn't complete - mark as attempted
-							console.log(
-								`[ATTEMPTED] User attempted but didn't complete: ${currentTabPuzzleId}`
-							);
 							skippedPuzzlesRef.current.add(currentTabPuzzleId); // Still mark as "left" so we don't track again
 
 							// Call addAttemptedGame to update user stats
 							if (user) {
-								console.log(
-									`[ATTEMPTED] Calling addAttemptedGame for user ${user.uid}`
-								);
 								addAttemptedGame(user.uid, currentTabPuzzleId)
 									.then(() => {
-										console.log(
-											`[ATTEMPTED] Successfully tracked attempted game: ${currentTabPuzzleId}`
-										);
+										// Successfully tracked
 									})
 									.catch((error) => {
 										console.error(
@@ -1654,8 +1556,6 @@ const FeedScreen = () => {
 											error
 										);
 									});
-							} else {
-								console.log("[ATTEMPTED] No user found, cannot track");
 							}
 
 							// Track attempted at global game level
@@ -1743,14 +1643,10 @@ const FeedScreen = () => {
 	const handleGameAttempt = (puzzleId: string) => {
 		// Mark puzzle as attempted in this session
 		if (!attemptedPuzzlesRef.current.has(puzzleId)) {
-			console.log(`[SESSION] Marking puzzle as attempted: ${puzzleId}`);
 			attemptedPuzzlesRef.current.add(puzzleId);
 
 			// If this game was previously marked as skipped in this session, remove it
 			if (skippedPuzzlesRef.current.has(puzzleId)) {
-				console.log(
-					`[SESSION] Removing ${puzzleId} from skipped session tracking`
-				);
 				skippedPuzzlesRef.current.delete(puzzleId);
 			}
 
@@ -1797,10 +1693,6 @@ const FeedScreen = () => {
 						error
 					);
 				});
-			} else {
-				console.log(
-					"[COMPLETED] Answer was revealed - skipping global completion tracking"
-				);
 			}
 		}
 

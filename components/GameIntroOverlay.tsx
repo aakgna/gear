@@ -1049,7 +1049,7 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 							onPress={() => router.push(`/user/${username}`)}
 							activeOpacity={0.7}
 						>
-							<Text style={styles.createdByText}>created by @{username}</Text>
+							<Text style={styles.createdByText}>created by {username}</Text>
 						</TouchableOpacity>
 					)}
 				</View>

@@ -234,12 +234,8 @@ const ProfileScreen = () => {
 			previousPath === "/notifications" &&
 			currentUser
 		) {
-			console.log(
-				"[Profile] Refreshing notification count after returning from notifications"
-			);
 			const refreshNotificationCount = async () => {
 				const count = await getUnreadNotificationCount(currentUser.uid);
-				console.log("[Profile] New notification count:", count);
 				setUnreadNotificationCount(count);
 			};
 			refreshNotificationCount();
@@ -251,16 +247,12 @@ const ProfileScreen = () => {
 			(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
 			currentUser
 		) {
-			console.log(
-				"[Profile] Refreshing message count after returning from inbox/chat"
-			);
 			const refreshMessageCount = async () => {
 				const conversations = await fetchConversations(currentUser.uid);
 				const totalUnread = conversations.reduce(
 					(sum, conv) => sum + (conv.unreadCount || 0),
 					0
 				);
-				console.log("[Profile] New message count:", totalUnread);
 				setUnreadMessageCount(totalUnread);
 			};
 			refreshMessageCount();
@@ -269,19 +261,12 @@ const ProfileScreen = () => {
 		// Also refresh counts whenever we're on profile (in case navigation detection fails)
 		// This ensures counts are always fresh when viewing profile
 		if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
-			console.log("[Profile] Profile screen focused, refreshing counts");
 			const refreshAllCounts = async () => {
 				const notifCount = await getUnreadNotificationCount(currentUser.uid);
 				const conversations = await fetchConversations(currentUser.uid);
 				const messageCount = conversations.reduce(
 					(sum, conv) => sum + (conv.unreadCount || 0),
 					0
-				);
-				console.log(
-					"[Profile] Refreshed counts - notifications:",
-					notifCount,
-					"messages:",
-					messageCount
 				);
 				setUnreadNotificationCount(notifCount);
 				setUnreadMessageCount(messageCount);
@@ -363,12 +348,6 @@ const ProfileScreen = () => {
 			puzzleId = `${gameType}_${difficulty}_${gameId}`;
 		}
 
-		console.log("[Profile] Navigating to play-game with puzzleId:", puzzleId);
-		console.log("[Profile] Game details:", {
-			gameId,
-			puzzleId,
-			isFullPuzzleId: parts.length >= 3,
-		});
 		// Use href format for Expo Router dynamic routes
 		router.push({
 			pathname: "/play-game/[gameId]",
@@ -540,9 +519,7 @@ const ProfileScreen = () => {
 			{/* Header */}
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
 				<View style={styles.headerSpacer} />
-				<Text style={styles.headerTitle}>
-					@{userData?.username || "username"}
-				</Text>
+
 				<View style={styles.headerActions}>
 					<TouchableOpacity
 						style={styles.headerButton}
@@ -679,7 +656,7 @@ const ProfileScreen = () => {
 					</View>
 
 					<Text style={styles.usernameText}>
-						@{userData?.username || userProfile?.username || "username"}
+						{userData?.username || userProfile?.username || "username"}
 					</Text>
 
 					{/* Stats Row - Following, Followers, Games Created */}

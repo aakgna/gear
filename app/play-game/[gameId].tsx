@@ -73,10 +73,6 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 		}
 		// Other game types (wordle, riddle, trivia, mastermind, sequencing, alias, zip, futoshiki, hidato, sudoku) use lowercase in both
 
-		console.log(
-			`[loadGameByPuzzleId] Normalized gameType: ${parts[0]} -> ${gameType}`
-		);
-
 		// Fetch game from Firestore
 		const gameDoc = await db
 			.collection("games")
@@ -336,8 +332,6 @@ const PlayGameScreen = () => {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		console.log("[PlayGameScreen] Mounted with gameId:", gameId);
-		console.log("[PlayGameScreen] All params:", params);
 		if (gameId) {
 			loadGame();
 		} else {
@@ -354,17 +348,12 @@ const PlayGameScreen = () => {
 			return;
 		}
 
-		console.log("[PlayGameScreen] Loading game with puzzleId:", gameId);
 		setLoading(true);
 		setError(null);
 
 		try {
 			const loadedPuzzle = await loadGameByPuzzleId(gameId);
 			if (loadedPuzzle) {
-				console.log(
-					"[PlayGameScreen] Game loaded successfully:",
-					loadedPuzzle.id
-				);
 				setPuzzle(loadedPuzzle);
 			} else {
 				console.error("[PlayGameScreen] Game not found for puzzleId:", gameId);

@@ -334,7 +334,7 @@ const ChatScreen = () => {
 						/>
 					)}
 					<Text style={styles.headerTitle}>
-						@{otherParticipant?.username || "user"}
+						{otherParticipant?.username || "user"}
 					</Text>
 				</View>
 				<View style={styles.backButton} />

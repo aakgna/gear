@@ -146,7 +146,7 @@ const SearchFriendsScreen = () => {
 						/>
 					)}
 					<View style={styles.userInfo}>
-						<Text style={styles.username}>@{user.username}</Text>
+						<Text style={styles.username}>{user.username}</Text>
 						{user.bio && (
 							<Text style={styles.bio} numberOfLines={1}>
 								{user.bio}

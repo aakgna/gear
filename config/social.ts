@@ -46,8 +46,6 @@ export const followUser = async (
 	targetUid: string
 ): Promise<void> => {
 	try {
-		console.log(`[followUser] START: ${currentUid} -> ${targetUid}`);
-		
 		if (currentUid === targetUid) {
 			throw new Error("Cannot follow yourself");
 		}
@@ -59,8 +57,6 @@ export const followUser = async (
 		const currentUserDoc = await currentUserRef.get();
 		const currentUserData = currentUserDoc.data();
 		const currentUserExists = docExists(currentUserDoc);
-		console.log(`[followUser] Current user doc exists: ${currentUserExists}`);
-		console.log(`[followUser] Current user data:`, JSON.stringify(currentUserData, null, 2));
 
 		// Use batch to ensure atomicity
 		const batch = db.batch();
@@ -71,7 +67,6 @@ export const followUser = async (
 			.doc(currentUid)
 			.collection("following")
 			.doc(targetUid);
-		console.log(`[followUser] Following ref path: users/${currentUid}/following/${targetUid}`);
 
 		// Add to target user's followers list
 		const targetUserFollowersRef = db
@@ -79,29 +74,23 @@ export const followUser = async (
 			.doc(targetUid)
 			.collection("followers")
 			.doc(currentUid);
-		console.log(`[followUser] Followers ref path: users/${targetUid}/followers/${currentUid}`);
 
 		// Check if already following
 		const currentFollowingDoc = await currentUserFollowingRef.get();
 		const alreadyExists = docExists(currentFollowingDoc);
-		console.log(`[followUser] Already following check: ${alreadyExists}`);
 		if (alreadyExists) {
 			// Already following, return silently (not an error)
-			console.log(`[followUser] User ${currentUid} is already following ${targetUid}`);
 			return;
 		}
 
 		// Add follow relationships
-		console.log(`[followUser] Adding follow relationships to batch...`);
 		batch.set(currentUserFollowingRef, {
 			followedAt: firestore.FieldValue.serverTimestamp(),
 		});
-		console.log(`[followUser] Added to batch: following relationship`);
 
 		batch.set(targetUserFollowersRef, {
 			followedAt: firestore.FieldValue.serverTimestamp(),
 		});
-		console.log(`[followUser] Added to batch: followers relationship`);
 
 		// Create notification for target user
 		const notificationRef = db
@@ -109,7 +98,6 @@ export const followUser = async (
 			.doc(targetUid)
 			.collection("notifications")
 			.doc(); // Auto-generated ID
-		console.log(`[followUser] Notification ref path: users/${targetUid}/notifications/${notificationRef.id}`);
 
 		batch.set(notificationRef, {
 			type: "follow",
@@ -119,7 +107,6 @@ export const followUser = async (
 			createdAt: firestore.FieldValue.serverTimestamp(),
 			read: false,
 		});
-		console.log(`[followUser] Added to batch: notification`);
 
 		// Update follower/following counts
 		// currentUserRef already defined above, reuse it
@@ -130,15 +117,12 @@ export const followUser = async (
 		
 		// Update current user's followingCount (reuse currentUserDoc from above)
 		const currentFollowingCount = currentUserDoc.data()?.followingCount;
-		console.log(`[followUser] Current user followingCount: ${currentFollowingCount}`);
 		if (currentFollowingCount === undefined || currentFollowingCount === null) {
-			console.log(`[followUser] Initializing current user followingCount to 1`);
 			batch.set(currentUserRef, {
 				followingCount: 1,
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			}, { merge: true });
 		} else {
-			console.log(`[followUser] Incrementing current user followingCount`);
 			batch.update(currentUserRef, {
 				followingCount: firestore.FieldValue.increment(1),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
@@ -148,17 +132,14 @@ export const followUser = async (
 		// Update target user's followerCount
 		const targetFollowerCount = targetUserDoc.data()?.followerCount;
 		const targetUnreadCount = targetUserDoc.data()?.unreadNotificationCount ?? 0;
-		console.log(`[followUser] Target user followerCount: ${targetFollowerCount}, unreadCount: ${targetUnreadCount}`);
 		
 		if (targetFollowerCount === undefined || targetFollowerCount === null) {
-			console.log(`[followUser] Initializing target user followerCount to 1`);
 			batch.set(targetUserRef, {
 				followerCount: 1,
 				unreadNotificationCount: targetUnreadCount + 1,
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			}, { merge: true });
 		} else {
-			console.log(`[followUser] Incrementing target user followerCount`);
 			batch.update(targetUserRef, {
 				followerCount: firestore.FieldValue.increment(1),
 				unreadNotificationCount: firestore.FieldValue.increment(1),
@@ -166,26 +147,14 @@ export const followUser = async (
 			});
 		}
 
-		console.log(`[followUser] Committing batch...`);
 		await batch.commit();
-		console.log(`[followUser] Batch committed successfully!`);
-		console.log(`[followUser] User ${currentUid} followed ${targetUid}`);
 		
 		// Verify the follow relationship was created
-		console.log(`[followUser] Verifying follow relationship...`);
 		const verifyFollowingDoc = await currentUserFollowingRef.get();
 		const followingExists = docExists(verifyFollowingDoc);
-		console.log(`[followUser] Verification - following doc exists: ${followingExists}`);
-		if (followingExists) {
-			console.log(`[followUser] Verification - following doc data:`, JSON.stringify(verifyFollowingDoc.data(), null, 2));
-		}
 		
 		const verifyFollowersDoc = await targetUserFollowersRef.get();
 		const followersExists = docExists(verifyFollowersDoc);
-		console.log(`[followUser] Verification - followers doc exists: ${followersExists}`);
-		if (followersExists) {
-			console.log(`[followUser] Verification - followers doc data:`, JSON.stringify(verifyFollowersDoc.data(), null, 2));
-		}
 		
 		if (!followingExists) {
 			console.error(`[followUser] ERROR: Follow relationship not created for ${currentUid} -> ${targetUid}`);
@@ -198,8 +167,6 @@ export const followUser = async (
 			console.error(`[followUser] Followers path: users/${targetUid}/followers/${currentUid}`);
 			throw new Error("Failed to create follower relationship");
 		}
-		
-		console.log(`[followUser] SUCCESS: Both relationships verified for ${currentUid} <-> ${targetUid}`);
 	} catch (error: any) {
 		console.error("[followUser] Error:", error);
 		// Log more details about the error
@@ -285,7 +252,6 @@ export const unfollowUser = async (
 		}
 
 		await batch.commit();
-		console.log(`[unfollowUser] User ${currentUid} unfollowed ${targetUid}`);
 	} catch (error: any) {
 		console.error("[unfollowUser] Error:", error);
 		throw error;
@@ -304,20 +270,10 @@ export const isFollowing = async (
 			.collection("following")
 			.doc(targetUid);
 
-		console.log(`[isFollowing] Checking: users/${currentUid}/following/${targetUid}`);
 		const doc = await followingRef.get();
 		
 		// Check if document exists - handle both property and method cases
 		const exists = docExists(doc);
-		console.log(`[isFollowing] Document exists: ${exists}`);
-		console.log(`[isFollowing] Document snapshot:`, doc);
-		
-		if (exists) {
-			const data = doc.data();
-			console.log(`[isFollowing] Document data:`, JSON.stringify(data, null, 2));
-		} else {
-			console.log(`[isFollowing] Document does not exist at path: users/${currentUid}/following/${targetUid}`);
-		}
 		return !!exists;
 	} catch (error: any) {
 		console.error("[isFollowing] Error:", error);
@@ -773,7 +729,6 @@ export const getUnreadNotificationCount = async (uid: string): Promise<number> =
 		if (docExists(userDoc)) {
 			const cachedCount = userDoc.data()?.unreadNotificationCount || 0;
 			if (cachedCount !== actualCount) {
-				console.log(`[getUnreadNotificationCount] Syncing count: cached=${cachedCount}, actual=${actualCount}`);
 				await userRef.update({
 					unreadNotificationCount: actualCount,
 					updatedAt: require("@react-native-firebase/firestore").default.FieldValue.serverTimestamp(),
@@ -1210,14 +1165,12 @@ export const getGameLikeCount = async (gameId: string): Promise<number> => {
 		if (docExists(gameDoc)) {
 			const gameData = gameDoc.data();
 			const likeCount = gameData?.stats?.likeCount;
-			console.log("[getGameLikeCount] Stats likeCount:", likeCount, "for", gameId);
 			if (typeof likeCount === "number" && likeCount >= 0) {
 				return likeCount;
 			}
 		}
 
 		// Fallback: count likes collection and update stats
-		console.log("[getGameLikeCount] No stats found, counting collection for", gameId);
 		const likesRef = gameRef.collection("likes");
 		const snapshot = await likesRef.get();
 		const count = snapshot.size;
@@ -1258,14 +1211,12 @@ export const getGameCommentCount = async (gameId: string): Promise<number> => {
 		if (docExists(gameDoc)) {
 			const gameData = gameDoc.data();
 			const commentCount = gameData?.stats?.commentCount;
-			console.log("[getGameCommentCount] Stats commentCount:", commentCount, "for", gameId);
 			if (typeof commentCount === "number" && commentCount >= 0) {
 				return commentCount;
 			}
 		}
 
 		// Fallback: count comments collection and update stats
-		console.log("[getGameCommentCount] No stats found, counting collection for", gameId);
 		const commentsRef = gameRef.collection("comments");
 		const snapshot = await commentsRef.get();
 		const count = snapshot.size;

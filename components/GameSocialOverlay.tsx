@@ -41,28 +41,12 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	onCommentPress,
 	onSharePress,
 }) => {
-	console.log(
-		"[GameSocialOverlay] FUNCTION CALLED - gameId:",
-		gameId,
-		"puzzle.uid:",
-		puzzle.uid
-	);
 	const router = useRouter();
 	const currentUser = getCurrentUser();
-	console.log("[GameSocialOverlay] currentUser:", currentUser?.uid);
 	const [isFollowingCreator, setIsFollowingCreator] = useState(false);
 	const [isLiked, setIsLiked] = useState(false);
 	const [likeCount, setLikeCount] = useState(0);
 	const [commentCount, setCommentCount] = useState(0);
-
-	// Debug: log state changes
-	useEffect(() => {
-		console.log("[GameSocialOverlay] likeCount changed to:", likeCount);
-	}, [likeCount]);
-
-	useEffect(() => {
-		console.log("[GameSocialOverlay] commentCount changed to:", commentCount);
-	}, [commentCount]);
 	const [loadingFollow, setLoadingFollow] = useState(false);
 	const [loadingLike, setLoadingLike] = useState(false);
 	const [loading, setLoading] = useState(true);
@@ -71,32 +55,12 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	const creatorUsername = puzzle.username;
 	const creatorProfilePicture = puzzle.profilePicture;
 
-	// Debug: log when component renders
-	console.log(
-		"[GameSocialOverlay] Component rendered - gameId:",
-		gameId,
-		"creatorId:",
-		creatorId,
-		"currentUser:",
-		currentUser?.uid
-	);
-
 	// Simple fetch on mount - get counts directly from game document
 	useEffect(() => {
-		console.log("=== [GameSocialOverlay] useEffect STARTED ===");
-		console.log(
-			"[GameSocialOverlay] useEffect RUNNING - currentUser:",
-			!!currentUser,
-			"creatorId:",
-			creatorId
-		);
 		if (!currentUser) {
-			console.log("[GameSocialOverlay] No currentUser, returning");
 			setLoading(false);
 			return;
 		}
-
-		console.log("[GameSocialOverlay] Loading counts for gameId:", gameId);
 
 		// Parse gameId to get Firestore path
 		const parsed = parsePuzzleId(gameId);
@@ -115,11 +79,8 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 
 		// Simple one-time fetch
 		const loadCounts = async () => {
-			console.log("[GameSocialOverlay] loadCounts function called");
 			try {
-				console.log("[GameSocialOverlay] About to fetch game document...");
 				const doc = await gameRef.get();
-				console.log("doc nigger", doc.data());
 				if (docExists(doc)) {
 					const data = doc.data();
 					const stats = data?.stats || {};
@@ -127,7 +88,6 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 					// Get counts from stats field
 					let likeCount = 0;
 					let commentCount = 0;
-					console.log("stats.likeCount", stats.likeCount);
 					if (typeof stats.likeCount === "number") {
 						likeCount = stats.likeCount;
 					} else {
@@ -135,7 +95,6 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 						const likesSnapshot = await gameRef.collection("likes").get();
 						likeCount = likesSnapshot.size;
 					}
-					console.log("stats.commentCount", stats.commentCount);
 					if (typeof stats.commentCount === "number") {
 						commentCount = stats.commentCount;
 					} else {
@@ -144,26 +103,13 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 						commentCount = commentsSnapshot.size;
 					}
 
-					console.log(
-						"[GameSocialOverlay] Loaded counts - likes:",
-						likeCount,
-						"comments:",
-						commentCount
-					);
-					console.log("likeCount", likeCount);
-					console.log("commentCount", commentCount);
-					console.log("About to set state...");
 					try {
 						setLikeCount(likeCount);
-						console.log("setLikeCount called successfully");
 						setCommentCount(commentCount);
-						console.log("setCommentCount called successfully");
-						console.log("we here bitches - state set complete");
 					} catch (stateError) {
 						console.error("Error setting state:", stateError);
 					}
 				} else {
-					console.log("[GameSocialOverlay] Game document doesn't exist");
 					setLikeCount(0);
 					setCommentCount(0);
 				}
@@ -191,17 +137,8 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 				console.error("[GameSocialOverlay] Error loading user data:", error);
 			}
 		};
-		console.log(
-			"[GameSocialOverlay] About to call loadCounts and loadUserData"
-		);
 		loadCounts();
 		loadUserData();
-
-		return () => {
-			console.log(
-				"[GameSocialOverlay] useEffect cleanup - component unmounting"
-			);
-		};
 	}, [gameId, creatorId, currentUser]);
 
 	const handleFollowPress = async () => {

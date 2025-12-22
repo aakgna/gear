@@ -132,7 +132,6 @@ const CreatorProfileScreen = () => {
 			// Check if current user follows this profile
 			if (currentUser && !isOwnProfile) {
 				const following = await isFollowing(currentUser.uid, userProfile.uid);
-				console.log(`[loadProfile] isFollowing check for ${currentUser.uid} -> ${userProfile.uid}: ${following}`);
 				setIsFollowingUser(following);
 			} else if (isOwnProfile) {
 				// Reset following state for own profile
@@ -232,23 +231,18 @@ const CreatorProfileScreen = () => {
 					setIsFollowingUser(true);
 					return;
 				}
-				console.log(`[handleFollow] Calling followUser(${currentUser.uid}, ${profile.uid})`);
 				await followUser(currentUser.uid, profile.uid);
-				console.log(`[handleFollow] followUser completed`);
 				
 				// Small delay to ensure Firestore has propagated the change
 				await new Promise(resolve => setTimeout(resolve, 500));
 				
 				// Verify the follow was successful
-				console.log(`[handleFollow] Verifying follow relationship...`);
 				const verifyFollowing = await isFollowing(currentUser.uid, profile.uid);
-				console.log(`[handleFollow] Verification result: ${verifyFollowing}`);
 				if (!verifyFollowing) {
 					console.error("[handleFollow] Follow action completed but relationship not found - retrying check");
 					// Retry once more after a longer delay
 					await new Promise(resolve => setTimeout(resolve, 1000));
 					const retryFollowing = await isFollowing(currentUser.uid, profile.uid);
-					console.log(`[handleFollow] Retry verification result: ${retryFollowing}`);
 					if (!retryFollowing) {
 						console.error("[handleFollow] Follow relationship still not found after retry");
 						console.error(`[handleFollow] Checking Firestore path: users/${currentUser.uid}/following/${profile.uid}`);
@@ -296,7 +290,6 @@ const CreatorProfileScreen = () => {
 			puzzleId = `${gameType}_${difficulty}_${gameId}`;
 		}
 
-		console.log("[UserProfile] Navigating to play-game with puzzleId:", puzzleId);
 		// Use href format for Expo Router dynamic routes
 		router.push({
 			pathname: "/play-game/[gameId]",
@@ -391,7 +384,7 @@ const CreatorProfileScreen = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>@{profile.username}</Text>
+				<Text style={styles.headerTitle}>{profile.username}</Text>
 				<TouchableOpacity style={styles.menuButton}>
 					<Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
@@ -425,7 +418,7 @@ const CreatorProfileScreen = () => {
 						)}
 					</View>
 
-					<Text style={styles.usernameText}>@{profile.username}</Text>
+					<Text style={styles.usernameText}>{profile.username}</Text>
 
 					{/* Stats Row 1 - Following, Followers, Games Created */}
 					<View style={styles.statsRow}>

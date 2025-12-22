@@ -300,9 +300,6 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const handleComplete = async (result: GameResult) => {
 		// Prevent duplicate processing
 		if (completionProcessedRef.current) {
-			console.log(
-				"[GameWrapper] Completion already processed, skipping duplicate call"
-			);
 			onComplete(result);
 			return;
 		}
@@ -690,15 +687,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 					>
 						{renderGame()}
 						{/* Social Overlay - only show when game is completed in this session */}
-						{(() => {
-							console.log(
-								"[GameWrapper] Checking social overlay conditions - completedInSession:",
-								completedInSession,
-								"completedResult:",
-								!!completedResult
-							);
-							return completedInSession && completedResult;
-						})() && (
+						{completedInSession && completedResult && (
 							<GameSocialOverlay
 								key={`social-${puzzle.id}`}
 								puzzle={puzzle}

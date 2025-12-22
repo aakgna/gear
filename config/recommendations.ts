@@ -68,10 +68,6 @@ export function getSimpleRecommendations(
 	userData: UserData | null,
 	batchSize: number = 15
 ): Puzzle[] {
-	console.log(
-		`[SimpleRecs] Generating ${batchSize} recommendations from ${availableGames.length} available games`
-	);
-
 	// If no games available, return empty
 	if (availableGames.length === 0) {
 		return [];
@@ -79,7 +75,6 @@ export function getSimpleRecommendations(
 
 	// If not enough games, return all shuffled
 	if (availableGames.length <= batchSize) {
-		console.log("[SimpleRecs] Not enough games, returning all shuffled");
 		return shuffleArray(availableGames);
 	}
 
@@ -87,18 +82,10 @@ export function getSimpleRecommendations(
 	const preferredCount = Math.floor(batchSize * 0.67);
 	const randomCount = batchSize - preferredCount;
 
-	console.log(
-		`[SimpleRecs] Target: ${preferredCount} preferred, ${randomCount} random`
-	);
-
 	// Determine user preferences
 	const favoriteCategory = getFavoriteCategory(userData?.statsByCategory);
 	const preferredDifficulty = getPreferredDifficulty(
 		userData?.statsByDifficulty
-	);
-
-	console.log(
-		`[SimpleRecs] User preferences: category=${favoriteCategory}, difficulty=${preferredDifficulty}`
 	);
 
 	// === PREFERRED GAMES (67%) ===
@@ -109,9 +96,6 @@ export function getSimpleRecommendations(
 
 	// If not enough in preferred category, use all games
 	if (preferredGames.length < preferredCount) {
-		console.log(
-			`[SimpleRecs] Not enough ${favoriteCategory} games (${preferredGames.length}), using all categories`
-		);
 		preferredGames = availableGames;
 	}
 
@@ -151,7 +135,6 @@ export function getSimpleRecommendations(
 		selectedPreferred.push(...unselected.slice(0, remaining));
 	}
 
-	console.log(`[SimpleRecs] Selected ${selectedPreferred.length} preferred games`);
 
 	// === RANDOM EXPLORATION GAMES (33%) ===
 	// Filter games from OTHER categories (not favorite)
@@ -177,14 +160,8 @@ export function getSimpleRecommendations(
 	// Shuffle and pick random games
 	const selectedRandom = shuffleArray(explorationGames).slice(0, randomCount);
 
-	console.log(`[SimpleRecs] Selected ${selectedRandom.length} random games`);
-
 	// Combine and shuffle final batch
 	const finalBatch = shuffleArray([...selectedPreferred, ...selectedRandom]);
-
-	console.log(
-		`[SimpleRecs] Final batch: ${finalBatch.length} games (${finalBatch.filter((g) => g.type === favoriteCategory).length} ${favoriteCategory}, ${finalBatch.filter((g) => g.type !== favoriteCategory).length} others)`
-	);
 
 	return finalBatch;
 }
@@ -192,7 +169,6 @@ export function getSimpleRecommendations(
 // Interleave games by type for visual variety
 // Takes games and arranges them so types alternate: QM → W → WC → R → QM → W ...
 export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
-	console.log(`[Interleave] Processing ${games.length} games`);
 
 	// Group by type
 	const byType: Record<string, Puzzle[]> = {
@@ -229,12 +205,6 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 			}
 		}
 	}
-
-	console.log(
-		`[Interleave] Result: ${interleaved.length} games`,
-		`(${byType.quickMath.length} QM, ${byType.wordle.length} W,`,
-		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.trivia.length} T, ${byType.alias.length} A, ${byType.zip.length} Z, ${byType.futoshiki.length} F, ${byType.magicSquare.length} MS, ${byType.hidato.length} H, ${byType.sudoku.length} S)`
-	);
 
 	return interleaved;
 }

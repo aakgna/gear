@@ -124,7 +124,6 @@ export const fetchGamesFromFirestore = async (
 		const snapshot = await gamesRef.get();
 
 		if (snapshot.empty) {
-			console.log(`No ${difficulty} ${gameType} games found in Firestore`);
 			return [];
 		}
 
@@ -266,20 +265,7 @@ export const saveGameToFirestore = async (
 			gameDoc.username = username;
 		}
 
-		console.log("Attempting to save game:", {
-			gameType,
-			difficulty,
-			userId,
-			gameData,
-			path: `games/${gameType}/${difficulty}`,
-		});
-
 		const docRef = await userGamesRef.add(gameDoc);
-
-		console.log(`Game saved successfully: ${gameType} - ${difficulty}`, {
-			documentId: docRef.id,
-			path: docRef.path,
-		});
 
 		// Also save to creator's createdGames subcollection
 		const createdGameRef = db
@@ -303,7 +289,6 @@ export const saveGameToFirestore = async (
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
 
-		console.log(`Game added to creator's createdGames: ${docRef.id}`);
 	} catch (error: any) {
 		console.error("Error saving game to Firestore:", error);
 		console.error("Error details:", {
@@ -339,18 +324,8 @@ export const saveGameIdeaToFirestore = async (
 			status: "pending", // pending, reviewed, approved, rejected
 		};
 
-		console.log("Attempting to save game idea:", {
-			userId,
-			ideaLength: idea.trim().length,
-			path: "gameAddition",
-		});
-
 		const docRef = await gameIdeasRef.add(ideaDoc);
 
-		console.log(`Game idea saved successfully:`, {
-			documentId: docRef.id,
-			path: docRef.path,
-		});
 	} catch (error: any) {
 		console.error("Error saving game idea to Firestore:", error);
 		console.error("Error details:", {
@@ -409,7 +384,6 @@ export const savePuzzleCompletion = async (
 	// Skip stats update if answer was revealed
 	// Game is still marked as completed in user's history, but doesn't affect leaderboard
 	if (answerRevealed) {
-		console.log("[Stats] Answer was revealed - skipping global stats update");
 		return;
 	}
 
@@ -423,12 +397,7 @@ export const savePuzzleCompletion = async (
 			return;
 		}
 
-		console.log("Parsed puzzle ID:", parsed);
-
 		const { gameType, difficulty, gameId } = parsed;
-		console.log(
-			`Updating stats for: games/${gameType}/${difficulty}/${gameId}`
-		);
 
 		const gameRef = db
 			.collection("games")
@@ -518,11 +487,9 @@ export const savePuzzleCompletion = async (
 			}
 
 			// Update the document
-			console.log("Updating stats:", JSON.stringify(newStats, null, 2));
 			transaction.update(gameRef, { stats: newStats });
 		});
 
-		console.log("Stats update transaction completed successfully");
 	} catch (error: any) {
 		console.error("Error saving puzzle completion:", error);
 		if (error?.code === "firestore/permission-denied") {
@@ -537,7 +504,6 @@ export const savePuzzleCompletion = async (
 // Track when a game is skipped globally (at game document level)
 export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 	try {
-		console.log(`[trackGameSkipped] Tracking skipped for: ${puzzleId}`);
 		const parsed = parsePuzzleId(puzzleId);
 		if (!parsed) {
 			console.warn(`[trackGameSkipped] Invalid puzzleId format: ${puzzleId}`);
@@ -587,9 +553,6 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 			finalCount = newSkipped;
 		});
 
-		console.log(
-			`[trackGameSkipped] Successfully updated skipped count to ${finalCount}`
-		);
 	} catch (error: any) {
 		console.error("[trackGameSkipped] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -599,7 +562,6 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 // Track when a game is attempted globally (at game document level)
 export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 	try {
-		console.log(`[trackGameAttempted] Tracking attempted for: ${puzzleId}`);
 		const parsed = parsePuzzleId(puzzleId);
 		if (!parsed) {
 			console.warn(`[trackGameAttempted] Invalid puzzleId format: ${puzzleId}`);
@@ -649,9 +611,6 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 			finalCount = newAttempted;
 		});
 
-		console.log(
-			`[trackGameAttempted] Successfully updated attempted count to ${finalCount}`
-		);
 	} catch (error: any) {
 		console.error("[trackGameAttempted] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -662,7 +621,6 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 // This increments the completed count in stats
 export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 	try {
-		console.log(`[trackGameCompleted] Tracking completed for: ${puzzleId}`);
 		const parsed = parsePuzzleId(puzzleId);
 		if (!parsed) {
 			console.warn(`[trackGameCompleted] Invalid puzzleId format: ${puzzleId}`);
@@ -712,9 +670,6 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 			finalCount = newCompleted;
 		});
 
-		console.log(
-			`[trackGameCompleted] Successfully updated completed count to ${finalCount}`
-		);
 	} catch (error: any) {
 		console.error("[trackGameCompleted] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -724,7 +679,6 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 // Decrement skipped count when a user comes back and attempts a previously skipped game
 export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 	try {
-		console.log(`[decrementGameSkipped] Decrementing skipped for: ${puzzleId}`);
 		const parsed = parsePuzzleId(puzzleId);
 		if (!parsed) {
 			console.warn(
@@ -778,9 +732,6 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 			newCount = newSkipped;
 		});
 
-		console.log(
-			`[decrementGameSkipped] Successfully decremented skipped from ${oldCount} to ${newCount}`
-		);
 	} catch (error: any) {
 		console.error("[decrementGameSkipped] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -945,9 +896,6 @@ export const addGameHistory = async (
 					// Already completed before
 					if (isRecentUpdate && existingData.action === "completed") {
 						// Very recent completion, likely a duplicate call - don't increment
-						console.log(
-							`[addGameHistory] Duplicate completion detected (${timeSinceLastUpdate}ms ago), keeping count at ${existingData.completionCount}`
-						);
 						historyData.completionCount = existingData.completionCount;
 					} else {
 						// Increment count
@@ -959,9 +907,6 @@ export const addGameHistory = async (
 				}
 
 				transaction.set(historyRef, historyData, { merge: true });
-				console.log(
-					`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId}), completionCount: ${historyData.completionCount}`
-				);
 			});
 		} else {
 			// For non-completed actions, use regular set with merge
@@ -1000,9 +945,6 @@ export const addGameHistory = async (
 			}
 
 			await historyRef.set(historyData, { merge: true });
-			console.log(
-				`[addGameHistory] Added ${action} entry for ${gameId} (user: ${userId})`
-			);
 		}
 	} catch (error) {
 		console.error("[addGameHistory] Error:", error);
@@ -1147,9 +1089,6 @@ export const batchCheckGameHistory = async (
 			});
 		}
 
-		console.log(
-			`[batchCheckGameHistory] Found ${matchingIds.size} ${action} games for user ${userId}`
-		);
 		return matchingIds;
 	} catch (error) {
 		console.error("[batchCheckGameHistory] Error:", error);
@@ -1184,10 +1123,6 @@ export const updateGameHistory = async (
 		}
 
 		await historyRef.update(updateData);
-		console.log(
-			`[updateGameHistory] Updated ${gameId} for user ${userId}:`,
-			updates
-		);
 	} catch (error) {
 		console.error("[updateGameHistory] Error:", error);
 		throw error;
@@ -1203,7 +1138,6 @@ export const migrateUserArraysToHistory = async (
 	userId: string
 ): Promise<void> => {
 	try {
-		console.log(`[Migration] Starting migration for user ${userId}`);
 		const firestore = require("@react-native-firebase/firestore").default;
 
 		// Import getUserData to check user document
@@ -1211,13 +1145,11 @@ export const migrateUserArraysToHistory = async (
 		const userDoc = await getUserData(userId);
 
 		if (!userDoc) {
-			console.log("[Migration] User document not found, skipping");
 			return;
 		}
 
 		// Check if already migrated
 		if (userDoc._historyMigrated) {
-			console.log("[Migration] Already migrated, skipping");
 			return;
 		}
 
@@ -1226,9 +1158,6 @@ export const migrateUserArraysToHistory = async (
 		// Migrate completed games if they exist
 		const completedGames = (userDoc as any).completedGames || [];
 		if (completedGames.length > 0) {
-			console.log(
-				`[Migration] Migrating ${completedGames.length} completed games`
-			);
 			for (const gameId of completedGames) {
 				try {
 					await addGameHistory(userId, gameId, "completed", {
@@ -1250,7 +1179,6 @@ export const migrateUserArraysToHistory = async (
 		// Migrate skipped games if they exist
 		const skippedGames = (userDoc as any).skippedGames || [];
 		if (skippedGames.length > 0) {
-			console.log(`[Migration] Migrating ${skippedGames.length} skipped games`);
 			for (const gameId of skippedGames) {
 				try {
 					await addGameHistory(userId, gameId, "skipped", {
@@ -1276,9 +1204,6 @@ export const migrateUserArraysToHistory = async (
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
 
-		console.log(
-			`[Migration] Completed! Migrated ${migratedCount} games for user ${userId}`
-		);
 	} catch (error) {
 		console.error(`[Migration] Error migrating user ${userId}:`, error);
 		// Don't throw - allow app to continue even if migration fails
