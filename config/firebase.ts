@@ -14,7 +14,7 @@ export const db = firestore();
 // Helper to check document existence - handles both property and method access
 // for compatibility with different React Native Firebase versions
 export const docExists = (doc: any): boolean => {
-	if (typeof doc.exists === 'function') {
+	if (typeof doc.exists === "function") {
 		return doc.exists() === true;
 	}
 	return doc.exists === true;
@@ -82,7 +82,7 @@ export interface FirestoreGame {
 		minDistance?: number;
 		description: string;
 	}>;
-	solution?: number[];
+	// Note: solution field is shared by Zip and Sequencing (both use number[])
 }
 
 // Game History Entry interface
@@ -259,7 +259,7 @@ export const saveGameToFirestore = async (
 			createdAt: firestore.FieldValue.serverTimestamp(),
 			approved: false, // Games need approval before appearing in main feed
 		};
-		
+
 		// Add username if provided
 		if (username) {
 			gameDoc.username = username;
@@ -288,7 +288,6 @@ export const saveGameToFirestore = async (
 			createdGamesCount: firestore.FieldValue.increment(1),
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
-
 	} catch (error: any) {
 		console.error("Error saving game to Firestore:", error);
 		console.error("Error details:", {
@@ -325,7 +324,6 @@ export const saveGameIdeaToFirestore = async (
 		};
 
 		const docRef = await gameIdeasRef.add(ideaDoc);
-
 	} catch (error: any) {
 		console.error("Error saving game idea to Firestore:", error);
 		console.error("Error details:", {
@@ -476,9 +474,15 @@ export const savePuzzleCompletion = async (
 				} else {
 					// Use Math.max for trivia (higher is better), Math.min for others (lower is better)
 					if (higherIsBetter) {
-						newStats.bestAttempts = Math.max(attempts, currentStats.bestAttempts);
+						newStats.bestAttempts = Math.max(
+							attempts,
+							currentStats.bestAttempts
+						);
 					} else {
-						newStats.bestAttempts = Math.min(attempts, currentStats.bestAttempts);
+						newStats.bestAttempts = Math.min(
+							attempts,
+							currentStats.bestAttempts
+						);
 					}
 				}
 			} else {
@@ -489,7 +493,6 @@ export const savePuzzleCompletion = async (
 			// Update the document
 			transaction.update(gameRef, { stats: newStats });
 		});
-
 	} catch (error: any) {
 		console.error("Error saving puzzle completion:", error);
 		if (error?.code === "firestore/permission-denied") {
@@ -540,7 +543,7 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			// Increment skipped count
 			const newSkipped = currentSkipped + 1;
-			
+
 			// Update entire stats object (Firestore doesn't support dot notation in transactions)
 			const updatedStats = {
 				...existingStats,
@@ -552,7 +555,6 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			finalCount = newSkipped;
 		});
-
 	} catch (error: any) {
 		console.error("[trackGameSkipped] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -598,7 +600,7 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 
 			// Increment attempted count
 			const newAttempted = currentAttempted + 1;
-			
+
 			// Update entire stats object (Firestore doesn't support dot notation in transactions)
 			const updatedStats = {
 				...existingStats,
@@ -610,7 +612,6 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 
 			finalCount = newAttempted;
 		});
-
 	} catch (error: any) {
 		console.error("[trackGameAttempted] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -657,7 +658,7 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 
 			// Increment completed count
 			const newCompleted = currentCompleted + 1;
-			
+
 			// Update entire stats object (Firestore doesn't support dot notation in transactions)
 			const updatedStats = {
 				...existingStats,
@@ -669,7 +670,6 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 
 			finalCount = newCompleted;
 		});
-
 	} catch (error: any) {
 		console.error("[trackGameCompleted] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -718,7 +718,7 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			// Decrement skipped count (but don't go below 0)
 			const newSkipped = Math.max(0, currentSkipped - 1);
-			
+
 			// Update entire stats object (Firestore doesn't support dot notation in transactions)
 			const updatedStats = {
 				...existingStats,
@@ -731,7 +731,6 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 			oldCount = currentSkipped;
 			newCount = newSkipped;
 		});
-
 	} catch (error: any) {
 		console.error("[decrementGameSkipped] Error:", error);
 		// Don't throw - this is non-critical tracking
@@ -877,22 +876,29 @@ export const addGameHistory = async (
 
 				// Handle completionCount: increment if completing again, set to 1 if first completion
 				// Also check if this completion was just processed (within last 5 seconds) to prevent duplicates
-				const now = metadata.timestamp ? metadata.timestamp.getTime() : Date.now();
+				const now = metadata.timestamp
+					? metadata.timestamp.getTime()
+					: Date.now();
 				let lastUpdate = 0;
 				if (existingData?.updatedAt) {
 					// Handle Firestore Timestamp
-					if (typeof existingData.updatedAt.toMillis === 'function') {
+					if (typeof existingData.updatedAt.toMillis === "function") {
 						lastUpdate = existingData.updatedAt.toMillis();
-					} else if (typeof existingData.updatedAt.getTime === 'function') {
+					} else if (typeof existingData.updatedAt.getTime === "function") {
 						lastUpdate = existingData.updatedAt.getTime();
-					} else if (typeof existingData.updatedAt === 'number') {
+					} else if (typeof existingData.updatedAt === "number") {
 						lastUpdate = existingData.updatedAt;
 					}
 				}
 				const timeSinceLastUpdate = now - lastUpdate;
-				const isRecentUpdate = timeSinceLastUpdate < 5000 && timeSinceLastUpdate >= 0; // 5 seconds
+				const isRecentUpdate =
+					timeSinceLastUpdate < 5000 && timeSinceLastUpdate >= 0; // 5 seconds
 
-				if (existingData && existingData.completionCount !== undefined && existingData.completionCount > 0) {
+				if (
+					existingData &&
+					existingData.completionCount !== undefined &&
+					existingData.completionCount > 0
+				) {
 					// Already completed before
 					if (isRecentUpdate && existingData.action === "completed") {
 						// Very recent completion, likely a duplicate call - don't increment
@@ -1203,7 +1209,6 @@ export const migrateUserArraysToHistory = async (
 			_historyMigrated: true,
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
-
 	} catch (error) {
 		console.error(`[Migration] Error migrating user ${userId}:`, error);
 		// Don't throw - allow app to continue even if migration fails

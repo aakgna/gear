@@ -38,6 +38,8 @@ export const Colors = {
 		present: "#FFD93D", // Yellow for "present" state (Wordle)
 		absent: "#E5E5E5", // Light gray for absent
 	},
+	// Border
+	border: "#E5E5E5", // Light gray border color
 };
 
 // Typography

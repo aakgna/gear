@@ -34,8 +34,7 @@ type GameType =
 	| "sudoku"
 	| "futoshiki"
 	| "hidato"
-	| "zip"
-	| "gameIdea";
+	| "zip";
 
 const gameTypes: Array<{
 	type: GameType;
@@ -54,7 +53,6 @@ const gameTypes: Array<{
 	{ type: "futoshiki", name: "Futoshiki", icon: "code-working-outline" },
 	{ type: "hidato", name: "Hidato", icon: "navigate-outline" },
 	{ type: "zip", name: "Zip", icon: "git-branch-outline" },
-	{ type: "gameIdea", name: "Own Game", icon: "bulb-outline" },
 ];
 
 const CreateGameIndex = () => {
@@ -62,11 +60,7 @@ const CreateGameIndex = () => {
 	const insets = useSafeAreaInsets();
 
 	const handleGameTypeSelect = (gameType: GameType) => {
-		if (gameType === "gameIdea") {
-			router.push("/create-game/game-idea");
-		} else {
-			router.push(`/create-game/${gameType}`);
-		}
+		router.push(`/create-game/${gameType}`);
 	};
 
 	return (

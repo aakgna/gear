@@ -184,6 +184,12 @@ const CreateHidatoPage = () => {
 		}
 	};
 
+	const handlePreviousStep = () => {
+		if (step === 2) {
+			setStep(1);
+		}
+	};
+
 	const handleSubmit = async () => {
 		const user = getCurrentUser();
 		if (!user) {
@@ -430,7 +436,7 @@ const CreateHidatoPage = () => {
 						<TouchableOpacity
 							style={styles.backToPathButton}
 							onPress={() => {
-								setStep(1);
+								handlePreviousStep();
 								setSelectedGivens(new Set());
 							}}
 						>

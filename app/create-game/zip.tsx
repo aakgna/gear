@@ -275,6 +275,12 @@ const CreateZipPage = () => {
 		setStep("numbers");
 	};
 
+	const handlePreviousStep = () => {
+		if (step === "numbers") {
+			setStep("path");
+		}
+	};
+
 	const validateZip = (): boolean => {
 		if (solution.length === 0) {
 			Alert.alert("Validation Error", "Please draw a complete path first.");
@@ -678,7 +684,7 @@ const CreateZipPage = () => {
 					<TouchableOpacity
 						style={styles.backToPathButton}
 						onPress={() => {
-							setStep("path");
+							handlePreviousStep();
 							setSelectedCell(null);
 						}}
 					>

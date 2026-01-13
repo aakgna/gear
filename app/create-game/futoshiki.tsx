@@ -390,6 +390,14 @@ const CreateFutoshikiPage = () => {
 		}
 	};
 
+	const handlePreviousStep = () => {
+		if (step === 2) {
+			setStep(1);
+		} else if (step === 3) {
+			setStep(2);
+		}
+	};
+
 	const getGivensArray = (): Array<{
 		row: number;
 		col: number;
@@ -737,19 +745,37 @@ const CreateFutoshikiPage = () => {
 					</View>
 				)}
 
-				{/* Next Step Button */}
-				{step < 3 && (
-					<TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
-						<Text style={styles.nextButtonText}>
-							{step === 1 ? "Next: Add Inequalities" : "Next: Select Givens"}
-						</Text>
-								<Ionicons
-							name="arrow-forward"
-									size={20}
-									color={Colors.text.primary}
-								/>
-							</TouchableOpacity>
-				)}
+				{/* Navigation Buttons */}
+				<View style={styles.navigationContainer}>
+					{/* Previous Button */}
+					{step > 1 && (
+						<TouchableOpacity
+							style={styles.previousButton}
+							onPress={handlePreviousStep}
+						>
+							<Ionicons
+								name="arrow-back"
+								size={20}
+								color={Colors.text.primary}
+							/>
+							<Text style={styles.previousButtonText}>Previous</Text>
+						</TouchableOpacity>
+					)}
+
+					{/* Next Step Button */}
+					{step < 3 && (
+						<TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
+							<Text style={styles.nextButtonText}>
+								{step === 1 ? "Next: Add Inequalities" : "Next: Select Givens"}
+							</Text>
+							<Ionicons
+								name="arrow-forward"
+								size={20}
+								color={Colors.text.primary}
+							/>
+						</TouchableOpacity>
+					)}
+				</View>
 
 				{/* Submit Button */}
 				{step === 3 && (
@@ -988,14 +1014,36 @@ const styles = StyleSheet.create({
 	stepLineActive: {
 		backgroundColor: Colors.accent,
 	},
+	navigationContainer: {
+		flexDirection: "row",
+		gap: Spacing.md,
+		marginTop: Spacing.xl,
+	},
+	previousButton: {
+		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.lg,
+		gap: Spacing.sm,
+		borderWidth: 1,
+		borderColor: Colors.border || "#E5E5E5",
+	},
+	previousButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
 	nextButton: {
+		flex: 1,
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
-		marginTop: Spacing.xl,
 		gap: Spacing.sm,
 		...Shadows.heavy,
 	},

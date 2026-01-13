@@ -55,43 +55,6 @@ const dismissedIntros = new Set<string>();
 // Global storage for completed game results (persists across tab switches)
 const completedGameResults = new Map<string, GameResult>();
 
-// Confetti particle component
-interface ConfettiParticle {
-	id: number;
-	x: number;
-	y: number;
-	color: string;
-	rotation: number;
-	scale: number;
-}
-
-const CONFETTI_COLORS = [
-	Colors.accent,
-	Colors.secondaryAccent,
-	Colors.game.correct,
-	"#FF6B6B",
-	"#4ECDC4",
-	"#45B7D1",
-	"#96CEB4",
-	"#FFEAA7",
-];
-
-const createConfettiParticles = (): ConfettiParticle[] => {
-	const particles: ConfettiParticle[] = [];
-	for (let i = 0; i < 50; i++) {
-		particles.push({
-			id: i,
-			x: Math.random() * SCREEN_WIDTH,
-			y: -20 - Math.random() * 100,
-			color:
-				CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-			rotation: Math.random() * 360,
-			scale: 0.5 + Math.random() * 0.5,
-		});
-	}
-	return particles;
-};
-
 interface GameWrapperProps {
 	puzzle: Puzzle;
 	onComplete: (result: GameResult) => void;
@@ -149,38 +112,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const completionProcessedRef = React.useRef<boolean>(false);
 
 	// Animation states
-	const [showConfetti, setShowConfetti] = useState(false);
-	const [confettiParticles, setConfettiParticles] = useState<
-		ConfettiParticle[]
-	>([]);
 	const failurePulseAnim = useRef(new Animated.Value(0)).current;
-	const confettiAnims = useRef<Animated.Value[]>([]).current;
-
-	// Trigger success animation (confetti)
-	const triggerSuccessAnimation = () => {
-		const particles = createConfettiParticles();
-		setConfettiParticles(particles);
-		setShowConfetti(true);
-
-		// Create animation values for each particle
-		const anims = particles.map(() => new Animated.Value(0));
-		confettiAnims.length = 0;
-		confettiAnims.push(...anims);
-
-		// Animate all particles
-		Animated.parallel(
-			anims.map((anim, index) =>
-				Animated.timing(anim, {
-					toValue: 1,
-					duration: 2000 + Math.random() * 1000,
-					useNativeDriver: true,
-				})
-			)
-		).start(() => {
-			setShowConfetti(false);
-			setConfettiParticles([]);
-		});
-	};
 
 	// Trigger failure animation (red pulse)
 	const triggerFailureAnimation = () => {
@@ -311,7 +243,6 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			// User won without revealing answer - celebrate!
 			// Trigger haptic feedback for success
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-			triggerSuccessAnimation();
 		} else if (result.answerRevealed) {
 			// User gave up or lost - subtle failure feedback
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -620,53 +551,6 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		<Animated.View
 			style={[styles.container, { backgroundColor: failurePulseColor }]}
 		>
-			{/* Confetti Overlay */}
-			{showConfetti && (
-				<View style={styles.confettiContainer} pointerEvents="none">
-					{confettiParticles.map((particle, index) => {
-						const anim = confettiAnims[index];
-						if (!anim) return null;
-
-						const translateY = anim.interpolate({
-							inputRange: [0, 1],
-							outputRange: [particle.y, SCREEN_HEIGHT + 50],
-						});
-
-						const rotate = anim.interpolate({
-							inputRange: [0, 1],
-							outputRange: [
-								`${particle.rotation}deg`,
-								`${particle.rotation + 720}deg`,
-							],
-						});
-
-						const opacity = anim.interpolate({
-							inputRange: [0, 0.8, 1],
-							outputRange: [1, 1, 0],
-						});
-
-						return (
-							<Animated.View
-								key={particle.id}
-								style={[
-									styles.confettiParticle,
-									{
-										left: particle.x,
-										backgroundColor: particle.color,
-										transform: [
-											{ translateY },
-											{ rotate },
-											{ scale: particle.scale },
-										],
-										opacity,
-									},
-								]}
-							/>
-						);
-					})}
-				</View>
-			)}
-
 			{/* Game Intro Screen or Game Container */}
 			{showIntro ? (
 				<View style={styles.gameContainer}>
@@ -815,21 +699,6 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		backgroundColor: Colors.background.secondary,
-	},
-	confettiContainer: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		zIndex: 1000,
-		pointerEvents: "none",
-	},
-	confettiParticle: {
-		position: "absolute",
-		width: 10,
-		height: 10,
-		borderRadius: 2,
 	},
 });
 
