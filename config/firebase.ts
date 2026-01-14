@@ -1102,6 +1102,100 @@ export const batchCheckGameHistory = async (
 	}
 };
 
+// Get all completed game IDs from gameHistory (for filtering recommendations)
+export const getAllCompletedGameIds = async (
+	userId: string
+): Promise<Set<string>> => {
+	try {
+		const completedHistory = await fetchGameHistory(userId, {
+			action: "completed",
+		});
+		return new Set(completedHistory.map((entry) => entry.gameId));
+	} catch (error) {
+		console.error("[getAllCompletedGameIds] Error:", error);
+		return new Set();
+	}
+};
+
+// Get all game IDs from gameHistory (completed, skipped, attempted)
+export const getAllGameHistoryIds = async (
+	userId: string
+): Promise<Set<string>> => {
+	try {
+		const allHistory = await fetchGameHistory(userId);
+		return new Set(allHistory.map((entry) => entry.gameId));
+	} catch (error) {
+		console.error("[getAllGameHistoryIds] Error:", error);
+		return new Set();
+	}
+};
+
+// Fetch multiple games by their IDs
+export const fetchGamesByIds = async (
+	gameIds: string[]
+): Promise<FirestoreGame[]> => {
+	try {
+		const games: FirestoreGame[] = [];
+		const gameMap = new Map<string, string[]>();
+
+		// Group by gameType and difficulty for efficient fetching
+		gameIds.forEach((gameId) => {
+			const parsed = parsePuzzleId(gameId);
+			if (parsed) {
+				const key = `${parsed.gameType}_${parsed.difficulty}`;
+				if (!gameMap.has(key)) {
+					gameMap.set(key, []);
+				}
+				gameMap.get(key)!.push(parsed.gameId);
+			}
+		});
+
+		// Fetch games in parallel for better performance
+		const fetchPromises: Promise<void>[] = [];
+
+		for (const [key, ids] of gameMap.entries()) {
+			const [gameType, difficulty] = key.split("_");
+			const gamesRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty);
+
+			// Fetch all games in this group in parallel
+			for (const gameId of ids) {
+				const fetchPromise = gamesRef
+					.doc(gameId)
+					.get()
+					.then((doc) => {
+						if (docExists(doc)) {
+							const gameData = doc.data();
+							games.push({
+								id: `${gameType}_${difficulty}_${gameId}`,
+								...gameData,
+							} as FirestoreGame);
+						}
+					})
+					.catch((error) => {
+						console.warn(`[fetchGamesByIds] Failed to fetch ${gameId}:`, error);
+					});
+
+				fetchPromises.push(fetchPromise);
+			}
+		}
+
+		// Wait for all fetches to complete in parallel
+		await Promise.all(fetchPromises);
+
+		// Preserve original order
+		const gameMapById = new Map(games.map((g) => [g.id, g]));
+		return gameIds
+			.map((id) => gameMapById.get(id))
+			.filter((g) => g !== undefined) as FirestoreGame[];
+	} catch (error) {
+		console.error("[fetchGamesByIds] Error:", error);
+		return [];
+	}
+};
+
 // Update existing history entry (for skip → attempt transition)
 export const updateGameHistory = async (
 	userId: string,

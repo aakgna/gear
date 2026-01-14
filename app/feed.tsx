@@ -17,6 +17,7 @@ import {
 	Animated,
 	Image,
 	Keyboard,
+	AppState,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -61,7 +62,15 @@ import {
 	batchCheckGameHistory,
 	migrateUserArraysToHistory,
 	db,
+	fetchGamesByIds,
+	getAllCompletedGameIds,
+	getAllGameHistoryIds,
 } from "../config/firebase";
+import auth from "@react-native-firebase/auth";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
+
+const COMPUTE_NEXT_RECOMMENDATIONS_URL =
+	"https://us-central1-gear-ff009.cloudfunctions.net/compute_next_recommendations";
 import {
 	getSimpleRecommendations,
 	interleaveGamesByType,
@@ -95,6 +104,300 @@ function deduplicateGames(games: Puzzle[]): Puzzle[] {
 	}
 
 	return Array.from(seen.values());
+}
+
+// Helper function to convert FirestoreGame to Puzzle
+function convertFirestoreGameToPuzzle(
+	game: FirestoreGame,
+	gameId: string
+): Puzzle | null {
+	const parts = gameId.split("_");
+	if (parts.length < 3) return null;
+
+	const gameType = parts[0].toLowerCase();
+	const difficulty = parts[1];
+	const difficultyNum =
+		difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3;
+
+	// Convert based on game type
+	switch (gameType) {
+		case "quickmath":
+			if (game.questions && game.answers) {
+				return {
+					id: gameId,
+					type: "quickMath",
+					data: {
+						problems: game.questions,
+						answers: game.answers,
+					} as QuickMathData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "wordle":
+			if (game.qna) {
+				return {
+					id: gameId,
+					type: "wordle",
+					data: {
+						answer: game.qna.toUpperCase(),
+					} as WordleData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "riddle":
+			if (game.question && game.answer && game.choices) {
+				return {
+					id: gameId,
+					type: "riddle",
+					data: {
+						prompt: game.question,
+						answer: game.answer,
+						choices: game.choices,
+					} as RiddleData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "trivia":
+			if (game.questions && Array.isArray(game.questions)) {
+				return {
+					id: gameId,
+					type: "trivia",
+					data: {
+						questions: game.questions as any,
+					} as TriviaData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "mastermind":
+			if (
+				game.secretCode &&
+				Array.isArray(game.secretCode) &&
+				game.maxGuesses
+			) {
+				return {
+					id: gameId,
+					type: "mastermind",
+					data: {
+						secretCode: game.secretCode,
+						maxGuesses: game.maxGuesses,
+					} as MastermindData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "sequencing":
+			if (
+				game.theme &&
+				game.numSlots &&
+				game.entities &&
+				Array.isArray(game.entities) &&
+				game.rules &&
+				Array.isArray(game.rules) &&
+				game.solution &&
+				Array.isArray(game.solution)
+			) {
+				return {
+					id: gameId,
+					type: "sequencing",
+					data: {
+						theme: game.theme as "people" | "appointments" | "runners",
+						numSlots: game.numSlots,
+						entities: game.entities,
+						rules: game.rules.map((r: any) => ({
+							type: r.type,
+							entity1: r.entity1,
+							entity2: r.entity2,
+							position: r.position,
+							minDistance: r.minDistance,
+							description: r.description,
+						})),
+						solution: game.solution,
+					} as SequencingData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "wordchain":
+			if (game.startWord && game.endWord && game.answer) {
+				const answerArray = Array.isArray(game.answer)
+					? game.answer
+					: typeof game.answer === "string"
+					? [game.answer]
+					: [];
+				return {
+					id: gameId,
+					type: "wordChain",
+					data: {
+						startWord: game.startWord,
+						endWord: game.endWord,
+						answer: answerArray,
+						minSteps: game.minSteps || 3,
+						hint: game.hint,
+					} as WordChainData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "alias":
+			if (game.definitions && game.answer && game.choices) {
+				return {
+					id: gameId,
+					type: "alias",
+					data: {
+						definitions: game.definitions,
+						answer: game.answer,
+						choices: game.choices,
+						hint: game.hint,
+					} as AliasData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "zip":
+			if (game.rows && game.cols && game.cells && game.solution) {
+				return {
+					id: gameId,
+					type: "zip",
+					data: {
+						rows: game.rows,
+						cols: game.cols,
+						cells: game.cells,
+						solution: game.solution,
+					} as ZipData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "futoshiki":
+			if (game.size && game.grid && game.givens && game.inequalities) {
+				return {
+					id: gameId,
+					type: "futoshiki",
+					data: {
+						size: game.size,
+						grid: game.grid,
+						givens: game.givens,
+						inequalities: game.inequalities,
+					} as FutoshikiData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "magicsquare":
+			if (
+				game.size &&
+				game.grid &&
+				game.magicConstant !== undefined &&
+				game.givens
+			) {
+				return {
+					id: gameId,
+					type: "magicSquare",
+					data: {
+						size: game.size,
+						grid: game.grid,
+						magicConstant: game.magicConstant,
+						givens: game.givens,
+					} as MagicSquareData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "hidato":
+			if (
+				game.rows &&
+				game.cols &&
+				game.startNum !== undefined &&
+				game.endNum !== undefined &&
+				game.path &&
+				game.givens
+			) {
+				return {
+					id: gameId,
+					type: "hidato",
+					data: {
+						rows: game.rows,
+						cols: game.cols,
+						startNum: game.startNum,
+						endNum: game.endNum,
+						path: game.path,
+						givens: game.givens,
+					} as HidatoData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "sudoku":
+			if (game.grid && game.givens) {
+				return {
+					id: gameId,
+					type: "sudoku",
+					data: {
+						grid: game.grid,
+						givens: game.givens,
+					} as SudokuData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+	}
+	return null;
 }
 
 const FeedScreen = () => {
@@ -141,6 +444,10 @@ const FeedScreen = () => {
 	const skippedPuzzlesRef = useRef<Set<string>>(new Set());
 	// Track checked games to avoid duplicate completion checks
 	const checkedGamesRef = useRef<Map<string, boolean>>(new Map());
+	// Track if we're currently refreshing recommendations
+	const isRefreshingRef = useRef(false);
+	// Track current game index for progressive loading
+	const currentGameIndexRef = useRef(0);
 	// Track keyboard state to disable FlatList scrolling when keyboard is visible
 	const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 	const keyboardHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -583,6 +890,92 @@ const FeedScreen = () => {
 	const loadPuzzlesFromFirestore = async () => {
 		setLoading(true);
 		try {
+			const user = getCurrentUser();
+			if (!user) {
+				setLoading(false);
+				return;
+			}
+
+			// Check for pre-computed recommendations first
+			const currentUserData = await getUserData(user.uid);
+			if (
+				currentUserData?.precomputedRecommendations?.gameIds &&
+				currentUserData.precomputedRecommendations.gameIds.length > 0
+			) {
+				const precomputedGameIds =
+					currentUserData.precomputedRecommendations.gameIds;
+
+				// INSTANT LOAD: Fetch games and display immediately
+				// Don't wait for completed check - do it in background
+				fetchGamesByIds(precomputedGameIds)
+					.then((firestoreGames) => {
+						// Convert FirestoreGame to Puzzle
+						const puzzles: Puzzle[] = [];
+						for (let i = 0; i < precomputedGameIds.length; i++) {
+							const gameId = precomputedGameIds[i];
+							const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+							if (firestoreGame) {
+								const puzzle = convertFirestoreGameToPuzzle(
+									firestoreGame,
+									gameId
+								);
+								if (puzzle) {
+									puzzles.push(puzzle);
+								}
+							}
+						}
+
+						// Set games immediately (instant load!)
+						setDisplayedPuzzles(puzzles);
+						setAllRecommendedPuzzles(puzzles);
+						setPuzzles(puzzles);
+
+						// Initialize elapsed times
+						const initialElapsedTimes: Record<string, number> = {};
+						puzzles.forEach((puzzle) => {
+							initialElapsedTimes[puzzle.id] = 0;
+						});
+						puzzleElapsedTimesRef.current = initialElapsedTimes;
+
+						// Filter out completed games in background (non-blocking)
+						getAllCompletedGameIds(user.uid)
+							.then((completedIds) => {
+								const filteredPuzzles = puzzles.filter(
+									(puzzle) => !completedIds.has(puzzle.id)
+								);
+
+								// Update if any were filtered out
+								if (filteredPuzzles.length !== puzzles.length) {
+									setDisplayedPuzzles(filteredPuzzles);
+									setAllRecommendedPuzzles(filteredPuzzles);
+									setPuzzles(filteredPuzzles);
+								}
+							})
+							.catch((error) => {
+								console.error("Error filtering completed games:", error);
+							});
+					})
+					.catch((error) => {
+						console.error("Error fetching pre-computed games:", error);
+						setLoading(false);
+					});
+
+				// FLUSH: Clear precomputed array in background (non-blocking)
+				db.collection("users")
+					.doc(user.uid)
+					.update({
+						"precomputedRecommendations.gameIds": [],
+					})
+					.catch((error) => {
+						console.error("Error flushing precomputed recommendations:", error);
+					});
+
+				setLoading(false);
+				return; // Exit early - instant load!
+			}
+
+			// Fallback: First time user or no pre-computed games
+			// Use existing client-side algorithm
 			const allPuzzles: Puzzle[] = [];
 
 			// Fetch QuickMath games
@@ -977,7 +1370,7 @@ const FeedScreen = () => {
 			setDisplayedPuzzles(firstBatch);
 
 			// Now filter displayed games in background (non-blocking)
-			const user = getCurrentUser();
+			// user is already declared at the top of the function
 			if (user) {
 				// Don't await - let it run in background
 				filterDisplayedGamesInBackground(firstBatch);
@@ -1517,6 +1910,21 @@ const FeedScreen = () => {
 						: currentPuzzleIdFollowing;
 
 				if (newPuzzleId && newPuzzleId !== currentTabPuzzleId) {
+					// Update current game index for progressive loading
+					if (activeTab === "forYou") {
+						// Calculate relative index within current batch (every 50 games)
+						const relativeIndex = newIndex % 50;
+						currentGameIndexRef.current = relativeIndex;
+
+						// Trigger progressive refresh at game 35 of each batch (indices 35, 85, 135, etc.)
+						if (relativeIndex === 35 && !isRefreshingRef.current) {
+							isRefreshingRef.current = true;
+							triggerProgressiveRefresh().finally(() => {
+								isRefreshingRef.current = false;
+							});
+						}
+					}
+
 					// Handle skip tracking for the previous puzzle
 					if (currentTabPuzzleId) {
 						// Save elapsed time for current puzzle before switching away
@@ -1613,6 +2021,98 @@ const FeedScreen = () => {
 	const viewabilityConfig = useRef({
 		itemVisiblePercentThreshold: 50,
 	}).current;
+
+	// Progressive refresh: Compute next 50 games in background (at game 35)
+	const triggerProgressiveRefresh = async () => {
+		const user = getCurrentUser();
+		if (!user) return;
+
+		try {
+			// Get current feed game IDs (to avoid duplicates)
+			const currentFeedIds = new Set(displayedPuzzles.map((game) => game.id));
+
+			// Get all game history IDs (completed, skipped, attempted)
+			const historyIds = await getAllGameHistoryIds(user.uid);
+
+			// Combine: exclude games already in feed OR in history
+			const excludeIds = Array.from(
+				new Set([...currentFeedIds, ...historyIds])
+			);
+
+			// Get auth token (using modular API to avoid deprecation warning)
+			const currentUser = auth().currentUser;
+			if (!currentUser) {
+				console.error("No current user available");
+				return;
+			}
+
+			const idToken = await currentUser.getIdToken();
+			if (!idToken) {
+				console.error("No auth token available");
+				return;
+			}
+
+			// Call Firebase function via HTTP to compute next 50
+			const response = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${idToken}`,
+				},
+				body: JSON.stringify({
+					data: {
+						excludeGameIds: excludeIds,
+						count: 50,
+					},
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+
+			const result = await response.json();
+
+			if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
+				// Fetch the new games
+				const firestoreGames = await fetchGamesByIds(result.result.gameIds);
+
+				// Convert FirestoreGame to Puzzle
+				const newPuzzles: Puzzle[] = [];
+				for (const gameId of result.result.gameIds) {
+					const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+					if (firestoreGame) {
+						const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
+						if (puzzle) {
+							newPuzzles.push(puzzle);
+						}
+					}
+				}
+
+				// Append to current feed at the end (games 51-100, 101-150, etc.)
+				setDisplayedPuzzles((prev) => [...prev, ...newPuzzles]);
+				setAllRecommendedPuzzles((prev) => [...prev, ...newPuzzles]);
+
+				// Reset tracking index for next batch (so next trigger happens at game 35 of new batch)
+				// Note: The actual FlatList index continues (0-49, 50-99, 100-149...)
+				// But we track relative position (0-49) within each batch
+				currentGameIndexRef.current = 0;
+			}
+		} catch (error) {
+			console.error("Failed to refresh recommendations:", error);
+			// Fallback: Use client-side algorithm if server fails
+			// (This would require loading all games, so we skip for now)
+		}
+	};
+
+	// Memoize displayed puzzle IDs to avoid recalculating on every render
+	const displayedPuzzleIds = useMemo(
+		() => displayedPuzzles.map((g) => g.id),
+		[displayedPuzzles]
+	);
+
+	// Use shared session end refresh hook (only sets up listener if user is authenticated)
+	useSessionEndRefresh(displayedPuzzleIds);
 
 	// Initialize first puzzle timer
 	useEffect(() => {

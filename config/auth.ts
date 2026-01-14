@@ -10,13 +10,6 @@ export interface CategoryStats {
 	avgTime: number;
 }
 
-export interface DifficultyStats {
-	completed: number;
-	attempted: number; // User started interacting with the game
-	skipped: number; // User skipped without interacting
-	avgTime: number;
-}
-
 export interface UserData {
 	email: string;
 	username?: string;
@@ -30,15 +23,17 @@ export interface UserData {
 	streakCount?: number;
 	lastPlayedAt?: any; // Firestore timestamp
 	statsByCategory?: {
-		wordle?: CategoryStats;
-		riddle?: CategoryStats;
-		quickMath?: CategoryStats;
-		wordChain?: CategoryStats;
+		[category: string]: {
+			attempted?: number; // Total attempted across all difficulties
+			skipped?: number; // Total skipped across all difficulties
+			easy?: CategoryStats;
+			medium?: CategoryStats;
+			hard?: CategoryStats;
+		};
 	};
-	statsByDifficulty?: {
-		easy?: DifficultyStats;
-		medium?: DifficultyStats;
-		hard?: DifficultyStats;
+	precomputedRecommendations?: {
+		gameIds: string[]; // Array of game IDs (50 games)
+		computedAt?: any; // Firestore timestamp
 	};
 	// Social fields
 	followerCount?: number;
@@ -136,7 +131,6 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 				averageTimePerGame: 0,
 				streakCount: 0,
 				statsByCategory: {},
-				statsByDifficulty: {},
 				followerCount: 0,
 				followingCount: 0,
 				createdGamesCount: 0,
@@ -206,23 +200,37 @@ export const hasUserData = (
 };
 
 // Helper to parse game ID and extract category and difficulty
+// Extended to support all game types
 const parseGameId = (
 	gameId: string
 ): {
-	category: "wordle" | "riddle" | "quickMath" | "wordChain" | null;
+	category: string | null;
 	difficulty: "easy" | "medium" | "hard" | null;
 } => {
 	const parts = gameId.split("_");
 	if (parts.length < 3) return { category: null, difficulty: null };
 
-	const categoryPart = parts[0];
+	const categoryPart = parts[0].toLowerCase();
 	const difficultyPart = parts[1];
 
-	let category: "wordle" | "riddle" | "quickMath" | "wordChain" | null = null;
-	if (categoryPart === "wordle") category = "wordle";
-	else if (categoryPart === "riddle") category = "riddle";
-	else if (categoryPart === "quickmath") category = "quickMath";
-	else if (categoryPart === "wordchain") category = "wordChain";
+	// Map all possible game types
+	const categoryMap: Record<string, string> = {
+		wordle: "wordle",
+		riddle: "riddle",
+		quickmath: "quickMath",
+		wordchain: "wordChain",
+		trivia: "trivia",
+		mastermind: "mastermind",
+		sequencing: "sequencing",
+		alias: "alias",
+		zip: "zip",
+		futoshiki: "futoshiki",
+		magicsquare: "magicSquare",
+		hidato: "hidato",
+		sudoku: "sudoku",
+	};
+
+	const category = categoryMap[categoryPart] || null;
 
 	let difficulty: "easy" | "medium" | "hard" | null = null;
 	if (
@@ -234,6 +242,36 @@ const parseGameId = (
 	}
 
 	return { category, difficulty };
+};
+
+// Helper function to calculate category totals from difficulty stats
+const calculateCategoryTotals = (
+	categoryData: {
+		easy?: CategoryStats;
+		medium?: CategoryStats;
+		hard?: CategoryStats;
+	}
+): { attempted: number; skipped: number } => {
+	let totalAttempted = 0;
+	let totalSkipped = 0;
+
+	["easy", "medium", "hard"].forEach((diff) => {
+		const diffStats = categoryData[diff as "easy" | "medium" | "hard"];
+		if (diffStats) {
+			totalAttempted +=
+				typeof diffStats.attempted === "number" &&
+				isFinite(diffStats.attempted)
+					? diffStats.attempted
+					: 0;
+			totalSkipped +=
+				typeof diffStats.skipped === "number" &&
+				isFinite(diffStats.skipped)
+					? diffStats.skipped
+					: 0;
+		}
+	});
+
+	return { attempted: totalAttempted, skipped: totalSkipped };
 };
 
 // Update user stats when a game is completed
@@ -321,17 +359,23 @@ export const updateUserStats = async (
 			newStreak = 1;
 		}
 
-		// Update stats by category
+		// Update stats by category with difficulty breakdown
 		const currentCategoryStats = userData.statsByCategory || {};
 		let categoryStatsUpdate: any = {};
 
-		if (category) {
-			const currentCatStats = currentCategoryStats[category] || {
+		if (category && difficulty) {
+			// Initialize category if it doesn't exist
+			if (!currentCategoryStats[category]) {
+				currentCategoryStats[category] = {};
+			}
+
+			const currentCatStats = currentCategoryStats[category][difficulty] || {
 				completed: 0,
 				attempted: 0,
 				skipped: 0,
 				avgTime: 0,
 			};
+
 			const catCompleted = currentCatStats.completed + 1;
 			const catTotalTime =
 				currentCatStats.completed * currentCatStats.avgTime + timeTaken;
@@ -349,47 +393,25 @@ export const updateUserStats = async (
 					? currentCatStats.skipped
 					: 0;
 
+			// Update the difficulty-level stats
+			const updatedDifficultyStats = {
+				...(currentCategoryStats[category] || {}),
+				[difficulty]: {
+					completed: catCompleted,
+					attempted: attempted, // Preserve attempted value
+					skipped: skipped, // Preserve skipped value
+					avgTime: catAvgTime,
+				},
+			};
+
+			// Calculate category-level totals (attempted and skipped)
+			const categoryTotals = calculateCategoryTotals(updatedDifficultyStats);
+
+			// Update the category with both difficulty breakdown and category totals
 			categoryStatsUpdate[category] = {
-				completed: catCompleted,
-				attempted: attempted, // Preserve attempted value
-				skipped: skipped, // Preserve skipped value
-				avgTime: catAvgTime,
-			};
-		}
-
-		// Update stats by difficulty
-		const currentDifficultyStats = userData.statsByDifficulty || {};
-		let difficultyStatsUpdate: any = {};
-
-		if (difficulty) {
-			const currentDiffStats = currentDifficultyStats[difficulty] || {
-				completed: 0,
-				attempted: 0,
-				skipped: 0,
-				avgTime: 0,
-			};
-			const diffCompleted = currentDiffStats.completed + 1;
-			const diffTotalTime =
-				currentDiffStats.completed * currentDiffStats.avgTime + timeTaken;
-			const diffAvgTime = Math.round(diffTotalTime / diffCompleted);
-
-			// Sanitize attempted and skipped to avoid NaN
-			const attempted =
-				typeof currentDiffStats.attempted === "number" &&
-				isFinite(currentDiffStats.attempted)
-					? currentDiffStats.attempted
-					: 0;
-			const skipped =
-				typeof currentDiffStats.skipped === "number" &&
-				isFinite(currentDiffStats.skipped)
-					? currentDiffStats.skipped
-					: 0;
-
-			difficultyStatsUpdate[difficulty] = {
-				completed: diffCompleted,
-				attempted: attempted, // Preserve attempted value
-				skipped: skipped, // Preserve skipped value
-				avgTime: diffAvgTime,
+				...updatedDifficultyStats,
+				attempted: categoryTotals.attempted,
+				skipped: categoryTotals.skipped,
 			};
 		}
 
@@ -409,14 +431,6 @@ export const updateUserStats = async (
 			updateData["statsByCategory"] = {
 				...(currentCategoryStats || {}),
 				...categoryStatsUpdate,
-			};
-		}
-
-		// Merge difficulty stats
-		if (Object.keys(difficultyStatsUpdate).length > 0) {
-			updateData["statsByDifficulty"] = {
-				...(currentDifficultyStats || {}),
-				...difficultyStatsUpdate,
 			};
 		}
 
@@ -481,12 +495,17 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 		const userData = userDoc.data() as UserData;
 		const { category, difficulty } = parseGameId(gameId);
 
-		// Update skipped stats by category (using existing statsByCategory structure)
+		// Update skipped stats by category with difficulty breakdown
 		const currentCategoryStats = userData.statsByCategory || {};
 		let categoryStatsUpdate: any = {};
 
-		if (category) {
-			const currentCatStats = currentCategoryStats[category] || {
+		if (category && difficulty) {
+			// Initialize category if it doesn't exist
+			if (!currentCategoryStats[category]) {
+				currentCategoryStats[category] = {};
+			}
+
+			const currentCatStats = currentCategoryStats[category][difficulty] || {
 				completed: 0,
 				attempted: 0,
 				skipped: 0,
@@ -516,54 +535,25 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 					: 0;
 			const catSkipped = skipped + 1;
 
+			// Update the difficulty-level stats
+			const updatedDifficultyStats = {
+				...(currentCategoryStats[category] || {}),
+				[difficulty]: {
+					completed,
+					attempted, // Preserve attempted value
+					skipped: catSkipped,
+					avgTime,
+				},
+			};
+
+			// Calculate category-level totals (attempted and skipped)
+			const categoryTotals = calculateCategoryTotals(updatedDifficultyStats);
+
+			// Update the category with both difficulty breakdown and category totals
 			categoryStatsUpdate[category] = {
-				completed,
-				attempted, // Preserve attempted value
-				skipped: catSkipped,
-				avgTime,
-			};
-		}
-
-		// Update skipped stats by difficulty (using existing statsByDifficulty structure)
-		const currentDifficultyStats = userData.statsByDifficulty || {};
-		let difficultyStatsUpdate: any = {};
-
-		if (difficulty) {
-			const currentDiffStats = currentDifficultyStats[difficulty] || {
-				completed: 0,
-				attempted: 0,
-				skipped: 0,
-				avgTime: 0,
-			};
-
-			// Sanitize values to avoid NaN
-			const completed =
-				typeof currentDiffStats.completed === "number" &&
-				isFinite(currentDiffStats.completed)
-					? currentDiffStats.completed
-					: 0;
-			const attempted =
-				typeof currentDiffStats.attempted === "number" &&
-				isFinite(currentDiffStats.attempted)
-					? currentDiffStats.attempted
-					: 0;
-			const avgTime =
-				typeof currentDiffStats.avgTime === "number" &&
-				isFinite(currentDiffStats.avgTime)
-					? currentDiffStats.avgTime
-					: 0;
-			const skipped =
-				typeof currentDiffStats.skipped === "number" &&
-				isFinite(currentDiffStats.skipped)
-					? currentDiffStats.skipped
-					: 0;
-			const diffSkipped = skipped + 1;
-
-			difficultyStatsUpdate[difficulty] = {
-				completed,
-				attempted, // Preserve attempted value
-				skipped: diffSkipped,
-				avgTime,
+				...updatedDifficultyStats,
+				attempted: categoryTotals.attempted,
+				skipped: categoryTotals.skipped,
 			};
 		}
 
@@ -577,14 +567,6 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 			updateData["statsByCategory"] = {
 				...(currentCategoryStats || {}),
 				...categoryStatsUpdate,
-			};
-		}
-
-		// Merge difficulty stats (preserving completed and avgTime, updating skipped)
-		if (Object.keys(difficultyStatsUpdate).length > 0) {
-			updateData["statsByDifficulty"] = {
-				...(currentDifficultyStats || {}),
-				...difficultyStatsUpdate,
 			};
 		}
 
@@ -647,52 +629,81 @@ export const moveFromSkippedToAttempted = async (
 
 		const userData = userDoc.data() as UserData;
 		const { category, difficulty } = parseGameId(gameId);
-		const currentCategoryStats = userData.statsByCategory || {};
-		const currentDifficultyStats = userData.statsByDifficulty || {};
 
+		const currentCategoryStats = userData.statsByCategory || {};
+		let categoryStatsUpdate: any = {};
+
+		if (category && difficulty) {
+			// Initialize category if it doesn't exist
+			if (!currentCategoryStats[category]) {
+				currentCategoryStats[category] = {};
+			}
+
+			const currentCatStats = currentCategoryStats[category][difficulty] || {
+				completed: 0,
+				attempted: 0,
+				skipped: 0,
+				avgTime: 0,
+			};
+
+			// Sanitize values to avoid NaN
+			const completed =
+				typeof currentCatStats.completed === "number" &&
+				isFinite(currentCatStats.completed)
+					? currentCatStats.completed
+					: 0;
+			const attempted =
+				typeof currentCatStats.attempted === "number" &&
+				isFinite(currentCatStats.attempted)
+					? currentCatStats.attempted
+					: 0;
+			const skipped =
+				typeof currentCatStats.skipped === "number" &&
+				isFinite(currentCatStats.skipped)
+					? currentCatStats.skipped
+					: 0;
+			const avgTime =
+				typeof currentCatStats.avgTime === "number" &&
+				isFinite(currentCatStats.avgTime)
+					? currentCatStats.avgTime
+					: 0;
+
+			// Decrement skipped, increment attempted
+			const newSkipped = Math.max(0, skipped - 1);
+			const newAttempted = attempted + 1;
+
+			// Update the difficulty-level stats
+			const updatedDifficultyStats = {
+				...(currentCategoryStats[category] || {}),
+				[difficulty]: {
+					completed,
+					attempted: newAttempted,
+					skipped: newSkipped,
+					avgTime,
+				},
+			};
+
+			// Calculate category-level totals (attempted and skipped)
+			const categoryTotals = calculateCategoryTotals(updatedDifficultyStats);
+
+			// Update the category with both difficulty breakdown and category totals
+			categoryStatsUpdate[category] = {
+				...updatedDifficultyStats,
+				attempted: categoryTotals.attempted,
+				skipped: categoryTotals.skipped,
+			};
+		}
+
+		// Prepare update object
 		const updateData: any = {
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		};
 
-		// Decrement category skipped count
-		if (category) {
-			const currentCatStats = currentCategoryStats[category] || {
-				completed: 0,
-				attempted: 0,
-				skipped: 0,
-				avgTime: 0,
-			};
-
-			const skipped =
-				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
-					? Math.max(0, currentCatStats.skipped - 1) // Decrement but don't go below 0
-					: 0;
-
-			updateData[`statsByCategory.${category}`] = {
-				...currentCatStats,
-				skipped,
-			};
-		}
-
-		// Decrement difficulty skipped count
-		if (difficulty) {
-			const currentDiffStats = currentDifficultyStats[difficulty] || {
-				completed: 0,
-				attempted: 0,
-				skipped: 0,
-				avgTime: 0,
-			};
-
-			const skipped =
-				typeof currentDiffStats.skipped === "number" &&
-				isFinite(currentDiffStats.skipped)
-					? Math.max(0, currentDiffStats.skipped - 1) // Decrement but don't go below 0
-					: 0;
-
-			updateData[`statsByDifficulty.${difficulty}`] = {
-				...currentDiffStats,
-				skipped,
+		// Merge category stats
+		if (Object.keys(categoryStatsUpdate).length > 0) {
+			updateData["statsByCategory"] = {
+				...(currentCategoryStats || {}),
+				...categoryStatsUpdate,
 			};
 		}
 
@@ -721,12 +732,17 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 		const userData = userDoc.data() as UserData;
 		const { category, difficulty } = parseGameId(gameId);
 
-		// Update attempted stats by category
+		// Update attempted stats by category with difficulty breakdown
 		const currentCategoryStats = userData.statsByCategory || {};
 		let categoryStatsUpdate: any = {};
 
-		if (category) {
-			const currentCatStats = currentCategoryStats[category] || {
+		if (category && difficulty) {
+			// Initialize category if it doesn't exist
+			if (!currentCategoryStats[category]) {
+				currentCategoryStats[category] = {};
+			}
+
+			const currentCatStats = currentCategoryStats[category][difficulty] || {
 				completed: 0,
 				attempted: 0,
 				skipped: 0,
@@ -756,54 +772,25 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 					: 0;
 			const catAttempted = attempted + 1;
 
+			// Update the difficulty-level stats
+			const updatedDifficultyStats = {
+				...(currentCategoryStats[category] || {}),
+				[difficulty]: {
+					completed,
+					attempted: catAttempted,
+					skipped,
+					avgTime,
+				},
+			};
+
+			// Calculate category-level totals (attempted and skipped)
+			const categoryTotals = calculateCategoryTotals(updatedDifficultyStats);
+
+			// Update the category with both difficulty breakdown and category totals
 			categoryStatsUpdate[category] = {
-				completed,
-				attempted: catAttempted,
-				skipped,
-				avgTime,
-			};
-		}
-
-		// Update attempted stats by difficulty
-		const currentDifficultyStats = userData.statsByDifficulty || {};
-		let difficultyStatsUpdate: any = {};
-
-		if (difficulty) {
-			const currentDiffStats = currentDifficultyStats[difficulty] || {
-				completed: 0,
-				attempted: 0,
-				skipped: 0,
-				avgTime: 0,
-			};
-
-			// Sanitize values to avoid NaN
-			const completed =
-				typeof currentDiffStats.completed === "number" &&
-				isFinite(currentDiffStats.completed)
-					? currentDiffStats.completed
-					: 0;
-			const attempted =
-				typeof currentDiffStats.attempted === "number" &&
-				isFinite(currentDiffStats.attempted)
-					? currentDiffStats.attempted
-					: 0;
-			const skipped =
-				typeof currentDiffStats.skipped === "number" &&
-				isFinite(currentDiffStats.skipped)
-					? currentDiffStats.skipped
-					: 0;
-			const avgTime =
-				typeof currentDiffStats.avgTime === "number" &&
-				isFinite(currentDiffStats.avgTime)
-					? currentDiffStats.avgTime
-					: 0;
-			const diffAttempted = attempted + 1;
-
-			difficultyStatsUpdate[difficulty] = {
-				completed,
-				attempted: diffAttempted,
-				skipped,
-				avgTime,
+				...updatedDifficultyStats,
+				attempted: categoryTotals.attempted,
+				skipped: categoryTotals.skipped,
 			};
 		}
 
@@ -817,14 +804,6 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 			updateData["statsByCategory"] = {
 				...(currentCategoryStats || {}),
 				...categoryStatsUpdate,
-			};
-		}
-
-		// Merge difficulty stats
-		if (Object.keys(difficultyStatsUpdate).length > 0) {
-			updateData["statsByDifficulty"] = {
-				...(currentDifficultyStats || {}),
-				...difficultyStatsUpdate,
 			};
 		}
 

@@ -7,6 +7,7 @@ import {
 	ScrollView,
 	Dimensions,
 } from "react-native";
+import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -58,6 +59,9 @@ const gameTypes: Array<{
 const CreateGameIndex = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 
 	const handleGameTypeSelect = (gameType: GameType) => {
 		router.push(`/create-game/${gameType}`);

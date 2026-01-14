@@ -39,6 +39,7 @@ import {
 import { getCurrentUser } from "../../config/auth";
 import { fetchGameHistory, GameHistoryEntry } from "../../config/firebase";
 import { PuzzleType } from "../../config/types";
+import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BOTTOM_NAV_HEIGHT = 70;
@@ -92,6 +93,9 @@ const CreatorProfileScreen = () => {
 	const { username } = useLocalSearchParams<{ username: string }>();
 	const [profile, setProfile] = useState<UserPublicProfile | null>(null);
 	const [loading, setLoading] = useState(true);
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 	const [activeTab, setActiveTab] = useState<TabType>("created");
 	const [createdGames, setCreatedGames] = useState<GameSummary[]>([]);
 	const [completedGames, setCompletedGames] = useState<GameHistoryEntry[]>([]);

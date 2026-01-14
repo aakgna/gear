@@ -24,6 +24,7 @@ import {
 } from "../constants/DesignSystem";
 import { getCurrentUser } from "../config/auth";
 import { getUserByUsername, isFollowing, followUser, UserPublicProfile } from "../config/social";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
 
@@ -35,6 +36,9 @@ const SearchFriendsScreen = () => {
 	const [loading, setLoading] = useState(false);
 	const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
 	const currentUser = getCurrentUser();
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 
 	// Debounced search
 	useEffect(() => {

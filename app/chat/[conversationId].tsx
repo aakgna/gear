@@ -34,6 +34,7 @@ import {
 import { fetchUserProfile, UserPublicProfile } from "../../config/social";
 import { db } from "../../config/firebase";
 import { PuzzleType } from "../../config/types";
+import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
 
@@ -73,6 +74,9 @@ const ChatScreen = () => {
 	const params = useLocalSearchParams<{ conversationId: string }>();
 	const conversationId = params.conversationId;
 	const currentUser = getCurrentUser();
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 	const flatListRef = useRef<FlatList>(null);
 
 	const [messages, setMessages] = useState<Message[]>([]);

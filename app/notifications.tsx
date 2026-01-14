@@ -31,6 +31,7 @@ import {
 	isFollowing,
 	Notification,
 } from "../config/social";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
 
@@ -69,6 +70,9 @@ const NotificationsScreen = () => {
 	const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
 	const [markingAllRead, setMarkingAllRead] = useState(false);
 	const currentUser = getCurrentUser();
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 
 	useEffect(() => {
 		loadNotifications();

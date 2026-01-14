@@ -28,6 +28,7 @@ import {
 	Conversation,
 } from "../config/messaging";
 import { fetchUserProfile, UserPublicProfile } from "../config/social";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
 
@@ -52,6 +53,9 @@ const InboxScreen = () => {
 	const currentUser = getCurrentUser();
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [loading, setLoading] = useState(true);
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 	const [refreshing, setRefreshing] = useState(false);
 	const [participantProfiles, setParticipantProfiles] = useState<
 		Record<string, UserPublicProfile>

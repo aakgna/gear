@@ -30,6 +30,7 @@ import {
 	UserSummary,
 } from "../config/social";
 import { getCurrentUser } from "../config/auth";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const FollowersFollowingScreen = () => {
 	const router = useRouter();
@@ -48,6 +49,9 @@ const FollowersFollowingScreen = () => {
 	const [loadingFollow, setLoadingFollow] = useState<Record<string, boolean>>(
 		{}
 	);
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 	const [profileUsername, setProfileUsername] = useState<string>("");
 
 	const currentUser = getCurrentUser();

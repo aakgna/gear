@@ -12,6 +12,7 @@ import {
 	TouchableWithoutFeedback,
 	RefreshControl,
 } from "react-native";
+import { useSessionEndRefresh } from "../utils/sessionRefresh";
 import { useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -105,6 +106,9 @@ const ProfileScreen = () => {
 	useEffect(() => {
 		loadUserData();
 	}, []);
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 
 	const loadUserData = async () => {
 		const user = getCurrentUser();

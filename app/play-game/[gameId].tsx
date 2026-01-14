@@ -46,6 +46,7 @@ import {
 	BorderRadius,
 	Shadows,
 } from "../../constants/DesignSystem";
+import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 
 // Utility function to load a game by puzzleId (format: gameType_difficulty_gameId)
 const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
@@ -328,6 +329,9 @@ const PlayGameScreen = () => {
 	const params = useLocalSearchParams<{ gameId: string }>();
 	const gameId = params.gameId ? decodeURIComponent(params.gameId) : undefined;
 	const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
+
+	// Session end refresh: Refresh recommendations when app goes to background
+	useSessionEndRefresh([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
