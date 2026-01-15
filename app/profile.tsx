@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+	useState,
+	useEffect,
+	useRef,
+	useCallback,
+	useMemo,
+} from "react";
 import {
 	View,
 	Text,
@@ -11,7 +17,9 @@ import {
 	Image,
 	TouchableWithoutFeedback,
 	RefreshControl,
+	Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
 import { useRouter, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -33,6 +41,7 @@ import {
 	Shadows,
 	Layout,
 	getGameColor,
+	Gradients,
 } from "../constants/DesignSystem";
 import { fetchGameHistory, GameHistoryEntry } from "../config/firebase";
 import {
@@ -102,6 +111,20 @@ const ProfileScreen = () => {
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
+
+	// Tab indicator animation
+	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		const tabIndex =
+			activeTab === "created" ? 0 : activeTab === "completed" ? 1 : 2;
+		Animated.spring(tabIndicatorAnim, {
+			toValue: tabIndex,
+			useNativeDriver: true,
+			tension: 100,
+			friction: 8,
+		}).start();
+	}, [activeTab]);
 
 	useEffect(() => {
 		loadUserData();
@@ -359,76 +382,83 @@ const ProfileScreen = () => {
 		} as any);
 	};
 
-	const renderGameCard = (
-		item: GameSummary | GameHistoryEntry,
-		index: number
-	) => {
-		const gameType =
-			"gameType" in item ? item.gameType : item.category || "wordle";
-		const gameColor = getGameColor(gameType as PuzzleType);
-		const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm * 2) / 3;
+	const renderGameCard = useCallback(
+		(item: GameSummary | GameHistoryEntry, index: number) => {
+			const gameType =
+				"gameType" in item ? item.gameType : item.category || "wordle";
+			const gameColor = getGameColor(gameType as PuzzleType);
+			const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm) / 2;
 
-		// Extract document ID from gameId
-		// For GameHistoryEntry, gameId is full puzzleId (gameType_difficulty_docId)
-		// For GameSummary, gameId is just the document ID
-		let documentId = item.gameId;
-		const parts = item.gameId.split("_");
-		if (parts.length >= 3) {
-			// Full puzzleId, extract the last part(s) which is the document ID
-			documentId = parts.slice(2).join("_");
-		}
+			// Extract document ID from gameId
+			// For GameHistoryEntry, gameId is full puzzleId (gameType_difficulty_docId)
+			// For GameSummary, gameId is just the document ID
+			let documentId = item.gameId;
+			const parts = item.gameId.split("_");
+			if (parts.length >= 3) {
+				// Full puzzleId, extract the last part(s) which is the document ID
+				documentId = parts.slice(2).join("_");
+			}
 
-		// Truncate ID to match game name width (approximately)
-		// Game name is typically 6-12 characters, so truncate ID to similar visual width
-		const gameName = formatGameType(gameType);
-		const maxIdLength = Math.max(6, Math.min(12, gameName.length + 2));
-		const truncatedId =
-			documentId.length > maxIdLength
-				? `${documentId.substring(0, maxIdLength)}...`
-				: documentId;
+			// Truncate ID to match game name width (approximately)
+			// Game name is typically 6-12 characters, so truncate ID to similar visual width
+			const gameName = formatGameType(gameType);
+			const maxIdLength = Math.max(6, Math.min(12, gameName.length + 2));
+			const truncatedId =
+				documentId.length > maxIdLength
+					? `${documentId.substring(0, maxIdLength)}...`
+					: documentId;
 
-		// Check if this is a GameHistoryEntry with completionCount (only show on completed tab)
-		const isGameHistoryEntry = "action" in item;
-		const showCompletionCount =
-			activeTab === "completed" &&
-			isGameHistoryEntry &&
-			item.completionCount !== undefined &&
-			item.completionCount > 0;
+			// Check if this is a GameHistoryEntry with completionCount (only show on completed tab)
+			const isGameHistoryEntry = "action" in item;
+			const showCompletionCount =
+				activeTab === "completed" &&
+				isGameHistoryEntry &&
+				item.completionCount !== undefined &&
+				item.completionCount > 0;
 
-		return (
-			<TouchableOpacity
-				key={index}
-				style={[styles.gameCard, { width: cardWidth, borderColor: gameColor }]}
-				onPress={() => handleGamePress(item)}
-				activeOpacity={0.7}
-			>
-				{showCompletionCount && (
-					<View style={styles.completionBadge}>
-						<Text style={styles.completionBadgeText}>
-							{item.completionCount}
-						</Text>
-					</View>
-				)}
-				<View
+			return (
+				<TouchableOpacity
+					key={index}
 					style={[
-						styles.gameIconContainer,
-						{ backgroundColor: gameColor + "20" },
+						styles.gameCard,
+						{ width: cardWidth, borderColor: gameColor },
 					]}
+					onPress={() => handleGamePress(item)}
+					activeOpacity={0.7}
 				>
-					<Ionicons name={getGameIcon(gameType)} size={32} color={gameColor} />
-				</View>
-				<Text style={styles.gameTypeText} numberOfLines={1}>
-					{formatGameType(gameType)}
-				</Text>
-				<Text style={styles.gameIdText} numberOfLines={1}>
-					ID: {truncatedId}
-				</Text>
-				{"playCount" in item && item.playCount > 0 && (
-					<Text style={styles.playCountText}>{item.playCount} plays</Text>
-				)}
-			</TouchableOpacity>
-		);
-	};
+					{showCompletionCount && (
+						<View style={styles.completionBadge}>
+							<Text style={styles.completionBadgeText}>
+								{item.completionCount}
+							</Text>
+						</View>
+					)}
+					<View
+						style={[
+							styles.gameIconContainer,
+							{ backgroundColor: gameColor + "20" },
+						]}
+					>
+						<Ionicons
+							name={getGameIcon(gameType)}
+							size={32}
+							color={gameColor}
+						/>
+					</View>
+					<Text style={styles.gameTypeText} numberOfLines={1}>
+						{formatGameType(gameType)}
+					</Text>
+					<Text style={styles.gameIdText} numberOfLines={1}>
+						ID: {truncatedId}
+					</Text>
+					{"playCount" in item && item.playCount > 0 && (
+						<Text style={styles.playCountText}>{item.playCount} plays</Text>
+					)}
+				</TouchableOpacity>
+			);
+		},
+		[activeTab, handleGamePress]
+	);
 
 	const handleDeleteAccount = () => {
 		Alert.alert(
@@ -521,9 +551,8 @@ const ProfileScreen = () => {
 			<StatusBar style="dark" />
 
 			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+			<View style={[styles.header, { paddingTop: insets.top + Spacing.xs }]}>
 				<View style={styles.headerSpacer} />
-
 				<View style={styles.headerActions}>
 					<TouchableOpacity
 						style={styles.headerButton}
@@ -531,7 +560,7 @@ const ProfileScreen = () => {
 					>
 						<Ionicons
 							name="search-outline"
-							size={24}
+							size={22}
 							color={Colors.text.primary}
 						/>
 					</TouchableOpacity>
@@ -541,7 +570,7 @@ const ProfileScreen = () => {
 					>
 						<Ionicons
 							name="notifications-outline"
-							size={24}
+							size={22}
 							color={Colors.text.primary}
 						/>
 						{unreadNotificationCount > 0 && (
@@ -560,7 +589,7 @@ const ProfileScreen = () => {
 					>
 						<Ionicons
 							name="chatbubbles-outline"
-							size={24}
+							size={22}
 							color={Colors.text.primary}
 						/>
 						{unreadMessageCount > 0 && (
@@ -577,7 +606,7 @@ const ProfileScreen = () => {
 					>
 						<Ionicons
 							name="ellipsis-horizontal"
-							size={24}
+							size={22}
 							color={Colors.text.primary}
 						/>
 					</TouchableOpacity>
@@ -636,7 +665,7 @@ const ProfileScreen = () => {
 					const scrollY = event.nativeEvent.contentOffset.y;
 					scrollPositionsRef.current[activeTab] = scrollY;
 				}}
-				scrollEventThrottle={16}
+				scrollEventThrottle={100}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -653,6 +682,8 @@ const ProfileScreen = () => {
 							<Image
 								source={{ uri: userData.profilePicture }}
 								style={styles.avatar}
+								resizeMode="cover"
+								cache="force-cache"
 							/>
 						) : (
 							<Ionicons name="person-circle" size={100} color={Colors.accent} />
@@ -731,9 +762,36 @@ const ProfileScreen = () => {
 
 				{/* Tabs */}
 				<View style={styles.tabContainer}>
+					<Animated.View
+						style={[
+							styles.tabIndicator,
+							{
+								transform: [
+									{
+										translateX: tabIndicatorAnim.interpolate({
+											inputRange: [0, 1, 2],
+											outputRange: [
+												0,
+												SCREEN_WIDTH / 3,
+												(SCREEN_WIDTH / 3) * 2,
+											],
+										}),
+									},
+								],
+							},
+						]}
+					>
+						<LinearGradient
+							colors={Gradients.primary}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={StyleSheet.absoluteFill}
+						/>
+					</Animated.View>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "created" && styles.activeTab]}
+						style={styles.tab}
 						onPress={() => setActiveTab("created")}
+						activeOpacity={0.7}
 					>
 						<Text
 							style={[
@@ -745,8 +803,9 @@ const ProfileScreen = () => {
 						</Text>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "completed" && styles.activeTab]}
+						style={styles.tab}
 						onPress={() => setActiveTab("completed")}
+						activeOpacity={0.7}
 					>
 						<Text
 							style={[
@@ -758,8 +817,9 @@ const ProfileScreen = () => {
 						</Text>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "attempted" && styles.activeTab]}
+						style={styles.tab}
 						onPress={() => setActiveTab("attempted")}
+						activeOpacity={0.7}
 					>
 						<Text
 							style={[
@@ -818,13 +878,13 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		backgroundColor: Colors.background.primary,
+		backgroundColor: "rgba(255, 255, 255, 0.95)",
 		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
+		paddingBottom: Spacing.xs,
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
 		zIndex: 10,
-		...Shadows.light,
+		minHeight: 48,
 	},
 	headerSpacer: {
 		width: 40,
@@ -839,14 +899,22 @@ const styles = StyleSheet.create({
 	headerActions: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: Spacing.xs,
+		gap: Spacing.sm,
 	},
 	headerButton: {
 		padding: Spacing.xs,
 		position: "relative",
+		width: 40,
+		height: 40,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	menuButton: {
 		padding: Spacing.xs,
+		width: 40,
+		height: 40,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	badge: {
 		position: "absolute",
@@ -906,9 +974,9 @@ const styles = StyleSheet.create({
 	},
 	profileHeader: {
 		alignItems: "center",
-		paddingVertical: Spacing.xl,
+		paddingVertical: Spacing.lg,
 		backgroundColor: Colors.background.primary,
-		marginBottom: Spacing.md,
+		marginBottom: 0,
 	},
 	avatarContainer: {
 		marginBottom: Spacing.md,
@@ -953,22 +1021,32 @@ const styles = StyleSheet.create({
 	tabContainer: {
 		flexDirection: "row",
 		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		marginBottom: Spacing.md,
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
+		marginBottom: Spacing.sm,
+		position: "relative",
+		overflow: "hidden",
+	},
+	tabIndicator: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		width: SCREEN_WIDTH / 3,
+		height: 2,
+		zIndex: 1,
 	},
 	tab: {
 		flex: 1,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.sm,
 		alignItems: "center",
-		borderBottomWidth: 2,
-		borderBottomColor: "transparent",
+		justifyContent: "center",
+		zIndex: 2,
 	},
 	activeTab: {
-		borderBottomColor: Colors.accent,
+		// Indicator handled by animated view
 	},
 	tabText: {
-		fontSize: Typography.fontSize.body,
+		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.secondary,
 	},
@@ -981,14 +1059,15 @@ const styles = StyleSheet.create({
 		flexWrap: "wrap",
 		paddingHorizontal: Layout.margin,
 		justifyContent: "space-between",
+		gap: Spacing.sm,
 	},
 	gameCard: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
-		marginBottom: Spacing.sm,
+		marginBottom: 0,
 		alignItems: "center",
-		borderWidth: 2,
+		borderWidth: 0,
 		...Shadows.light,
 		position: "relative",
 	},

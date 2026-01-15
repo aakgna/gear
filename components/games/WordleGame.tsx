@@ -574,6 +574,11 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.primary,
 		paddingHorizontal: Spacing.md,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	contentContainer: {
 		flex: 1,

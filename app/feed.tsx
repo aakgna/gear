@@ -18,8 +18,10 @@ import {
 	Image,
 	Keyboard,
 	AppState,
+	InteractionManager,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +33,8 @@ import {
 	BorderRadius,
 	Shadows,
 	Layout,
+	Gradients,
+	Animation,
 } from "../constants/DesignSystem";
 import {
 	Puzzle,
@@ -477,6 +481,36 @@ const FeedScreen = () => {
 			: setCurrentPuzzleIdFollowing;
 
 	const { addCompletedPuzzle } = useGameStore();
+
+	// Animation refs for tab transitions
+	const tabIndicatorAnim = useRef(
+		new Animated.Value(activeTab === "forYou" ? 0 : 1)
+	).current;
+	const tabOpacityAnim = useRef(new Animated.Value(1)).current;
+
+	// Update tab indicator animation when tab changes
+	useEffect(() => {
+		Animated.parallel([
+			Animated.spring(tabIndicatorAnim, {
+				toValue: activeTab === "forYou" ? 0 : 1,
+				useNativeDriver: true,
+				tension: 100,
+				friction: 8,
+			}),
+			Animated.sequence([
+				Animated.timing(tabOpacityAnim, {
+					toValue: 0.5,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+				Animated.timing(tabOpacityAnim, {
+					toValue: 1,
+					duration: Animation.duration.fast,
+					useNativeDriver: true,
+				}),
+			]),
+		]).start();
+	}, [activeTab]);
 
 	// Listen to keyboard events to disable FlatList scrolling
 	useEffect(() => {
@@ -2020,6 +2054,8 @@ const FeedScreen = () => {
 
 	const viewabilityConfig = useRef({
 		itemVisiblePercentThreshold: 50,
+		minimumViewTime: 100,
+		waitForInteraction: false,
 	}).current;
 
 	// Progressive refresh: Compute next 50 games in background (at game 35)
@@ -2218,66 +2254,80 @@ const FeedScreen = () => {
 		);
 	}, [feedHeight, headerHeight]);
 
-	const renderPuzzleCard = ({
-		item,
-		index,
-	}: {
-		item: Puzzle;
-		index: number;
-	}) => {
-		// Check if this puzzle is currently active/visible for the current tab
-		const currentTabPuzzleId =
-			activeTab === "forYou" ? currentPuzzleIdForYou : currentPuzzleIdFollowing;
-		const isActive = currentTabPuzzleId === item.id;
+	const renderPuzzleCard = useCallback(
+		({ item, index }: { item: Puzzle; index: number }) => {
+			// Check if this puzzle is currently active/visible for the current tab
+			const currentTabPuzzleId =
+				activeTab === "forYou"
+					? currentPuzzleIdForYou
+					: currentPuzzleIdFollowing;
+			const isActive = currentTabPuzzleId === item.id;
 
-		// Calculate startTime based on saved elapsed time
-		// Only recalculate when transitioning from inactive to active
-		let puzzleStartTime = puzzleStartTimesRef.current[item.id];
-		const previousActiveId =
-			activeTab === "forYou"
-				? previousActivePuzzleIdRef.current.forYou
-				: previousActivePuzzleIdRef.current.following;
-		const wasActive = previousActiveId === item.id;
+			// Calculate startTime based on saved elapsed time
+			// Only recalculate when transitioning from inactive to active
+			let puzzleStartTime = puzzleStartTimesRef.current[item.id];
+			const previousActiveId =
+				activeTab === "forYou"
+					? previousActivePuzzleIdRef.current.forYou
+					: previousActivePuzzleIdRef.current.following;
+			const wasActive = previousActiveId === item.id;
 
-		if (isActive && !wasActive) {
-			// Game just became active - recalculate startTime based on saved elapsed time
-			const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
-			puzzleStartTime = Date.now() - elapsedTime * 1000;
-			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
-		} else if (!puzzleStartTime) {
-			// If not set yet, calculate based on elapsed time
-			const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
-			puzzleStartTime = Date.now() - elapsedTime * 1000;
-			puzzleStartTimesRef.current[item.id] = puzzleStartTime;
-		}
-
-		// Update previous active puzzle ref for the current tab
-		if (isActive) {
-			if (activeTab === "forYou") {
-				previousActivePuzzleIdRef.current.forYou = item.id;
-			} else {
-				previousActivePuzzleIdRef.current.following = item.id;
+			if (isActive && !wasActive) {
+				// Game just became active - recalculate startTime based on saved elapsed time
+				const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+				puzzleStartTime = Date.now() - elapsedTime * 1000;
+				puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+			} else if (!puzzleStartTime) {
+				// If not set yet, calculate based on elapsed time
+				const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+				puzzleStartTime = Date.now() - elapsedTime * 1000;
+				puzzleStartTimesRef.current[item.id] = puzzleStartTime;
 			}
-		}
 
-		return (
-			<View style={[styles.puzzleCard, { height: itemHeight }]}>
-				<GameWrapper
-					key={item.id}
-					puzzle={item}
-					onComplete={handleGameComplete}
-					onAttempt={handleGameAttempt}
-					startTime={puzzleStartTime}
-					isActive={isActive}
-					onElapsedTimeUpdate={handleElapsedTimeUpdate}
-				/>
-			</View>
-		);
-	};
+			// Update previous active puzzle ref for the current tab
+			if (isActive) {
+				if (activeTab === "forYou") {
+					previousActivePuzzleIdRef.current.forYou = item.id;
+				} else {
+					previousActivePuzzleIdRef.current.following = item.id;
+				}
+			}
 
-	const renderHeader = () => {
+			return (
+				<View style={[styles.puzzleCard, { height: itemHeight }]}>
+					<GameWrapper
+						key={item.id}
+						puzzle={item}
+						onComplete={handleGameComplete}
+						onAttempt={handleGameAttempt}
+						startTime={puzzleStartTime}
+						isActive={isActive}
+						onElapsedTimeUpdate={handleElapsedTimeUpdate}
+					/>
+				</View>
+			);
+		},
+		[
+			activeTab,
+			currentPuzzleIdForYou,
+			currentPuzzleIdFollowing,
+			itemHeight,
+			handleGameComplete,
+			handleGameAttempt,
+			handleElapsedTimeUpdate,
+		]
+	);
+
+	const renderHeader = useCallback(() => {
+		const tabWidth = SCREEN_WIDTH / 2;
+		const indicatorTranslateX = tabIndicatorAnim.interpolate({
+			inputRange: [0, 1],
+			outputRange: [0, tabWidth],
+		});
+
 		return (
 			<>
+				{/* Glassmorphism header */}
 				<View
 					style={[styles.header, { paddingTop: insets.top }]}
 					onLayout={(e) => {
@@ -2286,40 +2336,98 @@ const FeedScreen = () => {
 							setHeaderHeight(height);
 						}
 					}}
-				></View>
+				>
+					<BlurView
+						intensity={80}
+						tint="light"
+						style={[
+							StyleSheet.absoluteFill,
+							{
+								elevation: 0,
+								shadowOpacity: 0,
+								shadowRadius: 0,
+								shadowOffset: { width: 0, height: 0 },
+								shadowColor: "transparent",
+								borderBottomWidth: 0,
+							},
+						]}
+					/>
+				</View>
 
-				{/* Tabs */}
+				{/* Tabs with animated indicator */}
 				<View style={styles.tabContainer}>
-					<TouchableOpacity
-						style={[styles.tab, activeTab === "forYou" && styles.activeTab]}
-						onPress={handleForYouTabPress}
+					<BlurView
+						intensity={60}
+						tint="light"
+						style={[
+							StyleSheet.absoluteFill,
+							{
+								elevation: 0,
+								shadowOpacity: 0,
+								shadowRadius: 0,
+								shadowOffset: { width: 0, height: 0 },
+								shadowColor: "transparent",
+								borderBottomWidth: 0,
+							},
+						]}
+					/>
+					<Animated.View
+						style={[
+							styles.tabIndicator,
+							{
+								transform: [{ translateX: indicatorTranslateX }],
+							},
+						]}
 					>
-						<Text
+						<LinearGradient
+							colors={Gradients.primary}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={StyleSheet.absoluteFill}
+						/>
+					</Animated.View>
+					<TouchableOpacity
+						style={styles.tab}
+						onPress={handleForYouTabPress}
+						activeOpacity={0.7}
+					>
+						<Animated.Text
 							style={[
 								styles.tabText,
 								activeTab === "forYou" && styles.activeTabText,
+								{ opacity: tabOpacityAnim },
 							]}
 						>
 							For You
-						</Text>
+						</Animated.Text>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "following" && styles.activeTab]}
+						style={styles.tab}
 						onPress={handleFollowingTabPress}
+						activeOpacity={0.7}
 					>
-						<Text
+						<Animated.Text
 							style={[
 								styles.tabText,
 								activeTab === "following" && styles.activeTabText,
+								{ opacity: tabOpacityAnim },
 							]}
 						>
 							Following
-						</Text>
+						</Animated.Text>
 					</TouchableOpacity>
 				</View>
 			</>
 		);
-	};
+	}, [
+		activeTab,
+		insets.top,
+		headerHeight,
+		tabIndicatorAnim,
+		tabOpacityAnim,
+		handleForYouTabPress,
+		handleFollowingTabPress,
+	]);
 
 	return (
 		<View style={styles.container}>
@@ -2328,10 +2436,17 @@ const FeedScreen = () => {
 			{/* Header */}
 			{renderHeader()}
 
-			{/* Loading state */}
+			{/* Loading state with animated gradient */}
 			{loading ? (
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color={Colors.accent} />
+					<LinearGradient
+						colors={Gradients.primary}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 1 }}
+						style={styles.loadingGradient}
+					>
+						<ActivityIndicator size="large" color={Colors.text.white} />
+					</LinearGradient>
 					<Text style={styles.loadingText}>Loading puzzles...</Text>
 				</View>
 			) : (
@@ -2375,15 +2490,21 @@ const FeedScreen = () => {
 								showsVerticalScrollIndicator={false}
 								onViewableItemsChanged={onViewableItemsChanged}
 								viewabilityConfig={viewabilityConfig}
-								scrollEventThrottle={16}
-								style={{ flex: 1 }}
+								scrollEventThrottle={32}
+								style={{
+									flex: 1,
+									elevation: 0,
+									shadowOpacity: 0,
+									shadowRadius: 0,
+									shadowOffset: { width: 0, height: 0 },
+									shadowColor: "transparent",
+								}}
 								keyboardDismissMode="on-drag"
 								keyboardShouldPersistTaps="handled"
 								scrollEnabled={!isKeyboardVisible && activeTab === "forYou"}
 								onEndReached={loadNextBatch}
-								onEndReachedThreshold={0.5}
-								removeClippedSubviews={false}
-								onScrollToIndexFailed={(info) => {
+								onEndReachedThreshold={0.8}
+								onScrollToIndexFailed={(info: any) => {
 									const wait = new Promise((resolve) =>
 										setTimeout(resolve, 500)
 									);
@@ -2402,7 +2523,17 @@ const FeedScreen = () => {
 								ListFooterComponent={
 									loadingMore ? (
 										<View style={styles.loadingFooter}>
-											<ActivityIndicator size="small" color={Colors.accent} />
+											<LinearGradient
+												colors={Gradients.primary}
+												start={{ x: 0, y: 0 }}
+												end={{ x: 1, y: 1 }}
+												style={styles.loadingGradientSmall}
+											>
+												<ActivityIndicator
+													size="small"
+													color={Colors.text.white}
+												/>
+											</LinearGradient>
 										</View>
 									) : null
 								}
@@ -2441,18 +2572,26 @@ const FeedScreen = () => {
 										: undefined
 								}
 								pagingEnabled
-								windowSize={5}
-								initialNumToRender={3}
-								maxToRenderPerBatch={3}
+								windowSize={3}
+								initialNumToRender={2}
+								maxToRenderPerBatch={2}
+								updateCellsBatchingPeriod={50}
 								showsVerticalScrollIndicator={false}
 								onViewableItemsChanged={onViewableItemsChanged}
 								viewabilityConfig={viewabilityConfig}
-								scrollEventThrottle={16}
-								style={{ flex: 1 }}
+								scrollEventThrottle={32}
+								style={{
+									flex: 1,
+									elevation: 0,
+									shadowOpacity: 0,
+									shadowRadius: 0,
+									shadowOffset: { width: 0, height: 0 },
+									shadowColor: "transparent",
+								}}
 								keyboardDismissMode="on-drag"
 								keyboardShouldPersistTaps="handled"
 								scrollEnabled={!isKeyboardVisible && activeTab === "following"}
-								removeClippedSubviews={false}
+								removeClippedSubviews={true}
 								onScrollToIndexFailed={(info) => {
 									const wait = new Promise((resolve) =>
 										setTimeout(resolve, 500)
@@ -2490,13 +2629,6 @@ const FeedScreen = () => {
 							</View>
 						)}
 					</View>
-
-					{/* Bottom Gradient Overlay - Light theme with subtle fade */}
-					<LinearGradient
-						colors={["transparent", "rgba(255,255,255,0.8)"]}
-						style={styles.bottomGradient}
-						pointerEvents="none"
-					/>
 				</View>
 			)}
 		</View>
@@ -2507,15 +2639,27 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: Colors.background.primary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	header: {
-		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
+		backgroundColor: "rgba(255, 255, 255, 0.95)",
+		borderBottomWidth: 0,
+		borderBottomColor: "transparent",
 		zIndex: 10,
 		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		...Shadows.light,
+		paddingBottom: 0,
+		overflow: "hidden",
+		height: 40,
+		justifyContent: "flex-end",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	headerTitle: {
 		fontSize: Typography.fontSize.h2,
@@ -2525,24 +2669,39 @@ const styles = StyleSheet.create({
 	},
 	tabContainer: {
 		flexDirection: "row",
-		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
+		backgroundColor: "rgba(255, 255, 255, 0.95)",
+		borderBottomWidth: 0,
+		borderBottomColor: "transparent",
+		position: "relative",
+		overflow: "hidden",
+		zIndex: 9,
+		height: 44,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	tab: {
 		flex: 1,
 		paddingVertical: Spacing.xs,
 		alignItems: "center",
-		borderBottomWidth: 2,
-		borderBottomColor: "transparent",
+		justifyContent: "center",
+		zIndex: 2,
 	},
-	activeTab: {
-		borderBottomColor: Colors.accent,
+	tabIndicator: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		width: "50%",
+		height: 2,
+		zIndex: 1,
 	},
 	tabText: {
-		fontSize: Typography.fontSize.small,
+		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.secondary,
+		letterSpacing: Typography.letterSpacing.normal,
 	},
 	activeTabText: {
 		color: Colors.accent,
@@ -2551,10 +2710,20 @@ const styles = StyleSheet.create({
 	feedContainer: {
 		flex: 1,
 		position: "relative",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	feed: {
 		flex: 1,
 		backgroundColor: Colors.background.primary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	feedAbsolute: {
 		position: "absolute",
@@ -2563,12 +2732,22 @@ const styles = StyleSheet.create({
 		right: 0,
 		bottom: 0,
 		backgroundColor: Colors.background.primary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	puzzleCard: {
 		width: SCREEN_WIDTH,
 		backgroundColor: Colors.background.primary,
 		overflow: "hidden",
 		position: "relative",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	loadingContainer: {
 		flex: 1,
@@ -2576,8 +2755,32 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		backgroundColor: Colors.background.primary,
 	},
+	loadingGradient: {
+		width: 60,
+		height: 60,
+		borderRadius: BorderRadius.lg,
+		alignItems: "center",
+		justifyContent: "center",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
+	},
+	loadingGradientSmall: {
+		width: 40,
+		height: 40,
+		borderRadius: BorderRadius.md,
+		alignItems: "center",
+		justifyContent: "center",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
+	},
 	loadingText: {
-		marginTop: Spacing.md,
+		marginTop: Spacing.lg,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.secondary,
 		fontWeight: Typography.fontWeight.medium,
@@ -2587,6 +2790,7 @@ const styles = StyleSheet.create({
 		color: Colors.text.secondary,
 		textAlign: "center",
 		fontWeight: Typography.fontWeight.medium,
+		letterSpacing: Typography.letterSpacing.normal,
 	},
 	emptyContainer: {
 		padding: Spacing.xl,
@@ -2598,14 +2802,6 @@ const styles = StyleSheet.create({
 		padding: Spacing.lg,
 		alignItems: "center",
 		justifyContent: "center",
-	},
-	bottomGradient: {
-		position: "absolute",
-		left: 0,
-		right: 0,
-		bottom: 0,
-		height: 100,
-		zIndex: 50,
 	},
 });
 

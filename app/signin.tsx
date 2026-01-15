@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import TikTokButton from "../components/TikTokButton";
 import {
 	signInWithGoogle,
 	configureGoogleSignIn,
@@ -24,6 +25,7 @@ import {
 	Spacing,
 	BorderRadius,
 	Shadows,
+	Gradients,
 } from "../constants/DesignSystem";
 
 const SignInScreen = () => {
@@ -97,26 +99,14 @@ const SignInScreen = () => {
 						recommendations.
 					</Text>
 
-					<TouchableOpacity
-						style={[styles.googleButton, loading && styles.buttonDisabled]}
+					<TikTokButton
+						label="Continue with Google"
 						onPress={handleGoogleSignIn}
 						disabled={loading}
-					>
-						{loading ? (
-						<ActivityIndicator color={Colors.text.white} />
-						) : (
-							<>
-								<Ionicons
-									name="logo-google"
-									size={24}
-									color={Colors.text.white}
-								/>
-								<Text style={styles.googleButtonText}>
-									Continue with Google
-								</Text>
-							</>
-						)}
-					</TouchableOpacity>
+						loading={loading}
+						icon={<Ionicons name="logo-google" size={20} color={Colors.text.white} />}
+						fullWidth
+					/>
 
 					<Text style={styles.privacyText}>
 						By continuing, you agree to our Terms of Service and Privacy Policy

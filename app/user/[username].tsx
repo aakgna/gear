@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -10,11 +10,15 @@ import {
 	Dimensions,
 	Image,
 	RefreshControl,
+	Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../../components/MinimalHeader";
+import TikTokButton from "../../components/TikTokButton";
 import {
 	Colors,
 	Typography,
@@ -23,6 +27,7 @@ import {
 	Shadows,
 	Layout,
 	getGameColor,
+	Gradients,
 } from "../../constants/DesignSystem";
 import {
 	getUserByUsername,
@@ -301,14 +306,14 @@ const CreatorProfileScreen = () => {
 		} as any);
 	};
 
-	const renderGameCard = (
+	const renderGameCard = useCallback((
 		item: GameSummary | GameHistoryEntry,
 		index: number
 	) => {
 		const gameType =
 			"gameType" in item ? item.gameType : item.category || "wordle";
 		const gameColor = getGameColor(gameType as PuzzleType);
-		const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm * 2) / 3;
+		const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm) / 2;
 
 		return (
 			<TouchableOpacity
@@ -332,7 +337,7 @@ const CreatorProfileScreen = () => {
 				)}
 			</TouchableOpacity>
 		);
-	};
+	}, [handleGamePress]);
 
 	if (loading) {
 		return (
@@ -380,19 +385,7 @@ const CreatorProfileScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>{profile.username}</Text>
-				<TouchableOpacity style={styles.menuButton}>
-					<Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-			</View>
+			<MinimalHeader title={profile.username} />
 
 			<ScrollView
 				style={styles.content}
@@ -483,39 +476,34 @@ const CreatorProfileScreen = () => {
 					</View>
 
 					{/* Follow/Edit Button */}
+					<View style={styles.buttonContainer}>
 					{isOwnProfile ? (
-						<TouchableOpacity
-							style={styles.editButton}
+							<TikTokButton
+								label="Edit Profile"
 							onPress={() => router.push("/profile")}
-						>
-							<Text style={styles.editButtonText}>Edit Profile</Text>
-						</TouchableOpacity>
+								variant="outline"
+								fullWidth
+							/>
 					) : (
-						<TouchableOpacity
-							style={[
-								styles.followButton,
-								isFollowingUser && styles.followingButton,
-							]}
+							isFollowingUser ? (
+								<TikTokButton
+									label="Following"
 							onPress={handleFollow}
 							disabled={loadingFollow}
-						>
-							{loadingFollow ? (
-								<ActivityIndicator
-									size="small"
-									color={isFollowingUser ? Colors.text.primary : Colors.text.white}
+									variant="secondary"
+									fullWidth
 								/>
 							) : (
-								<Text
-									style={[
-										styles.followButtonText,
-										isFollowingUser && styles.followingButtonText,
-									]}
-								>
-									{isFollowingUser ? "Following" : "Follow"}
-								</Text>
+								<TikTokButton
+									label="Follow"
+									onPress={handleFollow}
+									disabled={loadingFollow}
+									variant="primary"
+									fullWidth
+								/>
+							)
 							)}
-						</TouchableOpacity>
-					)}
+					</View>
 
 					{/* Bio */}
 					{profile.bio && (
@@ -649,8 +637,13 @@ const styles = StyleSheet.create({
 	},
 	profileHeader: {
 		alignItems: "center",
-		paddingVertical: Spacing.xl,
+		paddingVertical: Spacing.lg,
 		backgroundColor: Colors.background.primary,
+		marginBottom: 0,
+	},
+	buttonContainer: {
+		paddingHorizontal: Layout.margin,
+		marginTop: Spacing.md,
 		marginBottom: Spacing.md,
 	},
 	avatarContainer: {
@@ -734,22 +727,24 @@ const styles = StyleSheet.create({
 	tabContainer: {
 		flexDirection: "row",
 		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		marginBottom: Spacing.md,
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
+		marginBottom: Spacing.sm,
+		position: "relative",
+		overflow: "hidden",
 	},
 	tab: {
 		flex: 1,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.sm,
 		alignItems: "center",
-		borderBottomWidth: 2,
-		borderBottomColor: "transparent",
+		justifyContent: "center",
+		zIndex: 2,
 	},
 	activeTab: {
-		borderBottomColor: Colors.accent,
+		// Indicator handled by animated view
 	},
 	tabText: {
-		fontSize: Typography.fontSize.body,
+		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.secondary,
 	},
@@ -762,14 +757,15 @@ const styles = StyleSheet.create({
 		flexWrap: "wrap",
 		paddingHorizontal: Layout.margin,
 		justifyContent: "space-between",
+		gap: Spacing.sm,
 	},
 	gameCard: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
-		marginBottom: Spacing.sm,
+		marginBottom: 0,
 		alignItems: "center",
-		borderWidth: 2,
+		borderWidth: 0,
 		...Shadows.light,
 	},
 	gameIconContainer: {

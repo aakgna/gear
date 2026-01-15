@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
 	View,
 	Text,
@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import MinimalHeader from "../components/MinimalHeader";
+import TikTokButton from "../components/TikTokButton";
 import {
 	Colors,
 	Typography,
@@ -159,95 +162,78 @@ const FollowersFollowingScreen = () => {
 		}
 	};
 
-	const renderUserItem = ({ item }: { item: UserSummary }) => {
-		const isCurrentUser = item.uid === currentUid;
-		const isFollowingUser = followingMap[item.uid] || false;
-		const isLoading = loadingFollow[item.uid] || false;
+	const renderUserItem = useCallback(
+		({ item }: { item: UserSummary }) => {
+			const isCurrentUser = item.uid === currentUid;
+			const isFollowingUser = followingMap[item.uid] || false;
+			const isLoading = loadingFollow[item.uid] || false;
 
-		return (
-			<TouchableOpacity
-				style={styles.userItem}
-				onPress={() => handleUserPress(item)}
-				activeOpacity={0.7}
-			>
-				{/* Profile Picture */}
-				<View style={styles.avatarContainer}>
-					{item.profilePicture ? (
-						<Image
-							source={{ uri: item.profilePicture }}
-							style={styles.avatar}
-						/>
-					) : (
-						<View style={styles.avatarPlaceholder}>
-							<Ionicons name="person" size={24} color={Colors.text.secondary} />
-						</View>
-					)}
-				</View>
-
-				{/* User Info */}
-				<View style={styles.userInfo}>
-					<Text style={styles.username} numberOfLines={1}>
-						{item.username || "Unknown"}
-					</Text>
-					{item.bio && (
-						<Text style={styles.bio} numberOfLines={1}>
-							{item.bio}
-						</Text>
-					)}
-				</View>
-
-				{/* Follow Button */}
-				{!isCurrentUser && (
-					<TouchableOpacity
-						style={[
-							styles.followButton,
-							isFollowingUser && styles.followingButton,
-						]}
-						onPress={() => handleFollow(item.uid)}
-						disabled={isLoading}
-						activeOpacity={0.7}
-					>
-						{isLoading ? (
-							<ActivityIndicator
-								size="small"
-								color={
-									isFollowingUser ? Colors.text.primary : Colors.text.white
-								}
+			return (
+				<TouchableOpacity
+					style={styles.userItem}
+					onPress={() => handleUserPress(item)}
+					activeOpacity={0.7}
+				>
+					{/* Profile Picture */}
+					<View style={styles.avatarContainer}>
+						{item.profilePicture ? (
+							<Image
+								source={{ uri: item.profilePicture }}
+								style={styles.avatar}
 							/>
 						) : (
-							<Text
-								style={[
-									styles.followButtonText,
-									isFollowingUser && styles.followingButtonText,
-								]}
-							>
-								{isFollowingUser ? "Following" : "Follow"}
+							<View style={styles.avatarPlaceholder}>
+								<Ionicons
+									name="person"
+									size={24}
+									color={Colors.text.secondary}
+								/>
+							</View>
+						)}
+					</View>
+
+					{/* User Info */}
+					<View style={styles.userInfo}>
+						<Text style={styles.username} numberOfLines={1}>
+							{item.username || "Unknown"}
+						</Text>
+						{item.bio && (
+							<Text style={styles.bio} numberOfLines={1}>
+								{item.bio}
 							</Text>
 						)}
-					</TouchableOpacity>
-				)}
-			</TouchableOpacity>
-		);
-	};
+					</View>
+
+					{/* Follow Button */}
+					{!isCurrentUser &&
+						(isFollowingUser ? (
+							<TikTokButton
+								label="Following"
+								onPress={() => handleFollow(item.uid)}
+								disabled={isLoading}
+								variant="secondary"
+							/>
+						) : (
+							<TikTokButton
+								label="Follow"
+								onPress={() => handleFollow(item.uid)}
+								disabled={isLoading}
+								variant="primary"
+							/>
+						))}
+				</TouchableOpacity>
+			);
+		},
+		[currentUid, followingMap, handleFollow, handleUserPress]
+	);
 
 	if (loading && !refreshing) {
 		return (
 			<View style={styles.container}>
-				<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-					<TouchableOpacity
-						style={styles.backButton}
-						onPress={() => router.back()}
-					>
-						<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-					</TouchableOpacity>
-					<View style={styles.headerTitleContainer}>
-						{profileUsername ? (
-							<Text style={styles.profileUsername}>{profileUsername}</Text>
-						) : null}
-						<Text style={styles.headerTitle}>{title}</Text>
-					</View>
-					<View style={styles.backButton} />
-				</View>
+				<StatusBar style="dark" />
+				<MinimalHeader
+					title={profileUsername ? `${profileUsername}'s ${title}` : title}
+				/>
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color={Colors.accent} />
 				</View>
@@ -257,22 +243,10 @@ const FollowersFollowingScreen = () => {
 
 	return (
 		<View style={styles.container}>
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<View style={styles.headerTitleContainer}>
-					{profileUsername ? (
-						<Text style={styles.profileUsername}>{profileUsername}</Text>
-					) : null}
-					<Text style={styles.headerTitle}>{title}</Text>
-				</View>
-				<View style={styles.backButton} />
-			</View>
+			<StatusBar style="dark" />
+			<MinimalHeader
+				title={profileUsername ? `${profileUsername}'s ${title}` : title}
+			/>
 
 			{/* Users List */}
 			<FlatList
@@ -306,38 +280,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.primary,
 	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		backgroundColor: Colors.background.primary,
-		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		...Shadows.light,
-	},
-	backButton: {
-		width: 40,
-		height: 40,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	headerTitleContainer: {
-		alignItems: "center",
-		flex: 1,
-		justifyContent: "center",
-	},
-	profileUsername: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-		marginBottom: 2,
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h2,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-	},
 	listContent: {
 		paddingVertical: Spacing.sm,
 	},
@@ -346,8 +288,8 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		paddingHorizontal: Layout.margin,
 		paddingVertical: Spacing.md,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
 	},
 	avatarContainer: {
 		marginRight: Spacing.md,
@@ -379,28 +321,6 @@ const styles = StyleSheet.create({
 	bio: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-	},
-	followButton: {
-		paddingHorizontal: Spacing.lg,
-		paddingVertical: Spacing.sm,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.accent,
-		minWidth: 80,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	followingButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: "#E5E5E5",
-	},
-	followButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.white,
-	},
-	followingButtonText: {
-		color: Colors.text.primary,
 	},
 	loadingContainer: {
 		flex: 1,

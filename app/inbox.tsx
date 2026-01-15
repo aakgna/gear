@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
 	View,
 	StyleSheet,
@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../components/MinimalHeader";
 import {
 	Colors,
 	Typography,
@@ -22,11 +23,8 @@ import {
 	Layout,
 } from "../constants/DesignSystem";
 import { getCurrentUser } from "../config/auth";
-import {
-	fetchConversations,
-	markConversationRead,
-	Conversation,
-} from "../config/messaging";
+import { fetchConversations, markConversationRead } from "../config/messaging";
+import { Conversation } from "../config/types";
 import { fetchUserProfile, UserPublicProfile } from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
@@ -121,89 +119,83 @@ const InboxScreen = () => {
 	const getOtherParticipant = (conversation: Conversation): string | null => {
 		if (!currentUser) return null;
 		const other = conversation.participants.find(
-			(id) => id !== currentUser.uid
+			(id: string) => id !== currentUser.uid
 		);
 		return other || null;
 	};
 
-	const renderConversation = ({ item }: { item: Conversation }) => {
-		const otherParticipantId = getOtherParticipant(item);
-		const otherParticipant = otherParticipantId
-			? participantProfiles[otherParticipantId]
-			: null;
+	const renderConversation = useCallback(
+		({ item }: { item: Conversation }) => {
+			const otherParticipantId = getOtherParticipant(item);
+			const otherParticipant = otherParticipantId
+				? participantProfiles[otherParticipantId]
+				: null;
 
-		const isFromMe = item.lastMessage?.senderId === currentUser?.uid;
-		const unreadCount = item.unreadCount || 0;
+			const isFromMe = item.lastMessage?.senderId === currentUser?.uid;
+			const unreadCount = item.unreadCount || 0;
 
-		return (
-			<TouchableOpacity
-				style={styles.conversationItem}
-				onPress={() => handleConversationPress(item)}
-				activeOpacity={0.7}
-			>
-				<View style={styles.conversationContent}>
-					{otherParticipant?.profilePicture ? (
-						<Image
-							source={{ uri: otherParticipant.profilePicture }}
-							style={styles.avatar}
-						/>
-					) : (
-						<Ionicons
-							name="person-circle"
-							size={56}
-							color={Colors.text.secondary}
-						/>
-					)}
-					<View style={styles.conversationDetails}>
-						<View style={styles.conversationHeader}>
-							<Text style={styles.username}>
-								{otherParticipant?.username || "user"}
-							</Text>
-							{item.lastMessage && (
-								<Text style={styles.timestamp}>
-									{formatTimestamp(item.lastMessage.timestamp)}
+			return (
+				<TouchableOpacity
+					style={styles.conversationItem}
+					onPress={() => handleConversationPress(item)}
+					activeOpacity={0.7}
+				>
+					<View style={styles.conversationContent}>
+						{otherParticipant?.profilePicture ? (
+							<Image
+								source={{ uri: otherParticipant.profilePicture }}
+								style={styles.avatar}
+							/>
+						) : (
+							<Ionicons
+								name="person-circle"
+								size={56}
+								color={Colors.text.secondary}
+							/>
+						)}
+						<View style={styles.conversationDetails}>
+							<View style={styles.conversationHeader}>
+								<Text style={styles.username}>
+									{otherParticipant?.username || "user"}
 								</Text>
-							)}
-						</View>
-						{item.lastMessage && (
-							<View style={styles.messagePreview}>
-								<Text
-									style={[
-										styles.messageText,
-										unreadCount > 0 && styles.messageTextUnread,
-									]}
-									numberOfLines={1}
-								>
-									{isFromMe && "You: "}
-									{item.lastMessage.text}
-								</Text>
-								{unreadCount > 0 && (
-									<View style={styles.unreadBadge}>
-										<Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-									</View>
+								{item.lastMessage && (
+									<Text style={styles.timestamp}>
+										{formatTimestamp(item.lastMessage.timestamp)}
+									</Text>
 								)}
 							</View>
-						)}
+							{item.lastMessage && (
+								<View style={styles.messagePreview}>
+									<Text
+										style={[
+											styles.messageText,
+											unreadCount > 0 && styles.messageTextUnread,
+										]}
+										numberOfLines={1}
+									>
+										{isFromMe && "You: "}
+										{item.lastMessage.text}
+									</Text>
+									{unreadCount > 0 && (
+										<View style={styles.unreadBadge}>
+											<Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+										</View>
+									)}
+								</View>
+							)}
+						</View>
 					</View>
-				</View>
-			</TouchableOpacity>
-		);
-	};
+				</TouchableOpacity>
+			);
+		},
+		[currentUser, participantProfiles]
+	);
 
 	if (!currentUser) {
 		return (
 			<View style={styles.container}>
 				<StatusBar style="dark" />
-				<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-					<TouchableOpacity
-						onPress={() => router.back()}
-						style={styles.backButton}
-					>
-						<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-					</TouchableOpacity>
-					<Text style={styles.headerTitle}>Inbox</Text>
-					<View style={styles.backButton} />
-				</View>
+				<MinimalHeader title="Inbox" />
 				<View style={styles.emptyContainer}>
 					<Text style={styles.emptyText}>Please sign in to view messages</Text>
 				</View>
@@ -215,17 +207,7 @@ const InboxScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					onPress={() => router.back()}
-					style={styles.backButton}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Inbox</Text>
-				<View style={styles.backButton} />
-			</View>
+			<MinimalHeader title="Inbox" />
 
 			{/* Conversations List */}
 			{loading ? (
@@ -237,6 +219,16 @@ const InboxScreen = () => {
 					data={conversations}
 					renderItem={renderConversation}
 					keyExtractor={(item) => item.id}
+					windowSize={5}
+					initialNumToRender={10}
+					maxToRenderPerBatch={5}
+					updateCellsBatchingPeriod={50}
+					removeClippedSubviews={true}
+					getItemLayout={(data, index) => ({
+						length: 80,
+						offset: 80 * index,
+						index,
+					})}
 					contentContainerStyle={{
 						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					}}
@@ -302,8 +294,8 @@ const styles = StyleSheet.create({
 	},
 	conversationItem: {
 		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
 	},
 	conversationContent: {
 		flexDirection: "row",
@@ -384,4 +376,3 @@ const styles = StyleSheet.create({
 });
 
 export default InboxScreen;
-

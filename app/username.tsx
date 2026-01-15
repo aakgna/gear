@@ -15,6 +15,9 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import MinimalHeader from "../components/MinimalHeader";
+import TikTokInput from "../components/TikTokInput";
+import TikTokButton from "../components/TikTokButton";
 import {
 	checkUsernameAvailability,
 	saveUsername,
@@ -131,16 +134,7 @@ const UsernameScreen = () => {
 				style={StyleSheet.absoluteFill}
 			/>
 
-			{/* Header with Back Button */}
-			<View style={styles.header}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.replace("/signin")}
-					activeOpacity={0.7}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.accent} />
-				</TouchableOpacity>
-			</View>
+			<MinimalHeader title="Choose Username" />
 
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}

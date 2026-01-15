@@ -649,10 +649,20 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.secondary,
 		flexDirection: "column",
 		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	gameContainer: {
 		flex: 1,
 		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	gameContainerWithStats: {
 		flex: 0.55, // Takes 55% when stats are shown
@@ -662,7 +672,11 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.secondary,
 		borderTopWidth: 2,
 		borderTopColor: Colors.accent,
-		...Shadows.heavy,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	statsHeader: {
 		flexDirection: "row",
@@ -702,4 +716,11 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default GameWrapper;
+export default React.memo(GameWrapper, (prevProps, nextProps) => {
+	// Only re-render if puzzle ID changes or active state changes
+	return (
+		prevProps.puzzle.id === nextProps.puzzle.id &&
+		prevProps.isActive === nextProps.isActive &&
+		prevProps.startTime === nextProps.startTime
+	);
+});

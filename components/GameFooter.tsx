@@ -1,12 +1,21 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useRef } from "react";
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	Animated,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
 	Colors,
 	Typography,
 	Spacing,
 	BorderRadius,
 	Shadows,
+	Gradients,
+	Animation,
 } from "../constants/DesignSystem";
 
 interface GameFooterProps {
@@ -43,8 +52,34 @@ const GameFooter: React.FC<GameFooterProps> = ({
 	gameCompleted = false,
 	gameWon = false,
 }) => {
+	// Animation refs for button press feedback
+	const primaryScale = useRef(new Animated.Value(1)).current;
+	const secondaryScale = useRef(new Animated.Value(1)).current;
+	const statsScale = useRef(new Animated.Value(1)).current;
+
 	// Don't show primary/secondary when game is completed
 	const showActionButtons = !gameCompleted;
+
+	// Animated press handler
+	const handlePress = (scaleAnim: Animated.Value, callback?: () => void) => {
+		Animated.sequence([
+			Animated.spring(scaleAnim, {
+				toValue: 0.95,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+		]).start();
+		if (callback) {
+			callback();
+		}
+	};
 
 	return (
 		<View style={styles.container}>
@@ -52,63 +87,87 @@ const GameFooter: React.FC<GameFooterProps> = ({
 				<View style={styles.actionRow}>
 					{/* Secondary Action (Show Answer) - Left side, less prominent */}
 					{showSecondary && onSecondaryAction && (
-						<TouchableOpacity
-							style={styles.secondaryButton}
-							onPress={onSecondaryAction}
-							activeOpacity={0.7}
-						>
-							<Ionicons
-								name="eye-outline"
-								size={18}
-								color={Colors.text.secondary}
-							/>
-							<Text style={styles.secondaryButtonText}>{secondaryLabel}</Text>
-						</TouchableOpacity>
+						<Animated.View style={{ transform: [{ scale: secondaryScale }] }}>
+							<TouchableOpacity
+								style={styles.secondaryButton}
+								onPress={() => handlePress(secondaryScale, onSecondaryAction)}
+								activeOpacity={0.8}
+							>
+								<Ionicons
+									name="eye-outline"
+									size={18}
+									color={Colors.text.secondary}
+								/>
+								<Text style={styles.secondaryButtonText}>{secondaryLabel}</Text>
+							</TouchableOpacity>
+						</Animated.View>
 					)}
 
-					{/* Primary Action (Submit/Check) - Right side, prominent */}
+					{/* Primary Action (Submit/Check) - Right side, prominent with gradient */}
 					{showPrimary && onPrimaryAction && (
-						<TouchableOpacity
+						<Animated.View
 							style={[
-								styles.primaryButton,
-								primaryDisabled && styles.primaryButtonDisabled,
+								{ transform: [{ scale: primaryScale }] },
+								primaryDisabled && { opacity: 0.5 },
 							]}
-							onPress={onPrimaryAction}
-							activeOpacity={0.7}
-							disabled={primaryDisabled}
 						>
-							<Text
-								style={[
-									styles.primaryButtonText,
-									primaryDisabled && styles.primaryButtonTextDisabled,
-								]}
+							<TouchableOpacity
+								onPress={() => handlePress(primaryScale, onPrimaryAction)}
+								activeOpacity={0.8}
+								disabled={primaryDisabled}
 							>
-								{primaryLabel}
-							</Text>
-							<Ionicons
-								name="checkmark-circle"
-								size={20}
-								color={primaryDisabled ? Colors.text.disabled : Colors.text.primary}
-							/>
-						</TouchableOpacity>
+								<LinearGradient
+									colors={
+										primaryDisabled ? ["#9CA3AF", "#6B7280"] : Gradients.button
+									}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 1 }}
+									style={styles.primaryButton}
+								>
+									<Text
+										style={[
+											styles.primaryButtonText,
+											primaryDisabled && styles.primaryButtonTextDisabled,
+										]}
+									>
+										{primaryLabel}
+									</Text>
+									<Ionicons
+										name="checkmark-circle"
+										size={20}
+										color={
+											primaryDisabled ? Colors.text.disabled : Colors.text.white
+										}
+									/>
+								</LinearGradient>
+							</TouchableOpacity>
+						</Animated.View>
 					)}
 				</View>
 			)}
 
-			{/* Stats Button - shown when game is completed */}
+			{/* Stats Button - shown when game is completed with gradient */}
 			{showStats && onStatsAction && (
-				<TouchableOpacity
-					style={styles.statsButton}
-					onPress={onStatsAction}
-					activeOpacity={0.7}
-				>
-					<Ionicons
-						name="stats-chart"
-						size={20}
-						color={Colors.text.primary}
-					/>
-					<Text style={styles.statsButtonText}>View Stats</Text>
-				</TouchableOpacity>
+				<Animated.View style={{ transform: [{ scale: statsScale }] }}>
+					<TouchableOpacity
+						onPress={() => handlePress(statsScale, onStatsAction)}
+						activeOpacity={0.8}
+					>
+						<LinearGradient
+							colors={Gradients.button}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={styles.statsButton}
+						>
+							<Ionicons
+								name="stats-chart"
+								size={20}
+								color={Colors.text.white}
+							/>
+							<Text style={styles.statsButtonText}>View Stats</Text>
+						</LinearGradient>
+					</TouchableOpacity>
+				</Animated.View>
 			)}
 		</View>
 	);
@@ -120,6 +179,13 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.md,
 		gap: Spacing.md,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
+		borderBottomWidth: 0,
+		borderTopWidth: 0,
 	},
 	actionRow: {
 		flexDirection: "row",
@@ -132,21 +198,24 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.buttonPadding,
 		paddingHorizontal: Spacing.lg,
 		borderRadius: BorderRadius.lg,
 		gap: Spacing.sm,
-		...Shadows.medium,
+		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	primaryButtonDisabled: {
-		backgroundColor: Colors.background.tertiary,
 		opacity: 0.5,
 	},
 	primaryButtonText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
+		color: Colors.text.white,
 	},
 	primaryButtonTextDisabled: {
 		color: Colors.text.disabled,
@@ -156,11 +225,11 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: "transparent",
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.buttonPadding,
 		paddingHorizontal: Spacing.md,
 		borderRadius: BorderRadius.lg,
 		borderWidth: 1,
-		borderColor: "#E5E5E5",
+		borderColor: Colors.border,
 		gap: Spacing.xs,
 	},
 	secondaryButtonText: {
@@ -172,20 +241,22 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.buttonPadding,
 		paddingHorizontal: Spacing.xl,
 		borderRadius: BorderRadius.lg,
 		gap: Spacing.sm,
-		...Shadows.medium,
+		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	statsButtonText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
+		color: Colors.text.white,
 	},
 });
 
-export default GameFooter;
-
-
+export default React.memo(GameFooter);

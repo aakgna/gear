@@ -1,48 +1,48 @@
 /**
- * Design System for GEAR - Logic Puzzle App
- * Light theme inspired by TikTok with unique vibrant twist
+ * Design System for ThinkTok - Logic Puzzle App
+ * Vibrant & Energetic theme with modern visual effects
  */
 
 import { ViewStyle } from "react-native";
 import { PuzzleType } from "../config/types";
 
-// Color System - Light Theme (TikTok-inspired)
+// Color System - Vibrant & Energetic Theme
 export const Colors = {
-	// Primary Colors - Unique vibrant twist
-	primary: "#161823", // Deep dark blue-gray for headers, icons, main text
-	accent: "#FE2C55", // Vibrant pink-red (TikTok-inspired but unique)
-	secondaryAccent: "#25F4EE", // Cyan for secondary actions, highlights
-	error: "#FF3040", // Bright red for wrong answers or alerts
+	// Primary Colors - Vibrant & energetic
+	primary: "#0A0E27", // Richer dark blue for headers, icons, main text
+	accent: "#FF006E", // Hot pink - vibrant and energetic
+	secondaryAccent: "#00D4FF", // Electric blue for secondary actions, highlights
+	error: "#FF1744", // Bright red variant for wrong answers or alerts
 
-	// Background - Light Theme
+	// Background - Light Theme with subtle gradients
 	background: {
 		primary: "#FFFFFF", // Pure white
-		secondary: "#F8F8F8", // Light gray for sections
-		tertiary: "#F2F2F2", // Slightly darker gray for cards
-		gradient: ["#FFFFFF", "#F5F5F5"] as const, // Light gradient
+		secondary: "#FAFAFF", // Very light blue-tinted gray
+		tertiary: "#F5F5FA", // Slightly darker blue-tinted gray
+		gradient: ["#FAFAFF", "#FFFFFF"] as const, // Subtle gradient
 	},
 
 	// Text Colors - Light Theme
 	text: {
-		primary: "#161823", // Dark text (almost black)
-		secondary: "#8E8E93", // Medium gray for secondary text
-		disabled: "#C7C7CC", // Light gray for disabled text
+		primary: "#0A0E27", // Richer dark blue (softer than black)
+		secondary: "#6B7280", // Warmer gray for secondary text
+		disabled: "#9CA3AF", // Medium gray for disabled text
 		white: "#FFFFFF", // White text (for dark backgrounds)
-		accent: "#FE2C55", // Accent color for highlights
+		accent: "#FF006E", // Accent color for highlights
 	},
 
 	// Game States
 	game: {
-		correct: "#00C896", // Green for correct answers
-		incorrect: "#FF3040", // Red for incorrect
+		correct: "#10B981", // Emerald green for correct answers
+		incorrect: "#FF1744", // Bright red for incorrect
 		present: "#FFD93D", // Yellow for "present" state (Wordle)
-		absent: "#E5E5E5", // Light gray for absent
+		absent: "#E5E7EB", // Light gray for absent
 	},
 	// Border
-	border: "#E5E5E5", // Light gray border color
+	border: "#E5E7EB", // Light gray border color
 };
 
-// Typography
+// Typography - Enhanced for better readability and hierarchy
 export const Typography = {
 	fontFamily: {
 		primary: "Inter", // Fallback to system font if not loaded
@@ -67,9 +67,15 @@ export const Typography = {
 		normal: 1.5,
 		relaxed: 1.75,
 	},
+	letterSpacing: {
+		tight: -0.5,
+		normal: 0,
+		wide: 0.5,
+		wideUppercase: 1.2, // For uppercase labels
+	},
 };
 
-// Spacing System (8px multiples)
+// Spacing System (8px multiples) - Optimized for better breathing room
 export const Spacing = {
 	xxxxs: 0,
 	xxxs: 1,
@@ -80,6 +86,10 @@ export const Spacing = {
 	lg: 24,
 	xl: 32,
 	xxl: 48,
+	// Additional spacing for better vertical rhythm
+	cardPadding: 20, // Increased from 16px for cards
+	buttonPadding: 18, // Better padding for buttons
+	sectionGap: 32, // Gap between major sections
 };
 
 // Border Radius
@@ -91,12 +101,15 @@ export const BorderRadius = {
 	pill: 9999,
 };
 
-// Shadows - Light theme with subtle depth
+// Shadows - Enhanced depth with colored tints and glow effects
 export const Shadows: {
 	light: ViewStyle;
 	medium: ViewStyle;
 	heavy: ViewStyle;
 	glow: ViewStyle;
+	glowAccent: ViewStyle;
+	glowSecondary: ViewStyle;
+	colored: (color: string) => ViewStyle;
 } = {
 	light: {
 		shadowColor: "#000",
@@ -126,6 +139,27 @@ export const Shadows: {
 		shadowRadius: 12,
 		elevation: 6,
 	},
+	glowAccent: {
+		shadowColor: Colors.accent,
+		shadowOffset: { width: 0, height: 0 },
+		shadowOpacity: 0.5,
+		shadowRadius: 16,
+		elevation: 8,
+	},
+	glowSecondary: {
+		shadowColor: Colors.secondaryAccent,
+		shadowOffset: { width: 0, height: 0 },
+		shadowOpacity: 0.4,
+		shadowRadius: 12,
+		elevation: 6,
+	},
+	colored: (color: string): ViewStyle => ({
+		shadowColor: color,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 4,
+	}),
 };
 
 // Animation Timing
@@ -138,7 +172,17 @@ export const Animation = {
 	easing: "cubic-bezier(0.4, 0, 0.2, 1)", // iOS feel
 };
 
-// Component Styles - Light Theme
+// Gradient Utilities
+export const Gradients = {
+	primary: [Colors.accent, "#FF1744"] as const,
+	secondary: [Colors.secondaryAccent, "#00A8CC"] as const,
+	accent: [Colors.accent, Colors.secondaryAccent] as const,
+	background: Colors.background.gradient,
+	button: [Colors.accent, "#FF1744"] as const,
+	buttonSecondary: [Colors.secondaryAccent, "#00A8CC"] as const,
+};
+
+// Component Styles - Enhanced with better spacing
 export const ComponentStyles: {
 	puzzleCard: ViewStyle;
 	button: ViewStyle;
@@ -146,21 +190,21 @@ export const ComponentStyles: {
 	progressBar: ViewStyle;
 	card: ViewStyle;
 } = {
-	// Puzzle Card
+	// Puzzle Card - Increased padding
 	puzzleCard: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.xl,
-		padding: Spacing.md,
+		padding: Spacing.cardPadding,
 		borderWidth: 0,
 		borderColor: "transparent",
 		...Shadows.medium,
 	},
 
-	// Button
+	// Button - Enhanced with better padding
 	button: {
 		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.buttonPadding,
 		paddingHorizontal: Spacing.lg,
 		minHeight: 44, // Accessibility minimum
 		alignItems: "center",
@@ -172,7 +216,7 @@ export const ComponentStyles: {
 	input: {
 		borderRadius: BorderRadius.md,
 		borderWidth: 1,
-		borderColor: "#E5E5E5",
+		borderColor: Colors.border,
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.md,
 		fontSize: Typography.fontSize.body,
@@ -187,7 +231,7 @@ export const ComponentStyles: {
 		borderRadius: BorderRadius.pill,
 	},
 
-	// Card
+	// Card - Enhanced spacing
 	card: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
@@ -204,6 +248,8 @@ export const Layout = {
 	padding: Spacing.md, // 16px
 	verticalRhythm: Spacing.sm, // 8px multiples
 	tapTarget: 44, // Minimum tap target size
+	cardPadding: Spacing.cardPadding, // 20px for cards
+	buttonPadding: Spacing.buttonPadding, // 18px for buttons
 };
 
 // Game-Specific Color Themes

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -13,6 +13,8 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../components/MinimalHeader";
+import TikTokButton from "../components/TikTokButton";
 import {
 	Colors,
 	Typography,
@@ -203,7 +205,7 @@ const NotificationsScreen = () => {
 		}
 	};
 
-	const renderNotification = ({ item: notification }: { item: Notification }) => {
+	const renderNotification = useCallback(({ item: notification }: { item: Notification }) => {
 		if (notification.type !== "follow") return null;
 
 		const isFollowingUser = followingMap[notification.fromUserId] || false;
@@ -248,15 +250,11 @@ const NotificationsScreen = () => {
 				</View>
 				<View style={styles.rightActions}>
 					{!isFollowingUser && (
-						<TouchableOpacity
-							style={styles.followBackButton}
-							onPress={(e) => {
-								e.stopPropagation();
-								handleFollowBack(notification);
-							}}
-						>
-							<Text style={styles.followBackText}>Follow Back</Text>
-						</TouchableOpacity>
+						<TikTokButton
+							label="Follow Back"
+							onPress={() => handleFollowBack(notification)}
+							variant="primary"
+						/>
 					)}
 					<TouchableOpacity
 						style={styles.trashIconButton}
@@ -270,33 +268,27 @@ const NotificationsScreen = () => {
 				</View>
 			</TouchableOpacity>
 		);
-	};
+	}, [followingMap, handleNotificationPress, handleFollowBack, handleDeleteNotification]);
 
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+			<MinimalHeader
+				title="Notifications"
+				rightAction={
 				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Notifications</Text>
-				<TouchableOpacity
-					style={styles.markAllButton}
 					onPress={handleMarkAllAsRead}
 					disabled={markingAllRead || notifications.every((n) => n.read)}
 				>
 					{markingAllRead ? (
 						<ActivityIndicator size="small" color={Colors.accent} />
 					) : (
-						<Text style={styles.markAllText}>Mark all read</Text>
+							<Text style={styles.markAllText}>Mark all</Text>
 					)}
 				</TouchableOpacity>
-			</View>
+				}
+			/>
 
 			{/* Notifications List */}
 			{loading ? (
@@ -317,6 +309,16 @@ const NotificationsScreen = () => {
 					data={notifications}
 					renderItem={renderNotification}
 					keyExtractor={(item) => item.id}
+					windowSize={5}
+					initialNumToRender={10}
+					maxToRenderPerBatch={5}
+					updateCellsBatchingPeriod={50}
+					removeClippedSubviews={true}
+					getItemLayout={(data, index) => ({
+						length: 80,
+						offset: 80 * index,
+						index,
+					})}
 					contentContainerStyle={{
 						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					}}
@@ -339,32 +341,6 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: Colors.background.secondary,
-	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		backgroundColor: Colors.background.primary,
-		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		...Shadows.light,
-	},
-	backButton: {
-		padding: Spacing.xs,
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		flex: 1,
-		textAlign: "center",
-	},
-	markAllButton: {
-		padding: Spacing.xs,
-		minWidth: 100,
-		alignItems: "flex-end",
 	},
 	markAllText: {
 		fontSize: Typography.fontSize.caption,
@@ -395,10 +371,11 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.sm,
 		padding: Spacing.md,
 		borderRadius: BorderRadius.md,
+		borderWidth: 0,
 		...Shadows.light,
 	},
 	unreadItem: {
-		backgroundColor: "#F5F5F5",
+		backgroundColor: Colors.accent + "08",
 		borderLeftWidth: 3,
 		borderLeftColor: Colors.accent,
 	},
@@ -422,18 +399,6 @@ const styles = StyleSheet.create({
 	timestamp: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-	},
-	followBackButton: {
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.xs,
-		paddingHorizontal: Spacing.md,
-		borderRadius: BorderRadius.md,
-		marginLeft: Spacing.sm,
-	},
-	followBackText: {
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.white,
 	},
 	rightActions: {
 		flexDirection: "row",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
 	View,
 	Text,
@@ -6,12 +6,15 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	Dimensions,
+	Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../../components/MinimalHeader";
 import {
 	Colors,
 	Typography,
@@ -19,9 +22,52 @@ import {
 	BorderRadius,
 	Shadows,
 	Layout,
+	Gradients,
 } from "../../constants/DesignSystem";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Game Type Button Component with animation
+const GameTypeButton: React.FC<{
+	game: { type: GameType; name: string; icon: keyof typeof Ionicons.glyphMap };
+	onPress: () => void;
+	index: number;
+}> = ({ game, onPress, index }) => {
+	const scaleAnim = useRef(new Animated.Value(1)).current;
+
+	const handlePress = () => {
+		Animated.sequence([
+			Animated.spring(scaleAnim, {
+				toValue: 0.95,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+		]).start();
+		onPress();
+	};
+
+	return (
+		<Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+			<TouchableOpacity
+				style={styles.gameTypeButton}
+				onPress={handlePress}
+				activeOpacity={0.8}
+			>
+				<View style={styles.gameIconWrapper}>
+					<Ionicons name={game.icon} size={28} color={Colors.accent} />
+				</View>
+				<Text style={styles.gameTypeText}>{game.name}</Text>
+			</TouchableOpacity>
+		</Animated.View>
+	);
+};
 
 type GameType =
 	| "wordle"
@@ -70,16 +116,7 @@ const CreateGameIndex = () => {
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Game</Text>
-				<View style={styles.headerSpacer} />
-			</View>
+			<MinimalHeader title="Create Game" />
 
 			<ScrollView
 				style={styles.content}
@@ -88,27 +125,20 @@ const CreateGameIndex = () => {
 			>
 				<Text style={styles.sectionTitle}>Choose Game Type</Text>
 				<View style={styles.gameTypeContainer}>
-					{gameTypes.map((game) => (
-						<TouchableOpacity
+					{gameTypes.map((game, index) => (
+						<GameTypeButton
 							key={game.type}
-							style={styles.gameTypeButton}
+							game={game}
 							onPress={() => handleGameTypeSelect(game.type)}
-							activeOpacity={0.7}
-						>
-							<Ionicons
-								name={game.icon}
-								size={32}
-								color={Colors.accent}
+							index={index}
 							/>
-							<Text style={styles.gameTypeText}>{game.name}</Text>
-						</TouchableOpacity>
 					))}
 				</View>
 
 				<View style={styles.infoNote}>
 					<Ionicons
 						name="information-circle-outline"
-						size={20}
+						size={18}
 						color={Colors.text.secondary}
 					/>
 					<Text style={styles.infoNoteText}>
@@ -127,30 +157,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.secondary,
 	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		backgroundColor: Colors.background.primary,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		paddingHorizontal: Spacing.md,
-		paddingBottom: Spacing.md,
-		...Shadows.light,
-	},
-	backButton: {
-		padding: Spacing.xs,
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h2,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		flex: 1,
-		textAlign: "center",
-	},
-	headerSpacer: {
-		width: 40,
-	},
 	content: {
 		flex: 1,
 		paddingHorizontal: Layout.margin,
@@ -168,35 +174,44 @@ const styles = StyleSheet.create({
 	gameTypeContainer: {
 		flexDirection: "row",
 		flexWrap: "wrap",
-		justifyContent: "flex-start",
-		gap: Spacing.md,
+		justifyContent: "space-between",
 		marginBottom: Spacing.xl,
+		gap: Spacing.sm,
 	},
 	gameTypeButton: {
-		width: (SCREEN_WIDTH - Layout.margin * 2 - Spacing.md * 2) / 3,
+		width: (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm * 2) / 3,
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
 		padding: Spacing.lg,
 		alignItems: "center",
-		borderWidth: 2,
-		borderColor: "#E5E5E5",
+		justifyContent: "center",
+		borderWidth: 0,
 		...Shadows.light,
+		minHeight: 100,
+	},
+	gameIconWrapper: {
+		width: 56,
+		height: 56,
+		borderRadius: BorderRadius.md,
+		backgroundColor: Colors.accent + "15",
+		alignItems: "center",
+		justifyContent: "center",
+		marginBottom: Spacing.sm,
 	},
 	gameTypeText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.medium,
-		color: Colors.text.secondary,
-		marginTop: Spacing.sm,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
+		textAlign: "center",
 	},
 	infoNote: {
 		flexDirection: "row",
 		alignItems: "flex-start",
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		marginTop: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "#E5E5E5",
+		borderWidth: 0,
 		gap: Spacing.sm,
 	},
 	infoNoteText: {

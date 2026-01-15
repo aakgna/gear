@@ -503,6 +503,11 @@ const styles = StyleSheet.create({
 		width: "100%",
 		height: "100%",
 		backgroundColor: Colors.background.primary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	header: {
 		flexDirection: "row",

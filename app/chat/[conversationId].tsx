@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
 	View,
 	StyleSheet,
@@ -11,10 +11,12 @@ import {
 	ActivityIndicator,
 	Image,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../../components/MinimalHeader";
 import {
 	Colors,
 	Typography,
@@ -23,6 +25,7 @@ import {
 	Shadows,
 	Layout,
 	getGameColor,
+	Gradients,
 } from "../../constants/DesignSystem";
 import { getCurrentUser } from "../../config/auth";
 import {
@@ -190,7 +193,8 @@ const ChatScreen = () => {
 	};
 
 	const handleSendMessage = async () => {
-		if (!conversationId || !currentUser || !newMessage.trim() || sending) return;
+		if (!conversationId || !currentUser || !newMessage.trim() || sending)
+			return;
 
 		setSending(true);
 		try {
@@ -203,99 +207,109 @@ const ChatScreen = () => {
 		}
 	};
 
-	const handleGameSharePress = (gameShare: any) => {
-		// Navigate to play the game
-		const gameId = `${gameShare.gameType}_${gameShare.difficulty}_${gameShare.gameId}`;
-		router.push(`/play-game/${encodeURIComponent(gameId)}`);
-	};
+	const handleGameSharePress = useCallback(
+		(gameShare: any) => {
+			// Navigate to play the game
+			const gameId = `${gameShare.gameType}_${gameShare.difficulty}_${gameShare.gameId}`;
+			router.push(`/play-game/${encodeURIComponent(gameId)}`);
+		},
+		[router]
+	);
 
-	const renderMessage = ({ item }: { item: Message }) => {
-		const isFromMe = item.senderId === currentUser?.uid;
+	const renderMessage = useCallback(
+		({ item }: { item: Message }) => {
+			const isFromMe = item.senderId === currentUser?.uid;
 
-		return (
-			<View
-				style={[
-					styles.messageContainer,
-					isFromMe ? styles.messageFromMe : styles.messageFromOther,
-				]}
-			>
-				{!isFromMe && (
-					<View style={styles.avatarContainer}>
-						{item.senderProfilePicture ? (
-							<Image
-								source={{ uri: item.senderProfilePicture }}
-								style={styles.messageAvatar}
-							/>
-						) : (
-							<Ionicons
-								name="person-circle"
-								size={32}
-								color={Colors.text.secondary}
-							/>
-						)}
-					</View>
-				)}
+			return (
 				<View
 					style={[
-						styles.messageBubble,
-						isFromMe ? styles.messageBubbleFromMe : styles.messageBubbleFromOther,
+						styles.messageContainer,
+						isFromMe ? styles.messageFromMe : styles.messageFromOther,
 					]}
 				>
-					{item.gameShare ? (
-						<TouchableOpacity
-							onPress={() => handleGameSharePress(item.gameShare)}
-							activeOpacity={0.7}
-						>
-							<View
-								style={[
-									styles.gameShareCard,
-									{
-										borderColor:
+					{!isFromMe && (
+						<View style={styles.avatarContainer}>
+							{item.senderProfilePicture ? (
+								<Image
+									source={{ uri: item.senderProfilePicture }}
+									style={styles.messageAvatar}
+								/>
+							) : (
+								<Ionicons
+									name="person-circle"
+									size={32}
+									color={Colors.text.secondary}
+								/>
+							)}
+						</View>
+					)}
+					<View
+						style={[
+							styles.messageBubble,
+							isFromMe
+								? styles.messageBubbleFromMe
+								: styles.messageBubbleFromOther,
+						]}
+					>
+						{item.gameShare ? (
+							<TouchableOpacity
+								onPress={() => handleGameSharePress(item.gameShare)}
+								activeOpacity={0.7}
+							>
+								<View
+									style={[
+										styles.gameShareCard,
+										{
+											borderColor:
+												getGameColor(item.gameShare.gameType as PuzzleType) ||
+												Colors.accent,
+										},
+									]}
+								>
+									<Ionicons
+										name="game-controller-outline"
+										size={24}
+										color={
 											getGameColor(item.gameShare.gameType as PuzzleType) ||
-											Colors.accent,
-									},
+											Colors.accent
+										}
+									/>
+									<View style={styles.gameShareInfo}>
+										<Text style={styles.gameShareTitle}>
+											{formatGameType(item.gameShare.gameType)}
+										</Text>
+										<Text style={styles.gameShareDifficulty}>
+											{item.gameShare.difficulty}
+										</Text>
+									</View>
+									<Ionicons
+										name="play-circle"
+										size={24}
+										color={Colors.accent}
+									/>
+								</View>
+							</TouchableOpacity>
+						) : (
+							<Text
+								style={[
+									styles.messageText,
+									isFromMe
+										? styles.messageTextFromMe
+										: styles.messageTextFromOther,
 								]}
 							>
-								<Ionicons
-									name="game-controller-outline"
-									size={24}
-									color={
-										getGameColor(item.gameShare.gameType as PuzzleType) ||
-										Colors.accent
-									}
-								/>
-								<View style={styles.gameShareInfo}>
-									<Text style={styles.gameShareTitle}>
-										{formatGameType(item.gameShare.gameType)}
-									</Text>
-									<Text style={styles.gameShareDifficulty}>
-										{item.gameShare.difficulty}
-									</Text>
-								</View>
-								<Ionicons
-									name="play-circle"
-									size={24}
-									color={Colors.accent}
-								/>
-							</View>
-						</TouchableOpacity>
-					) : (
-						<Text
-							style={[
-								styles.messageText,
-								isFromMe ? styles.messageTextFromMe : styles.messageTextFromOther,
-							]}
-						>
-							{item.text}
+								{item.text}
+							</Text>
+						)}
+						<Text style={styles.messageTime}>
+							{formatTimestamp(item.createdAt)}
 						</Text>
-					)}
-					<Text style={styles.messageTime}>
-						{formatTimestamp(item.createdAt)}
-					</Text>
+					</View>
 				</View>
-			</View>
-		);
-	};
+			);
+		},
+		[currentUser, handleGameSharePress]
+	);
 
 	if (!currentUser || !conversationId) {
 		return (
@@ -316,16 +330,10 @@ const ChatScreen = () => {
 		>
 			<StatusBar style="dark" />
 
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					onPress={() => router.back()}
-					style={styles.backButton}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<View style={styles.headerInfo}>
-					{otherParticipant?.profilePicture ? (
+			<MinimalHeader
+				title={otherParticipant?.username || "user"}
+				rightAction={
+					otherParticipant?.profilePicture ? (
 						<Image
 							source={{ uri: otherParticipant.profilePicture }}
 							style={styles.headerAvatar}
@@ -333,16 +341,12 @@ const ChatScreen = () => {
 					) : (
 						<Ionicons
 							name="person-circle"
-							size={32}
+							size={28}
 							color={Colors.text.secondary}
 						/>
-					)}
-					<Text style={styles.headerTitle}>
-						{otherParticipant?.username || "user"}
-					</Text>
-				</View>
-				<View style={styles.backButton} />
-			</View>
+					)
+				}
+			/>
 
 			{/* Messages List */}
 			{loading ? (
@@ -355,6 +359,12 @@ const ChatScreen = () => {
 					data={messages}
 					renderItem={renderMessage}
 					keyExtractor={(item) => item.id}
+					inverted
+					windowSize={5}
+					initialNumToRender={10}
+					maxToRenderPerBatch={5}
+					updateCellsBatchingPeriod={50}
+					removeClippedSubviews={true}
 					contentContainerStyle={[
 						styles.messagesList,
 						{
@@ -368,9 +378,7 @@ const ChatScreen = () => {
 					ListEmptyComponent={
 						<View style={styles.emptyContainer}>
 							<Text style={styles.emptyText}>No messages yet</Text>
-							<Text style={styles.emptySubtext}>
-								Start the conversation!
-							</Text>
+							<Text style={styles.emptySubtext}>Start the conversation!</Text>
 						</View>
 					}
 				/>
@@ -400,11 +408,18 @@ const ChatScreen = () => {
 					onPress={handleSendMessage}
 					disabled={!newMessage.trim() || sending}
 				>
-					{sending ? (
-						<ActivityIndicator size="small" color={Colors.text.white} />
-					) : (
-						<Ionicons name="send" size={20} color={Colors.text.white} />
-					)}
+					<LinearGradient
+						colors={Gradients.button}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 1 }}
+						style={StyleSheet.absoluteFill}
+					>
+						{sending ? (
+							<ActivityIndicator size="small" color={Colors.text.white} />
+						) : (
+							<Ionicons name="send" size={20} color={Colors.text.white} />
+						)}
+					</LinearGradient>
 				</TouchableOpacity>
 			</View>
 		</KeyboardAvoidingView>
@@ -416,37 +431,10 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.secondary,
 	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: Colors.background.primary,
-		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		...Shadows.light,
-	},
-	backButton: {
-		width: 40,
-		height: 40,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	headerInfo: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.sm,
-	},
 	headerAvatar: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
+		width: 28,
+		height: 28,
+		borderRadius: 14,
 	},
 	loadingContainer: {
 		flex: 1,
@@ -482,11 +470,12 @@ const styles = StyleSheet.create({
 	},
 	messageBubbleFromMe: {
 		backgroundColor: Colors.accent,
-		borderBottomRightRadius: 4,
+		borderBottomRightRadius: 8,
 	},
 	messageBubbleFromOther: {
 		backgroundColor: Colors.background.primary,
-		borderBottomLeftRadius: 4,
+		borderBottomLeftRadius: 8,
+		borderWidth: 0,
 		...Shadows.light,
 	},
 	messageText: {
@@ -548,29 +537,31 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Layout.margin,
 		paddingTop: Spacing.md,
 		backgroundColor: Colors.background.primary,
-		borderTopWidth: 1,
-		borderTopColor: "#E5E5E5",
+		borderTopWidth: 0.5,
+		borderTopColor: Colors.border,
 		gap: Spacing.sm,
 	},
 	input: {
 		flex: 1,
-		borderRadius: BorderRadius.md,
+		borderRadius: BorderRadius.lg,
 		borderWidth: 1,
-		borderColor: "#E5E5E5",
+		borderColor: Colors.border,
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.primary,
 		maxHeight: 100,
+		backgroundColor: Colors.background.secondary,
 	},
 	sendButton: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		backgroundColor: Colors.accent,
 		justifyContent: "center",
 		alignItems: "center",
 		marginBottom: 2,
+		overflow: "hidden",
 	},
 	sendButtonDisabled: {
 		opacity: 0.5,
@@ -578,4 +569,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-

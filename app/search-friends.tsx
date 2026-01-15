@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
 	View,
 	Text,
@@ -10,10 +10,13 @@ import {
 	Image,
 	FlatList,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MinimalHeader from "../components/MinimalHeader";
+import TikTokButton from "../components/TikTokButton";
 import {
 	Colors,
 	Typography,
@@ -21,9 +24,15 @@ import {
 	BorderRadius,
 	Shadows,
 	Layout,
+	Gradients,
 } from "../constants/DesignSystem";
 import { getCurrentUser } from "../config/auth";
-import { getUserByUsername, isFollowing, followUser, UserPublicProfile } from "../config/social";
+import {
+	getUserByUsername,
+	isFollowing,
+	followUser,
+	UserPublicProfile,
+} from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
@@ -40,7 +49,7 @@ const SearchFriendsScreen = () => {
 	// Session end refresh: Refresh recommendations when app goes to background
 	useSessionEndRefresh([]);
 
-	// Debounced search
+	// Debounced search - increased delay for better performance
 	useEffect(() => {
 		if (!searchQuery.trim()) {
 			setSearchResults([]);
@@ -49,10 +58,10 @@ const SearchFriendsScreen = () => {
 
 		const timeoutId = setTimeout(() => {
 			performSearch(searchQuery.trim());
-		}, 300);
+		}, 500);
 
 		return () => clearTimeout(timeoutId);
-	}, [searchQuery]);
+	}, [searchQuery, performSearch]);
 
 	// Check following status for results
 	useEffect(() => {
@@ -61,28 +70,31 @@ const SearchFriendsScreen = () => {
 		}
 	}, [searchResults]);
 
-	const performSearch = async (query: string) => {
-		if (!query || !currentUser) return;
+	const performSearch = useCallback(
+		async (query: string) => {
+			if (!query || !currentUser) return;
 
-		setLoading(true);
-		try {
-			// Search by username (exact match or starts with)
-			const user = await getUserByUsername(query);
-			if (user) {
-				setSearchResults([user]);
-			} else {
+			setLoading(true);
+			try {
+				// Search by username (exact match or starts with)
+				const user = await getUserByUsername(query);
+				if (user) {
+					setSearchResults([user]);
+				} else {
+					setSearchResults([]);
+				}
+			} catch (error) {
+				console.error("Error searching users:", error);
 				setSearchResults([]);
+			} finally {
+				setLoading(false);
 			}
-		} catch (error) {
-			console.error("Error searching users:", error);
-			setSearchResults([]);
-		} finally {
-			setLoading(false);
-		}
-	};
+		},
+		[currentUser]
+	);
 
-	const checkFollowingStatus = async () => {
-		if (!currentUser) return;
+	const checkFollowingStatus = useCallback(async () => {
+		if (!currentUser || searchResults.length === 0) return;
 
 		const statusMap: Record<string, boolean> = {};
 		await Promise.all(
@@ -96,7 +108,7 @@ const SearchFriendsScreen = () => {
 			})
 		);
 		setFollowingMap(statusMap);
-	};
+	}, [currentUser, searchResults]);
 
 	const handleFollow = async (user: UserPublicProfile) => {
 		if (!currentUser || user.uid === currentUser.uid) return;
@@ -127,106 +139,89 @@ const SearchFriendsScreen = () => {
 		router.push(`/user/${username}`);
 	};
 
-	const renderUserCard = ({ item: user }: { item: UserPublicProfile }) => {
-		const isOwnProfile = currentUser?.uid === user.uid;
-		const isFollowingUser = followingMap[user.uid] || false;
+	const renderUserCard = useCallback(
+		({ item: user }: { item: UserPublicProfile }) => {
+			const isOwnProfile = currentUser?.uid === user.uid;
+			const isFollowingUser = followingMap[user.uid] || false;
 
-		return (
-			<TouchableOpacity
-				style={styles.userCard}
-				onPress={() => handleUserPress(user.username || "")}
-			>
-				<View style={styles.userCardContent}>
-					{user.profilePicture ? (
-						<Image
-							source={{ uri: user.profilePicture }}
-							style={styles.avatar}
-						/>
-					) : (
-						<Ionicons
-							name="person-circle"
-							size={50}
-							color={Colors.accent}
-						/>
-					)}
-					<View style={styles.userInfo}>
-						<Text style={styles.username}>{user.username}</Text>
-						{user.bio && (
-							<Text style={styles.bio} numberOfLines={1}>
-								{user.bio}
-							</Text>
+			return (
+				<TouchableOpacity
+					style={styles.userCard}
+					onPress={() => handleUserPress(user.username || "")}
+				>
+					<View style={styles.userCardContent}>
+						{user.profilePicture ? (
+							<Image
+								source={{ uri: user.profilePicture }}
+								style={styles.avatar}
+							/>
+						) : (
+							<Ionicons name="person-circle" size={50} color={Colors.accent} />
 						)}
+						<View style={styles.userInfo}>
+							<Text style={styles.username}>{user.username}</Text>
+							{user.bio && (
+								<Text style={styles.bio} numberOfLines={1}>
+									{user.bio}
+								</Text>
+							)}
+						</View>
+						{!isOwnProfile &&
+							(isFollowingUser ? (
+								<View style={styles.followingButton}>
+									<Text style={styles.followingButtonText}>Following</Text>
+								</View>
+							) : (
+								<TikTokButton
+									label="Follow"
+									onPress={() => handleFollow(user)}
+									variant="primary"
+								/>
+							))}
 					</View>
-					{!isOwnProfile && (
-						<TouchableOpacity
-							style={[
-								styles.followButton,
-								isFollowingUser && styles.followingButton,
-							]}
-							onPress={(e) => {
-								e.stopPropagation();
-								if (!isFollowingUser) {
-									handleFollow(user);
-								}
-							}}
-							disabled={isFollowingUser}
-						>
-							<Text
-								style={[
-									styles.followButtonText,
-									isFollowingUser && styles.followingButtonText,
-								]}
-							>
-								{isFollowingUser ? "Following" : "Follow"}
-							</Text>
-						</TouchableOpacity>
-					)}
-				</View>
-			</TouchableOpacity>
-		);
-	};
+				</TouchableOpacity>
+			);
+		},
+		[currentUser, followingMap, handleUserPress]
+	);
 
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			{/* Header */}
-			<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Search Friends</Text>
-				<View style={styles.headerSpacer} />
-			</View>
+			<MinimalHeader title="Search Friends" />
 
 			{/* Search Bar */}
 			<View style={styles.searchContainer}>
-				<Ionicons
-					name="search-outline"
-					size={20}
-					color={Colors.text.secondary}
-					style={styles.searchIcon}
-				/>
-				<TextInput
-					style={styles.searchInput}
-					placeholder="Search by username..."
-					placeholderTextColor={Colors.text.secondary}
-					value={searchQuery}
-					onChangeText={setSearchQuery}
-					autoCapitalize="none"
-					autoCorrect={false}
-				/>
-				{searchQuery.length > 0 && (
-					<TouchableOpacity
-						onPress={() => setSearchQuery("")}
-						style={styles.clearButton}
-					>
-						<Ionicons name="close-circle" size={20} color={Colors.text.secondary} />
-					</TouchableOpacity>
-				)}
+				<View style={styles.searchBar}>
+					<Ionicons
+						name="search-outline"
+						size={20}
+						color={Colors.text.secondary}
+						style={styles.searchIcon}
+					/>
+					<TextInput
+						style={styles.searchInput}
+						placeholder="Search by username..."
+						placeholderTextColor={Colors.text.secondary}
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						autoCapitalize="none"
+						autoCorrect={false}
+					/>
+					{searchQuery.length > 0 && (
+						<TouchableOpacity
+							onPress={() => setSearchQuery("")}
+							style={styles.clearButton}
+						>
+							<Ionicons
+								name="close-circle"
+								size={20}
+								color={Colors.text.secondary}
+							/>
+						</TouchableOpacity>
+					)}
+				</View>
 			</View>
 
 			{/* Results */}
@@ -257,6 +252,16 @@ const SearchFriendsScreen = () => {
 					data={searchResults}
 					renderItem={renderUserCard}
 					keyExtractor={(item) => item.uid}
+					windowSize={5}
+					initialNumToRender={10}
+					maxToRenderPerBatch={5}
+					updateCellsBatchingPeriod={50}
+					removeClippedSubviews={true}
+					getItemLayout={(data, index) => ({
+						length: 80,
+						offset: 80 * index,
+						index,
+					})}
 					contentContainerStyle={{
 						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					}}
@@ -272,42 +277,20 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.secondary,
 	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		backgroundColor: Colors.background.primary,
-		paddingHorizontal: Layout.margin,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: "#E5E5E5",
-		...Shadows.light,
-	},
-	backButton: {
-		padding: Spacing.xs,
-	},
-	headerTitle: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		flex: 1,
-		textAlign: "center",
-	},
-	headerSpacer: {
-		width: 40,
-	},
 	searchContainer: {
+		paddingHorizontal: Layout.margin,
+		paddingTop: Spacing.md,
+		paddingBottom: Spacing.sm,
+		backgroundColor: Colors.background.primary,
+	},
+	searchBar: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: Colors.background.primary,
-		marginHorizontal: Layout.margin,
-		marginTop: Spacing.md,
-		marginBottom: Spacing.sm,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.lg,
 		paddingHorizontal: Spacing.md,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: "#E5E5E5",
-		...Shadows.light,
+		height: 48,
+		borderWidth: 0,
 	},
 	searchIcon: {
 		marginRight: Spacing.sm,
@@ -342,18 +325,19 @@ const styles = StyleSheet.create({
 		marginHorizontal: Layout.margin,
 		marginBottom: Spacing.sm,
 		borderRadius: BorderRadius.md,
+		borderWidth: 0,
 		...Shadows.light,
 	},
 	userCardContent: {
 		flexDirection: "row",
 		alignItems: "center",
 		padding: Spacing.md,
+		gap: Spacing.md,
 	},
 	avatar: {
 		width: 50,
 		height: 50,
 		borderRadius: 25,
-		marginRight: Spacing.md,
 	},
 	userInfo: {
 		flex: 1,
@@ -368,26 +352,22 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
 	},
-	followButton: {
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.xs,
-		paddingHorizontal: Spacing.md,
-		borderRadius: BorderRadius.md,
-	},
 	followingButton: {
 		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary,
-	},
-	followButtonText: {
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.white,
+		borderWidth: 1.5,
+		borderColor: Colors.border,
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.lg,
+		borderRadius: BorderRadius.md,
+		minWidth: 80,
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	followingButtonText: {
-		color: Colors.text.primary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.secondary,
 	},
 });
 
 export default SearchFriendsScreen;
-
