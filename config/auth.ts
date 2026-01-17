@@ -260,12 +260,12 @@ const calculateCategoryTotals = (
 		if (diffStats) {
 			totalAttempted +=
 				typeof diffStats.attempted === "number" &&
-				isFinite(diffStats.attempted)
+					isFinite(diffStats.attempted)
 					? diffStats.attempted
 					: 0;
 			totalSkipped +=
 				typeof diffStats.skipped === "number" &&
-				isFinite(diffStats.skipped)
+					isFinite(diffStats.skipped)
 					? diffStats.skipped
 					: 0;
 		}
@@ -297,12 +297,12 @@ export const updateUserStats = async (
 		// Sanitize to ensure they are numbers (handle corrupted data)
 		const currentTotalGames =
 			typeof userData.totalGamesPlayed === "number" &&
-			isFinite(userData.totalGamesPlayed)
+				isFinite(userData.totalGamesPlayed)
 				? userData.totalGamesPlayed
 				: 0;
 		const currentTotalTime =
 			typeof userData.totalPlayTime === "number" &&
-			isFinite(userData.totalPlayTime)
+				isFinite(userData.totalPlayTime)
 				? userData.totalPlayTime
 				: 0;
 
@@ -384,12 +384,12 @@ export const updateUserStats = async (
 			// Sanitize attempted and skipped to avoid NaN
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 
@@ -440,8 +440,7 @@ export const updateUserStats = async (
 			!isFinite(updateData.totalPlayTime)
 		) {
 			console.error(
-				`[updateUserStats] Invalid totalPlayTime value: ${
-					updateData.totalPlayTime
+				`[updateUserStats] Invalid totalPlayTime value: ${updateData.totalPlayTime
 				}, type: ${typeof updateData.totalPlayTime}. Resetting to 0.`
 			);
 			updateData.totalPlayTime = 0;
@@ -515,22 +514,22 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const catSkipped = skipped + 1;
@@ -649,22 +648,22 @@ export const moveFromSkippedToAttempted = async (
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 
@@ -752,22 +751,22 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const catAttempted = attempted + 1;
@@ -885,6 +884,27 @@ export const saveUsername = async (
 				createdAt: firestore.FieldValue.serverTimestamp(),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
+
+			// Create user document if it doesn't exist
+			const userDoc = await transaction.get(userRef);
+			const userExists = typeof userDoc.exists === "function" ? userDoc.exists() : userDoc.exists;
+			if (!userExists) {
+				const currentUser = getCurrentUser();
+				transaction.set(userRef, {
+					email: currentUser?.email || "",
+					totalGamesPlayed: 0,
+					totalPlayTime: 0,
+					averageTimePerGame: 0,
+					streakCount: 0,
+					statsByCategory: {},
+					followerCount: 0,
+					followingCount: 0,
+					createdGamesCount: 0,
+					unreadNotificationCount: 0,
+					createdAt: firestore.FieldValue.serverTimestamp(),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
 
 			// Update user document with username
 			transaction.update(userRef, {
