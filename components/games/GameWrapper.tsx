@@ -338,7 +338,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		if (!completedResult) return;
 
 		try {
-			const gameUrl = `thinktok://game/${puzzle.id}`;
+			// Create shareable link - using game ID that can be used in the app
+			const gameLink = `thinktok://game/${puzzle.id}`;
+
 			let message = `I just completed ${formatGameType(
 				puzzle.type
 			)} on ThinkTok!\n\n`;
@@ -348,14 +350,18 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				message += `Tries: ${completedResult.attempts}\n`;
 			}
 
-			message += `\nCan you beat my score?\n\n${gameUrl}`;
+			message += `\nCan you beat my score?\n\nPlay this game: ${gameLink}\n\nOr search for game ID: ${puzzle.id} in ThinkTok`;
 
+			// Share with message - the link will be shareable as text
+			// On iOS, Share.share with message will allow sharing to iMessage, Instagram, etc.
 			await Share.share({
 				message,
-				url: gameUrl,
 			});
 		} catch (error: any) {
-			console.error("Error sharing:", error);
+			// User cancelled sharing - this is expected, don't log as error
+			if (error?.message !== "User did not share") {
+				console.error("Error sharing:", error);
+			}
 		}
 	};
 	const renderGame = () => {

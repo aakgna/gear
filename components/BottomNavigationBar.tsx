@@ -68,7 +68,10 @@ const BottomNavigationBar = () => {
 
 	return (
 		<View
-			style={[styles.container, { paddingBottom: Math.max(insets.bottom, 0) }]}
+			style={[
+				styles.container,
+				{ paddingBottom: Math.max(insets.bottom - 10, 0) },
+			]}
 		>
 			{/* Glassmorphism backdrop */}
 			<BlurView
@@ -216,10 +219,11 @@ const styles = StyleSheet.create({
 		zIndex: 1000,
 		overflow: "hidden",
 		borderWidth: 0,
-		borderTopWidth: 0,
+		borderTopWidth: 2,
 		borderBottomWidth: 0,
 		borderLeftWidth: 0,
 		borderRightWidth: 0,
+		borderTopColor: Colors.accent,
 	},
 	button: {
 		flex: 1,
