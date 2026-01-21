@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import {
 	View,
 	TouchableOpacity,
@@ -30,6 +30,29 @@ const BottomNavigationBar = () => {
 	const homeScale = useRef(new Animated.Value(1)).current;
 	const profileScale = useRef(new Animated.Value(1)).current;
 	const createScale = useRef(new Animated.Value(1)).current;
+	
+	const homeActive = pathname === "/feed" || pathname === "/";
+	const profileActive = pathname === "/profile";
+	
+	// Animation refs for smooth transitions
+	const homeActiveAnim = useRef(new Animated.Value(homeActive ? 1 : 0)).current;
+	const profileActiveAnim = useRef(new Animated.Value(profileActive ? 1 : 0)).current;
+
+	// Animate transitions when active state changes
+	useEffect(() => {
+		Animated.parallel([
+			Animated.timing(homeActiveAnim, {
+				toValue: homeActive ? 1 : 0,
+				duration: Animation.duration.normal,
+				useNativeDriver: true,
+			}),
+			Animated.timing(profileActiveAnim, {
+				toValue: profileActive ? 1 : 0,
+				duration: Animation.duration.normal,
+				useNativeDriver: true,
+			}),
+		]).start();
+	}, [homeActive, profileActive]);
 
 	const isActive = (route: string) => {
 		if (route === "/feed" || route === "/") {
@@ -62,9 +85,6 @@ const BottomNavigationBar = () => {
 		]).start();
 		navigateTo(route);
 	};
-
-	const homeActive = isActive("/feed");
-	const profileActive = isActive("/profile");
 
 	return (
 		<View
@@ -99,24 +119,30 @@ const BottomNavigationBar = () => {
 					activeOpacity={0.7}
 				>
 					<View style={styles.iconWrapper}>
-						{homeActive ? (
+						<Animated.View
+							style={[
+								styles.activeIconContainer,
+								{ opacity: homeActiveAnim },
+							]}
+						>
 							<LinearGradient
 								colors={Gradients.primary}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
-								style={styles.activeIconContainer}
-							>
-								<Home
-									size={16}
-									color={Colors.text.white}
-									fill={Colors.text.white}
-								/>
-							</LinearGradient>
-						) : (
+								style={StyleSheet.absoluteFill}
+							/>
+							<Home
+								size={16}
+								color={Colors.text.white}
+								fill={Colors.text.white}
+							/>
+						</Animated.View>
+						{!homeActive && (
 							<Home
 								size={16}
 								color={Colors.text.secondary}
 								fill="transparent"
+								style={{ position: 'absolute' }}
 							/>
 						)}
 					</View>
@@ -162,24 +188,30 @@ const BottomNavigationBar = () => {
 					activeOpacity={0.7}
 				>
 					<View style={styles.iconWrapper}>
-						{profileActive ? (
+						<Animated.View
+							style={[
+								styles.activeIconContainer,
+								{ opacity: profileActiveAnim },
+							]}
+						>
 							<LinearGradient
 								colors={Gradients.primary}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
-								style={styles.activeIconContainer}
-							>
-								<User
-									size={16}
-									color={Colors.text.white}
-									fill={Colors.text.white}
-								/>
-							</LinearGradient>
-						) : (
+								style={StyleSheet.absoluteFill}
+							/>
+							<User
+								size={16}
+								color={Colors.text.white}
+								fill={Colors.text.white}
+							/>
+						</Animated.View>
+						{!profileActive && (
 							<User
 								size={16}
 								color={Colors.text.secondary}
 								fill="transparent"
+								style={{ position: 'absolute' }}
 							/>
 						)}
 					</View>

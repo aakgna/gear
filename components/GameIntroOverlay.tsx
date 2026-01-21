@@ -23,6 +23,7 @@ import {
 	BorderRadius,
 	Shadows,
 	getGameColor,
+	Animation,
 } from "../constants/DesignSystem";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -996,6 +997,11 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 }) => {
 	const router = useRouter();
 	const [showInstructions, setShowInstructions] = useState(false);
+	const rotateAnim = useRef(new Animated.Value(0)).current;
+	const heightAnim = useRef(new Animated.Value(0)).current;
+	const pulseAnim = useRef(new Animated.Value(1)).current;
+	const buttonScale = useRef(new Animated.Value(1)).current;
+
 
 	const instructions = gameInstructions[gameType];
 	const difficultyLabel = getDifficultyLabel(difficulty);
@@ -1017,6 +1023,38 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 		return specialCases[type] || formatted;
 	};
 
+	useEffect(() => { //useeffect to animate the how to play button
+		Animated.parallel([
+			Animated.timing(rotateAnim, {
+				toValue: showInstructions ? 1 : 0,
+				duration: Animation.duration.normal,
+				useNativeDriver: true,
+			}),
+			Animated.timing(heightAnim, {
+				toValue: showInstructions ? 1 : 0,
+				duration: Animation.duration.normal,
+				useNativeDriver: false,
+			}),
+		]).start();
+	}, [showInstructions]);
+
+	useEffect(() => { //useeffect to pulse the play button
+		Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulseAnim, {
+					toValue: 1.05,
+					duration: 2000,
+					useNativeDriver: true,
+				}),
+				Animated.timing(pulseAnim, {
+					toValue: 1,
+					duration: 2000,
+					useNativeDriver: true,
+				}),
+			])
+		).start();
+	}, []);
+
 	return (
 		<View style={styles.container}>
 			{/* Animated Background */}
@@ -1030,19 +1068,20 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 			>
 				{/* Game Title */}
 				<View style={styles.titleSection}>
-					<View
-						style={[
-							styles.difficultyBadge,
-							{
-								backgroundColor: difficultyColor + "20",
-								borderColor: difficultyColor,
-							},
-						]}
-					>
-						<Text style={[styles.difficultyText, { color: difficultyColor }]}>
-							{difficultyLabel}
-						</Text>
-					</View>
+				<Animated.View
+					style={[
+						styles.difficultyBadge,
+						{
+							backgroundColor: difficultyColor + "20",
+							borderColor: difficultyColor,
+							transform: [{ scale: pulseAnim }],
+						},
+					]}
+				>
+					<Text style={[styles.difficultyText, { color: difficultyColor }]}>
+						{difficultyLabel}
+					</Text>
+				</Animated.View>
 					<Text style={styles.gameTitle}>{formatGameType(gameType)}</Text>
 					{username && (
 						<TouchableOpacity
@@ -1063,70 +1102,115 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 					<View style={styles.howToPlayHeader}>
 						<Ionicons name="help-circle-outline" size={22} color={gameColor} />
 						<Text style={styles.howToPlayText}>How to Play</Text>
-						<Ionicons
-							name={showInstructions ? "chevron-up" : "chevron-down"}
-							size={20}
-							color={Colors.text.secondary}
-							style={styles.chevronIcon}
-						/>
+						<Animated.View 
+							style={{ 
+								transform: [{ rotate: rotateAnim.interpolate({
+									inputRange: [0, 1],
+									outputRange: ['0deg', '180deg'],
+								}) }],
+							}}
+						>
+							<Ionicons
+								name="chevron-down"
+								size={20}
+								color={Colors.text.secondary}
+								style={styles.chevronIcon}
+							/>
+						</Animated.View>
 					</View>
 				</TouchableOpacity>
 
-				{/* Instructions Content */}
-				{showInstructions && (
-					<View style={styles.instructionsContainer}>
-						<View style={styles.instructionsContent}>
-							{instructions.instructions.map((instruction, index) => (
-								<View key={index} style={styles.instructionItem}>
-									<View
+								{/* Instructions Content */}
+								<Animated.View
+					style={[
+						styles.instructionsContainer,
+						{
+							maxHeight: heightAnim.interpolate({
+								inputRange: [0, 1],
+								outputRange: [0, 1000],
+							}),
+							opacity: heightAnim,
+							overflow: 'hidden',
+						},
+					]}
+				>
+					<View style={styles.instructionsContent}>
+						{instructions.instructions.map((instruction, index) => (
+							<View key={index} style={styles.instructionItem}>
+								<View
+									style={[
+										styles.instructionNumber,
+										{ backgroundColor: gameColor + "30" },
+									]}
+								>
+									<Text
 										style={[
-											styles.instructionNumber,
-											{ backgroundColor: gameColor + "30" },
+											styles.instructionNumberText,
+											{ color: gameColor },
 										]}
 									>
-										<Text
-											style={[
-												styles.instructionNumberText,
-												{ color: gameColor },
-											]}
-										>
-											{index + 1}
-										</Text>
-									</View>
-									<Text style={styles.instructionText}>{instruction}</Text>
-								</View>
-							))}
-							<View
-								style={[
-									styles.exampleContainer,
-									{
-										backgroundColor: gameColor + "15",
-										borderLeftColor: gameColor,
-									},
-								]}
-							>
-								<View style={styles.exampleHeader}>
-									<Ionicons name="bulb-outline" size={16} color={gameColor} />
-									<Text style={[styles.exampleLabel, { color: gameColor }]}>
-										Example
+										{index + 1}
 									</Text>
 								</View>
-								<Text style={styles.exampleText}>{instructions.example}</Text>
+								<Text style={styles.instructionText}>{instruction}</Text>
 							</View>
+						))}
+						<View
+							style={[
+								styles.exampleContainer,
+								{
+									backgroundColor: gameColor + "15",
+									borderLeftColor: gameColor,
+								},
+							]}
+						>
+							<View style={styles.exampleHeader}>
+								<Ionicons name="bulb-outline" size={16} color={gameColor} />
+								<Text style={[styles.exampleLabel, { color: gameColor }]}>
+									Example
+								</Text>
+							</View>
+							<Text style={styles.exampleText}>{instructions.example}</Text>
 						</View>
 					</View>
-				)}
+				</Animated.View>
 
 				{/* Play Button */}
 				<TouchableOpacity
-					style={[styles.playButton, { backgroundColor: gameColor }]}
+					activeOpacity={1}
 					onPress={onPlay}
-					activeOpacity={0.85}
+					onPressIn={() => {
+						Animated.spring(buttonScale, {
+							toValue: 0.95,
+							useNativeDriver: true,
+							tension: 300,
+							friction: 10,
+						}).start();
+					}}
+					onPressOut={() => {
+						Animated.spring(buttonScale, {
+							toValue: 1,
+							useNativeDriver: true,
+							tension: 300,
+							friction: 10,
+						}).start();
+					}}
 				>
-					<Ionicons name="play" size={28} color={Colors.text.white} />
-					<Text style={[styles.playButtonText, { color: Colors.text.white }]}>
-						Start Game
-					</Text>
+					<Animated.View
+						style={[
+							styles.playButton,
+							{
+								backgroundColor: gameColor,
+								transform: [{ scale: buttonScale }],
+								...Shadows.medium, // Shadow when not pressed
+							},
+						]}
+					>
+						<Ionicons name="play" size={28} color={Colors.text.white} />
+						<Text style={[styles.playButtonText, { color: Colors.text.white }]}>
+							Start Game
+						</Text>
+					</Animated.View>
 				</TouchableOpacity>
 			</ScrollView>
 		</View>
@@ -1296,7 +1380,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.lg,
 		paddingVertical: Spacing.xl,
 		paddingHorizontal: Spacing.xl,
-		marginTop: Spacing.md,
+		marginTop: -40,
 		minHeight: 56,
 		elevation: 0,
 		shadowOpacity: 0,

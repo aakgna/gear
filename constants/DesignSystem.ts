@@ -8,38 +8,52 @@ import { PuzzleType } from "../config/types";
 
 // Color System - Vibrant & Energetic Theme
 export const Colors = {
-	// Primary Colors - Vibrant & energetic
-	primary: "#0A0E27", // Richer dark blue for headers, icons, main text
-	accent: "#FF006E", // Hot pink - vibrant and energetic
-	secondaryAccent: "#00D4FF", // Electric blue for secondary actions, highlights
-	error: "#FF1744", // Bright red variant for wrong answers or alerts
-
-	// Background - Light Theme with subtle gradients
 	background: {
-		primary: "#FFFFFF", // Pure white
-		secondary: "#FAFAFF", // Very light blue-tinted gray
-		tertiary: "#F5F5FA", // Slightly darker blue-tinted gray
-		gradient: ["#FAFAFF", "#FFFFFF"] as const, // Subtle gradient
+		primary: "#fefdfb",        // Lighter warm cream background (top) - was #faf8f5
+		secondary: "#faf8f5",      // Lighter warm cream background (bottom) - was #f5f1ea
+		tertiary: "#fffcf9",       // Card backgrounds (keep as is - already very light)
+		quaternary: "#ffffff",     // Game preview section (keep as is - white)
+		gradient: ["#fefdfb", "#faf8f5"] as const, // Updated lighter gradient
+		outerGradient: ["#fefdfb", "#faf8f5", "#f5f1ea"] as const, // Lighter outer gradient
 	},
 
-	// Text Colors - Light Theme
+
+	// Required for compatibility
+	primary: "#44403c",          // For game text
+	accent: "#fcd34d",           // Main accent (maps to accent.primary)
+	secondaryAccent: "#fde68a",  // Secondary accent (maps to accent.secondary)
+	error: "#ef4444",            // Error color (red for wrong answers)
+
 	text: {
-		primary: "#0A0E27", // Richer dark blue (softer than black)
-		secondary: "#6B7280", // Warmer gray for secondary text
-		disabled: "#9CA3AF", // Medium gray for disabled text
-		white: "#FFFFFF", // White text (for dark backgrounds)
-		accent: "#FF006E", // Accent color for highlights
+		primary: "#44403c",        // Dark warm brown
+		secondary: "#78716c",      // Medium warm brown
+		accent: "#fcd34d",         // Golden yellow
+		inactive: "#a8a29e",       // Light warm brown
+		disabled: "#a8a29e",       // Used in games
+		white: "#44403c",          // Used in buttons/games
 	},
 
-	// Game States
+	// Required for game states
 	game: {
-		correct: "#10B981", // Emerald green for correct answers
-		incorrect: "#FF1744", // Bright red for incorrect
-		present: "#FFD93D", // Yellow for "present" state (Wordle)
-		absent: "#E5E7EB", // Light gray for absent
+		correct: "#10b981",        // Green for correct answers
+		incorrect: "#ef4444",      // Red for incorrect
+		present: "#fbbf24",        // Yellow for "present" (Wordle)
+		absent: "#d6d3d1",         // Warm gray for absent
 	},
-	// Border
-	border: "#E5E7EB", // Light gray border color
+
+	borders: {
+		primary: "#d6d3d1",        // Warm stone border
+		subtle: "#e7e5e4",         // Lighter warm stone
+	},
+
+	// Keep singular border for backward compatibility
+	border: "#d6d3d1",
+
+	overlay: {
+		card: "rgba(255, 252, 249, 0.9)",
+		preview: "rgba(250, 248, 245, 0.5)",
+		stats: "rgba(250, 248, 245, 0.9)",
+	}
 };
 
 // Typography - Enhanced for better readability and hierarchy
@@ -174,11 +188,11 @@ export const Animation = {
 
 // Gradient Utilities
 export const Gradients = {
-	primary: [Colors.accent, "#FF1744"] as const,
+	primary: [Colors.accent, Colors.background.primary] as const,
 	secondary: [Colors.secondaryAccent, "#00A8CC"] as const,
 	accent: [Colors.accent, Colors.secondaryAccent] as const,
 	background: Colors.background.gradient,
-	button: [Colors.accent, "#FF1744"] as const,
+	button: [Colors.accent, Colors.background.primary] as const,
 	buttonSecondary: [Colors.secondaryAccent, "#00A8CC"] as const,
 };
 

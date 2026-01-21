@@ -115,6 +115,38 @@ const ProfileScreen = () => {
 	// Tab indicator animation
 	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
 
+	// Animation refs for header icon pop animations
+	const searchScale = useRef(new Animated.Value(1)).current;
+	const notificationsScale = useRef(new Animated.Value(1)).current;
+	const inboxScale = useRef(new Animated.Value(1)).current;
+	const menuScale = useRef(new Animated.Value(1)).current;
+	
+	// Animation refs for avatar bounce
+	const avatarScale = useRef(new Animated.Value(0)).current;
+	const avatarOpacity = useRef(new Animated.Value(0)).current;
+	
+	// Animation refs for staggered stats (bottom to top)
+	const stat1Opacity = useRef(new Animated.Value(0)).current; // Avg Time (bottom)
+	const stat2Opacity = useRef(new Animated.Value(0)).current; // Streak
+	const stat3Opacity = useRef(new Animated.Value(0)).current; // Completed
+	const stat4Opacity = useRef(new Animated.Value(0)).current; // Games
+	const stat5Opacity = useRef(new Animated.Value(0)).current; // Followers
+	const stat6Opacity = useRef(new Animated.Value(0)).current; // Following (top)
+
+	// Page-level fade animation
+	const pageOpacity = useRef(new Animated.Value(0)).current;
+
+	// Game card animations - use Map to store per-card animations
+	const gameCardAnimations = useRef<Map<number, Animated.Value>>(new Map()).current;
+
+	// Helper to get or create animation value for a card
+	const getCardAnimation = (index: number): Animated.Value => {
+		if (!gameCardAnimations.has(index)) {
+			gameCardAnimations.set(index, new Animated.Value(0));
+		}
+		return gameCardAnimations.get(index)!;
+	};
+
 	useEffect(() => {
 		const tabIndex =
 			activeTab === "created" ? 0 : activeTab === "completed" ? 1 : 2;
@@ -125,6 +157,142 @@ const ProfileScreen = () => {
 			friction: 8,
 		}).start();
 	}, [activeTab]);
+
+	// Coordinated entrance animations - page fade -> avatar -> stats -> cards
+	useEffect(() => {
+		if (!loading && userData && pathname === "/profile") {
+			// Reset all animation values
+			pageOpacity.setValue(0);
+			avatarScale.setValue(0.9);
+			avatarOpacity.setValue(0);
+			stat1Opacity.setValue(0);
+			stat2Opacity.setValue(0);
+			stat3Opacity.setValue(0);
+			stat4Opacity.setValue(0);
+			stat5Opacity.setValue(0);
+			stat6Opacity.setValue(0);
+			gameCardAnimations.forEach((anim) => anim.setValue(0));
+
+			// Small delay to ensure component is ready and account for lag
+			const timer = setTimeout(() => {
+				// Step 1: Page fade-in (fast, smooth)
+				Animated.timing(pageOpacity, {
+					toValue: 1,
+					duration: 200,
+					useNativeDriver: true,
+				}).start(() => {
+					// Step 2: Avatar appears after page fade
+					Animated.parallel([
+						Animated.spring(avatarScale, {
+							toValue: 1,
+							useNativeDriver: true,
+							tension: 100,
+							friction: 8,
+						}),
+						Animated.timing(avatarOpacity, {
+							toValue: 1,
+							duration: 250,
+							useNativeDriver: true,
+						}),
+					]).start(() => {
+						// Step 3: Stats fade in after avatar
+						Animated.stagger(50, [
+							Animated.timing(stat1Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+							Animated.timing(stat2Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+							Animated.timing(stat3Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+							Animated.timing(stat4Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+							Animated.timing(stat5Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+							Animated.timing(stat6Opacity, {
+								toValue: 1,
+								duration: 300,
+								useNativeDriver: true,
+							}),
+						]).start(() => {
+							// Step 4: Game cards fade in after stats (only for created tab)
+							if (activeTab === "created" && !loadingGames && createdGames.length > 0) {
+								const visibleCardsCount = Math.min(8, createdGames.length);
+								const cardAnimations = Array.from({ length: visibleCardsCount }, (_, i) => {
+									const anim = getCardAnimation(i);
+									return Animated.timing(anim, {
+										toValue: 1,
+										duration: 300,
+										delay: i * 40, // Faster stagger for cards
+										useNativeDriver: true,
+									});
+								});
+								Animated.parallel(cardAnimations).start();
+							}
+						});
+					});
+				});
+			}, 50);
+
+			return () => clearTimeout(timer);
+		}
+	}, [loading, userData, pathname, activeTab, createdGames.length, loadingGames]);
+
+	// Game cards animation when switching to created tab
+	useEffect(() => {
+		if (!loadingGames && activeTab === "created" && createdGames.length > 0 && pathname === "/profile") {
+			// Reset card animations
+			gameCardAnimations.forEach((anim) => anim.setValue(0));
+			
+			// Small delay for smooth transition
+			const timer = setTimeout(() => {
+				const visibleCardsCount = Math.min(8, createdGames.length);
+				const cardAnimations = Array.from({ length: visibleCardsCount }, (_, i) => {
+					const anim = getCardAnimation(i);
+					return Animated.timing(anim, {
+						toValue: 1,
+						duration: 300,
+						delay: i * 40,
+						useNativeDriver: true,
+					});
+				});
+				Animated.parallel(cardAnimations).start();
+			}, 100);
+
+			return () => clearTimeout(timer);
+		}
+	}, [activeTab, createdGames.length, loadingGames, pathname]);
+
+	const handleIconPress = (scaleAnim: Animated.Value, onPress: () => void) => {
+		Animated.sequence([
+			Animated.spring(scaleAnim, {
+				toValue: 0.85,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 7,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 7,
+			}),
+		]).start();
+		onPress();
+	};
 
 	useEffect(() => {
 		loadUserData();
@@ -416,45 +584,55 @@ const ProfileScreen = () => {
 				item.completionCount !== undefined &&
 				item.completionCount > 0;
 
+			// Get animation value for this card (only animate if on created tab)
+			const cardOpacity = activeTab === "created" ? getCardAnimation(index) : new Animated.Value(1);
+
 			return (
-				<TouchableOpacity
+				<Animated.View
 					key={index}
-					style={[
-						styles.gameCard,
-						{ width: cardWidth, borderColor: gameColor },
-					]}
-					onPress={() => handleGamePress(item)}
-					activeOpacity={0.7}
+					style={{
+						opacity: cardOpacity,
+						width: cardWidth,
+					}}
 				>
-					{showCompletionCount && (
-						<View style={styles.completionBadge}>
-							<Text style={styles.completionBadgeText}>
-								{item.completionCount}
-							</Text>
-						</View>
-					)}
-					<View
+					<TouchableOpacity
 						style={[
-							styles.gameIconContainer,
-							{ backgroundColor: gameColor + "20" },
+							styles.gameCard,
+							{ width: cardWidth, borderColor: gameColor },
 						]}
+						onPress={() => handleGamePress(item)}
+						activeOpacity={0.7}
 					>
-						<Ionicons
-							name={getGameIcon(gameType)}
-							size={32}
-							color={gameColor}
-						/>
-					</View>
-					<Text style={styles.gameTypeText} numberOfLines={1}>
-						{formatGameType(gameType)}
-					</Text>
-					<Text style={styles.gameIdText} numberOfLines={1}>
-						ID: {truncatedId}
-					</Text>
-					{"playCount" in item && item.playCount > 0 && (
-						<Text style={styles.playCountText}>{item.playCount} plays</Text>
-					)}
-				</TouchableOpacity>
+						{showCompletionCount && (
+							<View style={styles.completionBadge}>
+								<Text style={styles.completionBadgeText}>
+									{item.completionCount}
+								</Text>
+							</View>
+						)}
+						<View
+							style={[
+								styles.gameIconContainer,
+								{ backgroundColor: gameColor + "20" },
+							]}
+						>
+							<Ionicons
+								name={getGameIcon(gameType)}
+								size={32}
+								color={gameColor}
+							/>
+						</View>
+						<Text style={styles.gameTypeText} numberOfLines={1}>
+							{formatGameType(gameType)}
+						</Text>
+						<Text style={styles.gameIdText} numberOfLines={1}>
+							ID: {truncatedId}
+						</Text>
+						{"playCount" in item && item.playCount > 0 && (
+							<Text style={styles.playCountText}>{item.playCount} plays</Text>
+						)}
+					</TouchableOpacity>
+				</Animated.View>
 			);
 		},
 		[activeTab, handleGamePress]
@@ -554,9 +732,11 @@ const ProfileScreen = () => {
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.xs }]}>
 				<View style={styles.headerSpacer} />
 				<View style={styles.headerActions}>
+				<Animated.View style={{ transform: [{ scale: searchScale }] }}>
 					<TouchableOpacity
 						style={styles.headerButton}
-						onPress={() => router.push("/search-friends")}
+						onPress={() => handleIconPress(searchScale, () => router.push("/search-friends"))}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name="search-outline"
@@ -564,9 +744,12 @@ const ProfileScreen = () => {
 							color={Colors.text.primary}
 						/>
 					</TouchableOpacity>
+				</Animated.View>
+				<Animated.View style={{ transform: [{ scale: notificationsScale }] }}>
 					<TouchableOpacity
 						style={styles.headerButton}
-						onPress={() => router.push("/notifications")}
+						onPress={() => handleIconPress(notificationsScale, () => router.push("/notifications"))}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name="notifications-outline"
@@ -583,9 +766,12 @@ const ProfileScreen = () => {
 							</View>
 						)}
 					</TouchableOpacity>
+				</Animated.View>
+				<Animated.View style={{ transform: [{ scale: inboxScale }] }}>
 					<TouchableOpacity
 						style={styles.headerButton}
-						onPress={() => router.push("/inbox")}
+						onPress={() => handleIconPress(inboxScale, () => router.push("/inbox"))}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name="chatbubbles-outline"
@@ -600,9 +786,12 @@ const ProfileScreen = () => {
 							</View>
 						)}
 					</TouchableOpacity>
+				</Animated.View>
+				<Animated.View style={{ transform: [{ scale: menuScale }] }}>
 					<TouchableOpacity
 						style={styles.menuButton}
-						onPress={() => setShowMenu(!showMenu)}
+						onPress={() => handleIconPress(menuScale, () => setShowMenu(!showMenu))}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name="ellipsis-horizontal"
@@ -610,7 +799,8 @@ const ProfileScreen = () => {
 							color={Colors.text.primary}
 						/>
 					</TouchableOpacity>
-				</View>
+				</Animated.View>
+			</View>
 			</View>
 
 			{/* Menu Dropdown */}
@@ -653,218 +843,240 @@ const ProfileScreen = () => {
 				</>
 			)}
 
-			<ScrollView
-				ref={scrollViewRef}
-				style={styles.content}
-				contentContainerStyle={{
-					paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
-				}}
-				showsVerticalScrollIndicator={false}
-				onScroll={(event) => {
-					// Track scroll position for current tab
-					const scrollY = event.nativeEvent.contentOffset.y;
-					scrollPositionsRef.current[activeTab] = scrollY;
-				}}
-				scrollEventThrottle={100}
-				refreshControl={
-					<RefreshControl
-						refreshing={refreshing}
-						onRefresh={handleRefresh}
-						tintColor={Colors.accent}
-						colors={[Colors.accent]}
-					/>
-				}
-			>
-				{/* Profile Header */}
-				<View style={styles.profileHeader}>
-					<View style={styles.avatarContainer}>
-						{userData?.profilePicture ? (
-							<Image
-								source={{ uri: userData.profilePicture }}
-								style={styles.avatar}
-								resizeMode="cover"
-								cache="force-cache"
-							/>
-						) : (
-							<Ionicons name="person-circle" size={100} color={Colors.accent} />
-						)}
-					</View>
-
-					<Text style={styles.usernameText}>
-						{userData?.username || userProfile?.username || "username"}
-					</Text>
-
-					{/* Stats Row - Following, Followers, Games Created */}
-					<View style={styles.statsRow}>
-						<TouchableOpacity
-							style={styles.statItem}
-							onPress={() =>
-								router.push(
-									`/followers-following?type=following&username=${
-										userData?.username || ""
-									}`
-								)
-							}
-						>
-							<Text style={styles.statNumber}>
-								{userData?.followingCount || 0}
-							</Text>
-							<Text style={styles.statLabel}>Following</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.statItem}
-							onPress={() =>
-								router.push(
-									`/followers-following?type=followers&username=${
-										userData?.username || ""
-									}`
-								)
-							}
-						>
-							<Text style={styles.statNumber}>
-								{userData?.followerCount || 0}
-							</Text>
-							<Text style={styles.statLabel}>Followers</Text>
-						</TouchableOpacity>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{userData?.createdGamesCount || 0}
-							</Text>
-							<Text style={styles.statLabel}>Games</Text>
-						</View>
-					</View>
-
-					{/* Stats Row 2 - Completed, Streak, Avg Time */}
-					<View style={styles.statsRow}>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{userData?.totalGamesPlayed || 0}
-							</Text>
-							<Text style={styles.statLabel}>Completed</Text>
-						</View>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{userData?.streakCount || 0}
-							</Text>
-							<Text style={styles.statLabel}>Streak</Text>
-						</View>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{formatTime(userData?.averageTimePerGame || 0)}
-							</Text>
-							<Text style={styles.statLabel}>Avg Time</Text>
-						</View>
-					</View>
-
-					{/* Bio */}
-					{userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
-				</View>
-
-				{/* Tabs */}
-				<View style={styles.tabContainer}>
-					<Animated.View
-						style={[
-							styles.tabIndicator,
-							{
-								transform: [
-									{
-										translateX: tabIndicatorAnim.interpolate({
-											inputRange: [0, 1, 2],
-											outputRange: [
-												0,
-												SCREEN_WIDTH / 3,
-												(SCREEN_WIDTH / 3) * 2,
-											],
-										}),
-									},
-								],
-							},
-						]}
-					>
-						<LinearGradient
-							colors={Gradients.primary}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-							style={StyleSheet.absoluteFill}
+			<Animated.View style={{ flex: 1, opacity: pageOpacity }}>
+				<ScrollView
+					ref={scrollViewRef}
+					style={styles.content}
+					contentContainerStyle={{
+						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
+					}}
+					showsVerticalScrollIndicator={false}
+					onScroll={(event) => {
+						// Track scroll position for current tab
+						const scrollY = event.nativeEvent.contentOffset.y;
+						scrollPositionsRef.current[activeTab] = scrollY;
+					}}
+					scrollEventThrottle={100}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={handleRefresh}
+							tintColor={Colors.accent}
+							colors={[Colors.accent]}
 						/>
-					</Animated.View>
-					<TouchableOpacity
-						style={styles.tab}
-						onPress={() => setActiveTab("created")}
-						activeOpacity={0.7}
-					>
-						<Text
+					}
+				>
+					{/* Profile Header */}
+					<View style={styles.profileHeader}>
+						<Animated.View 
 							style={[
-								styles.tabText,
-								activeTab === "created" && styles.activeTabText,
+								styles.avatarContainer,
+								{
+									transform: [{ scale: avatarScale }],
+									opacity: avatarOpacity,
+								},
 							]}
 						>
-							Created
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={styles.tab}
-						onPress={() => setActiveTab("completed")}
-						activeOpacity={0.7}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "completed" && styles.activeTabText,
-							]}
-						>
-							Completed
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={styles.tab}
-						onPress={() => setActiveTab("attempted")}
-						activeOpacity={0.7}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "attempted" && styles.activeTabText,
-							]}
-						>
-							Attempted
-						</Text>
-					</TouchableOpacity>
-				</View>
+							{userData?.profilePicture ? (
+								<Image
+									source={{ uri: userData.profilePicture }}
+									style={styles.avatar}
+									resizeMode="cover"
+									cache="force-cache"
+								/>
+							) : (
+								<Ionicons name="person-circle" size={100} color={Colors.accent} />
+							)}
+						</Animated.View>
 
-				{/* Game Grid */}
-				{loadingGames ? (
-					<View style={styles.loadingGamesContainer}>
-						<ActivityIndicator size="small" color={Colors.accent} />
-					</View>
-				) : (
-					<View style={styles.gameGrid}>
-						{activeTab === "created" &&
-							createdGames.map((game, index) => renderGameCard(game, index))}
-						{activeTab === "completed" &&
-							completedGames.map((game, index) => renderGameCard(game, index))}
-						{activeTab === "attempted" &&
-							attemptedGames.map((game, index) => renderGameCard(game, index))}
-					</View>
-				)}
+						<Text style={styles.usernameText}>
+							{userData?.username || userProfile?.username || "username"}
+						</Text>
 
-				{/* Empty State */}
-				{!loadingGames &&
-					((activeTab === "created" && createdGames.length === 0) ||
-						(activeTab === "completed" && completedGames.length === 0) ||
-						(activeTab === "attempted" && attemptedGames.length === 0)) && (
-						<View style={styles.emptyState}>
-							<Ionicons
-								name="game-controller-outline"
-								size={48}
-								color={Colors.text.secondary}
+						{/* Stats Row - Following, Followers, Games Created */}
+						<View style={styles.statsRow}>
+							<Animated.View style={{ opacity: stat6Opacity }}>
+								<TouchableOpacity
+									style={styles.statItem}
+									onPress={() =>
+										router.push(
+											`/followers-following?type=following&username=${
+												userData?.username || ""
+											}`
+										)
+									}
+								>
+									<Text style={styles.statNumber}>
+										{userData?.followingCount || 0}
+									</Text>
+									<Text style={styles.statLabel}>Following</Text>
+								</TouchableOpacity>
+							</Animated.View>
+							<Animated.View style={{ opacity: stat5Opacity }}>
+								<TouchableOpacity
+									style={styles.statItem}
+									onPress={() =>
+										router.push(
+											`/followers-following?type=followers&username=${
+												userData?.username || ""
+											}`
+										)
+									}
+								>
+									<Text style={styles.statNumber}>
+										{userData?.followerCount || 0}
+									</Text>
+									<Text style={styles.statLabel}>Followers</Text>
+								</TouchableOpacity>
+							</Animated.View>
+							<Animated.View style={{ opacity: stat4Opacity }}>
+								<View style={styles.statItem}>
+									<Text style={styles.statNumber}>
+										{userData?.createdGamesCount || 0}
+									</Text>
+									<Text style={styles.statLabel}>Games</Text>
+								</View>
+							</Animated.View>
+						</View>
+
+						{/* Stats Row 2 - Completed, Streak, Avg Time */}
+						<View style={styles.statsRow}>
+							<Animated.View style={{ opacity: stat3Opacity }}>
+								<View style={styles.statItem}>
+									<Text style={styles.statNumber}>
+										{userData?.totalGamesPlayed || 0}
+									</Text>
+									<Text style={styles.statLabel}>Completed</Text>
+								</View>
+							</Animated.View>
+							<Animated.View style={{ opacity: stat2Opacity }}>
+								<View style={styles.statItem}>
+									<Text style={styles.statNumber}>
+										{userData?.streakCount || 0}
+									</Text>
+									<Text style={styles.statLabel}>Streak</Text>
+								</View>
+							</Animated.View>
+							<Animated.View style={{ opacity: stat1Opacity }}>
+								<View style={styles.statItem}>
+									<Text style={styles.statNumber}>
+										{formatTime(userData?.averageTimePerGame || 0)}
+									</Text>
+									<Text style={styles.statLabel}>Avg Time</Text>
+								</View>
+							</Animated.View>
+						</View>
+
+						{/* Bio */}
+						{userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
+					</View>
+
+					{/* Tabs */}
+					<View style={styles.tabContainer}>
+						<Animated.View
+							style={[
+								styles.tabIndicator,
+								{
+									transform: [
+										{
+											translateX: tabIndicatorAnim.interpolate({
+												inputRange: [0, 1, 2],
+												outputRange: [
+													0,
+													SCREEN_WIDTH / 3,
+													(SCREEN_WIDTH / 3) * 2,
+												],
+											}),
+										},
+									],
+								},
+							]}
+						>
+							<LinearGradient
+								colors={Gradients.primary}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 1 }}
+								style={StyleSheet.absoluteFill}
 							/>
-							<Text style={styles.emptyStateText}>
-								No {activeTab} games yet
+						</Animated.View>
+						<TouchableOpacity
+							style={styles.tab}
+							onPress={() => setActiveTab("created")}
+							activeOpacity={0.7}
+						>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "created" && styles.activeTabText,
+								]}
+							>
+								Created
 							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.tab}
+							onPress={() => setActiveTab("completed")}
+							activeOpacity={0.7}
+						>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "completed" && styles.activeTabText,
+								]}
+							>
+								Completed
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.tab}
+							onPress={() => setActiveTab("attempted")}
+							activeOpacity={0.7}
+						>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "attempted" && styles.activeTabText,
+								]}
+							>
+								Attempted
+							</Text>
+						</TouchableOpacity>
+					</View>
+
+					{/* Game Grid */}
+					{loadingGames ? (
+						<View style={styles.loadingGamesContainer}>
+							<ActivityIndicator size="small" color={Colors.accent} />
+						</View>
+					) : (
+						<View style={styles.gameGrid}>
+							{activeTab === "created" &&
+								createdGames.map((game, index) => renderGameCard(game, index))}
+							{activeTab === "completed" &&
+								completedGames.map((game, index) => renderGameCard(game, index))}
+							{activeTab === "attempted" &&
+								attemptedGames.map((game, index) => renderGameCard(game, index))}
 						</View>
 					)}
-			</ScrollView>
+
+					{/* Empty State */}
+					{!loadingGames &&
+						((activeTab === "created" && createdGames.length === 0) ||
+							(activeTab === "completed" && completedGames.length === 0) ||
+							(activeTab === "attempted" && attemptedGames.length === 0)) && (
+							<View style={styles.emptyState}>
+								<Ionicons
+									name="game-controller-outline"
+									size={48}
+									color={Colors.text.secondary}
+								/>
+								<Text style={styles.emptyStateText}>
+									No {activeTab} games yet
+								</Text>
+							</View>
+						)}
+				</ScrollView>
+			</Animated.View>
 		</View>
 	);
 };
