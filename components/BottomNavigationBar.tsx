@@ -30,13 +30,15 @@ const BottomNavigationBar = () => {
 	const homeScale = useRef(new Animated.Value(1)).current;
 	const profileScale = useRef(new Animated.Value(1)).current;
 	const createScale = useRef(new Animated.Value(1)).current;
-	
+
 	const homeActive = pathname === "/feed" || pathname === "/";
 	const profileActive = pathname === "/profile";
-	
+
 	// Animation refs for smooth transitions
 	const homeActiveAnim = useRef(new Animated.Value(homeActive ? 1 : 0)).current;
-	const profileActiveAnim = useRef(new Animated.Value(profileActive ? 1 : 0)).current;
+	const profileActiveAnim = useRef(
+		new Animated.Value(profileActive ? 1 : 0)
+	).current;
 
 	// Animate transitions when active state changes
 	useEffect(() => {
@@ -120,10 +122,7 @@ const BottomNavigationBar = () => {
 				>
 					<View style={styles.iconWrapper}>
 						<Animated.View
-							style={[
-								styles.activeIconContainer,
-								{ opacity: homeActiveAnim },
-							]}
+							style={[styles.activeIconContainer, { opacity: homeActiveAnim }]}
 						>
 							<LinearGradient
 								colors={Gradients.primary}
@@ -142,7 +141,7 @@ const BottomNavigationBar = () => {
 								size={16}
 								color={Colors.text.secondary}
 								fill="transparent"
-								style={{ position: 'absolute' }}
+								style={{ position: "absolute" }}
 							/>
 						)}
 					</View>
@@ -211,7 +210,7 @@ const BottomNavigationBar = () => {
 								size={16}
 								color={Colors.text.secondary}
 								fill="transparent"
-								style={{ position: 'absolute' }}
+								style={{ position: "absolute" }}
 							/>
 						)}
 					</View>
@@ -284,6 +283,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.sm,
 		alignItems: "center",
 		justifyContent: "center",
+		overflow: "hidden",
 		elevation: 0,
 		shadowOpacity: 0,
 		shadowRadius: 0,
