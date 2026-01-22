@@ -21,7 +21,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter, usePathname, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -112,6 +112,17 @@ const ProfileScreen = () => {
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
 
+	const totalAttemptedGames = useMemo(() => {
+	if (!userData?.statsByCategory) return 0;
+	let total = 0;
+	Object.values(userData.statsByCategory).forEach((category) => {
+		if (category.attempted && typeof category.attempted === "number") {
+			total += category.attempted;
+		}
+	});
+	return total;
+}, [userData?.statsByCategory]);
+
 	// Tab indicator animation
 	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
 
@@ -142,7 +153,7 @@ const ProfileScreen = () => {
 	// Helper to get or create animation value for a card
 	const getCardAnimation = (index: number): Animated.Value => {
 		if (!gameCardAnimations.has(index)) {
-			gameCardAnimations.set(index, new Animated.Value(0));
+			gameCardAnimations.set(index, new Animated.Value(1));
 		}
 		return gameCardAnimations.get(index)!;
 	};
@@ -158,123 +169,96 @@ const ProfileScreen = () => {
 		}).start();
 	}, [activeTab]);
 
-	// Coordinated entrance animations - page fade -> avatar -> stats -> cards
-	useEffect(() => {
-		if (!loading && userData && pathname === "/profile") {
-			// Reset all animation values
-			pageOpacity.setValue(0);
-			avatarScale.setValue(0.9);
-			avatarOpacity.setValue(0);
-			stat1Opacity.setValue(0);
-			stat2Opacity.setValue(0);
-			stat3Opacity.setValue(0);
-			stat4Opacity.setValue(0);
-			stat5Opacity.setValue(0);
-			stat6Opacity.setValue(0);
-			gameCardAnimations.forEach((anim) => anim.setValue(0));
+// Replace the animation useEffect (lines 161-252) with:
+// Coordinated entrance animations - all at once
+useEffect(() => {
+	if (!loading && userData && pathname === "/profile") {
+		// Clear animation map
+		gameCardAnimations.clear();
 
-			// Small delay to ensure component is ready and account for lag
-			const timer = setTimeout(() => {
-				// Step 1: Page fade-in (fast, smooth)
+		// Reset all animation values
+		pageOpacity.setValue(0);
+		avatarScale.setValue(0.9);
+		avatarOpacity.setValue(0);
+		stat2Opacity.setValue(0);
+		stat5Opacity.setValue(0);
+		stat6Opacity.setValue(0);
+		gameCardAnimations.forEach((anim) => anim.setValue(0));
+
+		// Small delay to ensure component is ready
+		const timer = setTimeout(() => {
+			// All animations run in parallel
+			const animations: Animated.CompositeAnimation[] = [
+				// Page fade
 				Animated.timing(pageOpacity, {
 					toValue: 1,
-					duration: 200,
+					duration: 300,
 					useNativeDriver: true,
-				}).start(() => {
-					// Step 2: Avatar appears after page fade
-					Animated.parallel([
-						Animated.spring(avatarScale, {
-							toValue: 1,
-							useNativeDriver: true,
-							tension: 100,
-							friction: 8,
-						}),
-						Animated.timing(avatarOpacity, {
-							toValue: 1,
-							duration: 250,
-							useNativeDriver: true,
-						}),
-					]).start(() => {
-						// Step 3: Stats fade in after avatar
-						Animated.stagger(50, [
-							Animated.timing(stat1Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-							Animated.timing(stat2Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-							Animated.timing(stat3Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-							Animated.timing(stat4Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-							Animated.timing(stat5Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-							Animated.timing(stat6Opacity, {
-								toValue: 1,
-								duration: 300,
-								useNativeDriver: true,
-							}),
-						]).start(() => {
-							// Step 4: Game cards fade in after stats (only for created tab)
-							if (activeTab === "created" && !loadingGames && createdGames.length > 0) {
-								const visibleCardsCount = Math.min(8, createdGames.length);
-								const cardAnimations = Array.from({ length: visibleCardsCount }, (_, i) => {
-									const anim = getCardAnimation(i);
-									return Animated.timing(anim, {
-										toValue: 1,
-										duration: 300,
-										delay: i * 40, // Faster stagger for cards
-										useNativeDriver: true,
-									});
-								});
-								Animated.parallel(cardAnimations).start();
-							}
-						});
-					});
-				});
-			}, 50);
-
-			return () => clearTimeout(timer);
-		}
-	}, [loading, userData, pathname, activeTab, createdGames.length, loadingGames]);
-
-	// Game cards animation when switching to created tab
-	useEffect(() => {
-		if (!loadingGames && activeTab === "created" && createdGames.length > 0 && pathname === "/profile") {
-			// Reset card animations
-			gameCardAnimations.forEach((anim) => anim.setValue(0));
-			
-			// Small delay for smooth transition
-			const timer = setTimeout(() => {
-				const visibleCardsCount = Math.min(8, createdGames.length);
-				const cardAnimations = Array.from({ length: visibleCardsCount }, (_, i) => {
-					const anim = getCardAnimation(i);
-					return Animated.timing(anim, {
+				}),
+				// Avatar
+				Animated.parallel([
+					Animated.spring(avatarScale, {
+						toValue: 1,
+						useNativeDriver: true,
+						tension: 100,
+						friction: 8,
+					}),
+					Animated.timing(avatarOpacity, {
 						toValue: 1,
 						duration: 300,
-						delay: i * 40,
 						useNativeDriver: true,
-					});
-				});
-				Animated.parallel(cardAnimations).start();
-			}, 100);
+					}),
+				]),
+				// Stats (very fast stagger)
+				Animated.stagger(30, [
+					Animated.timing(stat6Opacity, {
+						toValue: 1,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+					Animated.timing(stat5Opacity, {
+						toValue: 1,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+					Animated.timing(stat2Opacity, {
+						toValue: 1,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+				]),
+			];
 
-			return () => clearTimeout(timer);
-		}
-	}, [activeTab, createdGames.length, loadingGames, pathname]);
+			// Add game cards for current tab
+			if (!loadingGames) {
+				const currentGames = 
+					activeTab === "created" ? createdGames :
+					activeTab === "completed" ? completedGames :
+					attemptedGames;
+				
+				if (currentGames.length > 0) {
+					// Animate ALL cards, not just first 8
+					const cardAnimations = Array.from({ length: currentGames.length }, (_, i) => {
+						const anim = getCardAnimation(i);
+						return Animated.timing(anim, {
+							toValue: 1,
+							duration: 300,
+							delay: i * 20,
+							useNativeDriver: true,
+						});
+					});
+					animations.push(Animated.parallel(cardAnimations));
+				}
+			}
+
+			// Start all animations together
+			Animated.parallel(animations).start();
+		}, 50);
+
+		return () => clearTimeout(timer);
+	}
+}, [loading, userData, pathname]);
+
 
 	const handleIconPress = (scaleAnim: Animated.Value, onPress: () => void) => {
 		Animated.sequence([
@@ -343,20 +327,19 @@ const ProfileScreen = () => {
 					action: "completed",
 					limit: 50,
 				});
-				setCompletedGames(history);
+				// Filter out completed games where answer was revealed (to match totalGamesPlayed)
+				const filteredHistory = history.filter(
+					(game) => !game.answerRevealed
+				);
+
+				setCompletedGames(filteredHistory);
 			} else if (tab === "attempted") {
 				const attempted = await fetchGameHistory(user.uid, {
 					action: "attempted",
 					limit: 50,
 				});
-				const skipped = await fetchGameHistory(user.uid, {
-					action: "skipped",
-					limit: 50,
-				});
-				const combined = [...attempted, ...skipped].sort(
-					(a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-				);
-				setAttemptedGames(combined.slice(0, 50));
+
+				setAttemptedGames(attempted);
 			}
 			// Mark tab as loaded
 			setLoadedTabs((prev) => new Set(prev).add(tab));
@@ -402,98 +385,120 @@ const ProfileScreen = () => {
 	});
 	const previousPathnameRef = useRef<string>(pathname || "");
 
-	// Restore scroll position when returning from play-game (but don't reload data)
-	// Also refresh notification/message counts when returning from notifications/inbox
-	useEffect(() => {
-		const previousPath = previousPathnameRef.current;
 
-		// Only restore scroll if we're coming back from play-game (pathname changed from play-game to profile)
-		if (
-			pathname === "/profile" &&
-			previousPath.startsWith("/play-game/") &&
-			scrollViewRef.current
-		) {
-			// Restore scroll position for current tab
-			const scrollY = scrollPositionsRef.current[activeTab];
-			if (scrollY > 0) {
-				// Use requestAnimationFrame to ensure ScrollView is ready
-				requestAnimationFrame(() => {
-					scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
-				});
-			}
-		}
-
-		// Refresh notification count when returning from notifications screen
-		if (
-			pathname === "/profile" &&
-			previousPath === "/notifications" &&
-			currentUser
-		) {
-			const refreshNotificationCount = async () => {
-				const count = await getUnreadNotificationCount(currentUser.uid);
-				setUnreadNotificationCount(count);
-			};
-			refreshNotificationCount();
-		}
-
-		// Refresh message count when returning from inbox or chat screens
-		if (
-			pathname === "/profile" &&
-			(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
-			currentUser
-		) {
-			const refreshMessageCount = async () => {
-				const conversations = await fetchConversations(currentUser.uid);
-				const totalUnread = conversations.reduce(
-					(sum, conv) => sum + (conv.unreadCount || 0),
-					0
-				);
-				setUnreadMessageCount(totalUnread);
-			};
-			refreshMessageCount();
-		}
-
-		// Also refresh counts whenever we're on profile (in case navigation detection fails)
-		// This ensures counts are always fresh when viewing profile
-		if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
-			const refreshAllCounts = async () => {
-				const notifCount = await getUnreadNotificationCount(currentUser.uid);
-				const conversations = await fetchConversations(currentUser.uid);
-				const messageCount = conversations.reduce(
-					(sum, conv) => sum + (conv.unreadCount || 0),
-					0
-				);
-				setUnreadNotificationCount(notifCount);
-				setUnreadMessageCount(messageCount);
-			};
-			refreshAllCounts();
-		}
-
-		previousPathnameRef.current = pathname || "";
-	}, [pathname, activeTab, currentUser]);
-
-	const handleRefresh = async () => {
-		setRefreshing(true);
-		// Reload user data
+useFocusEffect(
+	useCallback(() => {
+		// Refresh userData when profile page comes into focus to update tab counts
 		const user = getCurrentUser();
 		if (user) {
-			const data = await getUserData(user.uid);
-			setUserData(data);
-			// Reload notification count
-			const count = await getUnreadNotificationCount(user.uid);
+			getUserData(user.uid).then((data) => {
+				setUserData(data);
+			});
+		}
+	}, [])
+);
+
+	// Restore scroll position when returning from play-game (but don't reload data)
+	// Also refresh notification/message counts when returning from notifications/inbox
+useEffect(() => {
+	const previousPath = previousPathnameRef.current;
+
+	// Refresh current tab when returning from play-game to update game list
+	if (
+		pathname === "/profile" &&
+		previousPath.startsWith("/play-game/") &&
+		userData
+	) {
+		// Refresh the current tab's data if it's been loaded
+		if (loadedTabs.has(activeTab)) {
+			loadTabData(activeTab, true);
+		}
+		
+		// Restore scroll position for current tab after a short delay
+		if (scrollViewRef.current) {
+			setTimeout(() => {
+				const scrollY = scrollPositionsRef.current[activeTab];
+				if (scrollY > 0) {
+					requestAnimationFrame(() => {
+						scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
+					});
+				}
+			}, 100);
+		}
+	}
+
+	// Refresh notification count when returning from notifications screen
+	if (
+		pathname === "/profile" &&
+		previousPath === "/notifications" &&
+		currentUser
+	) {
+		const refreshNotificationCount = async () => {
+			const count = await getUnreadNotificationCount(currentUser.uid);
 			setUnreadNotificationCount(count);
-			// Reload unread message count
-			const conversations = await fetchConversations(user.uid);
+		};
+		refreshNotificationCount();
+	}
+
+	// Refresh message count when returning from inbox or chat screens
+	if (
+		pathname === "/profile" &&
+		(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
+		currentUser
+	) {
+		const refreshMessageCount = async () => {
+			const conversations = await fetchConversations(currentUser.uid);
 			const totalUnread = conversations.reduce(
 				(sum, conv) => sum + (conv.unreadCount || 0),
 				0
 			);
 			setUnreadMessageCount(totalUnread);
+		};
+		refreshMessageCount();
+	}
+
+	// Also refresh counts whenever we're on profile (in case navigation detection fails)
+	if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
+		const refreshAllCounts = async () => {
+			const notifCount = await getUnreadNotificationCount(currentUser.uid);
+			const conversations = await fetchConversations(currentUser.uid);
+			const messageCount = conversations.reduce(
+				(sum, conv) => sum + (conv.unreadCount || 0),
+				0
+			);
+			setUnreadNotificationCount(notifCount);
+			setUnreadMessageCount(messageCount);
+		};
+		refreshAllCounts();
+	}
+
+	previousPathnameRef.current = pathname || "";
+}, [pathname, userData, activeTab, loadedTabs, currentUser]);
+
+const handleRefresh = async () => {
+	setRefreshing(true);
+	// Reload user data
+	const user = getCurrentUser();
+	if (user) {
+		const data = await getUserData(user.uid);
+		setUserData(data);
+		// Reload notification count
+		const count = await getUnreadNotificationCount(user.uid);
+		setUnreadNotificationCount(count);
+		// Reload unread message count
+		const conversations = await fetchConversations(user.uid);
+		const totalUnread = conversations.reduce(
+			(sum, conv) => sum + (conv.unreadCount || 0),
+			0
+		);
+		setUnreadMessageCount(totalUnread);
+		// Reload current tab's data
+		if (userData) {
+			await loadTabData(activeTab, true);
 		}
-		// Force reload current tab
-		await loadTabData(activeTab, true);
-		setRefreshing(false);
-	};
+	}
+	setRefreshing(false);
+};
 
 	// Function to update local state after follow/unfollow (called from other screens)
 	const updateFollowingCount = (increment: number) => {
@@ -585,7 +590,7 @@ const ProfileScreen = () => {
 				item.completionCount > 0;
 
 			// Get animation value for this card (only animate if on created tab)
-			const cardOpacity = activeTab === "created" ? getCardAnimation(index) : new Animated.Value(1);
+			const cardOpacity = getCardAnimation(index);
 
 			return (
 				<Animated.View
@@ -912,6 +917,9 @@ const ProfileScreen = () => {
 									<Text style={styles.statLabel}>Following</Text>
 								</TouchableOpacity>
 							</Animated.View>
+							{/* Divider */}
+							<View style={styles.statDivider} />
+
 							<Animated.View style={{ opacity: stat5Opacity }}>
 								<TouchableOpacity
 									style={styles.statItem}
@@ -929,40 +937,16 @@ const ProfileScreen = () => {
 									<Text style={styles.statLabel}>Followers</Text>
 								</TouchableOpacity>
 							</Animated.View>
-							<Animated.View style={{ opacity: stat4Opacity }}>
-								<View style={styles.statItem}>
-									<Text style={styles.statNumber}>
-										{userData?.createdGamesCount || 0}
-									</Text>
-									<Text style={styles.statLabel}>Games</Text>
-								</View>
-							</Animated.View>
-						</View>
 
-						{/* Stats Row 2 - Completed, Streak, Avg Time */}
-						<View style={styles.statsRow}>
-							<Animated.View style={{ opacity: stat3Opacity }}>
-								<View style={styles.statItem}>
-									<Text style={styles.statNumber}>
-										{userData?.totalGamesPlayed || 0}
-									</Text>
-									<Text style={styles.statLabel}>Completed</Text>
-								</View>
-							</Animated.View>
+							{/* Divider */}
+							<View style={styles.statDivider} />
+				
 							<Animated.View style={{ opacity: stat2Opacity }}>
 								<View style={styles.statItem}>
 									<Text style={styles.statNumber}>
 										{userData?.streakCount || 0}
 									</Text>
 									<Text style={styles.statLabel}>Streak</Text>
-								</View>
-							</Animated.View>
-							<Animated.View style={{ opacity: stat1Opacity }}>
-								<View style={styles.statItem}>
-									<Text style={styles.statNumber}>
-										{formatTime(userData?.averageTimePerGame || 0)}
-									</Text>
-									<Text style={styles.statLabel}>Avg Time</Text>
 								</View>
 							</Animated.View>
 						</View>
@@ -1010,7 +994,7 @@ const ProfileScreen = () => {
 									activeTab === "created" && styles.activeTabText,
 								]}
 							>
-								Created
+								Created ({userData?.createdGamesCount || 0})
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -1024,7 +1008,7 @@ const ProfileScreen = () => {
 									activeTab === "completed" && styles.activeTabText,
 								]}
 							>
-								Completed
+								Completed ({userData?.totalGamesPlayed || 0})
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -1038,7 +1022,7 @@ const ProfileScreen = () => {
 									activeTab === "attempted" && styles.activeTabText,
 								]}
 							>
-								Attempted
+								Attempted ({totalAttemptedGames || 0})
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -1206,11 +1190,20 @@ const styles = StyleSheet.create({
 	},
 	statsRow: {
 		flexDirection: "row",
-		justifyContent: "space-around",
+		justifyContent: "center",
 		width: "100%",
 		paddingHorizontal: Layout.margin,
+		paddingRight: 30,
 		marginBottom: Spacing.lg,
+		gap: Spacing.lg
 	},
+	statDivider: {
+		width: 1,
+		height: 30,
+		backgroundColor: Colors.border,
+		marginHorizontal: Spacing.sm,
+	},
+
 	statItem: {
 		alignItems: "center",
 	},
@@ -1238,6 +1231,8 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.sm,
 		position: "relative",
 		overflow: "hidden",
+		paddingHorizontal: Spacing.md,
+		gap: Spacing.md,
 	},
 	tabIndicator: {
 		position: "absolute",
