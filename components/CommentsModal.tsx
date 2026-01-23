@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	StyleSheet,
@@ -11,7 +11,9 @@ import {
 	Platform,
 	ActivityIndicator,
 	Image,
+	Animated,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -52,7 +54,8 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 	const [newComment, setNewComment] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-	const [likingComments, setLikingComments] = useState<Set<string>>(new Set());
+	// Animation refs for each comment's like button (TikTok-style pulse)
+	const likeAnimationsRef = useRef<Map<string, Animated.Value>>(new Map());
 
 	useEffect(() => {
 		let unsubscribe: (() => void) | undefined;
@@ -157,30 +160,100 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		}
 	};
 
-	const handleLikeComment = async (commentId: string) => {
+	const handleLikeComment = (commentId: string) => {
 		if (!currentUser) return;
 
-		if (likingComments.has(commentId)) return;
-		setLikingComments((prev) => new Set(prev).add(commentId));
+		const comment = comments.find((c) => c.id === commentId);
+		if (!comment) return;
 
-		try {
-			const comment = comments.find((c) => c.id === commentId);
-			if (!comment) return;
+		// Get or create animation ref for this comment
+		if (!likeAnimationsRef.current.has(commentId)) {
+			likeAnimationsRef.current.set(commentId, new Animated.Value(1));
+		}
+		const pulseAnim = likeAnimationsRef.current.get(commentId)!;
 
-			const isLiked = comment.likedBy?.includes(currentUser.uid) || false;
+		// Optimistic update - update UI immediately, process in background
+		const wasLiked = comment.likedBy?.includes(currentUser.uid) || false;
+		const newLikedState = !wasLiked;
+		const currentLikeCount = comment.likes || 0;
+		const newLikeCount = wasLiked
+			? Math.max(0, currentLikeCount - 1)
+			: currentLikeCount + 1;
 
-			if (isLiked) {
-				await unlikeGameComment(gameId, commentId, currentUser.uid);
-			} else {
-				await likeGameComment(gameId, commentId, currentUser.uid);
-			}
-		} catch (error) {
-			console.error("[CommentsModal] Error liking comment:", error);
-		} finally {
-			setLikingComments((prev) => {
-				const next = new Set(prev);
-				next.delete(commentId);
-				return next;
+		// TikTok-style haptic feedback and pulse animation (only on like, not unlike)
+		if (!wasLiked) {
+			// Haptic feedback for like - medium impact for satisfying feel
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+			// TikTok-style pulse animation - quick bounce, heart doesn't stay big for more than 0.5s
+			Animated.sequence([
+				Animated.timing(pulseAnim, {
+					toValue: 1.4,
+					duration: 150, // Quick scale up in 150ms
+					useNativeDriver: true,
+				}),
+				Animated.timing(pulseAnim, {
+					toValue: 1,
+					duration: 300, // Scale back down in 300ms (total < 500ms)
+					useNativeDriver: true,
+				}),
+			]).start();
+		}
+
+		// Update UI instantly (optimistic update)
+		setComments((prevComments) =>
+			prevComments.map((c) => {
+				if (c.id === commentId) {
+					const updatedLikedBy = wasLiked
+						? (c.likedBy || []).filter((uid) => uid !== currentUser.uid)
+						: [...(c.likedBy || []), currentUser.uid];
+					return {
+						...c,
+						likes: newLikeCount,
+						likedBy: updatedLikedBy,
+					};
+				}
+				return c;
+			})
+		);
+
+		// Process in background (fire and forget)
+		if (wasLiked) {
+			unlikeGameComment(gameId, commentId, currentUser.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[CommentsModal] Error unliking comment:", error);
+				setComments((prevComments) =>
+					prevComments.map((c) => {
+						if (c.id === commentId) {
+							return {
+								...c,
+								likes: currentLikeCount,
+								likedBy: [...(c.likedBy || []), currentUser.uid],
+							};
+						}
+						return c;
+					})
+				);
+			});
+		} else {
+			likeGameComment(gameId, commentId, currentUser.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[CommentsModal] Error liking comment:", error);
+				setComments((prevComments) =>
+					prevComments.map((c) => {
+						if (c.id === commentId) {
+							const revertedLikedBy = (c.likedBy || []).filter(
+								(uid) => uid !== currentUser.uid
+							);
+							return {
+								...c,
+								likes: currentLikeCount,
+								likedBy: revertedLikedBy,
+							};
+						}
+						return c;
+					})
+				);
 			});
 		}
 	};
@@ -203,7 +276,12 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 	const renderComment = ({ item }: { item: GameComment }) => {
 		const isLiked =
 			currentUser && (item.likedBy?.includes(currentUser.uid) || false);
-		const isLiking = likingComments.has(item.id);
+
+		// Get or create animation ref for this comment
+		if (!likeAnimationsRef.current.has(item.id)) {
+			likeAnimationsRef.current.set(item.id, new Animated.Value(1));
+		}
+		const pulseAnim = likeAnimationsRef.current.get(item.id)!;
 
 		return (
 			<View style={styles.commentItem}>
@@ -230,17 +308,19 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 							<TouchableOpacity
 								style={styles.commentLikeButton}
 								onPress={() => handleLikeComment(item.id)}
-								disabled={isLiking}
+								activeOpacity={0.7}
 							>
-								{isLiking ? (
-									<ActivityIndicator size="small" color={Colors.accent} />
-								) : (
+								<Animated.View
+									style={{
+										transform: [{ scale: pulseAnim }],
+									}}
+								>
 									<Ionicons
 										name={isLiked ? "heart" : "heart-outline"}
 										size={16}
 										color={isLiked ? Colors.accent : Colors.text.secondary}
 									/>
-								)}
+								</Animated.View>
 								{item.likes > 0 && (
 									<Text
 										style={[

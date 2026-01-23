@@ -5,9 +5,40 @@ import {
 	fetchFollowing,
 	isUserBlocked,
 	isBlockedByUser,
+	fetchUserProfile,
+	UserPublicProfile,
 } from "./social";
 import { GameShare, Message, Conversation } from "./types";
 import { getCachedBlockedUsersAll } from "./blockedUsersCache";
+
+// Simple in-memory cache for participant profiles (to avoid repeated fetches)
+interface ParticipantProfileCache {
+	profile: UserPublicProfile;
+	timestamp: number;
+}
+
+const participantProfileCache = new Map<string, ParticipantProfileCache>();
+const PROFILE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Get cached participant profile or fetch if not cached/stale
+export const getCachedParticipantProfile = async (
+	userId: string
+): Promise<UserPublicProfile | null> => {
+	const cached = participantProfileCache.get(userId);
+	if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_TTL) {
+		return cached.profile;
+	}
+
+	// Fetch fresh profile
+	const profile = await fetchUserProfile(userId);
+	if (profile) {
+		participantProfileCache.set(userId, {
+			profile,
+			timestamp: Date.now(),
+		});
+	}
+	return profile;
+};
 
 // Get mutual followers (users who follow each other)
 // OPTIMIZED: Uses cached blocked users and single query for followers
@@ -327,10 +358,11 @@ export const fetchConversations = async (
 	}
 };
 
-// Fetch messages for a conversation
+// Fetch messages for a conversation with pagination support
 export const fetchMessages = async (
 	conversationId: string,
-	limit: number = 50
+	limit: number = 30,
+	startAfter?: any // Firestore DocumentSnapshot for pagination
 ): Promise<Message[]> => {
 	try {
 		const messagesRef = db
@@ -338,10 +370,14 @@ export const fetchMessages = async (
 			.doc(conversationId)
 			.collection("messages");
 
-		const snapshot = await messagesRef
-			.orderBy("createdAt", "desc")
-			.limit(limit)
-			.get();
+		let query = messagesRef.orderBy("createdAt", "desc").limit(limit);
+		
+		// Add pagination if startAfter is provided
+		if (startAfter) {
+			query = query.startAfter(startAfter);
+		}
+
+		const snapshot = await query.get();
 
 		const messages: Message[] = [];
 		snapshot.forEach((doc) => {
@@ -366,7 +402,28 @@ export const fetchMessages = async (
 	}
 };
 
-// Mark conversation as read
+// Get participant ID from conversation (optimized - can be called in parallel)
+export const getConversationParticipantId = async (
+	conversationId: string,
+	currentUserId: string
+): Promise<string | null> => {
+	try {
+		const conversationDoc = await db
+			.collection("conversations")
+			.doc(conversationId)
+			.get();
+
+		const conversationData = conversationDoc.data();
+		const participants = conversationData?.participants || [];
+		const otherId = participants.find((id: string) => id !== currentUserId);
+		return otherId || null;
+	} catch (error) {
+		console.error("[getConversationParticipantId] Error:", error);
+		return null;
+	}
+};
+
+// Mark conversation as read (optimized - runs in background)
 export const markConversationRead = async (
 	conversationId: string,
 	userId: string
@@ -375,63 +432,65 @@ export const markConversationRead = async (
 		const firestore = require("@react-native-firebase/firestore").default;
 		const now = firestore.FieldValue.serverTimestamp();
 
-		// Update main conversation
+		// OPTIMIZED: Run all operations in parallel where possible
 		const conversationRef = db.collection("conversations").doc(conversationId);
-		const conversationDoc = await conversationRef.get();
-		const conversationData = conversationDoc.data();
-
-		if (conversationData) {
-			const lastRead = conversationData.lastRead || {};
-			lastRead[userId] = now;
-
-			await conversationRef.update({
-				lastRead,
-			});
-
-			// Update in users' conversations subcollections
-			const participants = conversationData.participants || [];
-			await Promise.all(
-				participants.map(async (participantId: string) => {
-					const userConversationRef = db
-						.collection("users")
-						.doc(participantId)
-						.collection("conversations")
-						.doc(conversationId);
-
-					await userConversationRef.update({
-						lastRead,
-					});
-				})
-			);
-
-			// Mark all messages as read - avoid composite index queries
-			const messagesSnapshot = await db
+		
+		// Start fetching conversation doc and messages in parallel
+		const [conversationDoc, messagesSnapshot] = await Promise.all([
+			conversationRef.get(),
+			db
 				.collection("conversations")
 				.doc(conversationId)
 				.collection("messages")
 				.orderBy("createdAt", "desc")
-				.limit(100)
-				.get();
+				.limit(30) // Only mark latest 30 messages (matches display limit)
+				.get(),
+		]);
 
-			const batch = db.batch();
-			let batchHasUpdates = false;
-			messagesSnapshot.forEach((doc) => {
-				const data = doc.data();
-				// Mark all messages from other users as read
-				if (data.senderId !== userId) {
-					console.log("Marking message as read:", data.senderId);
-					batch.update(doc.ref, { read: true });
-					batchHasUpdates = true;
-				}
-			});
+		const conversationData = conversationDoc.data();
+		if (!conversationData) return;
 
-			if (batchHasUpdates) {
-				await batch.commit();
+		const lastRead = conversationData.lastRead || {};
+		lastRead[userId] = now;
+		const participants = conversationData.participants || [];
+
+		// Prepare batch for message updates
+		const batch = db.batch();
+		let batchHasUpdates = false;
+		messagesSnapshot.forEach((doc) => {
+			const data = doc.data();
+			// Only mark unread messages from other users
+			if (data.senderId !== userId && data.read !== true) {
+				batch.update(doc.ref, { read: true });
+				batchHasUpdates = true;
 			}
+		});
+
+		// OPTIMIZED: Run all write operations in parallel
+		const writePromises: Promise<any>[] = [
+			conversationRef.update({ lastRead }),
+		];
+
+		// Update users' subcollections
+		participants.forEach((participantId: string) => {
+			const userConversationRef = db
+				.collection("users")
+				.doc(participantId)
+				.collection("conversations")
+				.doc(conversationId);
+			writePromises.push(userConversationRef.update({ lastRead }));
+		});
+
+		// Add batch commit if there are message updates
+		if (batchHasUpdates) {
+			writePromises.push(batch.commit());
 		}
+
+		// Execute all writes in parallel
+		await Promise.all(writePromises);
 	} catch (error) {
+		// Silent error - marking as read is not critical
 		console.error("[markConversationRead] Error:", error);
-		throw error;
 	}
 };
 

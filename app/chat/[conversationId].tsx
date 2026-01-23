@@ -32,9 +32,11 @@ import {
 	fetchMessages,
 	sendMessage,
 	markConversationRead,
-	Message,
+	getConversationParticipantId,
+	getCachedParticipantProfile,
 } from "../../config/messaging";
-import { fetchUserProfile, UserPublicProfile } from "../../config/social";
+import { UserPublicProfile } from "../../config/social";
+import { Message } from "../../config/types";
 import { db } from "../../config/firebase";
 import { PuzzleType } from "../../config/types";
 import { useSessionEndRefresh } from "../../utils/sessionRefresh";
@@ -74,7 +76,12 @@ const formatGameType = (type: string): string => {
 const ChatScreen = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const params = useLocalSearchParams<{ conversationId: string }>();
+	const params = useLocalSearchParams<{
+		conversationId: string;
+		username?: string;
+		profilePicture?: string;
+		participantId?: string;
+	}>();
 	const conversationId = params.conversationId;
 	const currentUser = getCurrentUser();
 
@@ -84,18 +91,43 @@ const ChatScreen = () => {
 
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [newMessage, setNewMessage] = useState("");
-	const [loading, setLoading] = useState(true);
+	// OPTIMIZED: Start with loading=false, let listener populate instantly
+	const [loading, setLoading] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMoreMessages, setHasMoreMessages] = useState(true);
 	const [sending, setSending] = useState(false);
+	// OPTIMIZED: Initialize with passed params for instant display
 	const [otherParticipant, setOtherParticipant] =
-		useState<UserPublicProfile | null>(null);
+		useState<UserPublicProfile | null>(
+			params.username
+				? {
+						uid: params.participantId || "",
+						username: params.username,
+						profilePicture: params.profilePicture || undefined,
+				  }
+				: null
+		);
+	const lastMessageRef = useRef<any>(null); // For pagination
+	const scrollOffsetRef = useRef<number>(0);
+	const loadingMoreTriggeredRef = useRef<boolean>(false);
+	const listenerSetupRef = useRef<boolean>(false);
 
 	useEffect(() => {
 		let unsubscribe: (() => void) | undefined;
 
-		if (conversationId && currentUser) {
-			loadMessages();
+		if (conversationId && currentUser && !listenerSetupRef.current) {
+			listenerSetupRef.current = true;
+			
+			// OPTIMIZED: Only set up listener - it will populate messages instantly
+			// No separate loadMessages() call needed - listener handles everything
 			unsubscribe = setupListener();
-			loadOtherParticipant();
+			
+			// Only fetch participant if not passed via params
+			if (!params.username) {
+				loadOtherParticipant();
+			}
+			
+			// Mark as read in background (fire and forget - don't block UI!)
 			markAsRead();
 		}
 
@@ -104,36 +136,66 @@ const ChatScreen = () => {
 			if (unsubscribe) {
 				unsubscribe();
 			}
-			// Mark as read when exiting the chat
+			listenerSetupRef.current = false;
+			// Mark as read when exiting the chat (fire and forget)
 			if (conversationId && currentUser) {
 				markAsRead();
 			}
 		};
 	}, [conversationId, currentUser]);
 
-	const loadMessages = async () => {
-		if (!conversationId) return;
+	// Note: Initial messages are loaded by the real-time listener for instant display
+	// This function is only kept for potential manual refresh scenarios
 
-		setLoading(true);
+	const loadMoreMessages = async () => {
+		if (!conversationId || loadingMore || !hasMoreMessages || !lastMessageRef.current) {
+			return;
+		}
+
+		setLoadingMore(true);
 		try {
-			const fetchedMessages = await fetchMessages(conversationId, 100);
-			setMessages(fetchedMessages);
+			// Get the document snapshot for the oldest message we have
+			const oldestMessageDoc = await db
+				.collection("conversations")
+				.doc(conversationId)
+				.collection("messages")
+				.doc(lastMessageRef.current.id)
+				.get();
+
+			// Fetch 30 more messages before the oldest one
+			const olderMessages = await fetchMessages(conversationId, 30, oldestMessageDoc);
+			
+			if (olderMessages.length === 0) {
+				setHasMoreMessages(false);
+			} else {
+				// Prepend older messages to the list
+				setMessages((prev) => [...olderMessages, ...prev]);
+				
+				// Update pagination reference
+				if (olderMessages.length < 30) {
+					setHasMoreMessages(false);
+				} else {
+					lastMessageRef.current = olderMessages[0];
+				}
+			}
 		} catch (error) {
-			console.error("[ChatScreen] Error loading messages:", error);
+			console.error("[ChatScreen] Error loading more messages:", error);
 		} finally {
-			setLoading(false);
+			setLoadingMore(false);
 		}
 	};
 
 	const setupListener = (): (() => void) | undefined => {
 		if (!conversationId) return undefined;
 
+		// OPTIMIZED: Listener only fetches 30 most recent messages
+		// This reduces initial load time and keeps real-time updates fast
 		const messagesRef = db
 			.collection("conversations")
 			.doc(conversationId)
 			.collection("messages")
 			.orderBy("createdAt", "desc")
-			.limit(100);
+			.limit(30);
 
 		const unsubscribe = messagesRef.onSnapshot(
 			(snapshot) => {
@@ -151,8 +213,18 @@ const ChatScreen = () => {
 						read: data.read || false,
 					});
 				});
-				setMessages(updatedMessages.reverse());
-				markAsRead();
+				const reversed = updatedMessages.reverse();
+				setMessages(reversed);
+				
+				// Update pagination state
+				if (reversed.length < 30) {
+					setHasMoreMessages(false);
+				} else {
+					setHasMoreMessages(true);
+					lastMessageRef.current = reversed[0];
+				}
+				
+				// Note: markAsRead is called once in useEffect, not on every snapshot
 			},
 			(error) => {
 				console.error("[ChatScreen] Listener error:", error);
@@ -166,17 +238,12 @@ const ChatScreen = () => {
 		if (!conversationId || !currentUser) return;
 
 		try {
-			const conversationDoc = await db
-				.collection("conversations")
-				.doc(conversationId)
-				.get();
-
-			const conversationData = conversationDoc.data();
-			const participants = conversationData?.participants || [];
-			const otherId = participants.find((id: string) => id !== currentUser.uid);
+			// OPTIMIZED: Use dedicated function that can be called in parallel
+			const otherId = await getConversationParticipantId(conversationId, currentUser.uid);
 
 			if (otherId) {
-				const profile = await fetchUserProfile(otherId);
+				// OPTIMIZED: Use cached profile fetch
+				const profile = await getCachedParticipantProfile(otherId);
 				if (profile) {
 					setOtherParticipant(profile);
 				}
@@ -319,9 +386,7 @@ const ChatScreen = () => {
 		return (
 			<View style={styles.container}>
 				<StatusBar style="dark" />
-				<View style={styles.header}>
-					<Text style={styles.headerTitle}>Chat</Text>
-				</View>
+				<MinimalHeader title="Chat" />
 			</View>
 		);
 	}
@@ -363,7 +428,6 @@ const ChatScreen = () => {
 					data={messages}
 					renderItem={renderMessage}
 					keyExtractor={(item) => item.id}
-					// inverted
 					windowSize={5}
 					initialNumToRender={10}
 					maxToRenderPerBatch={5}
@@ -379,6 +443,35 @@ const ChatScreen = () => {
 					onContentSizeChange={() => {
 						flatListRef.current?.scrollToEnd({ animated: true });
 					}}
+					onScroll={(event) => {
+						const offsetY = event.nativeEvent.contentOffset.y;
+						scrollOffsetRef.current = offsetY;
+						
+						// Load more messages when scrolling near the top (offset < 100)
+						// Messages are displayed oldest first, so scrolling up (towards top) loads older messages
+						if (
+							offsetY < 100 &&
+							hasMoreMessages &&
+							!loadingMore &&
+							!loadingMoreTriggeredRef.current
+						) {
+							loadingMoreTriggeredRef.current = true;
+							loadMoreMessages().finally(() => {
+								// Reset trigger after a delay to allow loading again
+								setTimeout(() => {
+									loadingMoreTriggeredRef.current = false;
+								}, 1000);
+							});
+						}
+					}}
+					scrollEventThrottle={200}
+					ListHeaderComponent={
+						loadingMore ? (
+							<View style={styles.loadingMoreContainer}>
+								<ActivityIndicator size="small" color={Colors.accent} />
+							</View>
+						) : null
+					}
 					ListEmptyComponent={
 						<View style={styles.emptyContainer}>
 							<Text style={styles.emptyText}>No messages yet</Text>
@@ -445,6 +538,10 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 	},
+	loadingMoreContainer: {
+		padding: Spacing.md,
+		alignItems: "center",
+	},
 	messagesList: {
 		padding: Layout.margin,
 	},
@@ -494,7 +591,7 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 	},
 	messageTime: {
-		fontSize: Typography.fontSize.xxs || 10,
+		fontSize: 10,
 		color: Colors.text.secondary,
 		marginTop: Spacing.xxs,
 	},

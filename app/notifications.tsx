@@ -30,7 +30,7 @@ import {
 	markAllNotificationsAsRead,
 	deleteNotification,
 	followUser,
-	isFollowing,
+	batchCheckFollowing,
 	Notification,
 } from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
@@ -80,18 +80,25 @@ const NotificationsScreen = () => {
 		loadNotifications();
 	}, []);
 
-	useEffect(() => {
-		if (notifications.length > 0 && currentUser) {
-			checkFollowingStatus();
-		}
-	}, [notifications]);
-
+	// OPTIMIZED: Load notifications and following status together to prevent UI flicker
 	const loadNotifications = async () => {
 		if (!currentUser) return;
 
 		setLoading(true);
 		try {
 			const notifs = await fetchNotifications(currentUser.uid, 50);
+			
+			// OPTIMIZED: Get unique user IDs from follow notifications
+			const followNotifications = notifs.filter((n) => n.type === "follow");
+			const uniqueUserIds = [...new Set(followNotifications.map((n) => n.fromUserId))];
+			
+			// OPTIMIZED: Use batch check with caching for efficiency
+			const statusMap = uniqueUserIds.length > 0
+				? await batchCheckFollowing(currentUser.uid, uniqueUserIds)
+				: {};
+			
+			// Update both states together to prevent flicker
+			setFollowingMap(statusMap);
 			setNotifications(notifs);
 		} catch (error) {
 			console.error("Error loading notifications:", error);
@@ -104,23 +111,6 @@ const NotificationsScreen = () => {
 		setRefreshing(true);
 		await loadNotifications();
 		setRefreshing(false);
-	};
-
-	const checkFollowingStatus = async () => {
-		if (!currentUser) return;
-
-		const followNotifications = notifications.filter(
-			(n) => n.type === "follow"
-		);
-		const statusMap: Record<string, boolean> = {};
-
-		await Promise.all(
-			followNotifications.map(async (notif) => {
-				const following = await isFollowing(currentUser.uid, notif.fromUserId);
-				statusMap[notif.fromUserId] = following;
-			})
-		);
-		setFollowingMap(statusMap);
 	};
 
 	const handleMarkAllAsRead = async () => {
@@ -162,72 +152,38 @@ const NotificationsScreen = () => {
 	const handleFollowBack = async (notification: Notification) => {
 		if (!currentUser || notification.type !== "follow") return;
 
+		// Optimistic update - show as following immediately
+		setFollowingMap((prev) => ({
+			...prev,
+			[notification.fromUserId]: true,
+		}));
+
 		try {
-			// Check if already following before attempting
-			const alreadyFollowing = await isFollowing(
-				currentUser.uid,
-				notification.fromUserId
-			);
-			if (alreadyFollowing) {
-				setFollowingMap((prev) => ({
-					...prev,
-					[notification.fromUserId]: true,
-				}));
-				// Mark as read even if already following
-				if (!notification.read) {
-					try {
-						await markNotificationAsRead(currentUser.uid, notification.id);
+			await followUser(currentUser.uid, notification.fromUserId);
+			
+			// Mark as read after following (fire and forget)
+			if (!notification.read) {
+				markNotificationAsRead(currentUser.uid, notification.id)
+					.then(() => {
 						setNotifications((prev) =>
 							prev.map((n) =>
 								n.id === notification.id ? { ...n, read: true } : n
 							)
 						);
-					} catch (error) {
+					})
+					.catch((error) => {
 						console.error("Error marking notification as read:", error);
-					}
-				}
-				return;
-			}
-			await followUser(currentUser.uid, notification.fromUserId);
-			setFollowingMap((prev) => ({
-				...prev,
-				[notification.fromUserId]: true,
-			}));
-			// Mark as read after following
-			if (!notification.read) {
-				try {
-					await markNotificationAsRead(currentUser.uid, notification.id);
-					setNotifications((prev) =>
-						prev.map((n) =>
-							n.id === notification.id ? { ...n, read: true } : n
-						)
-					);
-				} catch (error) {
-					console.error("Error marking notification as read:", error);
-				}
+					});
 			}
 		} catch (error: any) {
-			console.error("Error following back:", error);
-			// If already following, update state
-			if (error.message && error.message.includes("Already following")) {
+			// On error, only revert if not already following
+			if (!error.message?.includes("Already following")) {
 				setFollowingMap((prev) => ({
 					...prev,
-					[notification.fromUserId]: true,
+					[notification.fromUserId]: false,
 				}));
-				// Mark as read even if error says already following
-				if (!notification.read) {
-					try {
-						await markNotificationAsRead(currentUser.uid, notification.id);
-						setNotifications((prev) =>
-							prev.map((n) =>
-								n.id === notification.id ? { ...n, read: true } : n
-							)
-						);
-					} catch (readError) {
-						console.error("Error marking notification as read:", readError);
-					}
-				}
 			}
+			console.error("Error following back:", error);
 		}
 	};
 

@@ -185,6 +185,9 @@ export const followUser = async (
 			);
 			throw new Error("Failed to create follower relationship");
 		}
+		
+		// Invalidate following cache
+		invalidateFollowingCache(currentUid, targetUid);
 	} catch (error: any) {
 		console.error("[followUser] Error:", error);
 		// Log more details about the error
@@ -278,17 +281,36 @@ export const unfollowUser = async (
 		}
 
 		await batch.commit();
+		
+		// Invalidate following cache
+		invalidateFollowingCache(currentUid, targetUid);
 	} catch (error: any) {
 		console.error("[unfollowUser] Error:", error);
 		throw error;
 	}
 };
 
-// Check if current user follows target
+// Simple in-memory cache for following status
+interface FollowingCacheEntry {
+	isFollowing: boolean;
+	timestamp: number;
+}
+const followingStatusCache = new Map<string, FollowingCacheEntry>();
+const FOLLOWING_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+// Check if current user follows target (with caching)
 export const isFollowing = async (
 	currentUid: string,
 	targetUid: string
 ): Promise<boolean> => {
+	const cacheKey = `${currentUid}_${targetUid}`;
+	const cached = followingStatusCache.get(cacheKey);
+	
+	// Return cached value if still valid
+	if (cached && Date.now() - cached.timestamp < FOLLOWING_CACHE_TTL) {
+		return cached.isFollowing;
+	}
+	
 	try {
 		const followingRef = db
 			.collection("users")
@@ -300,7 +322,15 @@ export const isFollowing = async (
 
 		// Check if document exists - handle both property and method cases
 		const exists = docExists(doc);
-		return !!exists;
+		const result = !!exists;
+		
+		// Cache the result
+		followingStatusCache.set(cacheKey, {
+			isFollowing: result,
+			timestamp: Date.now(),
+		});
+		
+		return result;
 	} catch (error: any) {
 		// Silent error for transient Firestore issues
 		if (error?.code === "firestore/unavailable") {
@@ -310,6 +340,51 @@ export const isFollowing = async (
 		}
 		return false;
 	}
+};
+
+// Invalidate following cache when follow/unfollow happens
+export const invalidateFollowingCache = (
+	currentUid: string,
+	targetUid: string
+): void => {
+	const cacheKey = `${currentUid}_${targetUid}`;
+	followingStatusCache.delete(cacheKey);
+};
+
+// Batch check following status for multiple users (efficient for notifications)
+export const batchCheckFollowing = async (
+	currentUid: string,
+	targetUids: string[]
+): Promise<Record<string, boolean>> => {
+	const results: Record<string, boolean> = {};
+	const uncachedUids: string[] = [];
+	
+	// Check cache first
+	for (const targetUid of targetUids) {
+		const cacheKey = `${currentUid}_${targetUid}`;
+		const cached = followingStatusCache.get(cacheKey);
+		
+		if (cached && Date.now() - cached.timestamp < FOLLOWING_CACHE_TTL) {
+			results[targetUid] = cached.isFollowing;
+		} else {
+			uncachedUids.push(targetUid);
+		}
+	}
+	
+	// Fetch uncached statuses in parallel
+	if (uncachedUids.length > 0) {
+		const promises = uncachedUids.map(async (targetUid) => {
+			const isFollowingUser = await isFollowing(currentUid, targetUid);
+			return { targetUid, isFollowingUser };
+		});
+		
+		const fetchedResults = await Promise.all(promises);
+		fetchedResults.forEach(({ targetUid, isFollowingUser }) => {
+			results[targetUid] = isFollowingUser;
+		});
+	}
+	
+	return results;
 };
 
 // ============================================================================

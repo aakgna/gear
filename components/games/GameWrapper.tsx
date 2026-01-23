@@ -98,8 +98,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const [likeCount, setLikeCount] = useState(0);
 	const [commentCount, setCommentCount] = useState(0);
 	const [loadingFollow, setLoadingFollow] = useState(false);
-	const [loadingLike, setLoadingLike] = useState(false);
+	// Removed loadingLike - optimistic updates, no loading state needed
 	const [showShareMenu, setShowShareMenu] = useState(false);
+	// Pulse animation for like button (TikTok-style)
+	const likePulseAnim = useRef(new Animated.Value(1)).current;
 
 	// Check if this puzzle was completed before
 	const globalCompletedResult = completedGameResults.get(puzzle.id);
@@ -445,25 +447,58 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		}
 	};
 
-	const handleLikePress = async () => {
+	const handleLikePress = () => {
 		const user = getCurrentUser();
 		if (!user) return;
 
-		setLoadingLike(true);
-		try {
-			if (isLiked) {
-				await unlikeGame(puzzle.id, user.uid);
-				setIsLiked(false);
-				setLikeCount((prev) => Math.max(0, prev - 1));
-			} else {
-				await likeGame(puzzle.id, user.uid);
+		// Optimistic update - update UI immediately, process in background
+		const wasLiked = isLiked;
+		const newLikedState = !wasLiked;
+		const currentLikeCount = likeCount;
+		const newLikeCount = wasLiked
+			? Math.max(0, currentLikeCount - 1)
+			: currentLikeCount + 1;
+
+		// TikTok-style haptic feedback and pulse animation (only on like, not unlike)
+		if (!wasLiked) {
+			// Haptic feedback for like - medium impact for satisfying feel
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+			// TikTok-style pulse animation - quick bounce, heart doesn't stay big for more than 0.5s
+			Animated.sequence([
+				Animated.timing(likePulseAnim, {
+					toValue: 1.4,
+					duration: 150, // Quick scale up in 150ms
+					useNativeDriver: true,
+				}),
+				Animated.timing(likePulseAnim, {
+					toValue: 1,
+					duration: 300, // Scale back down in 300ms (total < 500ms)
+					useNativeDriver: true,
+				}),
+			]).start();
+		}
+
+		// Update UI instantly (no loading state)
+		setIsLiked(newLikedState);
+		setLikeCount(newLikeCount);
+
+		// Process in background (fire and forget)
+		// Works even if user switches games - operation continues
+		if (wasLiked) {
+			unlikeGame(puzzle.id, user.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[GameWrapper] Error unliking:", error);
 				setIsLiked(true);
-				setLikeCount((prev) => prev + 1);
-			}
-		} catch (error) {
-			console.error("[GameWrapper] Error liking:", error);
-		} finally {
-			setLoadingLike(false);
+				setLikeCount(currentLikeCount);
+			});
+		} else {
+			likeGame(puzzle.id, user.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[GameWrapper] Error liking:", error);
+				setIsLiked(false);
+				setLikeCount(currentLikeCount);
+			});
 		}
 	};
 
@@ -801,22 +836,23 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 										</View>
 									)}
 
-									{/* Like Button */}
+									{/* Like Button - Optimistic updates with TikTok-style pulse */}
 									<TouchableOpacity
 										style={socialOverlayStyles.actionButton}
 										onPress={handleLikePress}
 										activeOpacity={0.7}
-										disabled={loadingLike}
 									>
-										{loadingLike ? (
-											<ActivityIndicator size="small" color={Colors.accent} />
-										) : (
+										<Animated.View
+											style={{
+												transform: [{ scale: likePulseAnim }],
+											}}
+										>
 											<Ionicons
 												name={isLiked ? "heart" : "heart-outline"}
 												size={28}
 												color={isLiked ? Colors.accent : Colors.text.primary}
 											/>
-										)}
+										</Animated.View>
 										<Text style={socialOverlayStyles.actionCount}>
 											{likeCount}
 										</Text>

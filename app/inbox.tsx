@@ -178,14 +178,29 @@ const InboxScreen = () => {
 		[currentUser]
 	);
 
-	const handleConversationPress = async (conversation: Conversation) => {
+	const handleConversationPress = (conversation: Conversation) => {
 		if (!currentUser) return;
 
-		// Mark as read
-		await markConversationRead(conversation.id, currentUser.uid);
+		// Get other participant's profile for instant display
+		const otherParticipantId = getOtherParticipant(conversation);
+		const otherParticipant = otherParticipantId
+			? participantProfiles[otherParticipantId]
+			: null;
 
-		// Navigate to chat
-		router.push(`/chat/${conversation.id}`);
+		// Mark as read in background (fire and forget - don't block navigation!)
+		markConversationRead(conversation.id, currentUser.uid).catch((err) =>
+			console.error("[InboxScreen] Error marking as read:", err)
+		);
+
+		// Navigate immediately with participant data for instant display
+		router.push({
+			pathname: `/chat/${conversation.id}`,
+			params: {
+				username: otherParticipant?.username || "",
+				profilePicture: otherParticipant?.profilePicture || "",
+				participantId: otherParticipantId || "",
+			},
+		});
 	};
 
 	// Filter conversations based on search query and blocked users
