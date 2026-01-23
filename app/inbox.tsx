@@ -41,6 +41,7 @@ import {
 	isBlockedByUser,
 } from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
+import { getCachedBlockedUsersAll } from "../config/blockedUsersCache";
 
 const BOTTOM_NAV_HEIGHT = 70;
 
@@ -188,6 +189,7 @@ const InboxScreen = () => {
 	};
 
 	// Filter conversations based on search query and blocked users
+	// OPTIMIZED: Uses cached blocked users instead of N+1 queries
 	useEffect(() => {
 		const filterConversations = async () => {
 			if (!currentUser) {
@@ -195,24 +197,20 @@ const InboxScreen = () => {
 				return;
 			}
 
-			// Filter out conversations with blocked users
-			const filteredByBlock: Conversation[] = [];
-			for (const conv of conversations) {
+			// Get blocked users from cache (fast, single call)
+			const { blocked, blockedBy } = await getCachedBlockedUsersAll(
+				currentUser.uid
+			);
+
+			// Filter out conversations with blocked users (local filtering)
+			const filteredByBlock = conversations.filter((conv) => {
 				const otherParticipantId = getOtherParticipant(conv);
-				if (otherParticipantId) {
-					const blocked = await isUserBlocked(
-						currentUser.uid,
-						otherParticipantId
-					);
-					const blockedBy = await isBlockedByUser(
-						currentUser.uid,
-						otherParticipantId
-					);
-					if (!blocked && !blockedBy) {
-						filteredByBlock.push(conv);
-					}
-				}
-			}
+				return (
+					otherParticipantId &&
+					!blocked.has(otherParticipantId) &&
+					!blockedBy.has(otherParticipantId)
+				);
+			});
 
 			if (!searchQuery.trim()) {
 				setFilteredConversations(filteredByBlock);

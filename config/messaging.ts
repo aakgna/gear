@@ -7,41 +7,35 @@ import {
 	isBlockedByUser,
 } from "./social";
 import { GameShare, Message, Conversation } from "./types";
+import { getCachedBlockedUsersAll } from "./blockedUsersCache";
 
 // Get mutual followers (users who follow each other)
+// OPTIMIZED: Uses cached blocked users and single query for followers
 export const getMutualFollowers = async (
 	userId: string
 ): Promise<UserSummary[]> => {
 	try {
-		// Get users that current user follows
+		// 1. Get blocked users from cache (single call, cached for 5 minutes)
+		const { blocked, blockedBy } = await getCachedBlockedUsersAll(userId);
+
+		// 2. Get users current user follows
 		const following = await fetchFollowing(userId, 1000);
-		const followingIds = new Set(following.map((u) => u.uid));
 
-		// For each user being followed, check if they also follow back
-		const mutualFollowers: UserSummary[] = [];
+		// 3. Get users who follow current user (single query)
+		const followersSnapshot = await db
+			.collection("users")
+			.doc(userId)
+			.collection("followers")
+			.get();
+		const followerIds = new Set(followersSnapshot.docs.map((doc) => doc.id));
 
-		// Batch check in groups of 10 (Firestore limit)
-		for (let i = 0; i < following.length; i += 10) {
-			const batch = following.slice(i, i + 10);
-			await Promise.all(
-				batch.map(async (user) => {
-					// Check if blocked
-					const blocked = await isUserBlocked(userId, user.uid);
-					const blockedBy = await isBlockedByUser(userId, user.uid);
-					if (blocked || blockedBy) {
-						return; // Skip blocked users
-					}
-
-					// Check if this user follows the current user back
-					const theirFollowing = await fetchFollowing(user.uid, 1000);
-					const theirFollowingIds = new Set(theirFollowing.map((u) => u.uid));
-
-					if (theirFollowingIds.has(userId)) {
-						mutualFollowers.push(user);
-					}
-				})
-			);
-		}
+		// 4. Filter locally - no more N+1 queries!
+		const mutualFollowers = following.filter(
+			(user) =>
+				followerIds.has(user.uid) &&
+				!blocked.has(user.uid) &&
+				!blockedBy.has(user.uid)
+		);
 
 		return mutualFollowers;
 	} catch (error) {

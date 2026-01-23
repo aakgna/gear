@@ -1,5 +1,6 @@
 // Social features: follow/unfollow, fetch followers/following, creator profiles
 import { db, docExists } from "./firebase";
+import { invalidateBlockedUsersCache } from "./blockedUsersCache";
 
 export interface UserSummary {
 	uid: string;
@@ -301,10 +302,12 @@ export const isFollowing = async (
 		const exists = docExists(doc);
 		return !!exists;
 	} catch (error: any) {
-		console.error("[isFollowing] Error:", error);
-		console.error("[isFollowing] Error code:", error?.code);
-		console.error("[isFollowing] Error message:", error?.message);
-		console.error("[isFollowing] Error stack:", error?.stack);
+		// Silent error for transient Firestore issues
+		if (error?.code === "firestore/unavailable") {
+			console.log("[isFollowing] Firestore temporarily unavailable");
+		} else {
+			console.error("[isFollowing] Error:", error);
+		}
 		return false;
 	}
 };
@@ -443,6 +446,9 @@ export const blockUser = async (
 
 		await batch.commit();
 
+		// Invalidate blocked users cache since we just blocked someone
+		invalidateBlockedUsersCache();
+
 		// Delete conversation if it exists
 		// Use require to avoid circular dependency issues
 		const messagingModule = require("./messaging");
@@ -509,6 +515,9 @@ export const unblockUser = async (
 		batch.delete(unblockedBlockedByRef);
 
 		await batch.commit();
+
+		// Invalidate blocked users cache since we just unblocked someone
+		invalidateBlockedUsersCache();
 	} catch (error: any) {
 		console.error("[unblockUser] Error:", error);
 		throw error;
@@ -1359,6 +1368,9 @@ export const addGameComment = async (
 			},
 			{ merge: true }
 		);
+
+		// Invalidate cache since count changed
+		invalidateSocialDataCache(gameId, userId);
 	} catch (error: any) {
 		console.error("[addGameComment] Error:", error);
 		throw error;
@@ -1510,6 +1522,161 @@ export const unlikeGameComment = async (
 };
 
 // ============================================================================
+// SOCIAL DATA PREFETCH CACHE
+// ============================================================================
+
+// Cache for social data (like counts, comment counts) to reduce latency
+interface SocialDataCache {
+	likeCount: number;
+	commentCount: number;
+	timestamp: number;
+}
+
+const socialDataCache = new Map<string, SocialDataCache>();
+const SOCIAL_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+// Extended cache for follow/like status
+interface ExtendedSocialDataCache extends SocialDataCache {
+	isLiked?: boolean;
+	isFollowing?: boolean;
+	userId?: string;
+	creatorId?: string;
+}
+
+const extendedSocialDataCache = new Map<string, ExtendedSocialDataCache>();
+
+/**
+ * Prefetch social data for a game to reduce perceived latency
+ * Call this when a game starts, so data is ready when user completes it
+ * @param gameId Game ID (full puzzle ID)
+ * @param creatorId Optional creator ID for prefetching follow status
+ * @param userId Current user ID for prefetching like/follow status
+ */
+export async function prefetchGameSocialData(
+	gameId: string,
+	creatorId?: string,
+	userId?: string
+): Promise<void> {
+	try {
+		// Fetch ALL data in parallel (counts + status)
+		const promises: Promise<any>[] = [
+			getGameLikeCount(gameId).catch(() => 0),
+			getGameCommentCount(gameId).catch(() => 0),
+		];
+
+		// Add like status if we have userId
+		if (userId) {
+			promises.push(checkGameLiked(gameId, userId).catch(() => false));
+		}
+
+		// Add follow status if we have both userId and creatorId (and they're different)
+		if (userId && creatorId && userId !== creatorId) {
+			promises.push(isFollowing(userId, creatorId).catch(() => false));
+		}
+
+		const results = await Promise.all(promises);
+		const likeCount = results[0];
+		const commentCount = results[1];
+		const isLikedValue = userId ? results[2] : undefined;
+		const isFollowingValue = userId && creatorId && userId !== creatorId ? results[3] : undefined;
+
+		// Cache counts (for backwards compatibility)
+		socialDataCache.set(gameId, {
+			likeCount,
+			commentCount,
+			timestamp: Date.now(),
+		});
+
+		// Cache extended data (with status)
+		if (userId) {
+			extendedSocialDataCache.set(`${gameId}_${userId}_${creatorId || ""}`, {
+				likeCount,
+				commentCount,
+				timestamp: Date.now(),
+				isLiked: isLikedValue,
+				isFollowing: isFollowingValue,
+				userId,
+				creatorId,
+			});
+		}
+	} catch (error) {
+		// Silent failure - prefetching is optional
+		console.log("[prefetchGameSocialData] Silent error:", error);
+	}
+}
+
+/**
+ * Get cached extended social data (includes like/follow status)
+ * @param gameId Game ID
+ * @param userId Current user ID
+ * @param creatorId Creator ID (optional)
+ * @returns Cached data or null
+ */
+export function getCachedExtendedSocialData(
+	gameId: string,
+	userId: string,
+	creatorId?: string
+): {
+	likeCount: number;
+	commentCount: number;
+	isLiked: boolean;
+	isFollowing: boolean | undefined;
+} | null {
+	const cacheKey = `${gameId}_${userId}_${creatorId || ""}`;
+	const cached = extendedSocialDataCache.get(cacheKey);
+	if (cached && Date.now() - cached.timestamp < SOCIAL_CACHE_TTL) {
+		return {
+			likeCount: cached.likeCount,
+			commentCount: cached.commentCount,
+			isLiked: cached.isLiked ?? false,
+			isFollowing: cached.isFollowing,
+		};
+	}
+	return null;
+}
+
+/**
+ * Get cached social data or return null if not cached
+ * @param gameId Game ID (full puzzle ID)
+ * @returns Cached data or null
+ */
+export function getCachedSocialData(
+	gameId: string
+): { likeCount: number; commentCount: number } | null {
+	const cached = socialDataCache.get(gameId);
+	if (cached && Date.now() - cached.timestamp < SOCIAL_CACHE_TTL) {
+		return { likeCount: cached.likeCount, commentCount: cached.commentCount };
+	}
+	return null;
+}
+
+/**
+ * Invalidate social data cache for a game
+ * Call this when like/comment counts change
+ * @param gameId Game ID (full puzzle ID)
+ * @param userId Optional user ID to invalidate extended cache
+ * @param creatorId Optional creator ID to invalidate extended cache
+ */
+export function invalidateSocialDataCache(
+	gameId: string,
+	userId?: string,
+	creatorId?: string
+): void {
+	socialDataCache.delete(gameId);
+	// Invalidate extended cache if userId provided
+	if (userId) {
+		const cacheKey = `${gameId}_${userId}_${creatorId || ""}`;
+		extendedSocialDataCache.delete(cacheKey);
+		// Also delete any other entries for this gameId (in case creatorId changed)
+		for (const key of extendedSocialDataCache.keys()) {
+			if (key.startsWith(`${gameId}_${userId}_`)) {
+				extendedSocialDataCache.delete(key);
+			}
+		}
+	}
+}
+
+// ============================================================================
 // GAME LIKES FUNCTIONS
 // ============================================================================
 
@@ -1573,6 +1740,20 @@ export const likeGame = async (
 			},
 			{ merge: true }
 		);
+
+		// Invalidate cache since count and like status changed
+		invalidateSocialDataCache(gameId, userId);
+		// Update extended cache to reflect new like status
+		const cacheKey = `${gameId}_${userId}_`;
+		for (const key of extendedSocialDataCache.keys()) {
+			if (key.startsWith(cacheKey)) {
+				const cached = extendedSocialDataCache.get(key);
+				if (cached) {
+					cached.isLiked = true;
+					cached.likeCount = (cached.likeCount || 0) + 1;
+				}
+			}
+		}
 	} catch (error: any) {
 		console.error("[likeGame] Error:", error);
 		throw error;
@@ -1635,6 +1816,20 @@ export const unlikeGame = async (
 			},
 			{ merge: true }
 		);
+
+		// Invalidate cache since count and like status changed
+		invalidateSocialDataCache(gameId, userId);
+		// Update extended cache to reflect new like status
+		const cacheKey = `${gameId}_${userId}_`;
+		for (const key of extendedSocialDataCache.keys()) {
+			if (key.startsWith(cacheKey)) {
+				const cached = extendedSocialDataCache.get(key);
+				if (cached) {
+					cached.isLiked = false;
+					cached.likeCount = Math.max(0, (cached.likeCount || 0) - 1);
+				}
+			}
+		}
 	} catch (error: any) {
 		console.error("[unlikeGame] Error:", error);
 		throw error;
@@ -1663,7 +1858,13 @@ export const checkGameLiked = async (
 		const likeDoc = await likeRef.get();
 		return docExists(likeDoc);
 	} catch (error: any) {
-		console.error("[checkGameLiked] Error:", error);
+		// Silent error for transient Firestore issues
+		// Component will default to "not liked" state
+		if (error?.code === "firestore/unavailable") {
+			console.log("[checkGameLiked] Firestore temporarily unavailable");
+		} else {
+			console.error("[checkGameLiked] Error:", error);
+		}
 		return false;
 	}
 };

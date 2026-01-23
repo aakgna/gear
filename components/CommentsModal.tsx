@@ -33,6 +33,7 @@ import {
 } from "../config/social";
 import { db } from "../config/firebase";
 import { parsePuzzleId } from "../config/firebase";
+import { getCachedBlockedUsers } from "../config/blockedUsersCache";
 
 interface CommentsModalProps {
 	visible: boolean;
@@ -78,9 +79,8 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		setLoading(true);
 		try {
 			const fetchedComments = await fetchGameComments(gameId, 100);
-			// Filter out comments from blocked users
-			const blockedUserIds = await getBlockedUsers(currentUser.uid);
-			const blockedSet = new Set(blockedUserIds);
+			// Filter out comments from blocked users (using cache)
+			const blockedSet = await getCachedBlockedUsers(currentUser.uid);
 			const filteredComments = fetchedComments.filter(
 				(comment) => !blockedSet.has(comment.userId)
 			);
@@ -124,10 +124,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 						likedBy: data.likedBy || [],
 					});
 				});
-				// Filter out comments from blocked users
+				// Filter out comments from blocked users (using cache)
 				if (currentUser) {
-					const blockedUserIds = await getBlockedUsers(currentUser.uid);
-					const blockedSet = new Set(blockedUserIds);
+					const blockedSet = await getCachedBlockedUsers(currentUser.uid);
 					const filteredComments = updatedComments.filter(
 						(comment) => !blockedSet.has(comment.userId)
 					);

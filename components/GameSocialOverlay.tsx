@@ -25,6 +25,8 @@ import {
 	checkGameLiked,
 	likeGame,
 	unlikeGame,
+	getCachedSocialData,
+	getCachedExtendedSocialData,
 } from "../config/social";
 import { Puzzle } from "../config/types";
 import { db, parsePuzzleId, docExists } from "../config/firebase";
@@ -38,6 +40,13 @@ interface GameSocialOverlayProps {
 	onCommentPress: () => void;
 	onSharePress: () => void;
 	onShareCompletion?: () => void;
+	visible?: boolean; // Controls visibility - component mounts early but can be hidden
+	prefetchedData?: {
+		likeCount: number;
+		commentCount: number;
+		isLiked: boolean;
+		isFollowing: boolean | undefined;
+	} | null; // Data prefetched by GameWrapper - eliminates need to fetch
 }
 
 const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
@@ -47,6 +56,8 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	onCommentPress,
 	onSharePress,
 	onShareCompletion,
+	visible = true, // Default to visible for backwards compatibility
+	prefetchedData, // Data passed from GameWrapper - instant display!
 }) => {
 	const router = useRouter();
 	const currentUser = getCurrentUser();
@@ -63,11 +74,59 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	const creatorUsername = puzzle.username;
 	const creatorProfilePicture = puzzle.profilePicture;
 
-	// Simple fetch on mount - get counts directly from game document
+	// Use prefetched data if provided (bridges gap from GameWrapper)
+	// This eliminates all fetching in this component - instant display!
 	useEffect(() => {
+		if (prefetchedData) {
+			// Data already fetched by GameWrapper - use it immediately!
+			setLikeCount(prefetchedData.likeCount);
+			setCommentCount(prefetchedData.commentCount);
+			setIsLiked(prefetchedData.isLiked);
+			if (prefetchedData.isFollowing !== undefined) {
+				setIsFollowingCreator(prefetchedData.isFollowing);
+			}
+			setLoading(false);
+			return; // Instant - no fetching needed!
+		}
+	}, [prefetchedData]); // Update immediately when prefetchedData changes
+
+	// Fallback: Fetch data if not prefetched (backwards compatibility)
+	useEffect(() => {
+		// Skip if we have prefetched data (handled by effect above)
+		if (prefetchedData) {
+			return;
+		}
+
+		// Fallback: Fetch data if not prefetched (backwards compatibility)
 		if (!currentUser) {
 			setLoading(false);
 			return;
+		}
+
+		// Check extended cache first (includes counts + status) - INSTANT if prefetched
+		const cachedExtended = getCachedExtendedSocialData(
+			gameId,
+			currentUser.uid,
+			creatorId
+		);
+		if (cachedExtended) {
+			// All data cached - set everything immediately
+			setLikeCount(cachedExtended.likeCount);
+			setCommentCount(cachedExtended.commentCount);
+			setIsLiked(cachedExtended.isLiked);
+			if (cachedExtended.isFollowing !== undefined) {
+				setIsFollowingCreator(cachedExtended.isFollowing);
+			}
+			setLoading(false);
+			return; // Instant load from cache!
+		}
+
+		// Fallback: Check basic cache (counts only)
+		const cachedBasic = getCachedSocialData(gameId);
+		if (cachedBasic) {
+			setLikeCount(cachedBasic.likeCount);
+			setCommentCount(cachedBasic.commentCount);
+			setLoading(false); // Counts loaded, but still need status
 		}
 
 		// Parse gameId to get Firestore path
@@ -85,69 +144,91 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 			.collection(difficulty)
 			.doc(actualGameId);
 
-		// Simple one-time fetch
-		const loadCounts = async () => {
+		// Fetch ALL data in parallel (not sequential!)
+		const fetchAllData = async () => {
 			try {
-				const doc = await gameRef.get();
-				if (docExists(doc)) {
-					const data = doc.data();
-					const stats = data?.stats || {};
+				// Build parallel promises
+				const promises: Promise<any>[] = [];
 
-					// Get counts from stats field
-					let likeCount = 0;
-					let commentCount = 0;
-					if (typeof stats.likeCount === "number") {
-						likeCount = stats.likeCount;
-					} else {
-						// Fallback: count likes collection
-						const likesSnapshot = await gameRef.collection("likes").get();
-						likeCount = likesSnapshot.size;
-					}
-					if (typeof stats.commentCount === "number") {
-						commentCount = stats.commentCount;
-					} else {
-						// Fallback: count comments collection
-						const commentsSnapshot = await gameRef.collection("comments").get();
-						commentCount = commentsSnapshot.size;
-					}
+				// Only fetch counts if not cached
+				if (!cachedBasic) {
+					promises.push(
+						(async () => {
+							const doc = await gameRef.get();
+							if (docExists(doc)) {
+								const data = doc.data();
+								const stats = data?.stats || {};
+								let likeCount = 0;
+								let commentCount = 0;
+								if (typeof stats.likeCount === "number") {
+									likeCount = stats.likeCount;
+								} else {
+									const likesSnapshot = await gameRef.collection("likes").get();
+									likeCount = likesSnapshot.size;
+								}
+								if (typeof stats.commentCount === "number") {
+									commentCount = stats.commentCount;
+								} else {
+									const commentsSnapshot = await gameRef
+										.collection("comments")
+										.get();
+									commentCount = commentsSnapshot.size;
+								}
+								return { likeCount, commentCount };
+							}
+							return { likeCount: 0, commentCount: 0 };
+						})()
+					);
+				}
 
-					try {
-						setLikeCount(likeCount);
-						setCommentCount(commentCount);
-					} catch (stateError) {
-						console.error("Error setting state:", stateError);
-					}
-				} else {
-					setLikeCount(0);
-					setCommentCount(0);
+				// Always fetch like status (if not in extended cache)
+				if (!cachedExtended) {
+					promises.push(
+						checkGameLiked(gameId, currentUser.uid).catch(() => false)
+					);
+				}
+
+				// Fetch follow status if needed (if not in extended cache)
+				if (!cachedExtended && creatorId && currentUser.uid !== creatorId) {
+					promises.push(
+						isFollowing(currentUser.uid, creatorId).catch(() => false)
+					);
+				}
+
+				// Execute all fetches in parallel
+				const results = await Promise.all(promises);
+				let resultIndex = 0;
+
+				// Process counts if fetched
+				if (!cachedBasic && results.length > 0) {
+					const counts = results[resultIndex++];
+					setLikeCount(counts.likeCount);
+					setCommentCount(counts.commentCount);
+				}
+
+				// Process like status if fetched
+				if (!cachedExtended && resultIndex < results.length) {
+					setIsLiked(results[resultIndex++]);
+				}
+
+				// Process follow status if fetched
+				if (
+					!cachedExtended &&
+					creatorId &&
+					currentUser.uid !== creatorId &&
+					resultIndex < results.length
+				) {
+					setIsFollowingCreator(results[resultIndex++]);
 				}
 			} catch (error) {
-				console.error("[GameSocialOverlay] Error loading counts:", error);
-				setLikeCount(0);
-				setCommentCount(0);
+				console.error("[GameSocialOverlay] Error loading data:", error);
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		// Load follow status and like status
-		const loadUserData = async () => {
-			try {
-				// Load follow status only if we have creatorId and it's not the current user
-				if (creatorId && currentUser.uid !== creatorId) {
-					const following = await isFollowing(currentUser.uid, creatorId);
-					setIsFollowingCreator(following);
-				}
-				// Always load like status (doesn't require creatorId)
-				const liked = await checkGameLiked(gameId, currentUser.uid);
-				setIsLiked(liked);
-			} catch (error) {
-				console.error("[GameSocialOverlay] Error loading user data:", error);
-			}
-		};
-		loadCounts();
-		loadUserData();
-	}, [gameId, creatorId, currentUser]);
+		fetchAllData();
+	}, [gameId, creatorId, currentUser, prefetchedData]); // Include prefetchedData - use it if available
 
 	const handleFollowPress = async () => {
 		if (!currentUser || !creatorId || currentUser.uid === creatorId) return;
@@ -200,6 +281,11 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	};
 
 	if (!currentUser) {
+		return null;
+	}
+
+	// Hide component if not visible (but keep it mounted for prefetching)
+	if (!visible) {
 		return null;
 	}
 

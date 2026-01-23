@@ -22,6 +22,7 @@ import {
 import { getCurrentUser } from "../config/auth";
 import { getMutualFollowers, shareGameToDM } from "../config/messaging";
 import { UserSummary } from "../config/social";
+// Note: getMutualFollowers now uses cached blocked users internally
 
 interface ShareToDMModalProps {
 	visible: boolean;

@@ -10,6 +10,7 @@ import {
 	Animated,
 	Dimensions,
 	Share,
+	ActivityIndicator,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,7 +34,6 @@ import HidatoGame from "./HidatoGame";
 import SudokuGame from "./SudokuGame";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
-import GameSocialOverlay from "../GameSocialOverlay";
 import CommentsModal from "../CommentsModal";
 import ShareToDMModal from "../ShareToDMModal";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
@@ -45,6 +45,16 @@ import {
 	Typography,
 	BorderRadius,
 } from "../../constants/DesignSystem";
+import {
+	prefetchGameSocialData,
+	getCachedExtendedSocialData,
+	followUser,
+	unfollowUser,
+	likeGame,
+	unlikeGame,
+} from "../../config/social";
+import { useRouter } from "expo-router";
+import { Image, Modal } from "react-native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -76,11 +86,20 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onElapsedTimeUpdate,
 	forceShowIntro = false,
 }) => {
+	const router = useRouter();
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
 	const [showCommentsModal, setShowCommentsModal] = useState(false);
 	const [showShareModal, setShowShareModal] = useState(false);
+	// Social overlay state - merged directly into GameWrapper for instant display
+	const [isFollowingCreator, setIsFollowingCreator] = useState(false);
+	const [isLiked, setIsLiked] = useState(false);
+	const [likeCount, setLikeCount] = useState(0);
+	const [commentCount, setCommentCount] = useState(0);
+	const [loadingFollow, setLoadingFollow] = useState(false);
+	const [loadingLike, setLoadingLike] = useState(false);
+	const [showShareMenu, setShowShareMenu] = useState(false);
 
 	// Check if this puzzle was completed before
 	const globalCompletedResult = completedGameResults.get(puzzle.id);
@@ -228,7 +247,64 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		}
 	}, [startTime, gameStarted, actualStartTime, isActive]);
 
+	// Load social data directly in GameWrapper when game starts
+	// This eliminates component boundary - data is ready instantly when game completes
+	React.useEffect(() => {
+		if (gameStarted && puzzle.id) {
+			const user = getCurrentUser();
+			if (!user) return;
+
+			const creatorId = puzzle.uid;
+
+			// Check cache first (instant if already prefetched)
+			const cached = getCachedExtendedSocialData(
+				puzzle.id,
+				user.uid,
+				creatorId
+			);
+			if (cached) {
+				// Cache hit - set state immediately (INSTANT!)
+				setLikeCount(cached.likeCount);
+				setCommentCount(cached.commentCount);
+				setIsLiked(cached.isLiked);
+				if (cached.isFollowing !== undefined) {
+					setIsFollowingCreator(cached.isFollowing);
+				}
+			} else {
+				// Not cached - prefetch and update state when ready
+				prefetchGameSocialData(puzzle.id, creatorId, user.uid)
+					.then(() => {
+						// After prefetch completes, get from cache and set state
+						const freshCached = getCachedExtendedSocialData(
+							puzzle.id,
+							user.uid,
+							creatorId
+						);
+						if (freshCached) {
+							setLikeCount(freshCached.likeCount);
+							setCommentCount(freshCached.commentCount);
+							setIsLiked(freshCached.isLiked);
+							if (freshCached.isFollowing !== undefined) {
+								setIsFollowingCreator(freshCached.isFollowing);
+							}
+						}
+					})
+					.catch((err) => {
+						// Silent error - prefetching is optional
+						console.log("[GameWrapper] Prefetch silent error:", err);
+					});
+			}
+		} else {
+			// Reset when game changes
+			setLikeCount(0);
+			setCommentCount(0);
+			setIsLiked(false);
+			setIsFollowingCreator(false);
+		}
+	}, [gameStarted, puzzle.id, puzzle.uid]);
+
 	// Enhanced onComplete that also tracks completion and prepares stats
+	// OPTIMIZED: Social overlay appears instantly, async operations happen in parallel
 	const handleComplete = async (result: GameResult) => {
 		// Prevent duplicate processing
 		if (completionProcessedRef.current) {
@@ -238,15 +314,16 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 		const user = getCurrentUser();
 
-		// Trigger appropriate animation based on result
+		// Trigger appropriate animation/haptics based on result
+		// These are non-blocking and run in parallel
 		if (result.completed && !result.answerRevealed) {
 			// User won without revealing answer - celebrate!
-			// Trigger haptic feedback for success
+			// Trigger haptic feedback for success (non-blocking)
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 		} else if (result.answerRevealed) {
 			// User gave up or lost - subtle failure feedback
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-			triggerFailureAnimation();
+			triggerFailureAnimation(); // Animation runs in parallel, doesn't block
 		}
 
 		if (user && result.completed) {
@@ -259,37 +336,42 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				puzzleId: puzzle.id,
 			};
 
-			// Save to user's completed games
-			await addCompletedGame(
-				user.uid,
-				puzzle.id,
-				result.timeTaken,
-				result.answerRevealed
-			);
-
-			// Save puzzle completion to Firestore for stats
-			// (skipped if answerRevealed is true)
-			// For trivia, higher score is better; for others, fewer attempts is better
-			await savePuzzleCompletion(
-				puzzle.id,
-				user.uid,
-				result.timeTaken,
-				result.attempts,
-				result.mistakes,
-				result.answerRevealed,
-				puzzle.type === "trivia" // higherIsBetter for trivia
-			);
-
-			// Store result for stats display (but don't show yet)
+			// INSTANT: Set state immediately so social overlay appears right away
+			// Don't wait for async operations!
 			setCompletedResult(updatedResult);
-			// Mark as completed in this session (for social overlay)
-			setCompletedInSession(true);
+			setCompletedInSession(true); // This triggers social overlay to appear INSTANTLY
 
 			// Store globally so it persists across tab switches
 			completedGameResults.set(puzzle.id, updatedResult);
 
 			// Remove from dismissed intros since it's now completed
 			dismissedIntros.delete(puzzle.id);
+
+			// Run async operations in background (fire and forget)
+			// These don't block the UI - social overlay is already showing!
+			Promise.all([
+				addCompletedGame(
+					user.uid,
+					puzzle.id,
+					result.timeTaken,
+					result.answerRevealed
+				).catch((err) =>
+					console.error("[GameWrapper] Error adding completed game:", err)
+				),
+				savePuzzleCompletion(
+					puzzle.id,
+					user.uid,
+					result.timeTaken,
+					result.attempts,
+					result.mistakes,
+					result.answerRevealed,
+					puzzle.type === "trivia" // higherIsBetter for trivia
+				).catch((err) =>
+					console.error("[GameWrapper] Error saving puzzle completion:", err)
+				),
+			]).catch((err) =>
+				console.error("[GameWrapper] Error in background operations:", err)
+			);
 		}
 
 		// Still call the original onComplete callback
@@ -331,6 +413,58 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		};
 
 		return specialCases[type] || formatted;
+	};
+
+	// Social overlay handlers - merged directly into GameWrapper
+	const handleFollowPress = async () => {
+		const user = getCurrentUser();
+		const creatorId = puzzle.uid;
+		if (!user || !creatorId || user.uid === creatorId) return;
+
+		setLoadingFollow(true);
+		try {
+			if (isFollowingCreator) {
+				await unfollowUser(user.uid, creatorId);
+				setIsFollowingCreator(false);
+			} else {
+				await followUser(user.uid, creatorId);
+				setIsFollowingCreator(true);
+			}
+		} catch (error) {
+			console.error("[GameWrapper] Error following/unfollowing:", error);
+		} finally {
+			setLoadingFollow(false);
+		}
+	};
+
+	const handleCreatorPress = () => {
+		if (puzzle.username) {
+			router.push(`/user/${puzzle.username}`);
+		} else if (puzzle.uid) {
+			router.push(`/user/${puzzle.uid}`);
+		}
+	};
+
+	const handleLikePress = async () => {
+		const user = getCurrentUser();
+		if (!user) return;
+
+		setLoadingLike(true);
+		try {
+			if (isLiked) {
+				await unlikeGame(puzzle.id, user.uid);
+				setIsLiked(false);
+				setLikeCount((prev) => Math.max(0, prev - 1));
+			} else {
+				await likeGame(puzzle.id, user.uid);
+				setIsLiked(true);
+				setLikeCount((prev) => prev + 1);
+			}
+		} catch (error) {
+			console.error("[GameWrapper] Error liking:", error);
+		} finally {
+			setLoadingLike(false);
+		}
 	};
 
 	// Handle share
@@ -610,18 +744,176 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						]}
 					>
 						{renderGame()}
-						{/* Social Overlay - only show when game is completed in this session */}
-						{completedInSession && completedResult && (
-							<GameSocialOverlay
-								key={`social-${puzzle.id}`}
-								puzzle={puzzle}
-								gameId={puzzle.id}
-								completedResult={completedResult}
-								onCommentPress={() => setShowCommentsModal(true)}
-								onSharePress={() => setShowShareModal(true)}
-								onShareCompletion={handleShare}
-							/>
-						)}
+						{/* Social Overlay - rendered directly in GameWrapper for instant display */}
+						{gameStarted &&
+							completedInSession &&
+							completedResult &&
+							getCurrentUser() && (
+								<View style={socialOverlayStyles.container}>
+									{/* Creator Profile Button */}
+									{puzzle.uid && (
+										<View style={socialOverlayStyles.creatorButton}>
+											<View style={socialOverlayStyles.avatarContainer}>
+												<TouchableOpacity
+													onPress={handleCreatorPress}
+													activeOpacity={0.7}
+													style={socialOverlayStyles.avatarTouchable}
+												>
+													{puzzle.profilePicture ? (
+														<Image
+															source={{ uri: puzzle.profilePicture }}
+															style={socialOverlayStyles.avatar}
+														/>
+													) : (
+														<View style={socialOverlayStyles.avatarPlaceholder}>
+															<Ionicons
+																name="person"
+																size={28}
+																color={Colors.text.secondary}
+															/>
+														</View>
+													)}
+												</TouchableOpacity>
+												{getCurrentUser()?.uid !== puzzle.uid && (
+													<TouchableOpacity
+														style={socialOverlayStyles.followBadge}
+														onPress={handleFollowPress}
+														activeOpacity={0.7}
+														disabled={loadingFollow}
+													>
+														{loadingFollow ? (
+															<ActivityIndicator
+																size="small"
+																color={Colors.text.white}
+															/>
+														) : (
+															<Ionicons
+																name={
+																	isFollowingCreator ? "checkmark" : "add"
+																}
+																size={14}
+																color={Colors.text.white}
+															/>
+														)}
+													</TouchableOpacity>
+												)}
+											</View>
+										</View>
+									)}
+
+									{/* Like Button */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={handleLikePress}
+										activeOpacity={0.7}
+										disabled={loadingLike}
+									>
+										{loadingLike ? (
+											<ActivityIndicator size="small" color={Colors.accent} />
+										) : (
+											<Ionicons
+												name={isLiked ? "heart" : "heart-outline"}
+												size={28}
+												color={isLiked ? Colors.accent : Colors.text.primary}
+											/>
+										)}
+										<Text style={socialOverlayStyles.actionCount}>
+											{likeCount}
+										</Text>
+									</TouchableOpacity>
+
+									{/* Comment Button */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={() => setShowCommentsModal(true)}
+										activeOpacity={0.7}
+									>
+										<Ionicons
+											name="chatbubble-outline"
+											size={28}
+											color={Colors.text.primary}
+										/>
+										<Text style={socialOverlayStyles.actionCount}>
+											{commentCount}
+										</Text>
+									</TouchableOpacity>
+
+									{/* Share Button */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={() => setShowShareMenu(true)}
+										activeOpacity={0.7}
+									>
+										<Ionicons
+											name="share-social-outline"
+											size={28}
+											color={Colors.text.primary}
+										/>
+									</TouchableOpacity>
+
+									{/* Share Menu Modal */}
+									<Modal
+										visible={showShareMenu}
+										transparent={true}
+										animationType="fade"
+										onRequestClose={() => setShowShareMenu(false)}
+									>
+										<TouchableOpacity
+											style={socialOverlayStyles.shareMenuOverlay}
+											activeOpacity={1}
+											onPress={() => setShowShareMenu(false)}
+										>
+											<View style={socialOverlayStyles.shareMenuContainer}>
+												<TouchableOpacity
+													style={socialOverlayStyles.shareMenuItem}
+													onPress={() => {
+														setShowShareMenu(false);
+														setShowShareModal(true);
+													}}
+													activeOpacity={0.7}
+												>
+													<Ionicons
+														name="chatbubbles-outline"
+														size={24}
+														color={Colors.text.primary}
+													/>
+													<Text style={socialOverlayStyles.shareMenuText}>
+														Share to DM
+													</Text>
+												</TouchableOpacity>
+												{completedResult && (
+													<TouchableOpacity
+														style={socialOverlayStyles.shareMenuItem}
+														onPress={async () => {
+															setShowShareMenu(false);
+															setTimeout(async () => {
+																try {
+																	await handleShare();
+																} catch (error) {
+																	console.error(
+																		"[GameWrapper] Error calling handleShare:",
+																		error
+																	);
+																}
+															}, 300);
+														}}
+														activeOpacity={0.7}
+													>
+														<Ionicons
+															name="share-outline"
+															size={24}
+															color={Colors.text.primary}
+														/>
+														<Text style={socialOverlayStyles.shareMenuText}>
+															Share Result
+														</Text>
+													</TouchableOpacity>
+												)}
+											</View>
+										</TouchableOpacity>
+									</Modal>
+								</View>
+							)}
 					</View>
 				)
 			)}
@@ -671,6 +963,97 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		</Animated.View>
 	);
 };
+
+// Social overlay styles - merged directly into GameWrapper for instant rendering
+const socialOverlayStyles = StyleSheet.create({
+	container: {
+		position: "absolute",
+		right: Spacing.md,
+		bottom: 120,
+		alignItems: "center",
+		gap: Spacing.lg,
+		zIndex: 10,
+	},
+	creatorButton: {
+		alignItems: "center",
+		marginBottom: Spacing.md,
+	},
+	avatarContainer: {
+		position: "relative",
+		width: 56,
+		height: 56,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	avatarTouchable: {
+		width: 52,
+		height: 52,
+	},
+	avatar: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		borderWidth: 2,
+		borderColor: Colors.background.primary,
+	},
+	avatarPlaceholder: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: Colors.background.tertiary,
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 2,
+		borderColor: Colors.background.primary,
+	},
+	followBadge: {
+		position: "absolute",
+		bottom: -2,
+		right: -2,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: Colors.accent,
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 2.5,
+		borderColor: Colors.background.primary,
+	},
+	actionButton: {
+		alignItems: "center",
+		gap: Spacing.xs,
+	},
+	actionCount: {
+		fontSize: Typography.fontSize.small,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	shareMenuOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	shareMenuContainer: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.sm,
+		minWidth: 200,
+		...Shadows.heavy,
+	},
+	shareMenuItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.md,
+		borderRadius: BorderRadius.md,
+	},
+	shareMenuText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+});
 
 const styles = StyleSheet.create({
 	container: {
