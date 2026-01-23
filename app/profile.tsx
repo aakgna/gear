@@ -18,6 +18,8 @@ import {
 	TouchableWithoutFeedback,
 	RefreshControl,
 	Animated,
+	Modal,
+	FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
@@ -48,6 +50,10 @@ import {
 	fetchCreatedGames,
 	GameSummary,
 	getUnreadNotificationCount,
+	getBlockedUsers,
+	unblockUser,
+	fetchUserProfile,
+	UserPublicProfile,
 } from "../config/social";
 import { fetchConversations } from "../config/messaging";
 import { PuzzleType } from "../config/types";
@@ -108,6 +114,10 @@ const ProfileScreen = () => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 	const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+	const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false);
+	const [blockedUsers, setBlockedUsers] = useState<UserPublicProfile[]>([]);
+	const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
+	const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
@@ -643,6 +653,55 @@ const handleRefresh = async () => {
 		[activeTab, handleGamePress]
 	);
 
+	const handleBlockedUsers = async () => {
+		if (!currentUser) return;
+
+		setShowBlockedUsersModal(true);
+		setLoadingBlockedUsers(true);
+		try {
+			const blockedUserIds = await getBlockedUsers(currentUser.uid);
+			const profiles = await Promise.all(
+				blockedUserIds.map((uid) => fetchUserProfile(uid))
+			);
+			setBlockedUsers(profiles.filter((p): p is UserPublicProfile => p !== null));
+		} catch (error) {
+			console.error("[ProfileScreen] Error loading blocked users:", error);
+			Alert.alert("Error", "Failed to load blocked users");
+		} finally {
+			setLoadingBlockedUsers(false);
+		}
+	};
+
+	const handleUnblockUser = async (userId: string, username: string) => {
+		if (!currentUser || unblockingUserId) return;
+
+		Alert.alert(
+			"Unblock User",
+			`Are you sure you want to unblock ${username}?`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Unblock",
+					style: "default",
+					onPress: async () => {
+						setUnblockingUserId(userId);
+						try {
+							await unblockUser(currentUser.uid, userId);
+							// Remove from list
+							setBlockedUsers((prev) => prev.filter((u) => u.uid !== userId));
+							Alert.alert("Success", `${username} has been unblocked`);
+						} catch (error) {
+							console.error("[ProfileScreen] Error unblocking user:", error);
+							Alert.alert("Error", "Failed to unblock user. Please try again.");
+						} finally {
+							setUnblockingUserId(null);
+						}
+					},
+				},
+			]
+		);
+	};
+
 	const handleDeleteAccount = () => {
 		Alert.alert(
 			"Delete Account",
@@ -815,6 +874,16 @@ const handleRefresh = async () => {
 						<View style={styles.menuOverlay} />
 					</TouchableWithoutFeedback>
 					<View style={styles.menuDropdown}>
+						<TouchableOpacity
+							style={styles.menuItem}
+							onPress={() => {
+								setShowMenu(false);
+								handleBlockedUsers();
+							}}
+						>
+							<Ionicons name="ban-outline" size={20} color={Colors.text.primary} />
+							<Text style={styles.menuItemText}>Blocked Users</Text>
+						</TouchableOpacity>
 						<TouchableOpacity
 							style={styles.menuItem}
 							onPress={() => {
@@ -1061,6 +1130,88 @@ const handleRefresh = async () => {
 						)}
 				</ScrollView>
 			</Animated.View>
+
+			{/* Blocked Users Modal */}
+			<Modal
+				visible={showBlockedUsersModal}
+				transparent={true}
+				animationType="slide"
+				onRequestClose={() => setShowBlockedUsersModal(false)}
+			>
+				<View style={styles.modalContainer}>
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Blocked Users</Text>
+							<TouchableOpacity
+								style={styles.modalCloseButton}
+								onPress={() => setShowBlockedUsersModal(false)}
+							>
+								<Ionicons name="close" size={24} color={Colors.text.primary} />
+							</TouchableOpacity>
+						</View>
+
+						{loadingBlockedUsers ? (
+							<View style={styles.modalLoadingContainer}>
+								<ActivityIndicator size="large" color={Colors.accent} />
+							</View>
+						) : blockedUsers.length === 0 ? (
+							<View style={styles.modalEmptyContainer}>
+								<Ionicons
+									name="ban-outline"
+									size={64}
+									color={Colors.text.secondary}
+								/>
+								<Text style={styles.modalEmptyText}>No blocked users</Text>
+							</View>
+						) : (
+							<FlatList
+								data={blockedUsers}
+								keyExtractor={(item) => item.uid}
+								renderItem={({ item }) => (
+									<View style={styles.blockedUserItem}>
+										<View style={styles.blockedUserInfo}>
+											{item.profilePicture ? (
+												<Image
+													source={{ uri: item.profilePicture }}
+													style={styles.blockedUserAvatar}
+												/>
+											) : (
+												<Ionicons
+													name="person-circle"
+													size={40}
+													color={Colors.accent}
+												/>
+											)}
+											<Text style={styles.blockedUserName}>
+												{item.username || "Unknown"}
+											</Text>
+										</View>
+										<TouchableOpacity
+											style={styles.unblockButton}
+											onPress={() =>
+												handleUnblockUser(item.uid, item.username || "user")
+											}
+											disabled={unblockingUserId === item.uid}
+										>
+											{unblockingUserId === item.uid ? (
+												<ActivityIndicator
+													size="small"
+													color={Colors.accent}
+												/>
+											) : (
+												<Text style={styles.unblockButtonText}>
+													Unblock
+												</Text>
+											)}
+										</TouchableOpacity>
+									</View>
+								)}
+								contentContainerStyle={styles.modalListContent}
+							/>
+						)}
+					</View>
+				</View>
+			</Modal>
 		</View>
 	);
 };
@@ -1159,6 +1310,89 @@ const styles = StyleSheet.create({
 	menuItemText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.medium,
+	},
+	modalContainer: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "flex-end",
+	},
+	modalContent: {
+		backgroundColor: Colors.background.primary,
+		borderTopLeftRadius: BorderRadius.lg,
+		borderTopRightRadius: BorderRadius.lg,
+		maxHeight: "80%",
+		paddingBottom: Spacing.lg,
+	},
+	modalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: Spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: Colors.border,
+	},
+	modalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	modalCloseButton: {
+		padding: Spacing.xs,
+	},
+	modalLoadingContainer: {
+		padding: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		minHeight: 200,
+	},
+	modalEmptyContainer: {
+		padding: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		minHeight: 200,
+	},
+	modalEmptyText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginTop: Spacing.md,
+	},
+	modalListContent: {
+		padding: Spacing.md,
+	},
+	blockedUserItem: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: Spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: Colors.border,
+	},
+	blockedUserInfo: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+		gap: Spacing.sm,
+	},
+	blockedUserAvatar: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+	},
+	blockedUserName: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	unblockButton: {
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.sm,
+		backgroundColor: Colors.accent + "20",
+	},
+	unblockButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.accent,
 	},
 	content: {
 		flex: 1,

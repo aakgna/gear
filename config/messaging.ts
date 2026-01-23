@@ -1,6 +1,11 @@
 // Direct messaging system for mutual followers
 import { db } from "./firebase";
-import { UserSummary, fetchFollowing } from "./social";
+import {
+	UserSummary,
+	fetchFollowing,
+	isUserBlocked,
+	isBlockedByUser,
+} from "./social";
 import { GameShare, Message, Conversation } from "./types";
 
 // Get mutual followers (users who follow each other)
@@ -20,6 +25,13 @@ export const getMutualFollowers = async (
 			const batch = following.slice(i, i + 10);
 			await Promise.all(
 				batch.map(async (user) => {
+					// Check if blocked
+					const blocked = await isUserBlocked(userId, user.uid);
+					const blockedBy = await isBlockedByUser(userId, user.uid);
+					if (blocked || blockedBy) {
+						return; // Skip blocked users
+					}
+
 					// Check if this user follows the current user back
 					const theirFollowing = await fetchFollowing(user.uid, 1000);
 					const theirFollowingIds = new Set(theirFollowing.map((u) => u.uid));
@@ -414,6 +426,79 @@ export const markConversationRead = async (
 		}
 	} catch (error) {
 		console.error("[markConversationRead] Error:", error);
+		throw error;
+	}
+};
+
+// Delete a conversation between two users
+export const deleteConversation = async (
+	conversationId: string,
+	userId1: string,
+	userId2: string
+): Promise<void> => {
+	try {
+		// Get conversation data to find participants
+		const conversationRef = db.collection("conversations").doc(conversationId);
+		const conversationDoc = await conversationRef.get();
+		const conversationData = conversationDoc.data();
+
+		if (!conversationData) {
+			// Conversation doesn't exist, nothing to delete
+			return;
+		}
+
+		const participants = conversationData.participants || [userId1, userId2];
+
+		// Delete all messages in the conversation
+		const messagesRef = db
+			.collection("conversations")
+			.doc(conversationId)
+			.collection("messages");
+
+		// Get all messages and delete in batches
+		let lastDoc: any = null;
+		const BATCH_SIZE = 500; // Firestore batch limit is 500
+
+		while (true) {
+			let query = messagesRef.orderBy("createdAt", "desc").limit(BATCH_SIZE);
+			if (lastDoc) {
+				query = query.startAfter(lastDoc);
+			}
+
+			const snapshot = await query.get();
+			if (snapshot.empty) {
+				break;
+			}
+
+			const batch = db.batch();
+			snapshot.forEach((doc) => {
+				batch.delete(doc.ref);
+			});
+			await batch.commit();
+
+			if (snapshot.size < BATCH_SIZE) {
+				break;
+			}
+			lastDoc = snapshot.docs[snapshot.docs.length - 1];
+		}
+
+		// Delete from main conversations collection
+		await conversationRef.delete();
+
+		// Delete from both users' conversations subcollections
+		await Promise.all(
+			participants.map(async (participantId: string) => {
+				const userConversationRef = db
+					.collection("users")
+					.doc(participantId)
+					.collection("conversations")
+					.doc(conversationId);
+
+				await userConversationRef.delete();
+			})
+		);
+	} catch (error) {
+		console.error("[deleteConversation] Error:", error);
 		throw error;
 	}
 };

@@ -75,6 +75,7 @@ const InboxScreen = () => {
 	const [mutualFollowers, setMutualFollowers] = useState<UserSummary[]>([]);
 	const [loadingMutualFollowers, setLoadingMutualFollowers] = useState(false);
 	const [creatingChat, setCreatingChat] = useState<string | null>(null);
+	const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
 
 	useEffect(() => {
 		if (currentUser) {
@@ -153,22 +154,46 @@ const InboxScreen = () => {
 		router.push(`/chat/${conversation.id}`);
 	};
 
-	// Filter conversations based on search query
-	const filteredConversations = useMemo(() => {
-		if (!searchQuery.trim()) {
-			return conversations;
-		}
+	// Filter conversations based on search query and blocked users
+	useEffect(() => {
+		const filterConversations = async () => {
+			if (!currentUser) {
+				setFilteredConversations(conversations);
+				return;
+			}
 
-		const query = searchQuery.toLowerCase().trim();
-		return conversations.filter((conv) => {
-			const otherParticipantId = getOtherParticipant(conv);
-			const otherParticipant = otherParticipantId
-				? participantProfiles[otherParticipantId]
-				: null;
-			const username = otherParticipant?.username || "";
-			return username.toLowerCase().includes(query);
-		});
-	}, [conversations, searchQuery, participantProfiles, getOtherParticipant]);
+			// Filter out conversations with blocked users
+			const filteredByBlock: Conversation[] = [];
+			for (const conv of conversations) {
+				const otherParticipantId = getOtherParticipant(conv);
+				if (otherParticipantId) {
+					const blocked = await isUserBlocked(currentUser.uid, otherParticipantId);
+					const blockedBy = await isBlockedByUser(currentUser.uid, otherParticipantId);
+					if (!blocked && !blockedBy) {
+						filteredByBlock.push(conv);
+					}
+				}
+			}
+
+			if (!searchQuery.trim()) {
+				setFilteredConversations(filteredByBlock);
+				return;
+			}
+
+			const query = searchQuery.toLowerCase().trim();
+			const filtered = filteredByBlock.filter((conv) => {
+				const otherParticipantId = getOtherParticipant(conv);
+				const otherParticipant = otherParticipantId
+					? participantProfiles[otherParticipantId]
+					: null;
+				const username = otherParticipant?.username || "";
+				return username.toLowerCase().includes(query);
+			});
+			setFilteredConversations(filtered);
+		};
+
+		filterConversations();
+	}, [conversations, searchQuery, participantProfiles, getOtherParticipant, currentUser]);
 
 	const handleNewChatPress = async () => {
 		if (!currentUser) return;

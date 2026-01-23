@@ -87,7 +87,7 @@ import {
 	addAttemptedGame,
 	moveFromSkippedToAttempted,
 } from "../config/auth";
-import { fetchFollowingFeed } from "../config/social";
+import { fetchFollowingFeed, getBlockedUsers } from "../config/social";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -959,34 +959,51 @@ const FeedScreen = () => {
 							}
 						}
 
-						// Set games immediately (instant load!)
-						setDisplayedPuzzles(puzzles);
-						setAllRecommendedPuzzles(puzzles);
-						setPuzzles(puzzles);
+						// Filter out games from blocked users
+						getBlockedUsers(user.uid)
+							.then((blockedUserIds) => {
+								const blockedSet = new Set(blockedUserIds);
+								const filteredByBlock = puzzles.filter((puzzle) => {
+									if (!puzzle.uid) return true; // Keep games without uid
+									return !blockedSet.has(puzzle.uid);
+								});
 
-						// Initialize elapsed times
-						const initialElapsedTimes: Record<string, number> = {};
-						puzzles.forEach((puzzle) => {
-							initialElapsedTimes[puzzle.id] = 0;
-						});
-						puzzleElapsedTimesRef.current = initialElapsedTimes;
+								// Set games immediately (instant load!)
+								setDisplayedPuzzles(filteredByBlock);
+								setAllRecommendedPuzzles(filteredByBlock);
+								setPuzzles(filteredByBlock);
 
-						// Filter out completed games in background (non-blocking)
-						getAllCompletedGameIds(user.uid)
-							.then((completedIds) => {
-								const filteredPuzzles = puzzles.filter(
-									(puzzle) => !completedIds.has(puzzle.id)
-								);
+								// Initialize elapsed times
+								const initialElapsedTimes: Record<string, number> = {};
+								filteredByBlock.forEach((puzzle) => {
+									initialElapsedTimes[puzzle.id] = 0;
+								});
+								puzzleElapsedTimesRef.current = initialElapsedTimes;
 
-								// Update if any were filtered out
-								if (filteredPuzzles.length !== puzzles.length) {
-									setDisplayedPuzzles(filteredPuzzles);
-									setAllRecommendedPuzzles(filteredPuzzles);
-									setPuzzles(filteredPuzzles);
-								}
+								// Filter out completed games in background (non-blocking)
+								getAllCompletedGameIds(user.uid)
+									.then((completedIds) => {
+										const filteredPuzzles = filteredByBlock.filter(
+											(puzzle) => !completedIds.has(puzzle.id)
+										);
+
+										// Update if any were filtered out
+										if (filteredPuzzles.length !== filteredByBlock.length) {
+											setDisplayedPuzzles(filteredPuzzles);
+											setAllRecommendedPuzzles(filteredPuzzles);
+											setPuzzles(filteredPuzzles);
+										}
+									})
+									.catch((error) => {
+										console.error("Error filtering completed games:", error);
+									});
 							})
 							.catch((error) => {
-								console.error("Error filtering completed games:", error);
+								console.error("Error fetching blocked users:", error);
+								// Fallback: use puzzles without filtering
+								setDisplayedPuzzles(puzzles);
+								setAllRecommendedPuzzles(puzzles);
+								setPuzzles(puzzles);
 							});
 					})
 					.catch((error) => {
@@ -1396,11 +1413,20 @@ const FeedScreen = () => {
 
 			// LAYER 2: Deduplicate after interleaving (double-check)
 			const uniqueInterleaved = deduplicateGames(interleaved);
-			setAllRecommendedPuzzles(uniqueInterleaved);
+
+			// LAYER 2.5: Filter out games from blocked users
+			const blockedUserIds = await getBlockedUsers(user.uid);
+			const blockedSet = new Set(blockedUserIds);
+			const filteredByBlock = uniqueInterleaved.filter((puzzle) => {
+				if (!puzzle.uid) return true; // Keep games without uid
+				return !blockedSet.has(puzzle.uid);
+			});
+
+			setAllRecommendedPuzzles(filteredByBlock);
 
 			// Display first 15 games immediately
 			const BATCH_SIZE = 15;
-			const firstBatch = uniqueInterleaved.slice(0, BATCH_SIZE);
+			const firstBatch = filteredByBlock.slice(0, BATCH_SIZE);
 			setDisplayedPuzzles(firstBatch);
 
 			// Now filter displayed games in background (non-blocking)
@@ -1425,8 +1451,18 @@ const FeedScreen = () => {
 		const user = getCurrentUser();
 		if (!user) return;
 
+		// Get blocked users list
+		const blockedUserIds = await getBlockedUsers(user.uid);
+		const blockedSet = new Set(blockedUserIds);
+
+		// Filter out games from blocked users
+		const nonBlockedGames = games.filter((g) => {
+			if (!g.uid) return true; // Keep games without uid
+			return !blockedSet.has(g.uid);
+		});
+
 		// Only check games we haven't checked yet
-		const uncheckedGames = games.filter(
+		const uncheckedGames = nonBlockedGames.filter(
 			(g) => !checkedGamesRef.current.has(g.id)
 		);
 		if (uncheckedGames.length === 0) return;

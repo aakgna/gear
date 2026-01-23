@@ -28,6 +28,7 @@ import {
 	addGameComment,
 	likeGameComment,
 	unlikeGameComment,
+	getBlockedUsers,
 	GameComment,
 } from "../config/social";
 import { db } from "../config/firebase";
@@ -77,7 +78,13 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		setLoading(true);
 		try {
 			const fetchedComments = await fetchGameComments(gameId, 100);
-			setComments(fetchedComments);
+			// Filter out comments from blocked users
+			const blockedUserIds = await getBlockedUsers(currentUser.uid);
+			const blockedSet = new Set(blockedUserIds);
+			const filteredComments = fetchedComments.filter(
+				(comment) => !blockedSet.has(comment.userId)
+			);
+			setComments(filteredComments);
 		} catch (error) {
 			console.error("[CommentsModal] Error loading comments:", error);
 		} finally {
@@ -102,7 +109,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
 		// Set up real-time listener
 		const unsubscribe = commentsRef.onSnapshot(
-			(snapshot) => {
+			async (snapshot) => {
 				const updatedComments: GameComment[] = [];
 				snapshot.forEach((doc) => {
 					const data = doc.data();
@@ -117,7 +124,17 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 						likedBy: data.likedBy || [],
 					});
 				});
-				setComments(updatedComments.reverse()); // Show oldest first
+				// Filter out comments from blocked users
+				if (currentUser) {
+					const blockedUserIds = await getBlockedUsers(currentUser.uid);
+					const blockedSet = new Set(blockedUserIds);
+					const filteredComments = updatedComments.filter(
+						(comment) => !blockedSet.has(comment.userId)
+					);
+					setComments(filteredComments.reverse()); // Show oldest first
+				} else {
+					setComments(updatedComments.reverse()); // Show oldest first
+				}
 			},
 			(error) => {
 				console.error("[CommentsModal] Listener error:", error);

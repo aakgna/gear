@@ -78,7 +78,7 @@ const SearchFriendsScreen = () => {
 			setLoading(true);
 			try {
 				// Search by username prefix (starts with)
-				const users = await searchUsersByUsername(query, 20);
+				const users = await searchUsersByUsername(query, 20, currentUser?.uid);
 				setSearchResults(users);
 			} catch (error) {
 				console.error("Error searching users:", error);

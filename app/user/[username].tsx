@@ -11,6 +11,8 @@ import {
 	Image,
 	RefreshControl,
 	Animated,
+	Alert,
+	Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -38,6 +40,10 @@ import {
 	followUser,
 	unfollowUser,
 	isFollowing,
+	blockUser,
+	unblockUser,
+	isUserBlocked,
+	isBlockedByUser,
 	UserPublicProfile,
 	GameSummary,
 } from "../../config/social";
@@ -110,6 +116,10 @@ const CreatorProfileScreen = () => {
 	const [loadingFollow, setLoadingFollow] = useState(false);
 	const [loadingGames, setLoadingGames] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+	const [isBlocked, setIsBlocked] = useState(false);
+	const [isBlockedBy, setIsBlockedBy] = useState(false);
+	const [showBlockMenu, setShowBlockMenu] = useState(false);
+	const [loadingBlock, setLoadingBlock] = useState(false);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
@@ -135,17 +145,32 @@ const CreatorProfileScreen = () => {
 				return;
 			}
 
-			setProfile(userProfile);
 			setIsOwnProfile(currentUser?.uid === userProfile.uid);
 
-			// Check if current user follows this profile
+			// Check blocking status
 			if (currentUser && !isOwnProfile) {
+				const blocked = await isUserBlocked(currentUser.uid, userProfile.uid);
+				const blockedBy = await isBlockedByUser(currentUser.uid, userProfile.uid);
+				setIsBlocked(blocked);
+				setIsBlockedBy(blockedBy);
+
+				// If blocked by user, don't show profile
+				if (blockedBy) {
+					setLoading(false);
+					return;
+				}
+
+				// Check if current user follows this profile
 				const following = await isFollowing(currentUser.uid, userProfile.uid);
 				setIsFollowingUser(following);
 			} else if (isOwnProfile) {
 				// Reset following state for own profile
 				setIsFollowingUser(false);
+				setIsBlocked(false);
+				setIsBlockedBy(false);
 			}
+
+			setProfile(userProfile);
 
 			// Load initial tab (created) on first load
 			if (activeTab === "created" && !loadedTabs.has("created")) {
@@ -216,6 +241,58 @@ const CreatorProfileScreen = () => {
 		// Force reload current tab
 		await loadTabData(activeTab, true);
 		setRefreshing(false);
+	};
+
+	const handleBlockUser = async () => {
+		if (!currentUser || !profile || isOwnProfile || loadingBlock) return;
+
+		Alert.alert(
+			"Block User",
+			`Are you sure you want to block ${profile.username}? You won't be able to see their content, and they won't be able to see yours.`,
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+					onPress: () => setShowBlockMenu(false),
+				},
+				{
+					text: "Block",
+					style: "destructive",
+					onPress: async () => {
+						setLoadingBlock(true);
+						try {
+							await blockUser(currentUser.uid, profile.uid);
+							setShowBlockMenu(false);
+							// Navigate back
+							router.back();
+						} catch (error) {
+							console.error("[handleBlockUser] Error:", error);
+							Alert.alert("Error", "Failed to block user. Please try again.");
+						} finally {
+							setLoadingBlock(false);
+						}
+					},
+				},
+			]
+		);
+	};
+
+	const handleUnblockUser = async () => {
+		if (!currentUser || !profile || isOwnProfile || loadingBlock) return;
+
+		setLoadingBlock(true);
+		try {
+			await unblockUser(currentUser.uid, profile.uid);
+			setIsBlocked(false);
+			setShowBlockMenu(false);
+			// Refresh profile to update state
+			await loadProfile();
+		} catch (error) {
+			console.error("[handleUnblockUser] Error:", error);
+			Alert.alert("Error", "Failed to unblock user. Please try again.");
+		} finally {
+			setLoadingBlock(false);
+		}
 	};
 
 	const handleFollow = async () => {
@@ -375,17 +452,43 @@ const CreatorProfileScreen = () => {
 					<View style={styles.headerSpacer} />
 				</View>
 				<View style={styles.loadingContainer}>
-					<Text style={styles.errorText}>User not found</Text>
+					<Text style={styles.errorText}>
+						{isBlockedBy ? "Profile unavailable" : "User not found"}
+					</Text>
 				</View>
 			</View>
 		);
 	}
 
+	// If blocked by user, show unavailable message
+	if (isBlockedBy && currentUser && !isOwnProfile) {
+		return (
+			<View style={styles.container}>
+				<StatusBar style="dark" />
+				<MinimalHeader title={profile.username} />
+				<View style={styles.loadingContainer}>
+					<Text style={styles.errorText}>Profile unavailable</Text>
+				</View>
+			</View>
+		);
+	}
+
+	// Block menu button component
+	const blockMenuButton = !isOwnProfile && currentUser ? (
+		<TouchableOpacity
+			style={styles.menuButton}
+			onPress={() => setShowBlockMenu(true)}
+			activeOpacity={0.7}
+		>
+			<Ionicons name="ellipsis-horizontal" size={24} color={Colors.text.primary} />
+		</TouchableOpacity>
+	) : null;
+
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			<MinimalHeader title={profile.username} />
+			<MinimalHeader title={profile.username} rightAction={blockMenuButton} />
 
 			<ScrollView
 				style={styles.content}
@@ -587,6 +690,54 @@ const CreatorProfileScreen = () => {
 						</View>
 					)}
 			</ScrollView>
+
+			{/* Block Menu Modal */}
+			<Modal
+				visible={showBlockMenu}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setShowBlockMenu(false)}
+			>
+				<TouchableOpacity
+					style={styles.menuOverlay}
+					activeOpacity={1}
+					onPress={() => setShowBlockMenu(false)}
+				>
+					<View style={styles.menuContainer}>
+						{isBlocked ? (
+							<TouchableOpacity
+								style={styles.menuItem}
+								onPress={handleUnblockUser}
+								disabled={loadingBlock}
+								activeOpacity={0.7}
+							>
+								<Ionicons
+									name="checkmark-circle-outline"
+									size={24}
+									color={Colors.text.primary}
+								/>
+								<Text style={styles.menuItemText}>Unblock User</Text>
+							</TouchableOpacity>
+						) : (
+							<TouchableOpacity
+								style={[styles.menuItem, styles.menuItemDanger]}
+								onPress={handleBlockUser}
+								disabled={loadingBlock}
+								activeOpacity={0.7}
+							>
+								<Ionicons
+									name="ban-outline"
+									size={24}
+									color={Colors.error}
+								/>
+								<Text style={[styles.menuItemText, styles.menuItemTextDanger]}>
+									Block User
+								</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				</TouchableOpacity>
+			</Modal>
 		</View>
 	);
 };
@@ -619,6 +770,43 @@ const styles = StyleSheet.create({
 	},
 	headerSpacer: {
 		width: 40,
+	},
+	menuButton: {
+		padding: Spacing.xs,
+		width: 40,
+		height: 40,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	menuOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	menuContainer: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.xs,
+		minWidth: 200,
+		...Shadows.medium,
+	},
+	menuItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.sm,
+	},
+	menuItemDanger: {
+		// Additional styling for destructive actions
+	},
+	menuItemText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	menuItemTextDanger: {
+		color: Colors.error,
 	},
 	menuButton: {
 		padding: Spacing.xs,

@@ -309,6 +309,289 @@ export const isFollowing = async (
 	}
 };
 
+// ============================================================================
+// BLOCKING FUNCTIONS
+// ============================================================================
+
+// Block a user
+export const blockUser = async (
+	blockerId: string,
+	blockedId: string
+): Promise<void> => {
+	try {
+		if (blockerId === blockedId) {
+			throw new Error("Cannot block yourself");
+		}
+
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Use batch to ensure atomicity
+		const batch = db.batch();
+
+		// Add to blocker's blocked subcollection
+		const blockerBlockedRef = db
+			.collection("users")
+			.doc(blockerId)
+			.collection("blocked")
+			.doc(blockedId);
+
+		// Add to blocked user's blockedBy subcollection
+		const blockedBlockedByRef = db
+			.collection("users")
+			.doc(blockedId)
+			.collection("blockedBy")
+			.doc(blockerId);
+
+		// Check if already blocked
+		const existingBlockDoc = await blockerBlockedRef.get();
+		if (docExists(existingBlockDoc)) {
+			// Already blocked, return silently
+			return;
+		}
+
+		// Add block relationships
+		batch.set(blockerBlockedRef, {
+			blockedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		batch.set(blockedBlockedByRef, {
+			blockedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		// Unfollow each other if following (bidirectional)
+		const blockerFollowingRef = db
+			.collection("users")
+			.doc(blockerId)
+			.collection("following")
+			.doc(blockedId);
+
+		const blockedFollowingRef = db
+			.collection("users")
+			.doc(blockedId)
+			.collection("following")
+			.doc(blockerId);
+
+		const blockerFollowersRef = db
+			.collection("users")
+			.doc(blockerId)
+			.collection("followers")
+			.doc(blockedId);
+
+		const blockedFollowersRef = db
+			.collection("users")
+			.doc(blockedId)
+			.collection("followers")
+			.doc(blockerId);
+
+		// Check and remove follow relationships
+		const blockerFollowingDoc = await blockerFollowingRef.get();
+		const blockedFollowingDoc = await blockedFollowingRef.get();
+
+		if (docExists(blockerFollowingDoc)) {
+			batch.delete(blockerFollowingRef);
+			batch.delete(blockedFollowersRef);
+		}
+
+		if (docExists(blockedFollowingDoc)) {
+			batch.delete(blockedFollowingRef);
+			batch.delete(blockerFollowersRef);
+		}
+
+		// Update follower/following counts if relationships existed
+		const blockerUserRef = db.collection("users").doc(blockerId);
+		const blockedUserRef = db.collection("users").doc(blockedId);
+
+		if (docExists(blockerFollowingDoc)) {
+			const blockerUserDoc = await blockerUserRef.get();
+			const blockerFollowingCount = blockerUserDoc.data()?.followingCount ?? 0;
+			if (blockerFollowingCount > 0) {
+				batch.update(blockerUserRef, {
+					followingCount: firestore.FieldValue.increment(-1),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
+
+			const blockedUserDoc = await blockedUserRef.get();
+			const blockedFollowerCount = blockedUserDoc.data()?.followerCount ?? 0;
+			if (blockedFollowerCount > 0) {
+				batch.update(blockedUserRef, {
+					followerCount: firestore.FieldValue.increment(-1),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
+		}
+
+		if (docExists(blockedFollowingDoc)) {
+			const blockedUserDoc = await blockedUserRef.get();
+			const blockedFollowingCount = blockedUserDoc.data()?.followingCount ?? 0;
+			if (blockedFollowingCount > 0) {
+				batch.update(blockedUserRef, {
+					followingCount: firestore.FieldValue.increment(-1),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
+
+			const blockerUserDoc = await blockerUserRef.get();
+			const blockerFollowerCount = blockerUserDoc.data()?.followerCount ?? 0;
+			if (blockerFollowerCount > 0) {
+				batch.update(blockerUserRef, {
+					followerCount: firestore.FieldValue.increment(-1),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
+		}
+
+		await batch.commit();
+
+		// Delete conversation if it exists
+		// Use require to avoid circular dependency issues
+		const messagingModule = require("./messaging");
+		const conversationId = await messagingModule.getConversationId(
+			blockerId,
+			blockedId
+		);
+		if (conversationId) {
+			try {
+				await messagingModule.deleteConversation(
+					conversationId,
+					blockerId,
+					blockedId
+				);
+			} catch (convError) {
+				console.error("[blockUser] Error deleting conversation:", convError);
+				// Don't throw - blocking should succeed even if conversation deletion fails
+			}
+		}
+	} catch (error: any) {
+		console.error("[blockUser] Error:", error);
+		throw error;
+	}
+};
+
+// Unblock a user
+export const unblockUser = async (
+	unblockerId: string,
+	unblockedId: string
+): Promise<void> => {
+	try {
+		if (unblockerId === unblockedId) {
+			throw new Error("Cannot unblock yourself");
+		}
+
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		// Use batch to ensure atomicity
+		const batch = db.batch();
+
+		// Remove from unblocker's blocked subcollection
+		const blockerBlockedRef = db
+			.collection("users")
+			.doc(unblockerId)
+			.collection("blocked")
+			.doc(unblockedId);
+
+		// Remove from unblocked user's blockedBy subcollection
+		const unblockedBlockedByRef = db
+			.collection("users")
+			.doc(unblockedId)
+			.collection("blockedBy")
+			.doc(unblockerId);
+
+		// Check if blocked
+		const existingBlockDoc = await blockerBlockedRef.get();
+		if (!docExists(existingBlockDoc)) {
+			// Not blocked, return silently
+			return;
+		}
+
+		// Remove block relationships
+		batch.delete(blockerBlockedRef);
+		batch.delete(unblockedBlockedByRef);
+
+		await batch.commit();
+	} catch (error: any) {
+		console.error("[unblockUser] Error:", error);
+		throw error;
+	}
+};
+
+// Check if a user has blocked another user
+export const isUserBlocked = async (
+	userId: string,
+	targetUserId: string
+): Promise<boolean> => {
+	try {
+		const blockedRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("blocked")
+			.doc(targetUserId);
+
+		const doc = await blockedRef.get();
+		return docExists(doc);
+	} catch (error: any) {
+		console.error("[isUserBlocked] Error:", error);
+		return false;
+	}
+};
+
+// Check if a user is blocked by another user
+export const isBlockedByUser = async (
+	userId: string,
+	targetUserId: string
+): Promise<boolean> => {
+	try {
+		const blockedByRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("blockedBy")
+			.doc(targetUserId);
+
+		const doc = await blockedByRef.get();
+		return docExists(doc);
+	} catch (error: any) {
+		console.error("[isBlockedByUser] Error:", error);
+		return false;
+	}
+};
+
+// Get list of users blocked by a user
+export const getBlockedUsers = async (userId: string): Promise<string[]> => {
+	try {
+		const blockedRef = db.collection("users").doc(userId).collection("blocked");
+
+		const snapshot = await blockedRef.get();
+		const blockedIds: string[] = [];
+		snapshot.forEach((doc) => {
+			blockedIds.push(doc.id);
+		});
+		return blockedIds;
+	} catch (error: any) {
+		console.error("[getBlockedUsers] Error:", error);
+		return [];
+	}
+};
+
+// Get list of users who blocked a user
+export const getBlockedByUsers = async (userId: string): Promise<string[]> => {
+	try {
+		const blockedByRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("blockedBy");
+
+		const snapshot = await blockedByRef.get();
+		const blockedByIds: string[] = [];
+		snapshot.forEach((doc) => {
+			blockedByIds.push(doc.id);
+		});
+		return blockedByIds;
+	} catch (error: any) {
+		console.error("[getBlockedByUsers] Error:", error);
+		return [];
+	}
+};
+
 // Fetch followers list with pagination
 export const fetchFollowers = async (
 	uid: string,
@@ -526,7 +809,8 @@ export const getUserByUsername = async (
 // Search users by username prefix (starts with)
 export const searchUsersByUsername = async (
 	query: string,
-	limit: number = 20
+	limit: number = 20,
+	currentUserId?: string
 ): Promise<UserPublicProfile[]> => {
 	try {
 		const lowerQuery = query.toLowerCase().trim();
@@ -563,6 +847,14 @@ export const searchUsersByUsername = async (
 				updatedAt: data?.updatedAt,
 			});
 		});
+
+		// Filter out blocked users if currentUserId is provided
+		if (currentUserId) {
+			const blockedUserIds = await getBlockedUsers(currentUserId);
+			const blockedByUserIds = await getBlockedByUsers(currentUserId);
+			const blockedSet = new Set([...blockedUserIds, ...blockedByUserIds]);
+			return users.filter((user) => !blockedSet.has(user.uid));
+		}
 
 		return users;
 	} catch (error: any) {
@@ -624,12 +916,23 @@ export const fetchFollowingFeed = async (
 			return [];
 		}
 
+		// 1.5. Get blocked users and filter them out
+		const blockedUserIds = await getBlockedUsers(userId);
+		const blockedSet = new Set(blockedUserIds);
+		const nonBlockedFollowedUids = followedUids.filter(
+			(uid) => !blockedSet.has(uid)
+		);
+
+		if (nonBlockedFollowedUids.length === 0) {
+			return [];
+		}
+
 		// 2. Fetch created games from followed users
 		// Firestore 'in' query is limited to 10, so we batch if needed
 		const allGames: any[] = [];
 
-		for (let i = 0; i < followedUids.length; i += 10) {
-			const batchUids = followedUids.slice(i, i + 10);
+		for (let i = 0; i < nonBlockedFollowedUids.length; i += 10) {
+			const batchUids = nonBlockedFollowedUids.slice(i, i + 10);
 
 			// For each followed user, fetch their created games
 			for (const uid of batchUids) {

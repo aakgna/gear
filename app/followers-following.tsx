@@ -30,6 +30,8 @@ import {
 	unfollowUser,
 	isFollowing,
 	fetchUserProfile,
+	isUserBlocked,
+	isBlockedByUser,
 	UserSummary,
 } from "../config/social";
 import { getCurrentUser } from "../config/auth";
@@ -107,7 +109,20 @@ const FollowersFollowingScreen = () => {
 					fetchedUsers = await fetchFollowing(targetUserId, 100);
 				}
 
-				setUsers(fetchedUsers);
+				// Filter out blocked users
+				if (currentUid) {
+					const filteredUsers: UserSummary[] = [];
+					for (const user of fetchedUsers) {
+						const blocked = await isUserBlocked(currentUid, user.uid);
+						const blockedBy = await isBlockedByUser(currentUid, user.uid);
+						if (!blocked && !blockedBy) {
+							filteredUsers.push(user);
+						}
+					}
+					setUsers(filteredUsers);
+				} else {
+					setUsers(fetchedUsers);
+				}
 
 				// Check follow status for each user
 				const followStatus: Record<string, boolean> = {};
