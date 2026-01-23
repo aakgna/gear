@@ -24,6 +24,7 @@ import { useSessionEndRefresh } from "../utils/sessionRefresh";
 import { useRouter, usePathname, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { Grid2x2Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useGameStore } from "../stores/gameStore";
 import {
@@ -46,16 +47,18 @@ import {
 import { fetchGameHistory, GameHistoryEntry } from "../config/firebase";
 import {
 	fetchCreatedGames,
+	fetchLikedGames,
 	GameSummary,
 	getUnreadNotificationCount,
 } from "../config/social";
 import { fetchConversations } from "../config/messaging";
 import { PuzzleType } from "../config/types";
+import { db } from "../config/firebase";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BOTTOM_NAV_HEIGHT = 70;
 
-type TabType = "created" | "completed" | "attempted";
+type TabType = "created" | "liked";
 
 const formatGameType = (type: string): string => {
 	const formatted = type
@@ -100,8 +103,7 @@ const ProfileScreen = () => {
 	const [loading, setLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState<TabType>("created");
 	const [createdGames, setCreatedGames] = useState<GameSummary[]>([]);
-	const [completedGames, setCompletedGames] = useState<GameHistoryEntry[]>([]);
-	const [attemptedGames, setAttemptedGames] = useState<GameHistoryEntry[]>([]);
+	const [likedGames, setLikedGames] = useState<GameSummary[]>([]);
 	const [loadingGames, setLoadingGames] = useState(false);
 	const [deletingAccount, setDeletingAccount] = useState(false);
 	const [showMenu, setShowMenu] = useState(false);
@@ -137,10 +139,7 @@ const ProfileScreen = () => {
 	const avatarOpacity = useRef(new Animated.Value(0)).current;
 	
 	// Animation refs for staggered stats (bottom to top)
-	const stat1Opacity = useRef(new Animated.Value(0)).current; // Avg Time (bottom)
 	const stat2Opacity = useRef(new Animated.Value(0)).current; // Streak
-	const stat3Opacity = useRef(new Animated.Value(0)).current; // Completed
-	const stat4Opacity = useRef(new Animated.Value(0)).current; // Games
 	const stat5Opacity = useRef(new Animated.Value(0)).current; // Followers
 	const stat6Opacity = useRef(new Animated.Value(0)).current; // Following (top)
 
@@ -160,7 +159,7 @@ const ProfileScreen = () => {
 
 	useEffect(() => {
 		const tabIndex =
-			activeTab === "created" ? 0 : activeTab === "completed" ? 1 : 2;
+			activeTab === "created" ? 0 : 1;
 		Animated.spring(tabIndicatorAnim, {
 			toValue: tabIndex,
 			useNativeDriver: true,
@@ -233,8 +232,7 @@ useEffect(() => {
 			if (!loadingGames) {
 				const currentGames = 
 					activeTab === "created" ? createdGames :
-					activeTab === "completed" ? completedGames :
-					attemptedGames;
+					likedGames;
 				
 				if (currentGames.length > 0) {
 					// Animate ALL cards, not just first 8
@@ -322,25 +320,11 @@ useEffect(() => {
 			if (tab === "created") {
 				const games = await fetchCreatedGames(user.uid, 50);
 				setCreatedGames(games);
-			} else if (tab === "completed") {
-				const history = await fetchGameHistory(user.uid, {
-					action: "completed",
-					limit: 50,
-				});
-				// Filter out completed games where answer was revealed (to match totalGamesPlayed)
-				const filteredHistory = history.filter(
-					(game) => !game.answerRevealed
-				);
-
-				setCompletedGames(filteredHistory);
-			} else if (tab === "attempted") {
-				const attempted = await fetchGameHistory(user.uid, {
-					action: "attempted",
-					limit: 50,
-				});
-
-				setAttemptedGames(attempted);
+			} else if (tab === "liked") {
+				const games = await fetchLikedGames(user.uid, 50);
+					setLikedGames(games);
 			}
+
 			// Mark tab as loaded
 			setLoadedTabs((prev) => new Set(prev).add(tab));
 
@@ -380,8 +364,7 @@ useEffect(() => {
 	const scrollViewRef = useRef<ScrollView>(null);
 	const scrollPositionsRef = useRef<Record<TabType, number>>({
 		created: 0,
-		completed: 0,
-		attempted: 0,
+		liked: 0,
 	});
 	const previousPathnameRef = useRef<string>(pathname || "");
 
@@ -964,11 +947,10 @@ const handleRefresh = async () => {
 									transform: [
 										{
 											translateX: tabIndicatorAnim.interpolate({
-												inputRange: [0, 1, 2],
+												inputRange: [0, 1],
 												outputRange: [
 													0,
-													SCREEN_WIDTH / 3,
-													(SCREEN_WIDTH / 3) * 2,
+													SCREEN_WIDTH / 2,
 												],
 											}),
 										},
@@ -988,42 +970,51 @@ const handleRefresh = async () => {
 							onPress={() => setActiveTab("created")}
 							activeOpacity={0.7}
 						>
+						<View style={styles.tabContent}>
+							<Grid2x2Plus
+								size={24}
+								color={
+									activeTab === "created"
+										? Colors.accent
+										: Colors.text.secondary
+								}
+								style={styles.tabIcon}
+							/>
 							<Text
 								style={[
 									styles.tabText,
 									activeTab === "created" && styles.activeTabText,
 								]}
 							>
-								Created ({userData?.createdGamesCount || 0})
+								
 							</Text>
+						</View>
 						</TouchableOpacity>
 						<TouchableOpacity
 							style={styles.tab}
-							onPress={() => setActiveTab("completed")}
+							onPress={() => setActiveTab("liked")}
 							activeOpacity={0.7}
 						>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === "completed" && styles.activeTabText,
-								]}
-							>
-								Completed ({userData?.totalGamesPlayed || 0})
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.tab}
-							onPress={() => setActiveTab("attempted")}
-							activeOpacity={0.7}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === "attempted" && styles.activeTabText,
-								]}
-							>
-								Attempted ({totalAttemptedGames || 0})
-							</Text>
+							<View style={styles.tabContent}>
+								<Ionicons
+									name={activeTab === "liked" ? "heart" : "heart-outline"}
+									size={24}
+									color={
+										activeTab === "liked"
+											? Colors.accent
+											: Colors.text.secondary
+									}
+									style={styles.tabIcon}
+								/>
+								<Text
+									style={[
+										styles.tabText,
+										activeTab === "liked" && styles.activeTabText,
+									]}
+								>
+								
+								</Text>
+							</View>
 						</TouchableOpacity>
 					</View>
 
@@ -1036,18 +1027,15 @@ const handleRefresh = async () => {
 						<View style={styles.gameGrid}>
 							{activeTab === "created" &&
 								createdGames.map((game, index) => renderGameCard(game, index))}
-							{activeTab === "completed" &&
-								completedGames.map((game, index) => renderGameCard(game, index))}
-							{activeTab === "attempted" &&
-								attemptedGames.map((game, index) => renderGameCard(game, index))}
+							{activeTab === "liked" &&
+								likedGames.map((game, index) => renderGameCard(game, index))}
 						</View>
 					)}
 
 					{/* Empty State */}
 					{!loadingGames &&
 						((activeTab === "created" && createdGames.length === 0) ||
-							(activeTab === "completed" && completedGames.length === 0) ||
-							(activeTab === "attempted" && attemptedGames.length === 0)) && (
+							(activeTab === "liked" && likedGames.length === 0)) && (
 							<View style={styles.emptyState}>
 								<Ionicons
 									name="game-controller-outline"
@@ -1234,11 +1222,21 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Spacing.md,
 		gap: Spacing.md,
 	},
+	tabContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: Spacing.xs,
+	},
+
+	tabIcon: {
+		marginRight: 0, // Gap handles spacing
+	},
 	tabIndicator: {
 		position: "absolute",
 		bottom: 0,
 		left: 0,
-		width: SCREEN_WIDTH / 3,
+		width: "50%",
 		height: 2,
 		zIndex: 1,
 	},

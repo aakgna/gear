@@ -2380,7 +2380,11 @@ const FeedScreen = () => {
 						]}
 					>
 						<LinearGradient
-							colors={Gradients.primary}
+							colors={
+								activeTab === "following" 
+									? [...Gradients.primary].reverse() 
+									: Gradients.primary
+							}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 1 }}
 							style={StyleSheet.absoluteFill}
