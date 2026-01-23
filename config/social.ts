@@ -765,6 +765,129 @@ export const fetchCreatedGames = async (
 };
 
 // Get user by username (for profile routing) - exact match
+// Replace fetchLikedGames (lines 484-577) with this corrected version:
+// Fetch user's liked games (optimized to minimize reads with parallel fetching)
+export const fetchLikedGames = async (
+	uid: string,
+	limit: number = 50
+): Promise<GameSummary[]> => {
+	try {
+		const likedSnapshot = await db
+			.collection("users")
+			.doc(uid)
+			.collection("liked")
+			.orderBy("createdAt", "desc")
+			.limit(limit)
+			.get();
+
+		if (likedSnapshot.empty) {
+			return [];
+		}
+
+		const gameIds = likedSnapshot.docs.map((doc) => doc.id);
+
+		// Group games by gameType and difficulty for better organization
+		const gameGroups = new Map<
+			string,
+			{
+				gameType: string;
+				difficulty: string;
+				docIds: string[];
+				originalIds: string[];
+			}
+		>();
+
+		gameIds.forEach((gameId) => {
+			const parts = gameId.split("_");
+			if (parts.length >= 3) {
+				const gameType = parts[0];
+				const difficulty = parts[1];
+				const docId = parts.slice(2).join("_");
+				const key = `${gameType}_${difficulty}`;
+
+				if (!gameGroups.has(key)) {
+					gameGroups.set(key, {
+						gameType,
+						difficulty,
+						docIds: [],
+						originalIds: [],
+					});
+				}
+				const group = gameGroups.get(key)!;
+				group.docIds.push(docId);
+				group.originalIds.push(gameId); // Store full puzzleId
+			}
+		});
+
+		// Fetch all games in parallel by group
+		const fetchPromises = Array.from(gameGroups.entries()).map(
+			async ([key, group]) => {
+				const { gameType, difficulty, docIds, originalIds } = group;
+
+				// Fetch all games in this group in parallel
+				const gamePromises = docIds.map(async (docId, index) => {
+					try {
+						const gameDoc = await db
+							.collection("games")
+							.doc(gameType)
+							.collection(difficulty)
+							.doc(docId)
+							.get();
+
+						if (gameDoc.exists) {
+							const gameData = gameDoc.data();
+							return {
+								gameId: originalIds[index], // Return FULL puzzleId (gameType_difficulty_docId) to match fetchCreatedGames
+								gameType: gameType as any,
+								difficulty: difficulty as any,
+								createdAt: gameData?.createdAt,
+								playCount: gameData?.stats?.played || 0,
+								title: gameData?.title,
+								originalGameId: originalIds[index], // Keep for sorting
+							};
+						}
+						return null;
+					} catch (error) {
+						console.error(`[fetchLikedGames] Error fetching ${docId}:`, error);
+						return null;
+					}
+				});
+
+				const results = await Promise.all(gamePromises);
+				return results.filter(
+					(g): g is GameSummary & { originalGameId: string } => g !== null
+				);
+			}
+		);
+
+		const allGames = await Promise.all(fetchPromises);
+		const flatGames = allGames.flat();
+
+		// Create a map for quick lookup by original gameId
+		const gameMap = new Map<string, GameSummary & { originalGameId: string }>();
+		flatGames.forEach((g) => {
+			gameMap.set(g.originalGameId, g);
+		});
+
+		// Return games in the same order as liked (by createdAt desc)
+		const orderedGames: GameSummary[] = [];
+		for (const id of gameIds) {
+			const game = gameMap.get(id);
+			if (game) {
+				// Remove originalGameId before returning (it was only for internal sorting)
+				const { originalGameId, ...gameSummary } = game;
+				orderedGames.push(gameSummary);
+			}
+		}
+
+		return orderedGames;
+	} catch (error: any) {
+		console.error("[fetchLikedGames] Error:", error);
+		return [];
+	}
+};
+
+// Get user by username (for profile routing)
 export const getUserByUsername = async (
 	username: string
 ): Promise<UserPublicProfile | null> => {
