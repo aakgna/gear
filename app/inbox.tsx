@@ -37,6 +37,8 @@ import {
 	fetchUserProfile,
 	UserPublicProfile,
 	UserSummary,
+	isUserBlocked,
+	isBlockedByUser,
 } from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
@@ -75,7 +77,9 @@ const InboxScreen = () => {
 	const [mutualFollowers, setMutualFollowers] = useState<UserSummary[]>([]);
 	const [loadingMutualFollowers, setLoadingMutualFollowers] = useState(false);
 	const [creatingChat, setCreatingChat] = useState<string | null>(null);
-	const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
+	const [filteredConversations, setFilteredConversations] = useState<
+		Conversation[]
+	>([]);
 
 	useEffect(() => {
 		if (currentUser) {
@@ -97,32 +101,61 @@ const InboxScreen = () => {
 
 		setLoading(true);
 		try {
-			const convos = await fetchConversations(currentUser.uid);
-			setConversations(convos);
+			// Fetch conversations without waiting for unread count calculation (fast version)
+			const convos = await fetchConversations(currentUser.uid, false);
 
-			// Load participant profiles
-			const profilePromises: Promise<void>[] = [];
+			// Show conversations immediately - don't wait for profiles
+			setConversations(convos);
+			setLoading(false); // Set loading to false immediately after conversations load
+
+			// Load participant profiles in background and update as they come in
 			const profiles: Record<string, UserPublicProfile> = {};
+			const uniqueParticipantIds = new Set<string>();
 
 			convos.forEach((conv) => {
 				conv.participants.forEach((participantId) => {
-					if (participantId !== currentUser.uid && !profiles[participantId]) {
-						profilePromises.push(
-							fetchUserProfile(participantId).then((profile) => {
-								if (profile) {
-									profiles[participantId] = profile;
-								}
-							})
-						);
+					if (participantId !== currentUser.uid) {
+						uniqueParticipantIds.add(participantId);
 					}
 				});
 			});
 
+			// Load profiles in parallel and update state as they arrive
+			const profilePromises = Array.from(uniqueParticipantIds).map(
+				async (participantId) => {
+					try {
+						const profile = await fetchUserProfile(participantId);
+						if (profile) {
+							profiles[participantId] = profile;
+							// Update state incrementally for better UX
+							setParticipantProfiles((prev) => ({
+								...prev,
+								[participantId]: profile,
+							}));
+						}
+					} catch (error) {
+						console.error(
+							`[InboxScreen] Error loading profile for ${participantId}:`,
+							error
+						);
+					}
+				}
+			);
+
+			// Wait for all profiles but don't block UI
 			await Promise.all(profilePromises);
-			setParticipantProfiles(profiles);
+
+			// Trigger accurate unread count calculation in background
+			// This will update conversations with accurate counts without blocking
+			fetchConversations(currentUser.uid, true)
+				.then((updatedConvos) => {
+					setConversations(updatedConvos);
+				})
+				.catch((err) => {
+					console.error("[InboxScreen] Error updating unread counts:", err);
+				});
 		} catch (error) {
 			console.error("[InboxScreen] Error loading conversations:", error);
-		} finally {
 			setLoading(false);
 		}
 	};
@@ -167,8 +200,14 @@ const InboxScreen = () => {
 			for (const conv of conversations) {
 				const otherParticipantId = getOtherParticipant(conv);
 				if (otherParticipantId) {
-					const blocked = await isUserBlocked(currentUser.uid, otherParticipantId);
-					const blockedBy = await isBlockedByUser(currentUser.uid, otherParticipantId);
+					const blocked = await isUserBlocked(
+						currentUser.uid,
+						otherParticipantId
+					);
+					const blockedBy = await isBlockedByUser(
+						currentUser.uid,
+						otherParticipantId
+					);
 					if (!blocked && !blockedBy) {
 						filteredByBlock.push(conv);
 					}
@@ -193,16 +232,25 @@ const InboxScreen = () => {
 		};
 
 		filterConversations();
-	}, [conversations, searchQuery, participantProfiles, getOtherParticipant, currentUser]);
+	}, [
+		conversations,
+		searchQuery,
+		participantProfiles,
+		getOtherParticipant,
+		currentUser,
+	]);
 
 	const handleNewChatPress = async () => {
 		if (!currentUser) return;
 
 		setShowNewChatModal(true);
 		setLoadingMutualFollowers(true);
+		setMutualFollowers([]); // Clear previous results
 		try {
+			console.log("[InboxScreen] Loading mutual followers...");
 			const followers = await getMutualFollowers(currentUser.uid);
-			
+			console.log("[InboxScreen] Found mutual followers:", followers.length);
+
 			// Get IDs of users we already have conversations with
 			const existingConversationUserIds = new Set<string>();
 			conversations.forEach((conv) => {
@@ -211,15 +259,20 @@ const InboxScreen = () => {
 					existingConversationUserIds.add(otherId);
 				}
 			});
-			
+
 			// Filter out mutual followers who already have conversations
 			const availableFollowers = followers.filter(
 				(follower) => !existingConversationUserIds.has(follower.uid)
 			);
-			
+
+			console.log(
+				"[InboxScreen] Available followers (after filtering):",
+				availableFollowers.length
+			);
 			setMutualFollowers(availableFollowers);
 		} catch (error) {
 			console.error("[InboxScreen] Error loading mutual followers:", error);
+			setMutualFollowers([]);
 		} finally {
 			setLoadingMutualFollowers(false);
 		}
@@ -231,8 +284,11 @@ const InboxScreen = () => {
 		setCreatingChat(recipientId);
 		try {
 			// Check if conversation already exists
-			let conversationId = await getConversationId(currentUser.uid, recipientId);
-			
+			let conversationId = await getConversationId(
+				currentUser.uid,
+				recipientId
+			);
+
 			// If it doesn't exist, create it
 			if (!conversationId) {
 				conversationId = await createConversation(currentUser.uid, recipientId);
@@ -413,9 +469,7 @@ const InboxScreen = () => {
 						<View style={styles.emptyContainer}>
 							<Ionicons
 								name={
-									searchQuery.trim()
-										? "search-outline"
-										: "chatbubbles-outline"
+									searchQuery.trim() ? "search-outline" : "chatbubbles-outline"
 								}
 								size={64}
 								color={Colors.text.secondary}
@@ -496,10 +550,7 @@ const InboxScreen = () => {
 										)}
 										<Text style={styles.username}>{item.username}</Text>
 										{isCreating ? (
-											<ActivityIndicator
-												size="small"
-												color={Colors.accent}
-											/>
+											<ActivityIndicator size="small" color={Colors.accent} />
 										) : (
 											<Ionicons
 												name="chevron-forward"

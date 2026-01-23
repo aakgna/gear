@@ -764,8 +764,6 @@ export const fetchCreatedGames = async (
 	}
 };
 
-// Get user by username (for profile routing) - exact match
-// Replace fetchLikedGames (lines 484-577) with this corrected version:
 // Fetch user's liked games (optimized to minimize reads with parallel fetching)
 export const fetchLikedGames = async (
 	uid: string,
@@ -834,7 +832,7 @@ export const fetchLikedGames = async (
 							.doc(docId)
 							.get();
 
-						if (gameDoc.exists) {
+						if (docExists(gameDoc)) {
 							const gameData = gameDoc.data();
 							return {
 								gameId: originalIds[index], // Return FULL puzzleId (gameType_difficulty_docId) to match fetchCreatedGames
@@ -855,8 +853,8 @@ export const fetchLikedGames = async (
 
 				const results = await Promise.all(gamePromises);
 				return results.filter(
-					(g): g is GameSummary & { originalGameId: string } => g !== null
-				);
+					(g): g is NonNullable<typeof g> => g !== null
+				) as (GameSummary & { originalGameId: string })[];
 			}
 		);
 

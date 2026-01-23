@@ -226,7 +226,8 @@ export const sendMessage = async (
 
 // Fetch all conversations for a user
 export const fetchConversations = async (
-	userId: string
+	userId: string,
+	calculateUnreadCounts: boolean = false
 ): Promise<Conversation[]> => {
 	try {
 		const conversationsRef = db
@@ -244,22 +245,28 @@ export const fetchConversations = async (
 			const data = doc.data();
 			const lastRead = data.lastRead || {};
 			const lastReadTime = lastRead[userId];
+			const lastMessage = data.lastMessage;
 
-			// Calculate unread count
+			// Quick unread count estimate: if last message is from someone else and
+			// lastRead is before lastMessage timestamp, likely unread
 			let unreadCount = 0;
-			if (!lastReadTime) {
-				// If lastRead is null or doesn't exist, count messages after conversation creation
-				unreadCount = 1; // Will be calculated more accurately when fetching messages
+			if (lastMessage && lastMessage.senderId !== userId) {
+				const lastReadTimestamp = lastReadTime?.toMillis?.() || 0;
+				const lastMessageTimestamp = lastMessage.timestamp?.toMillis?.() || 0;
+				if (lastReadTimestamp < lastMessageTimestamp) {
+					// Likely has unread messages - set to 1 as estimate
+					unreadCount = 1;
+				}
 			}
 
 			conversations.push({
 				id: doc.id,
 				participants: data.participants || [],
-				lastMessage: data.lastMessage
+				lastMessage: lastMessage
 					? {
-							text: data.lastMessage.text,
-							senderId: data.lastMessage.senderId,
-							timestamp: data.lastMessage.timestamp?.toDate() || new Date(),
+							text: lastMessage.text,
+							senderId: lastMessage.senderId,
+							timestamp: lastMessage.timestamp?.toDate() || new Date(),
 					  }
 					: undefined,
 				lastRead: lastRead,
@@ -269,51 +276,55 @@ export const fetchConversations = async (
 			});
 		});
 
-		// Calculate accurate unread counts - avoid composite index queries
-		await Promise.all(
-			conversations.map(async (conv) => {
-				try {
-					const lastReadTime = conv.lastRead?.[userId];
-					const messagesSnapshot = await db
-						.collection("conversations")
-						.doc(conv.id)
-						.collection("messages")
-						.orderBy("createdAt", "desc")
-						.limit(50)
-						.get();
+		// Optionally calculate accurate unread counts (slower, but more accurate)
+		// This is deferred to avoid blocking the initial render
+		if (calculateUnreadCounts && conversations.length > 0) {
+			// Calculate accurate unread counts - await to ensure they're updated before returning
+			await Promise.all(
+				conversations.map(async (conv) => {
+					try {
+						const lastReadTime = conv.lastRead?.[userId];
+						const messagesSnapshot = await db
+							.collection("conversations")
+							.doc(conv.id)
+							.collection("messages")
+							.orderBy("createdAt", "desc")
+							.limit(50)
+							.get();
 
-					// Check if the last message from the other person is read
-					let lastMessageFromOther: any = null;
-					messagesSnapshot.forEach((doc) => {
-						const data = doc.data();
-						if (data.senderId !== userId && !lastMessageFromOther) {
-							lastMessageFromOther = { id: doc.id, ...data };
+						// Check if the last message from the other person is read
+						let lastMessageFromOther: any = null;
+						messagesSnapshot.forEach((doc) => {
+							const data = doc.data();
+							if (data.senderId !== userId && !lastMessageFromOther) {
+								lastMessageFromOther = { id: doc.id, ...data };
+							}
+						});
+
+						// If the last message from the other person is read, unreadCount = 0
+						if (lastMessageFromOther && lastMessageFromOther.read === true) {
+							conv.unreadCount = 0;
+							return;
 						}
-					});
 
-					// If the last message from the other person is read, unreadCount = 0
-					if (lastMessageFromOther && lastMessageFromOther.read === true) {
+						let unreadCount = 0;
+						messagesSnapshot.forEach((doc) => {
+							const data = doc.data();
+							// Only count messages from other users that are not marked as read
+							// The read field is the source of truth
+							if (data.senderId !== userId && data.read !== true) {
+								unreadCount++;
+							}
+						});
+
+						conv.unreadCount = unreadCount;
+					} catch (err) {
+						console.error("[fetchConversations] Error counting unread:", err);
 						conv.unreadCount = 0;
-						return;
 					}
-
-					let unreadCount = 0;
-					messagesSnapshot.forEach((doc) => {
-						const data = doc.data();
-						// Only count messages from other users that are not marked as read
-						// The read field is the source of truth
-						if (data.senderId !== userId && data.read !== true) {
-							unreadCount++;
-						}
-					});
-
-					conv.unreadCount = unreadCount;
-				} catch (err) {
-					console.error("[fetchConversations] Error counting unread:", err);
-					conv.unreadCount = 0;
-				}
-			})
-		);
+				})
+			);
+		}
 
 		return conversations;
 	} catch (error) {

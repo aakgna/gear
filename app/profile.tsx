@@ -125,15 +125,15 @@ const ProfileScreen = () => {
 	const currentUser = getCurrentUser();
 
 	const totalAttemptedGames = useMemo(() => {
-	if (!userData?.statsByCategory) return 0;
-	let total = 0;
-	Object.values(userData.statsByCategory).forEach((category) => {
-		if (category.attempted && typeof category.attempted === "number") {
-			total += category.attempted;
-		}
-	});
-	return total;
-}, [userData?.statsByCategory]);
+		if (!userData?.statsByCategory) return 0;
+		let total = 0;
+		Object.values(userData.statsByCategory).forEach((category) => {
+			if (category.attempted && typeof category.attempted === "number") {
+				total += category.attempted;
+			}
+		});
+		return total;
+	}, [userData?.statsByCategory]);
 
 	// Tab indicator animation
 	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
@@ -143,11 +143,11 @@ const ProfileScreen = () => {
 	const notificationsScale = useRef(new Animated.Value(1)).current;
 	const inboxScale = useRef(new Animated.Value(1)).current;
 	const menuScale = useRef(new Animated.Value(1)).current;
-	
+
 	// Animation refs for avatar bounce
 	const avatarScale = useRef(new Animated.Value(0)).current;
 	const avatarOpacity = useRef(new Animated.Value(0)).current;
-	
+
 	// Animation refs for staggered stats (bottom to top)
 	const stat2Opacity = useRef(new Animated.Value(0)).current; // Streak
 	const stat5Opacity = useRef(new Animated.Value(0)).current; // Followers
@@ -157,7 +157,9 @@ const ProfileScreen = () => {
 	const pageOpacity = useRef(new Animated.Value(0)).current;
 
 	// Game card animations - use Map to store per-card animations
-	const gameCardAnimations = useRef<Map<number, Animated.Value>>(new Map()).current;
+	const gameCardAnimations = useRef<Map<number, Animated.Value>>(
+		new Map()
+	).current;
 
 	// Helper to get or create animation value for a card
 	const getCardAnimation = (index: number): Animated.Value => {
@@ -168,8 +170,7 @@ const ProfileScreen = () => {
 	};
 
 	useEffect(() => {
-		const tabIndex =
-			activeTab === "created" ? 0 : 1;
+		const tabIndex = activeTab === "created" ? 0 : 1;
 		Animated.spring(tabIndicatorAnim, {
 			toValue: tabIndex,
 			useNativeDriver: true,
@@ -178,95 +179,96 @@ const ProfileScreen = () => {
 		}).start();
 	}, [activeTab]);
 
-// Replace the animation useEffect (lines 161-252) with:
-// Coordinated entrance animations - all at once
-useEffect(() => {
-	if (!loading && userData && pathname === "/profile") {
-		// Clear animation map
-		gameCardAnimations.clear();
+	// Replace the animation useEffect (lines 161-252) with:
+	// Coordinated entrance animations - all at once
+	useEffect(() => {
+		if (!loading && userData && pathname === "/profile") {
+			// Clear animation map
+			gameCardAnimations.clear();
 
-		// Reset all animation values
-		pageOpacity.setValue(0);
-		avatarScale.setValue(0.9);
-		avatarOpacity.setValue(0);
-		stat2Opacity.setValue(0);
-		stat5Opacity.setValue(0);
-		stat6Opacity.setValue(0);
-		gameCardAnimations.forEach((anim) => anim.setValue(0));
+			// Reset all animation values
+			pageOpacity.setValue(0);
+			avatarScale.setValue(0.9);
+			avatarOpacity.setValue(0);
+			stat2Opacity.setValue(0);
+			stat5Opacity.setValue(0);
+			stat6Opacity.setValue(0);
+			gameCardAnimations.forEach((anim) => anim.setValue(0));
 
-		// Small delay to ensure component is ready
-		const timer = setTimeout(() => {
-			// All animations run in parallel
-			const animations: Animated.CompositeAnimation[] = [
-				// Page fade
-				Animated.timing(pageOpacity, {
-					toValue: 1,
-					duration: 300,
-					useNativeDriver: true,
-				}),
-				// Avatar
-				Animated.parallel([
-					Animated.spring(avatarScale, {
-						toValue: 1,
-						useNativeDriver: true,
-						tension: 100,
-						friction: 8,
-					}),
-					Animated.timing(avatarOpacity, {
+			// Small delay to ensure component is ready
+			const timer = setTimeout(() => {
+				// All animations run in parallel
+				const animations: Animated.CompositeAnimation[] = [
+					// Page fade
+					Animated.timing(pageOpacity, {
 						toValue: 1,
 						duration: 300,
 						useNativeDriver: true,
 					}),
-				]),
-				// Stats (very fast stagger)
-				Animated.stagger(30, [
-					Animated.timing(stat6Opacity, {
-						toValue: 1,
-						duration: 300,
-						useNativeDriver: true,
-					}),
-					Animated.timing(stat5Opacity, {
-						toValue: 1,
-						duration: 300,
-						useNativeDriver: true,
-					}),
-					Animated.timing(stat2Opacity, {
-						toValue: 1,
-						duration: 300,
-						useNativeDriver: true,
-					}),
-				]),
-			];
-
-			// Add game cards for current tab
-			if (!loadingGames) {
-				const currentGames = 
-					activeTab === "created" ? createdGames :
-					likedGames;
-				
-				if (currentGames.length > 0) {
-					// Animate ALL cards, not just first 8
-					const cardAnimations = Array.from({ length: currentGames.length }, (_, i) => {
-						const anim = getCardAnimation(i);
-						return Animated.timing(anim, {
+					// Avatar
+					Animated.parallel([
+						Animated.spring(avatarScale, {
+							toValue: 1,
+							useNativeDriver: true,
+							tension: 100,
+							friction: 8,
+						}),
+						Animated.timing(avatarOpacity, {
 							toValue: 1,
 							duration: 300,
-							delay: i * 20,
 							useNativeDriver: true,
-						});
-					});
-					animations.push(Animated.parallel(cardAnimations));
+						}),
+					]),
+					// Stats (very fast stagger)
+					Animated.stagger(30, [
+						Animated.timing(stat6Opacity, {
+							toValue: 1,
+							duration: 300,
+							useNativeDriver: true,
+						}),
+						Animated.timing(stat5Opacity, {
+							toValue: 1,
+							duration: 300,
+							useNativeDriver: true,
+						}),
+						Animated.timing(stat2Opacity, {
+							toValue: 1,
+							duration: 300,
+							useNativeDriver: true,
+						}),
+					]),
+				];
+
+				// Add game cards for current tab
+				if (!loadingGames) {
+					const currentGames =
+						activeTab === "created" ? createdGames : likedGames;
+
+					if (currentGames.length > 0) {
+						// Animate ALL cards, not just first 8
+						const cardAnimations = Array.from(
+							{ length: currentGames.length },
+							(_, i) => {
+								const anim = getCardAnimation(i);
+								return Animated.timing(anim, {
+									toValue: 1,
+									duration: 300,
+									delay: i * 20,
+									useNativeDriver: true,
+								});
+							}
+						);
+						animations.push(Animated.parallel(cardAnimations));
+					}
 				}
-			}
 
-			// Start all animations together
-			Animated.parallel(animations).start();
-		}, 50);
+				// Start all animations together
+				Animated.parallel(animations).start();
+			}, 50);
 
-		return () => clearTimeout(timer);
-	}
-}, [loading, userData, pathname]);
-
+			return () => clearTimeout(timer);
+		}
+	}, [loading, userData, pathname]);
 
 	const handleIconPress = (scaleAnim: Animated.Value, onPress: () => void) => {
 		Animated.sequence([
@@ -301,8 +303,8 @@ useEffect(() => {
 			// Load notification count
 			const count = await getUnreadNotificationCount(user.uid);
 			setUnreadNotificationCount(count);
-			// Load unread message count
-			const conversations = await fetchConversations(user.uid);
+			// Load unread message count (using fast version)
+			const conversations = await fetchConversations(user.uid, false);
 			const totalUnread = conversations.reduce(
 				(sum, conv) => sum + (conv.unreadCount || 0),
 				0
@@ -332,7 +334,7 @@ useEffect(() => {
 				setCreatedGames(games);
 			} else if (tab === "liked") {
 				const games = await fetchLikedGames(user.uid, 50);
-					setLikedGames(games);
+				setLikedGames(games);
 			}
 
 			// Mark tab as loaded
@@ -378,120 +380,119 @@ useEffect(() => {
 	});
 	const previousPathnameRef = useRef<string>(pathname || "");
 
-
-useFocusEffect(
-	useCallback(() => {
-		// Refresh userData when profile page comes into focus to update tab counts
-		const user = getCurrentUser();
-		if (user) {
-			getUserData(user.uid).then((data) => {
-				setUserData(data);
-			});
-		}
-	}, [])
-);
+	useFocusEffect(
+		useCallback(() => {
+			// Refresh userData when profile page comes into focus to update tab counts
+			const user = getCurrentUser();
+			if (user) {
+				getUserData(user.uid).then((data) => {
+					setUserData(data);
+				});
+			}
+		}, [])
+	);
 
 	// Restore scroll position when returning from play-game (but don't reload data)
 	// Also refresh notification/message counts when returning from notifications/inbox
-useEffect(() => {
-	const previousPath = previousPathnameRef.current;
+	useEffect(() => {
+		const previousPath = previousPathnameRef.current;
 
-	// Refresh current tab when returning from play-game to update game list
-	if (
-		pathname === "/profile" &&
-		previousPath.startsWith("/play-game/") &&
-		userData
-	) {
-		// Refresh the current tab's data if it's been loaded
-		if (loadedTabs.has(activeTab)) {
-			loadTabData(activeTab, true);
-		}
-		
-		// Restore scroll position for current tab after a short delay
-		if (scrollViewRef.current) {
-			setTimeout(() => {
-				const scrollY = scrollPositionsRef.current[activeTab];
-				if (scrollY > 0) {
-					requestAnimationFrame(() => {
-						scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
-					});
-				}
-			}, 100);
-		}
-	}
+		// Refresh current tab when returning from play-game to update game list
+		if (
+			pathname === "/profile" &&
+			previousPath.startsWith("/play-game/") &&
+			userData
+		) {
+			// Refresh the current tab's data if it's been loaded
+			if (loadedTabs.has(activeTab)) {
+				loadTabData(activeTab, true);
+			}
 
-	// Refresh notification count when returning from notifications screen
-	if (
-		pathname === "/profile" &&
-		previousPath === "/notifications" &&
-		currentUser
-	) {
-		const refreshNotificationCount = async () => {
-			const count = await getUnreadNotificationCount(currentUser.uid);
+			// Restore scroll position for current tab after a short delay
+			if (scrollViewRef.current) {
+				setTimeout(() => {
+					const scrollY = scrollPositionsRef.current[activeTab];
+					if (scrollY > 0) {
+						requestAnimationFrame(() => {
+							scrollViewRef.current?.scrollTo({ y: scrollY, animated: false });
+						});
+					}
+				}, 100);
+			}
+		}
+
+		// Refresh notification count when returning from notifications screen
+		if (
+			pathname === "/profile" &&
+			previousPath === "/notifications" &&
+			currentUser
+		) {
+			const refreshNotificationCount = async () => {
+				const count = await getUnreadNotificationCount(currentUser.uid);
+				setUnreadNotificationCount(count);
+			};
+			refreshNotificationCount();
+		}
+
+		// Refresh message count when returning from inbox or chat screens
+		if (
+			pathname === "/profile" &&
+			(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
+			currentUser
+		) {
+			const refreshMessageCount = async () => {
+				const conversations = await fetchConversations(currentUser.uid);
+				const totalUnread = conversations.reduce(
+					(sum, conv) => sum + (conv.unreadCount || 0),
+					0
+				);
+				setUnreadMessageCount(totalUnread);
+			};
+			refreshMessageCount();
+		}
+
+		// Also refresh counts whenever we're on profile (in case navigation detection fails)
+		if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
+			const refreshAllCounts = async () => {
+				const notifCount = await getUnreadNotificationCount(currentUser.uid);
+				const conversations = await fetchConversations(currentUser.uid);
+				const messageCount = conversations.reduce(
+					(sum, conv) => sum + (conv.unreadCount || 0),
+					0
+				);
+				setUnreadNotificationCount(notifCount);
+				setUnreadMessageCount(messageCount);
+			};
+			refreshAllCounts();
+		}
+
+		previousPathnameRef.current = pathname || "";
+	}, [pathname, userData, activeTab, loadedTabs, currentUser]);
+
+	const handleRefresh = async () => {
+		setRefreshing(true);
+		// Reload user data
+		const user = getCurrentUser();
+		if (user) {
+			const data = await getUserData(user.uid);
+			setUserData(data);
+			// Reload notification count
+			const count = await getUnreadNotificationCount(user.uid);
 			setUnreadNotificationCount(count);
-		};
-		refreshNotificationCount();
-	}
-
-	// Refresh message count when returning from inbox or chat screens
-	if (
-		pathname === "/profile" &&
-		(previousPath === "/inbox" || previousPath.startsWith("/chat/")) &&
-		currentUser
-	) {
-		const refreshMessageCount = async () => {
-			const conversations = await fetchConversations(currentUser.uid);
+			// Reload unread message count
+			const conversations = await fetchConversations(user.uid);
 			const totalUnread = conversations.reduce(
 				(sum, conv) => sum + (conv.unreadCount || 0),
 				0
 			);
 			setUnreadMessageCount(totalUnread);
-		};
-		refreshMessageCount();
-	}
-
-	// Also refresh counts whenever we're on profile (in case navigation detection fails)
-	if (pathname === "/profile" && previousPath !== "/profile" && currentUser) {
-		const refreshAllCounts = async () => {
-			const notifCount = await getUnreadNotificationCount(currentUser.uid);
-			const conversations = await fetchConversations(currentUser.uid);
-			const messageCount = conversations.reduce(
-				(sum, conv) => sum + (conv.unreadCount || 0),
-				0
-			);
-			setUnreadNotificationCount(notifCount);
-			setUnreadMessageCount(messageCount);
-		};
-		refreshAllCounts();
-	}
-
-	previousPathnameRef.current = pathname || "";
-}, [pathname, userData, activeTab, loadedTabs, currentUser]);
-
-const handleRefresh = async () => {
-	setRefreshing(true);
-	// Reload user data
-	const user = getCurrentUser();
-	if (user) {
-		const data = await getUserData(user.uid);
-		setUserData(data);
-		// Reload notification count
-		const count = await getUnreadNotificationCount(user.uid);
-		setUnreadNotificationCount(count);
-		// Reload unread message count
-		const conversations = await fetchConversations(user.uid);
-		const totalUnread = conversations.reduce(
-			(sum, conv) => sum + (conv.unreadCount || 0),
-			0
-		);
-		setUnreadMessageCount(totalUnread);
-		// Reload current tab's data
-		if (userData) {
-			await loadTabData(activeTab, true);
+			// Reload current tab's data
+			if (userData) {
+				await loadTabData(activeTab, true);
+			}
 		}
-	}
-	setRefreshing(false);
-};
+		setRefreshing(false);
+	};
 
 	// Function to update local state after follow/unfollow (called from other screens)
 	const updateFollowingCount = (increment: number) => {
@@ -646,7 +647,9 @@ const handleRefresh = async () => {
 			const profiles = await Promise.all(
 				blockedUserIds.map((uid) => fetchUserProfile(uid))
 			);
-			setBlockedUsers(profiles.filter((p): p is UserPublicProfile => p !== null));
+			setBlockedUsers(
+				profiles.filter((p): p is UserPublicProfile => p !== null)
+			);
 		} catch (error) {
 			console.error("[ProfileScreen] Error loading blocked users:", error);
 			Alert.alert("Error", "Failed to load blocked users");
@@ -779,75 +782,87 @@ const handleRefresh = async () => {
 			<View style={[styles.header, { paddingTop: insets.top + Spacing.xs }]}>
 				<View style={styles.headerSpacer} />
 				<View style={styles.headerActions}>
-				<Animated.View style={{ transform: [{ scale: searchScale }] }}>
-					<TouchableOpacity
-						style={styles.headerButton}
-						onPress={() => handleIconPress(searchScale, () => router.push("/search-friends"))}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="search-outline"
-							size={22}
-							color={Colors.text.primary}
-						/>
-					</TouchableOpacity>
-				</Animated.View>
-				<Animated.View style={{ transform: [{ scale: notificationsScale }] }}>
-					<TouchableOpacity
-						style={styles.headerButton}
-						onPress={() => handleIconPress(notificationsScale, () => router.push("/notifications"))}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="notifications-outline"
-							size={22}
-							color={Colors.text.primary}
-						/>
-						{unreadNotificationCount > 0 && (
-							<View style={styles.badge}>
-								<Text style={styles.badgeText}>
-									{unreadNotificationCount > 99
-										? "99+"
-										: unreadNotificationCount}
-								</Text>
-							</View>
-						)}
-					</TouchableOpacity>
-				</Animated.View>
-				<Animated.View style={{ transform: [{ scale: inboxScale }] }}>
-					<TouchableOpacity
-						style={styles.headerButton}
-						onPress={() => handleIconPress(inboxScale, () => router.push("/inbox"))}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="chatbubbles-outline"
-							size={22}
-							color={Colors.text.primary}
-						/>
-						{unreadMessageCount > 0 && (
-							<View style={styles.badge}>
-								<Text style={styles.badgeText}>
-									{unreadMessageCount > 99 ? "99+" : unreadMessageCount}
-								</Text>
-							</View>
-						)}
-					</TouchableOpacity>
-				</Animated.View>
-				<Animated.View style={{ transform: [{ scale: menuScale }] }}>
-					<TouchableOpacity
-						style={styles.menuButton}
-						onPress={() => handleIconPress(menuScale, () => setShowMenu(!showMenu))}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="ellipsis-horizontal"
-							size={22}
-							color={Colors.text.primary}
-						/>
-					</TouchableOpacity>
-				</Animated.View>
-			</View>
+					<Animated.View style={{ transform: [{ scale: searchScale }] }}>
+						<TouchableOpacity
+							style={styles.headerButton}
+							onPress={() =>
+								handleIconPress(searchScale, () =>
+									router.push("/search-friends")
+								)
+							}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name="search-outline"
+								size={22}
+								color={Colors.text.primary}
+							/>
+						</TouchableOpacity>
+					</Animated.View>
+					<Animated.View style={{ transform: [{ scale: notificationsScale }] }}>
+						<TouchableOpacity
+							style={styles.headerButton}
+							onPress={() =>
+								handleIconPress(notificationsScale, () =>
+									router.push("/notifications")
+								)
+							}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name="notifications-outline"
+								size={22}
+								color={Colors.text.primary}
+							/>
+							{unreadNotificationCount > 0 && (
+								<View style={styles.badge}>
+									<Text style={styles.badgeText}>
+										{unreadNotificationCount > 99
+											? "99+"
+											: unreadNotificationCount}
+									</Text>
+								</View>
+							)}
+						</TouchableOpacity>
+					</Animated.View>
+					<Animated.View style={{ transform: [{ scale: inboxScale }] }}>
+						<TouchableOpacity
+							style={styles.headerButton}
+							onPress={() =>
+								handleIconPress(inboxScale, () => router.push("/inbox"))
+							}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name="chatbubbles-outline"
+								size={22}
+								color={Colors.text.primary}
+							/>
+							{unreadMessageCount > 0 && (
+								<View style={styles.badge}>
+									<Text style={styles.badgeText}>
+										{unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+									</Text>
+								</View>
+							)}
+						</TouchableOpacity>
+					</Animated.View>
+					<Animated.View style={{ transform: [{ scale: menuScale }] }}>
+						<TouchableOpacity
+							style={styles.menuButton}
+							onPress={() =>
+								handleIconPress(menuScale, () => setShowMenu(!showMenu))
+							}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name="ellipsis-horizontal"
+								size={22}
+								color={Colors.text.primary}
+							/>
+						</TouchableOpacity>
+					</Animated.View>
+				</View>
 			</View>
 
 			{/* Menu Dropdown */}
@@ -864,7 +879,11 @@ const handleRefresh = async () => {
 								handleBlockedUsers();
 							}}
 						>
-							<Ionicons name="ban-outline" size={20} color={Colors.text.primary} />
+							<Ionicons
+								name="ban-outline"
+								size={20}
+								color={Colors.text.primary}
+							/>
 							<Text style={styles.menuItemText}>Blocked Users</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
@@ -925,7 +944,7 @@ const handleRefresh = async () => {
 				>
 					{/* Profile Header */}
 					<View style={styles.profileHeader}>
-						<Animated.View 
+						<Animated.View
 							style={[
 								styles.avatarContainer,
 								{
@@ -942,7 +961,11 @@ const handleRefresh = async () => {
 									cache="force-cache"
 								/>
 							) : (
-								<Ionicons name="person-circle" size={100} color={Colors.accent} />
+								<Ionicons
+									name="person-circle"
+									size={100}
+									color={Colors.accent}
+								/>
 							)}
 						</Animated.View>
 
@@ -992,7 +1015,7 @@ const handleRefresh = async () => {
 
 							{/* Divider */}
 							<View style={styles.statDivider} />
-				
+
 							<Animated.View style={{ opacity: stat2Opacity }}>
 								<View style={styles.statItem}>
 									<Text style={styles.statNumber}>
@@ -1004,7 +1027,9 @@ const handleRefresh = async () => {
 						</View>
 
 						{/* Bio */}
-						{userData?.bio && <Text style={styles.bioText}>{userData.bio}</Text>}
+						{userData?.bio && (
+							<Text style={styles.bioText}>{userData.bio}</Text>
+						)}
 					</View>
 
 					{/* Tabs */}
@@ -1017,10 +1042,7 @@ const handleRefresh = async () => {
 										{
 											translateX: tabIndicatorAnim.interpolate({
 												inputRange: [0, 1],
-												outputRange: [
-													0,
-													SCREEN_WIDTH / 2,
-												],
+												outputRange: [0, SCREEN_WIDTH / 2],
 											}),
 										},
 									],
@@ -1039,25 +1061,23 @@ const handleRefresh = async () => {
 							onPress={() => setActiveTab("created")}
 							activeOpacity={0.7}
 						>
-						<View style={styles.tabContent}>
-							<Grid2x2Plus
-								size={24}
-								color={
-									activeTab === "created"
-										? Colors.accent
-										: Colors.text.secondary
-								}
-								style={styles.tabIcon}
-							/>
-							<Text
-								style={[
-									styles.tabText,
-									activeTab === "created" && styles.activeTabText,
-								]}
-							>
-								
-							</Text>
-						</View>
+							<View style={styles.tabContent}>
+								<Grid2x2Plus
+									size={24}
+									color={
+										activeTab === "created"
+											? Colors.accent
+											: Colors.text.secondary
+									}
+									style={styles.tabIcon}
+								/>
+								<Text
+									style={[
+										styles.tabText,
+										activeTab === "created" && styles.activeTabText,
+									]}
+								></Text>
+							</View>
 						</TouchableOpacity>
 						<TouchableOpacity
 							style={styles.tab}
@@ -1080,9 +1100,7 @@ const handleRefresh = async () => {
 										styles.tabText,
 										activeTab === "liked" && styles.activeTabText,
 									]}
-								>
-								
-								</Text>
+								></Text>
 							</View>
 						</TouchableOpacity>
 					</View>
@@ -1182,14 +1200,9 @@ const handleRefresh = async () => {
 											disabled={unblockingUserId === item.uid}
 										>
 											{unblockingUserId === item.uid ? (
-												<ActivityIndicator
-													size="small"
-													color={Colors.accent}
-												/>
+												<ActivityIndicator size="small" color={Colors.accent} />
 											) : (
-												<Text style={styles.unblockButtonText}>
-													Unblock
-												</Text>
+												<Text style={styles.unblockButtonText}>Unblock</Text>
 											)}
 										</TouchableOpacity>
 									</View>
@@ -1417,7 +1430,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: Layout.margin,
 		paddingRight: 30,
 		marginBottom: Spacing.lg,
-		gap: Spacing.lg
+		gap: Spacing.lg,
 	},
 	statDivider: {
 		width: 1,
