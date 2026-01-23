@@ -270,21 +270,28 @@ export const fetchConversations = async (
 						.limit(50)
 						.get();
 
+					// Check if the last message from the other person is read
+					let lastMessageFromOther: any = null;
+					messagesSnapshot.forEach((doc) => {
+						const data = doc.data();
+						if (data.senderId !== userId && !lastMessageFromOther) {
+							lastMessageFromOther = { id: doc.id, ...data };
+						}
+					});
+
+					// If the last message from the other person is read, unreadCount = 0
+					if (lastMessageFromOther && lastMessageFromOther.read === true) {
+						conv.unreadCount = 0;
+						return;
+					}
+
 					let unreadCount = 0;
 					messagesSnapshot.forEach((doc) => {
 						const data = doc.data();
-						// Count messages not from this user and either:
-						// - after lastReadTime if it exists
-						// - marked as not read
-						if (data.senderId !== userId) {
-							if (lastReadTime) {
-								const msgTime = data.createdAt?.toDate();
-								if (msgTime && msgTime > lastReadTime) {
-									unreadCount++;
-								}
-							} else if (!data.read) {
-								unreadCount++;
-							}
+						// Only count messages from other users that are not marked as read
+						// The read field is the source of truth
+						if (data.senderId !== userId && data.read !== true) {
+							unreadCount++;
 						}
 					});
 
@@ -393,7 +400,9 @@ export const markConversationRead = async (
 			let batchHasUpdates = false;
 			messagesSnapshot.forEach((doc) => {
 				const data = doc.data();
-				if (data.senderId !== userId && !data.read) {
+				// Mark all messages from other users as read
+				if (data.senderId !== userId) {
+					console.log("Marking message as read:", data.senderId);
 					batch.update(doc.ref, { read: true });
 					batchHasUpdates = true;
 				}
@@ -450,4 +459,3 @@ export const shareGameToDM = async (
 		throw error;
 	}
 };
-

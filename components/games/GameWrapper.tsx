@@ -335,9 +335,13 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Handle share
 	const handleShare = async () => {
-		if (!completedResult) return;
+		if (!completedResult) {
+			console.log("[handleShare] No completed result");
+			return;
+		}
 
 		try {
+			console.log("[handleShare] Starting share...");
 			// Create shareable link - using game ID that can be used in the app
 			const gameLink = `thinktok://game/${puzzle.id}`;
 
@@ -354,11 +358,41 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			// Share with message - the link will be shareable as text
 			// On iOS, Share.share with message will allow sharing to iMessage, Instagram, etc.
-			await Share.share({
+			// On Android, message is used for sharing
+			const shareOptions: any = {
 				message,
-			});
+			};
+
+			// Add title for Android
+			if (Platform.OS === "android") {
+				shareOptions.title = "Share Game Result";
+			}
+
+			console.log(
+				"[handleShare] Calling Share.share with options:",
+				JSON.stringify(shareOptions)
+			);
+
+			// Use Share API to open native share sheet
+			// The share sheet should appear immediately when Share.share is called
+			const result = await Share.share(shareOptions);
+			console.log("[handleShare] Share result:", result);
+
+			// Check if sharing was successful
+			if (result && result.action) {
+				if (result.action === Share.sharedAction) {
+					if (result.activityType) {
+						console.log("Shared with activity type:", result.activityType);
+					} else {
+						console.log("Shared successfully");
+					}
+				} else if (result.action === Share.dismissedAction) {
+					console.log("Share dismissed");
+				}
+			}
 		} catch (error: any) {
 			// User cancelled sharing - this is expected, don't log as error
+			console.error("[handleShare] Error:", error);
 			if (error?.message !== "User did not share") {
 				console.error("Error sharing:", error);
 			}
@@ -582,8 +616,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 								key={`social-${puzzle.id}`}
 								puzzle={puzzle}
 								gameId={puzzle.id}
+								completedResult={completedResult}
 								onCommentPress={() => setShowCommentsModal(true)}
 								onSharePress={() => setShowShareModal(true)}
+								onShareCompletion={handleShare}
 							/>
 						)}
 					</View>
@@ -595,24 +631,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				<View style={styles.statsContainer}>
 					<View style={styles.statsHeader}>
 						<Text style={styles.statsHeaderText}>Comparison Stats</Text>
-						<View style={styles.statsHeaderActions}>
-							<TouchableOpacity
-								onPress={handleShare}
-								style={styles.shareButton}
-							>
-								<Ionicons
-									name="share-outline"
-									size={24}
-									color={Colors.accent}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								onPress={() => setShowStats(false)}
-								style={styles.closeButton}
-							>
-								<Ionicons name="close" size={24} color={Colors.text.primary} />
-							</TouchableOpacity>
-						</View>
+						<TouchableOpacity
+							onPress={() => setShowStats(false)}
+							style={styles.closeButton}
+						>
+							<Ionicons name="close" size={24} color={Colors.text.primary} />
+						</TouchableOpacity>
 					</View>
 					<ScrollView
 						style={styles.statsScrollView}
@@ -696,14 +720,6 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-	},
-	statsHeaderActions: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.sm,
-	},
-	shareButton: {
-		padding: Spacing.xs,
 	},
 	closeButton: {
 		padding: Spacing.xs,

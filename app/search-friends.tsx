@@ -29,6 +29,7 @@ import {
 import { getCurrentUser } from "../config/auth";
 import {
 	getUserByUsername,
+	searchUsersByUsername,
 	isFollowing,
 	followUser,
 	UserPublicProfile,
@@ -76,13 +77,9 @@ const SearchFriendsScreen = () => {
 
 			setLoading(true);
 			try {
-				// Search by username (exact match or starts with)
-				const user = await getUserByUsername(query);
-				if (user) {
-					setSearchResults([user]);
-				} else {
-					setSearchResults([]);
-				}
+				// Search by username prefix (starts with)
+				const users = await searchUsersByUsername(query, 20);
+				setSearchResults(users);
 			} catch (error) {
 				console.error("Error searching users:", error);
 				setSearchResults([]);

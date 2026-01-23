@@ -481,7 +481,7 @@ export const fetchCreatedGames = async (
 	}
 };
 
-// Get user by username (for profile routing)
+// Get user by username (for profile routing) - exact match
 export const getUserByUsername = async (
 	username: string
 ): Promise<UserPublicProfile | null> => {
@@ -520,6 +520,54 @@ export const getUserByUsername = async (
 	} catch (error: any) {
 		console.error("[getUserByUsername] Error:", error);
 		return null;
+	}
+};
+
+// Search users by username prefix (starts with)
+export const searchUsersByUsername = async (
+	query: string,
+	limit: number = 20
+): Promise<UserPublicProfile[]> => {
+	try {
+		const lowerQuery = query.toLowerCase().trim();
+
+		if (!lowerQuery) {
+			return [];
+		}
+
+		// Use Firestore range query for "starts with" search
+		// >= query and < query + "\uf8ff" (highest Unicode character)
+		const usersSnapshot = await db
+			.collection("users")
+			.where("username", ">=", lowerQuery)
+			.where("username", "<", lowerQuery + "\uf8ff")
+			.limit(limit)
+			.get();
+
+		const users: UserPublicProfile[] = [];
+		usersSnapshot.forEach((doc) => {
+			const data = doc.data();
+			users.push({
+				uid: doc.id,
+				username: data?.username,
+				email: data?.email,
+				followerCount: data?.followerCount || 0,
+				followingCount: data?.followingCount || 0,
+				createdGamesCount: data?.createdGamesCount || 0,
+				bio: data?.bio,
+				profilePicture: data?.profilePicture,
+				totalGamesPlayed: data?.totalGamesPlayed || 0,
+				streakCount: data?.streakCount || 0,
+				averageTimePerGame: data?.averageTimePerGame || 0,
+				createdAt: data?.createdAt,
+				updatedAt: data?.updatedAt,
+			});
+		});
+
+		return users;
+	} catch (error: any) {
+		console.error("[searchUsersByUsername] Error:", error);
+		return [];
 	}
 };
 

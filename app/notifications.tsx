@@ -109,7 +109,9 @@ const NotificationsScreen = () => {
 	const checkFollowingStatus = async () => {
 		if (!currentUser) return;
 
-		const followNotifications = notifications.filter((n) => n.type === "follow");
+		const followNotifications = notifications.filter(
+			(n) => n.type === "follow"
+		);
 		const statusMap: Record<string, boolean> = {};
 
 		await Promise.all(
@@ -128,9 +130,7 @@ const NotificationsScreen = () => {
 		try {
 			await markAllNotificationsAsRead(currentUser.uid);
 			// Update local state
-			setNotifications((prev) =>
-				prev.map((n) => ({ ...n, read: true }))
-			);
+			setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 		} catch (error) {
 			console.error("Error marking all as read:", error);
 		} finally {
@@ -146,9 +146,7 @@ const NotificationsScreen = () => {
 			try {
 				await markNotificationAsRead(currentUser.uid, notification.id);
 				setNotifications((prev) =>
-					prev.map((n) =>
-						n.id === notification.id ? { ...n, read: true } : n
-					)
+					prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
 				);
 			} catch (error) {
 				console.error("Error marking notification as read:", error);
@@ -166,12 +164,28 @@ const NotificationsScreen = () => {
 
 		try {
 			// Check if already following before attempting
-			const alreadyFollowing = await isFollowing(currentUser.uid, notification.fromUserId);
+			const alreadyFollowing = await isFollowing(
+				currentUser.uid,
+				notification.fromUserId
+			);
 			if (alreadyFollowing) {
 				setFollowingMap((prev) => ({
 					...prev,
 					[notification.fromUserId]: true,
 				}));
+				// Mark as read even if already following
+				if (!notification.read) {
+					try {
+						await markNotificationAsRead(currentUser.uid, notification.id);
+						setNotifications((prev) =>
+							prev.map((n) =>
+								n.id === notification.id ? { ...n, read: true } : n
+							)
+						);
+					} catch (error) {
+						console.error("Error marking notification as read:", error);
+					}
+				}
 				return;
 			}
 			await followUser(currentUser.uid, notification.fromUserId);
@@ -179,8 +193,19 @@ const NotificationsScreen = () => {
 				...prev,
 				[notification.fromUserId]: true,
 			}));
-			// Refresh notifications to update any UI that might show counts
-			await loadNotifications();
+			// Mark as read after following
+			if (!notification.read) {
+				try {
+					await markNotificationAsRead(currentUser.uid, notification.id);
+					setNotifications((prev) =>
+						prev.map((n) =>
+							n.id === notification.id ? { ...n, read: true } : n
+						)
+					);
+				} catch (error) {
+					console.error("Error marking notification as read:", error);
+				}
+			}
 		} catch (error: any) {
 			console.error("Error following back:", error);
 			// If already following, update state
@@ -189,6 +214,19 @@ const NotificationsScreen = () => {
 					...prev,
 					[notification.fromUserId]: true,
 				}));
+				// Mark as read even if error says already following
+				if (!notification.read) {
+					try {
+						await markNotificationAsRead(currentUser.uid, notification.id);
+						setNotifications((prev) =>
+							prev.map((n) =>
+								n.id === notification.id ? { ...n, read: true } : n
+							)
+						);
+					} catch (readError) {
+						console.error("Error marking notification as read:", readError);
+					}
+				}
 			}
 		}
 	};
@@ -205,70 +243,76 @@ const NotificationsScreen = () => {
 		}
 	};
 
-	const renderNotification = useCallback(({ item: notification }: { item: Notification }) => {
-		if (notification.type !== "follow") return null;
+	const renderNotification = useCallback(
+		({ item: notification }: { item: Notification }) => {
+			if (notification.type !== "follow") return null;
 
-		const isFollowingUser = followingMap[notification.fromUserId] || false;
-		const isUnread = !notification.read;
+			const isFollowingUser = followingMap[notification.fromUserId] || false;
+			const isUnread = !notification.read;
 
-		return (
-			<TouchableOpacity
-				style={[styles.notificationItem, isUnread && styles.unreadItem]}
-				onPress={() => handleNotificationPress(notification)}
-				activeOpacity={0.7}
-			>
+			return (
 				<TouchableOpacity
-					onPress={() => {
-						if (notification.fromUsername) {
-							router.push(`/user/${notification.fromUsername}`);
-						}
-					}}
+					style={[styles.notificationItem, isUnread && styles.unreadItem]}
+					onPress={() => handleNotificationPress(notification)}
+					activeOpacity={0.7}
 				>
-					{notification.fromProfilePicture ? (
-						<Image
-							source={{ uri: notification.fromProfilePicture }}
-							style={styles.avatar}
-						/>
-					) : (
-						<Ionicons
-							name="person-circle"
-							size={50}
-							color={Colors.accent}
-						/>
-					)}
-				</TouchableOpacity>
-				<View style={styles.notificationContent}>
-					<Text style={styles.notificationText}>
-						<Text style={styles.username}>
-							{notification.fromUsername}
-						</Text>
-						{" followed you"}
-					</Text>
-					<Text style={styles.timestamp}>
-						{formatTimestamp(notification.createdAt)}
-					</Text>
-				</View>
-				<View style={styles.rightActions}>
-					{!isFollowingUser && (
-						<TikTokButton
-							label="Follow Back"
-							onPress={() => handleFollowBack(notification)}
-							variant="primary"
-						/>
-					)}
 					<TouchableOpacity
-						style={styles.trashIconButton}
-						onPress={(e) => {
-							e.stopPropagation();
-							handleDeleteNotification(notification);
+						onPress={() => {
+							if (notification.fromUsername) {
+								router.push(`/user/${notification.fromUsername}`);
+							}
 						}}
 					>
-						<Ionicons name="trash-outline" size={22} color={Colors.text.secondary} />
+						{notification.fromProfilePicture ? (
+							<Image
+								source={{ uri: notification.fromProfilePicture }}
+								style={styles.avatar}
+							/>
+						) : (
+							<Ionicons name="person-circle" size={50} color={Colors.accent} />
+						)}
 					</TouchableOpacity>
-				</View>
-			</TouchableOpacity>
-		);
-	}, [followingMap, handleNotificationPress, handleFollowBack, handleDeleteNotification]);
+					<View style={styles.notificationContent}>
+						<Text style={styles.notificationText}>
+							<Text style={styles.username}>{notification.fromUsername}</Text>
+							{" followed you"}
+						</Text>
+						<Text style={styles.timestamp}>
+							{formatTimestamp(notification.createdAt)}
+						</Text>
+					</View>
+					<View style={styles.rightActions}>
+						{!isFollowingUser && (
+							<TikTokButton
+								label="Follow Back"
+								onPress={() => handleFollowBack(notification)}
+								variant="primary"
+							/>
+						)}
+						<TouchableOpacity
+							style={styles.trashIconButton}
+							onPress={(e) => {
+								e.stopPropagation();
+								handleDeleteNotification(notification);
+							}}
+						>
+							<Ionicons
+								name="trash-outline"
+								size={22}
+								color={Colors.text.secondary}
+							/>
+						</TouchableOpacity>
+					</View>
+				</TouchableOpacity>
+			);
+		},
+		[
+			followingMap,
+			handleNotificationPress,
+			handleFollowBack,
+			handleDeleteNotification,
+		]
+	);
 
 	return (
 		<View style={styles.container}>
@@ -277,16 +321,16 @@ const NotificationsScreen = () => {
 			<MinimalHeader
 				title="Notifications"
 				rightAction={
-				<TouchableOpacity
-					onPress={handleMarkAllAsRead}
-					disabled={markingAllRead || notifications.every((n) => n.read)}
-				>
-					{markingAllRead ? (
-						<ActivityIndicator size="small" color={Colors.accent} />
-					) : (
+					<TouchableOpacity
+						onPress={handleMarkAllAsRead}
+						disabled={markingAllRead || notifications.every((n) => n.read)}
+					>
+						{markingAllRead ? (
+							<ActivityIndicator size="small" color={Colors.accent} />
+						) : (
 							<Text style={styles.markAllText}>Mark all</Text>
-					)}
-				</TouchableOpacity>
+						)}
+					</TouchableOpacity>
 				}
 			/>
 
@@ -412,4 +456,3 @@ const styles = StyleSheet.create({
 });
 
 export default NotificationsScreen;
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
 	View,
 	StyleSheet,
@@ -8,8 +8,10 @@ import {
 	ActivityIndicator,
 	RefreshControl,
 	Image,
+	TextInput,
+	Modal,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,9 +25,19 @@ import {
 	Layout,
 } from "../constants/DesignSystem";
 import { getCurrentUser } from "../config/auth";
-import { fetchConversations, markConversationRead } from "../config/messaging";
+import {
+	fetchConversations,
+	markConversationRead,
+	getMutualFollowers,
+	createConversation,
+	getConversationId,
+} from "../config/messaging";
 import { Conversation } from "../config/types";
-import { fetchUserProfile, UserPublicProfile } from "../config/social";
+import {
+	fetchUserProfile,
+	UserPublicProfile,
+	UserSummary,
+} from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const BOTTOM_NAV_HEIGHT = 70;
@@ -58,12 +70,26 @@ const InboxScreen = () => {
 	const [participantProfiles, setParticipantProfiles] = useState<
 		Record<string, UserPublicProfile>
 	>({});
+	const [searchQuery, setSearchQuery] = useState("");
+	const [showNewChatModal, setShowNewChatModal] = useState(false);
+	const [mutualFollowers, setMutualFollowers] = useState<UserSummary[]>([]);
+	const [loadingMutualFollowers, setLoadingMutualFollowers] = useState(false);
+	const [creatingChat, setCreatingChat] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (currentUser) {
 			loadConversations();
 		}
 	}, []); // Only load once on mount, like feed and profile pages
+
+	// Refresh conversations when screen comes into focus (e.g., returning from chat)
+	useFocusEffect(
+		useCallback(() => {
+			if (currentUser) {
+				loadConversations();
+			}
+		}, [currentUser])
+	);
 
 	const loadConversations = async () => {
 		if (!currentUser) return;
@@ -106,6 +132,17 @@ const InboxScreen = () => {
 		setRefreshing(false);
 	};
 
+	const getOtherParticipant = useCallback(
+		(conversation: Conversation): string | null => {
+			if (!currentUser) return null;
+			const other = conversation.participants.find(
+				(id: string) => id !== currentUser.uid
+			);
+			return other || null;
+		},
+		[currentUser]
+	);
+
 	const handleConversationPress = async (conversation: Conversation) => {
 		if (!currentUser) return;
 
@@ -116,12 +153,75 @@ const InboxScreen = () => {
 		router.push(`/chat/${conversation.id}`);
 	};
 
-	const getOtherParticipant = (conversation: Conversation): string | null => {
-		if (!currentUser) return null;
-		const other = conversation.participants.find(
-			(id: string) => id !== currentUser.uid
-		);
-		return other || null;
+	// Filter conversations based on search query
+	const filteredConversations = useMemo(() => {
+		if (!searchQuery.trim()) {
+			return conversations;
+		}
+
+		const query = searchQuery.toLowerCase().trim();
+		return conversations.filter((conv) => {
+			const otherParticipantId = getOtherParticipant(conv);
+			const otherParticipant = otherParticipantId
+				? participantProfiles[otherParticipantId]
+				: null;
+			const username = otherParticipant?.username || "";
+			return username.toLowerCase().includes(query);
+		});
+	}, [conversations, searchQuery, participantProfiles, getOtherParticipant]);
+
+	const handleNewChatPress = async () => {
+		if (!currentUser) return;
+
+		setShowNewChatModal(true);
+		setLoadingMutualFollowers(true);
+		try {
+			const followers = await getMutualFollowers(currentUser.uid);
+			
+			// Get IDs of users we already have conversations with
+			const existingConversationUserIds = new Set<string>();
+			conversations.forEach((conv) => {
+				const otherId = getOtherParticipant(conv);
+				if (otherId) {
+					existingConversationUserIds.add(otherId);
+				}
+			});
+			
+			// Filter out mutual followers who already have conversations
+			const availableFollowers = followers.filter(
+				(follower) => !existingConversationUserIds.has(follower.uid)
+			);
+			
+			setMutualFollowers(availableFollowers);
+		} catch (error) {
+			console.error("[InboxScreen] Error loading mutual followers:", error);
+		} finally {
+			setLoadingMutualFollowers(false);
+		}
+	};
+
+	const handleSelectMutualFollower = async (recipientId: string) => {
+		if (!currentUser || creatingChat) return;
+
+		setCreatingChat(recipientId);
+		try {
+			// Check if conversation already exists
+			let conversationId = await getConversationId(currentUser.uid, recipientId);
+			
+			// If it doesn't exist, create it
+			if (!conversationId) {
+				conversationId = await createConversation(currentUser.uid, recipientId);
+			}
+
+			// Close modal and navigate to chat
+			setShowNewChatModal(false);
+			setSearchQuery(""); // Clear search
+			router.push(`/chat/${conversationId}`);
+		} catch (error) {
+			console.error("[InboxScreen] Error creating/opening chat:", error);
+		} finally {
+			setCreatingChat(null);
+		}
 	};
 
 	const renderConversation = useCallback(
@@ -207,7 +307,51 @@ const InboxScreen = () => {
 		<View style={styles.container}>
 			<StatusBar style="dark" />
 
-			<MinimalHeader title="Inbox" />
+			<MinimalHeader
+				title="Inbox"
+				rightAction={
+					<TouchableOpacity onPress={handleNewChatPress}>
+						<Ionicons
+							name="add-circle-outline"
+							size={28}
+							color={Colors.accent}
+						/>
+					</TouchableOpacity>
+				}
+			/>
+
+			{/* Search Bar */}
+			<View style={styles.searchContainer}>
+				<View style={styles.searchBar}>
+					<Ionicons
+						name="search-outline"
+						size={20}
+						color={Colors.text.secondary}
+						style={styles.searchIcon}
+					/>
+					<TextInput
+						style={styles.searchInput}
+						placeholder="Search conversations..."
+						placeholderTextColor={Colors.text.secondary}
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						autoCapitalize="none"
+						autoCorrect={false}
+					/>
+					{searchQuery.length > 0 && (
+						<TouchableOpacity
+							onPress={() => setSearchQuery("")}
+							style={styles.clearButton}
+						>
+							<Ionicons
+								name="close-circle"
+								size={20}
+								color={Colors.text.secondary}
+							/>
+						</TouchableOpacity>
+					)}
+				</View>
+			</View>
 
 			{/* Conversations List */}
 			{loading ? (
@@ -216,7 +360,7 @@ const InboxScreen = () => {
 				</View>
 			) : (
 				<FlatList
-					data={conversations}
+					data={filteredConversations}
 					renderItem={renderConversation}
 					keyExtractor={(item) => item.id}
 					windowSize={5}
@@ -243,18 +387,111 @@ const InboxScreen = () => {
 					ListEmptyComponent={
 						<View style={styles.emptyContainer}>
 							<Ionicons
-								name="chatbubbles-outline"
+								name={
+									searchQuery.trim()
+										? "search-outline"
+										: "chatbubbles-outline"
+								}
 								size={64}
 								color={Colors.text.secondary}
 							/>
-							<Text style={styles.emptyText}>No messages yet</Text>
-							<Text style={styles.emptySubtext}>
-								Share games with mutual followers to start conversations
+							<Text style={styles.emptyText}>
+								{searchQuery.trim()
+									? "No conversations found"
+									: "No messages yet"}
 							</Text>
+							{!searchQuery.trim() && (
+								<Text style={styles.emptySubtext}>
+									Share games with mutual followers to start conversations
+								</Text>
+							)}
 						</View>
 					}
 				/>
 			)}
+
+			{/* New Chat Modal */}
+			<Modal
+				visible={showNewChatModal}
+				animationType="slide"
+				presentationStyle="pageSheet"
+				onRequestClose={() => setShowNewChatModal(false)}
+			>
+				<View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+					<StatusBar style="dark" />
+					<View style={styles.modalHeader}>
+						<Text style={styles.modalTitle}>New Chat</Text>
+						<TouchableOpacity
+							onPress={() => setShowNewChatModal(false)}
+							style={styles.closeButton}
+						>
+							<Ionicons name="close" size={28} color={Colors.text.primary} />
+						</TouchableOpacity>
+					</View>
+
+					{loadingMutualFollowers ? (
+						<View style={styles.loadingContainer}>
+							<ActivityIndicator size="large" color={Colors.accent} />
+						</View>
+					) : mutualFollowers.length === 0 ? (
+						<View style={styles.emptyContainer}>
+							<Ionicons
+								name="people-outline"
+								size={64}
+								color={Colors.text.secondary}
+							/>
+							<Text style={styles.emptyText}>No mutual followers</Text>
+							<Text style={styles.emptySubtext}>
+								Follow users who follow you back to start chatting
+							</Text>
+						</View>
+					) : (
+						<FlatList
+							data={mutualFollowers}
+							keyExtractor={(item) => item.uid}
+							renderItem={({ item }) => {
+								const isCreating = creatingChat === item.uid;
+								return (
+									<TouchableOpacity
+										style={styles.mutualFollowerItem}
+										onPress={() => handleSelectMutualFollower(item.uid)}
+										disabled={isCreating}
+									>
+										{item.profilePicture ? (
+											<Image
+												source={{ uri: item.profilePicture }}
+												style={styles.avatar}
+											/>
+										) : (
+											<Ionicons
+												name="person-circle"
+												size={50}
+												color={Colors.text.secondary}
+											/>
+										)}
+										<Text style={styles.username}>{item.username}</Text>
+										{isCreating ? (
+											<ActivityIndicator
+												size="small"
+												color={Colors.accent}
+											/>
+										) : (
+											<Ionicons
+												name="chevron-forward"
+												size={20}
+												color={Colors.text.secondary}
+											/>
+										)}
+									</TouchableOpacity>
+								);
+							}}
+							contentContainerStyle={{
+								paddingBottom: insets.bottom + Spacing.lg,
+							}}
+						/>
+					)}
+				</View>
+			</Modal>
 		</View>
 	);
 };
@@ -372,6 +609,64 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
 		textAlign: "center",
+	},
+	searchContainer: {
+		paddingHorizontal: Layout.margin,
+		paddingTop: Spacing.md,
+		paddingBottom: Spacing.sm,
+		backgroundColor: Colors.background.primary,
+	},
+	searchBar: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.lg,
+		paddingHorizontal: Spacing.md,
+		height: 48,
+		borderWidth: 0,
+	},
+	searchIcon: {
+		marginRight: Spacing.sm,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		paddingVertical: Spacing.sm,
+	},
+	clearButton: {
+		padding: Spacing.xs,
+	},
+	modalContainer: {
+		flex: 1,
+		backgroundColor: Colors.background.secondary,
+	},
+	modalHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingHorizontal: Layout.margin,
+		paddingVertical: Spacing.md,
+		backgroundColor: Colors.background.primary,
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
+	},
+	modalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	closeButton: {
+		padding: Spacing.xs,
+	},
+	mutualFollowerItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: Colors.background.primary,
+		padding: Layout.margin,
+		borderBottomWidth: 0.5,
+		borderBottomColor: Colors.border,
+		gap: Spacing.md,
 	},
 });
 

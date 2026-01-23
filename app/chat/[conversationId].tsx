@@ -104,6 +104,10 @@ const ChatScreen = () => {
 			if (unsubscribe) {
 				unsubscribe();
 			}
+			// Mark as read when exiting the chat
+			if (conversationId && currentUser) {
+				markAsRead();
+			}
 		};
 	}, [conversationId, currentUser]);
 
@@ -359,7 +363,7 @@ const ChatScreen = () => {
 					data={messages}
 					renderItem={renderMessage}
 					keyExtractor={(item) => item.id}
-					inverted
+					// inverted
 					windowSize={5}
 					initialNumToRender={10}
 					maxToRenderPerBatch={5}

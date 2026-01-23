@@ -6,6 +6,7 @@ import {
 	Text,
 	Image,
 	ActivityIndicator,
+	Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,18 +29,24 @@ import {
 import { Puzzle } from "../config/types";
 import { db, parsePuzzleId, docExists } from "../config/firebase";
 
+import { GameResult } from "../config/types";
+
 interface GameSocialOverlayProps {
 	puzzle: Puzzle;
 	gameId: string;
+	completedResult?: GameResult | null;
 	onCommentPress: () => void;
 	onSharePress: () => void;
+	onShareCompletion?: () => void;
 }
 
 const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	puzzle,
 	gameId,
+	completedResult,
 	onCommentPress,
 	onSharePress,
+	onShareCompletion,
 }) => {
 	const router = useRouter();
 	const currentUser = getCurrentUser();
@@ -50,6 +57,7 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 	const [loadingFollow, setLoadingFollow] = useState(false);
 	const [loadingLike, setLoadingLike] = useState(false);
 	const [loading, setLoading] = useState(true);
+	const [showShareMenu, setShowShareMenu] = useState(false);
 
 	const creatorId = puzzle.uid;
 	const creatorUsername = puzzle.username;
@@ -284,7 +292,7 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 			{/* Share Button */}
 			<TouchableOpacity
 				style={styles.actionButton}
-				onPress={onSharePress}
+				onPress={() => setShowShareMenu(true)}
 				activeOpacity={0.7}
 			>
 				<Ionicons
@@ -293,6 +301,66 @@ const GameSocialOverlay: React.FC<GameSocialOverlayProps> = ({
 					color={Colors.text.primary}
 				/>
 			</TouchableOpacity>
+
+			{/* Share Menu Modal */}
+			<Modal
+				visible={showShareMenu}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setShowShareMenu(false)}
+			>
+				<TouchableOpacity
+					style={styles.shareMenuOverlay}
+					activeOpacity={1}
+					onPress={() => setShowShareMenu(false)}
+				>
+					<View style={styles.shareMenuContainer}>
+						<TouchableOpacity
+							style={styles.shareMenuItem}
+							onPress={() => {
+								setShowShareMenu(false);
+								onSharePress();
+							}}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name="chatbubbles-outline"
+								size={24}
+								color={Colors.text.primary}
+							/>
+							<Text style={styles.shareMenuText}>Share to DM</Text>
+						</TouchableOpacity>
+						{completedResult && onShareCompletion && (
+							<TouchableOpacity
+								style={styles.shareMenuItem}
+								onPress={async () => {
+									setShowShareMenu(false);
+									console.log("[GameSocialOverlay] Share Result pressed");
+									// Wait for modal to fully close before calling Share API
+									setTimeout(async () => {
+										try {
+											await onShareCompletion();
+										} catch (error) {
+											console.error(
+												"[GameSocialOverlay] Error calling onShareCompletion:",
+												error
+											);
+										}
+									}, 300); // Small delay to ensure modal is fully closed
+								}}
+								activeOpacity={0.7}
+							>
+								<Ionicons
+									name="share-outline"
+									size={24}
+									color={Colors.text.primary}
+								/>
+								<Text style={styles.shareMenuText}>Share Result</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				</TouchableOpacity>
+			</Modal>
 		</View>
 	);
 };
@@ -359,6 +427,31 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.small,
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.primary,
+	},
+	shareMenuOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	shareMenuContainer: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.sm,
+		minWidth: 200,
+		...Shadows.heavy,
+	},
+	shareMenuItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.md,
+		borderRadius: BorderRadius.md,
+	},
+	shareMenuText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
 	},
 });
 
