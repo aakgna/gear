@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import auth from "@react-native-firebase/auth";
 import { getCurrentUser } from "../config/auth";
-import { getAllGameHistoryIds } from "../config/firebase";
 
 const REFRESH_RECOMMENDATIONS_URL =
 	"https://us-central1-gear-ff009.cloudfunctions.net/refresh_user_recommendations";
@@ -84,37 +83,11 @@ export const triggerSessionEndRefresh = async (
 				return;
 			}
 
-			// Get game history with timeout (when app is backgrounded, this can hang)
-			console.log("[triggerSessionEndRefresh] Getting game history IDs...");
-			let historyIds: Set<string> = new Set();
-
-			try {
-				// Add timeout to prevent hanging
-				const historyPromise = getAllGameHistoryIds(user.uid);
-				const timeoutPromise = new Promise<Set<string>>((resolve) => {
-					setTimeout(() => {
-						console.log(
-							"[triggerSessionEndRefresh] Game history query timed out, using empty set"
-						);
-						resolve(new Set());
-					}, 2000); // 2 second timeout
-				});
-
-				historyIds = await Promise.race([historyPromise, timeoutPromise]);
-			} catch (error) {
-				console.error(
-					"[triggerSessionEndRefresh] Error getting game history:",
-					error
-				);
-				// Continue with empty set if history query fails
-				historyIds = new Set();
-			}
-
-			const excludeIds = Array.from(
-				new Set([...currentFeedIds, ...historyIds])
-			);
+			// Only exclude current feed IDs to avoid duplicates
+			// The Firebase function will handle excluding completed games internally
+			const excludeIds = currentFeedIds;
 			console.log(
-				`[triggerSessionEndRefresh] Excluding ${excludeIds.length} game IDs (${historyIds.size} from history)`
+				`[triggerSessionEndRefresh] Excluding ${excludeIds.length} game IDs from current feed`
 			);
 
 			console.log(

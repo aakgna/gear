@@ -944,10 +944,16 @@ const FeedScreen = () => {
 				fetchGamesByIds(precomputedGameIds)
 					.then((firestoreGames) => {
 						// Convert FirestoreGame to Puzzle
+						// Create a map for O(1) lookup while preserving order from precomputedGameIds
+						const gameMap = new Map<string, FirestoreGame>();
+						firestoreGames.forEach((game) => {
+							gameMap.set(game.id, game);
+						});
+
 						const puzzles: Puzzle[] = [];
-						for (let i = 0; i < precomputedGameIds.length; i++) {
-							const gameId = precomputedGameIds[i];
-							const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+						// Iterate through precomputedGameIds in order to preserve Firebase order
+						for (const gameId of precomputedGameIds) {
+							const firestoreGame = gameMap.get(gameId);
 							if (firestoreGame) {
 								const puzzle = convertFirestoreGameToPuzzle(
 									firestoreGame,
