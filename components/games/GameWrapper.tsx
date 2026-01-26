@@ -513,6 +513,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			console.log("[handleShare] Starting share...");
 			// Create shareable link - using game ID that can be used in the app
 			const gameLink = `thinktok://game/${puzzle.id}`;
+			
+			// App store links for users without the app
+			const iosAppStoreLink = "https://apps.apple.com/app/thinktok/id6739000000"; // Update with actual App Store ID
+			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
 
 			let message = `I just completed ${formatGameType(
 				puzzle.type
@@ -523,7 +527,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				message += `Tries: ${completedResult.attempts}\n`;
 			}
 
-			message += `\nCan you beat my score?\n\nPlay this game: ${gameLink}\n\nOr search for game ID: ${puzzle.id} in ThinkTok`;
+			message += `\nCan you beat my score?\n\n`;
+			message += `Play this game: ${gameLink}\n\n`;
+			message += `Or search for game ID: ${puzzle.id} in ThinkTok\n\n`;
+			message += `Don't have ThinkTok? Download it:\n`;
+			message += `iOS: ${iosAppStoreLink}\n`;
+			message += `Android: ${androidPlayStoreLink}`;
 
 			// Share with message - the link will be shareable as text
 			// On iOS, Share.share with message will allow sharing to iMessage, Instagram, etc.
@@ -988,6 +997,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				visible={showCommentsModal}
 				gameId={puzzle.id}
 				onClose={() => setShowCommentsModal(false)}
+				onCommentAdded={() => {
+					// Optimistically increment comment count
+					setCommentCount((prev) => prev + 1);
+				}}
 			/>
 
 			{/* Share to DM Modal */}

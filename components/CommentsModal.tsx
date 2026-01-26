@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
 	Colors,
@@ -41,13 +42,16 @@ interface CommentsModalProps {
 	visible: boolean;
 	gameId: string;
 	onClose: () => void;
+	onCommentAdded?: () => void; // Callback when a comment is successfully added
 }
 
 const CommentsModal: React.FC<CommentsModalProps> = ({
 	visible,
 	gameId,
 	onClose,
+	onCommentAdded,
 }) => {
+	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const currentUser = getCurrentUser();
 	const [comments, setComments] = useState<GameComment[]>([]);
@@ -153,6 +157,10 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		try {
 			await addGameComment(gameId, currentUser.uid, newComment.trim());
 			setNewComment("");
+			// Notify parent that a comment was added (for optimistic UI updates)
+			if (onCommentAdded) {
+				onCommentAdded();
+			}
 		} catch (error) {
 			console.error("[CommentsModal] Error submitting comment:", error);
 		} finally {
@@ -273,6 +281,13 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		return timestamp.toLocaleDateString();
 	};
 
+	const handleProfilePress = (username: string) => {
+		if (username) {
+			onClose(); // Close the modal before navigating
+			router.push(`/user/${username}`);
+		}
+	};
+
 	const renderComment = ({ item }: { item: GameComment }) => {
 		const isLiked =
 			currentUser && (item.likedBy?.includes(currentUser.uid) || false);
@@ -286,20 +301,30 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		return (
 			<View style={styles.commentItem}>
 				<View style={styles.commentHeader}>
-					{item.profilePicture ? (
-						<Image
-							source={{ uri: item.profilePicture }}
-							style={styles.commentAvatar}
-						/>
-					) : (
-						<Ionicons
-							name="person-circle"
-							size={32}
-							color={Colors.text.secondary}
-						/>
-					)}
+					<TouchableOpacity
+						onPress={() => handleProfilePress(item.username)}
+						activeOpacity={0.7}
+					>
+						{item.profilePicture ? (
+							<Image
+								source={{ uri: item.profilePicture }}
+								style={styles.commentAvatar}
+							/>
+						) : (
+							<Ionicons
+								name="person-circle"
+								size={32}
+								color={Colors.text.secondary}
+							/>
+						)}
+					</TouchableOpacity>
 					<View style={styles.commentContent}>
-						<Text style={styles.commentUsername}>{item.username}</Text>
+						<TouchableOpacity
+							onPress={() => handleProfilePress(item.username)}
+							activeOpacity={0.7}
+						>
+							<Text style={styles.commentUsername}>{item.username}</Text>
+						</TouchableOpacity>
 						<Text style={styles.commentText}>{item.text}</Text>
 						<View style={styles.commentFooter}>
 							<Text style={styles.commentTime}>

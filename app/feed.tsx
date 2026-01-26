@@ -55,6 +55,7 @@ import {
 	SequencingData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
+import WelcomeCard from "../components/WelcomeCard";
 import { useGameStore } from "../stores/gameStore";
 import {
 	fetchGamesFromFirestore,
@@ -1979,6 +1980,11 @@ const FeedScreen = () => {
 				const newIndex = viewableItems[0].index ?? 0;
 				const newPuzzleId = viewableItems[0].item?.id;
 
+				// Skip welcome card in viewability tracking
+				if (newPuzzleId === "__welcome__") {
+					return;
+				}
+
 				// Get current state for the active tab
 				const currentTabPuzzleId =
 					activeTab === "forYou"
@@ -2194,8 +2200,11 @@ const FeedScreen = () => {
 
 	// Initialize first puzzle timer
 	useEffect(() => {
-		if (displayedPuzzles.length > 0 && !currentPuzzleId) {
-			const firstPuzzleId = displayedPuzzles[0].id;
+		if (feedData.length > 0 && !currentPuzzleId) {
+			// Find first non-welcome puzzle
+			const firstPuzzle = feedData.find(p => p.id !== "__welcome__");
+			if (!firstPuzzle) return;
+			const firstPuzzleId = firstPuzzle.id;
 			setCurrentPuzzleId(firstPuzzleId);
 			setCurrentIndex(0);
 			// Calculate startTime for first puzzle (elapsed time is 0, so startTime is now)
@@ -2205,7 +2214,7 @@ const FeedScreen = () => {
 			// Mark when first puzzle became visible
 			puzzleVisibleTimesRef.current[firstPuzzleId] = Date.now();
 		}
-	}, [displayedPuzzles, currentPuzzleId]);
+	}, [feedData, currentPuzzleId, setCurrentPuzzleId, setCurrentIndex]);
 
 	// Handle elapsed time updates from games
 	const handleElapsedTimeUpdate = useCallback(
@@ -2296,8 +2305,36 @@ const FeedScreen = () => {
 		);
 	}, [feedHeight, headerHeight]);
 
+	// Create data array with welcome card as permanent first item (only for "For You" tab)
+	const feedData = useMemo(() => {
+		// Always show welcome card as first item in "For You" tab
+		if (activeTab === "forYou") {
+			// Create a placeholder puzzle object for the welcome card
+			const welcomeCard: Puzzle = {
+				id: "__welcome__",
+				type: "wordle" as PuzzleType, // Dummy type, won't be used
+				difficulty: "easy",
+				data: {} as any, // Dummy data
+				createdAt: new Date(),
+				uid: "",
+				username: "",
+			};
+			return [welcomeCard, ...displayedPuzzles];
+		}
+		return displayedPuzzles;
+	}, [displayedPuzzles, activeTab]);
+
 	const renderPuzzleCard = useCallback(
 		({ item, index }: { item: Puzzle; index: number }) => {
+			// Check if this is the welcome card
+			if (item.id === "__welcome__") {
+				return (
+					<View style={[styles.puzzleCard, { height: itemHeight }]}>
+						<WelcomeCard height={itemHeight} />
+					</View>
+				);
+			}
+
 			// Check if this puzzle is currently active/visible for the current tab
 			const currentTabPuzzleId =
 				activeTab === "forYou"
@@ -2514,10 +2551,10 @@ const FeedScreen = () => {
 							}
 						}}
 					>
-						{displayedPuzzles.length > 0 ? (
+						{feedData.length > 0 ? (
 							<FlatList
 								ref={forYouFlatListRef}
-								data={displayedPuzzles}
+								data={feedData}
 								renderItem={renderPuzzleCard}
 								keyExtractor={(item) => item.id}
 								getItemLayout={
@@ -2557,7 +2594,7 @@ const FeedScreen = () => {
 									wait.then(() => {
 										if (
 											forYouFlatListRef.current &&
-											info.index < displayedPuzzles.length
+											info.index < feedData.length
 										) {
 											forYouFlatListRef.current.scrollToIndex({
 												index: info.index,
