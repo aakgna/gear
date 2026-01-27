@@ -87,10 +87,6 @@ import {
 	addSkippedGame,
 	addAttemptedGame,
 	moveFromSkippedToAttempted,
-	requestNotificationPermission,
-	getFCMToken,
-	registerFCMToken,
-	removeFCMToken,
 } from "../config/auth";
 import { fetchFollowingFeed, getBlockedUsers } from "../config/social";
 
@@ -565,6 +561,7 @@ const FeedScreen = () => {
 		if (!user) return;
 
 		setLoadingFollowing(true);
+		setFollowingPuzzles([]);
 		try {
 			const followingGames = await fetchFollowingFeed(user.uid, 50);
 
@@ -882,6 +879,78 @@ const FeedScreen = () => {
 			setCurrentIndexForYou(0);
 			setCurrentPuzzleIdForYou("");
 			setLoading(true);
+			// Trigger fresh recommendations (minimal inline version)
+			const user = getCurrentUser();
+			if (user) {
+				try {
+					const historyIds = await getAllGameHistoryIds(user.uid);
+					const idToken = await auth().currentUser?.getIdToken();
+					if (idToken) {
+						const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+							method: "POST",
+							headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+							body: JSON.stringify({ data: { excludeGameIds: historyIds, count: 50 } }),
+						});
+						const result = await res.json();
+						if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
+							// Fetch games directly
+							const firestoreGames = await fetchGamesByIds(result.result.gameIds);
+							
+							// Convert to puzzles
+							const puzzles: Puzzle[] = [];
+							for (const gameId of result.result.gameIds) {
+								const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+								if (firestoreGame) {
+									const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
+									if (puzzle) {
+										puzzles.push(puzzle);
+									}
+								}
+							}
+							
+							// Filter out blocked users
+							const blockedUserIds = await getBlockedUsers(user.uid);
+							const blockedSet = new Set(blockedUserIds);
+							const filteredByBlock = puzzles.filter((puzzle) => {
+								if (!puzzle.uid) return true;
+								return !blockedSet.has(puzzle.uid);
+							});
+							
+							// Set puzzles immediately (replace feed)
+							setDisplayedPuzzles(filteredByBlock);
+							setAllRecommendedPuzzles(filteredByBlock);
+							setPuzzles(filteredByBlock);
+							
+							// Initialize elapsed times
+							const initialElapsedTimes: Record<string, number> = {};
+							filteredByBlock.forEach((puzzle) => {
+								initialElapsedTimes[puzzle.id] = 0;
+							});
+							puzzleElapsedTimesRef.current = initialElapsedTimes;
+							
+							// Filter completed games in background (non-blocking)
+							getAllCompletedGameIds(user.uid).then((completedIds) => {
+								const filteredPuzzles = filteredByBlock.filter(
+									(puzzle) => !completedIds.has(puzzle.id)
+								);
+								if (filteredPuzzles.length !== filteredByBlock.length) {
+									setDisplayedPuzzles(filteredPuzzles);
+									setAllRecommendedPuzzles(filteredPuzzles);
+									setPuzzles(filteredPuzzles);
+								}
+							}).catch((error) => {
+								console.error("Error filtering completed games:", error);
+							});
+							
+							setLoading(false);
+							return; // Exit early - feed is populated
+						}
+					}
+				} catch (e) {
+					console.error("Recommendation refresh failed:", e);
+				}
+			}
+			
 			await loadPuzzlesFromFirestore();
 		} else {
 			setActiveTab("forYou");
@@ -900,6 +969,7 @@ const FeedScreen = () => {
 			// Reset state and reload
 			setCurrentIndexFollowing(0);
 			setCurrentPuzzleIdFollowing("");
+			setLoadingFollowing(true);
 			await loadFollowingFeed();
 		} else {
 			setActiveTab("following");
@@ -922,63 +992,6 @@ const FeedScreen = () => {
 			// 2. User document exists but doesn't have username field (!data.username)
 			if (!data || !data.username) {
 				router.replace("/username");
-				return;
-			}
-
-			// Check if this is a first-time user (fcmToken is undefined)
-			// Only prompt on initial load to avoid showing prompt on every mount
-			if (isInitialLoad && data && data.fcmToken === undefined) {
-				// Show notification prompt after a small delay to ensure smooth UI load
-				setTimeout(() => {
-					Alert.alert(
-						"Enable Notifications?",
-						"Stay updated with new games, likes, and messages. You can change this later in your profile settings.",
-						[
-							{
-								text: "Not Now",
-								style: "cancel",
-								onPress: async () => {
-									try {
-										// Mark as opted out
-										await removeFCMToken(user.uid);
-									} catch (error) {
-										console.error("Error saving notification preference:", error);
-									}
-								},
-							},
-							{
-								text: "Enable",
-								onPress: async () => {
-									try {
-										const hasPermission = await requestNotificationPermission();
-										if (hasPermission) {
-											const token = await getFCMToken();
-											if (token) {
-												await registerFCMToken(user.uid, token);
-											} else {
-												// Failed to get token, mark as opted out
-												await removeFCMToken(user.uid);
-											}
-										} else {
-											// Permission denied, mark as opted out
-											await removeFCMToken(user.uid);
-											Alert.alert(
-												"Permission Denied",
-												"You can enable notifications later in your profile settings."
-											);
-										}
-									} catch (error) {
-										console.error("Error enabling notifications:", error);
-										Alert.alert(
-											"Error",
-											"Failed to enable notifications. You can try again later in your profile settings."
-										);
-									}
-								},
-							},
-						]
-					);
-				}, 1000);
 			}
 		}
 	};

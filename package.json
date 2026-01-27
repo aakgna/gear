@@ -22,7 +22,7 @@
 		"@react-native-firebase/app": "^23.5.0",
 		"@react-native-firebase/auth": "^23.5.0",
 		"@react-native-firebase/firestore": "^23.5.0",
-		"@react-native-firebase/messaging": "^23.5.0",
+		"@react-native-firebase/messaging": "23.5",
 		"@react-native-google-signin/google-signin": "^16.0.0",
 		"@react-navigation/bottom-tabs": "^7.2.0",
 		"@react-navigation/drawer": "^7.1.1",
