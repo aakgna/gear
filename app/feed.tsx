@@ -2408,7 +2408,7 @@ const FeedScreen = () => {
 			<>
 				{/* Glassmorphism header */}
 				<View
-					style={[styles.header, { paddingTop: insets.top }]}
+					style={[styles.header, { paddingTop: insets.top}]}
 					onLayout={(e) => {
 						const height = e.nativeEvent.layout.height;
 						if (height > 0 && height !== headerHeight) {
@@ -2416,40 +2416,11 @@ const FeedScreen = () => {
 						}
 					}}
 				>
-					<BlurView
-						intensity={80}
-						tint="light"
-						style={[
-							StyleSheet.absoluteFill,
-							{
-								elevation: 0,
-								shadowOpacity: 0,
-								shadowRadius: 0,
-								shadowOffset: { width: 0, height: 0 },
-								shadowColor: "transparent",
-								borderBottomWidth: 0,
-							},
-						]}
-					/>
+
 				</View>
 
 				{/* Tabs with animated indicator */}
 				<View style={styles.tabContainer}>
-					<BlurView
-						intensity={60}
-						tint="light"
-						style={[
-							StyleSheet.absoluteFill,
-							{
-								elevation: 0,
-								shadowOpacity: 0,
-								shadowRadius: 0,
-								shadowOffset: { width: 0, height: 0 },
-								shadowColor: "transparent",
-								borderBottomWidth: 0,
-							},
-						]}
-					/>
 					<Animated.View
 						style={[
 							styles.tabIndicator,
@@ -2729,11 +2700,11 @@ const styles = StyleSheet.create({
 		shadowColor: "transparent",
 	},
 	header: {
-		backgroundColor: "rgba(255, 255, 255, 0.95)",
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 0,
 		borderBottomColor: "transparent",
 		zIndex: 10,
-		paddingHorizontal: Layout.margin,
+		paddingHorizontal: 0,
 		paddingBottom: 0,
 		overflow: "hidden",
 		height: 40,
@@ -2752,7 +2723,7 @@ const styles = StyleSheet.create({
 	},
 	tabContainer: {
 		flexDirection: "row",
-		backgroundColor: "rgba(255, 255, 255, 0.95)",
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 0,
 		borderBottomColor: "transparent",
 		position: "relative",
@@ -2764,6 +2735,7 @@ const styles = StyleSheet.create({
 		shadowRadius: 0,
 		shadowOffset: { width: 0, height: 0 },
 		shadowColor: "transparent",
+		paddingHorizontal: 0,
 	},
 	tab: {
 		flex: 1,

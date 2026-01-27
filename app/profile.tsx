@@ -124,6 +124,13 @@ const ProfileScreen = () => {
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
 
+	// Games counter popup state
+	const [showGamesPopup, setShowGamesPopup] = useState(false);
+	const backdropOpacity = useRef(new Animated.Value(0)).current;
+	const popupTranslateY = useRef(new Animated.Value(-20)).current;
+	const counterButtonRef = useRef<View>(null);
+	const [counterButtonLayout, setCounterButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
 	const totalAttemptedGames = useMemo(() => {
 		if (!userData?.statsByCategory) return 0;
 		let total = 0;
@@ -134,6 +141,74 @@ const ProfileScreen = () => {
 		});
 		return total;
 	}, [userData?.statsByCategory]);
+
+	// Calculate stats from backend (Firestore) - all values come directly from userData
+	const gamesStats = useMemo(() => {
+		if (!userData) {
+			return { completed: 0, attempted: 0, skipped: 0 };
+		}
+
+		// Completed games - directly from backend
+		const completed = userData.totalGamesPlayed || 0;
+
+		// Attempted and Skipped - sum from statsByCategory (all from backend)
+		let attempted = 0;
+		let skipped = 0;
+		
+		if (userData.statsByCategory) {
+			Object.values(userData.statsByCategory).forEach((category) => {
+				// These values are already calculated and stored in Firestore
+				if (category.attempted && typeof category.attempted === "number") {
+					attempted += category.attempted;
+				}
+				if (category.skipped && typeof category.skipped === "number") {
+					skipped += category.skipped;
+				}
+			});
+		}
+
+		return {
+			completed, // From userData.totalGamesPlayed (backend)
+			attempted, // Sum from userData.statsByCategory[].attempted (backend)
+			skipped,   // Sum from userData.statsByCategory[].skipped (backend)
+		};
+	}, [userData]);
+
+	// Handle counter button press
+	const handleCounterPress = () => {
+		setShowGamesPopup(true);
+		Animated.parallel([
+			Animated.timing(backdropOpacity, {
+				toValue: 1,
+				duration: 200,
+				useNativeDriver: true,
+			}),
+			Animated.spring(popupTranslateY, {
+				toValue: 0,
+				tension: 100,
+				friction: 8,
+				useNativeDriver: true,
+			}),
+		]).start();
+	};
+
+	// Handle close popup
+	const handleClosePopup = () => {
+		Animated.parallel([
+			Animated.timing(backdropOpacity, {
+				toValue: 0,
+				duration: 150,
+				useNativeDriver: true,
+			}),
+			Animated.timing(popupTranslateY, {
+				toValue: -20,
+				duration: 150,
+				useNativeDriver: true,
+			}),
+		]).start(() => {
+			setShowGamesPopup(false);
+		});
+	};
 
 	// Tab indicator animation
 	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
@@ -1026,6 +1101,25 @@ const ProfileScreen = () => {
 							</Animated.View>
 						</View>
 
+						{/* Games Completed Counter */}
+						<View
+							ref={counterButtonRef}
+							style={styles.counterButtonContainer}
+							onLayout={(e) => {
+								const { x, y, width, height } = e.nativeEvent.layout;
+								setCounterButtonLayout({ x, y, width, height });
+							}}
+						>
+							<TouchableOpacity
+								style={styles.counterButton}
+								onPress={handleCounterPress}
+								activeOpacity={0.7}
+							>
+								<Ionicons name="trophy" size={16} color={Colors.accent} />
+								<Text style={styles.counterText}>{gamesStats.completed}</Text>
+							</TouchableOpacity>
+						</View>
+
 						{/* Bio */}
 						{userData?.bio && (
 							<Text style={styles.bioText}>{userData.bio}</Text>
@@ -1212,6 +1306,60 @@ const ProfileScreen = () => {
 						)}
 					</View>
 				</View>
+			</Modal>
+
+			{/* Games Stats Popup Modal */}
+			<Modal
+				visible={showGamesPopup}
+				transparent={true}
+				animationType="none"
+				onRequestClose={handleClosePopup}
+			>
+				<TouchableWithoutFeedback onPress={handleClosePopup}>
+					<Animated.View
+						style={[
+							styles.popupBackdrop,
+							{
+								opacity: backdropOpacity,
+							},
+						]}
+					>
+						<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+							<Animated.View
+								style={[
+									styles.popupCard,
+									{
+										transform: [{ translateY: popupTranslateY }],
+										top: counterButtonLayout.y + counterButtonLayout.height + 45,
+										right: SCREEN_WIDTH - counterButtonLayout.x - counterButtonLayout.width,
+									},
+								]}
+							>
+								<View style={styles.popupHeader}>
+									<Text style={styles.popupTitle}>Breakdown</Text>
+								</View>
+								<View style={styles.popupDivider} />
+								<View style={styles.popupStats}>
+									<View style={styles.popupStatRow}>
+										<View style={[styles.popupStatDot, { backgroundColor: Colors.accent }]} />
+										<Text style={styles.popupStatLabel}>Completed</Text>
+										<Text style={styles.popupStatValue}>{gamesStats.completed}</Text>
+									</View>
+									<View style={styles.popupStatRow}>
+										<View style={[styles.popupStatDot, { backgroundColor: Colors.text.secondary }]} />
+										<Text style={styles.popupStatLabel}>Attempted</Text>
+										<Text style={styles.popupStatValue}>{gamesStats.attempted}</Text>
+									</View>
+									<View style={styles.popupStatRow}>
+										<View style={[styles.popupStatDot, { backgroundColor: Colors.text.inactive }]} />
+										<Text style={styles.popupStatLabel}>Skipped</Text>
+										<Text style={styles.popupStatValue}>{gamesStats.skipped}</Text>
+									</View>
+								</View>
+							</Animated.View>
+						</TouchableWithoutFeedback>
+					</Animated.View>
+				</TouchableWithoutFeedback>
 			</Modal>
 		</View>
 	);
@@ -1408,6 +1556,7 @@ const styles = StyleSheet.create({
 		paddingVertical: Spacing.lg,
 		backgroundColor: Colors.background.primary,
 		marginBottom: 0,
+		position: "relative",
 	},
 	avatarContainer: {
 		marginBottom: Spacing.md,
@@ -1579,6 +1728,75 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.secondary,
 		marginTop: Spacing.md,
+	},
+	// Games counter popup styles
+	counterButtonContainer: {
+		position: "absolute",
+		top: Spacing.md,
+		right: Layout.margin,
+		zIndex: 11,
+	},
+	counterButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.xs,
+		paddingHorizontal: Spacing.sm,
+		paddingVertical: Spacing.xs,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
+	},
+	counterText: {
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	popupBackdrop: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+	},
+	popupCard: {
+		position: "absolute",
+		width: 180,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.md,
+		...Shadows.medium,
+	},
+	popupHeader: {
+		marginBottom: Spacing.xs,
+	},
+	popupTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	popupDivider: {
+		height: 1,
+		backgroundColor: Colors.border,
+		marginVertical: Spacing.sm,
+	},
+	popupStats: {
+		gap: Spacing.sm,
+	},
+	popupStatRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: Spacing.xs,
+	},
+	popupStatDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+	},
+	popupStatLabel: {
+		flex: 1,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+	},
+	popupStatValue: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
 	},
 });
 

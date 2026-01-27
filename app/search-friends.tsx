@@ -1,22 +1,19 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
 	View,
 	Text,
 	StyleSheet,
 	TextInput,
 	TouchableOpacity,
-	ScrollView,
 	ActivityIndicator,
 	Image,
 	FlatList,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MinimalHeader from "../components/MinimalHeader";
-import TikTokButton from "../components/TikTokButton";
 import {
 	Colors,
 	Typography,
@@ -24,14 +21,10 @@ import {
 	BorderRadius,
 	Shadows,
 	Layout,
-	Gradients,
 } from "../constants/DesignSystem";
 import { getCurrentUser } from "../config/auth";
 import {
-	getUserByUsername,
 	searchUsersByUsername,
-	isFollowing,
-	followUser,
 	UserPublicProfile,
 } from "../config/social";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
@@ -44,7 +37,6 @@ const SearchFriendsScreen = () => {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchResults, setSearchResults] = useState<UserPublicProfile[]>([]);
 	const [loading, setLoading] = useState(false);
-	const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
 	const currentUser = getCurrentUser();
 
 	// Session end refresh: Refresh recommendations when app goes to background
@@ -63,13 +55,6 @@ const SearchFriendsScreen = () => {
 
 		return () => clearTimeout(timeoutId);
 	}, [searchQuery, performSearch]);
-
-	// Check following status for results
-	useEffect(() => {
-		if (searchResults.length > 0 && currentUser) {
-			checkFollowingStatus();
-		}
-	}, [searchResults]);
 
 	const performSearch = useCallback(
 		async (query: string) => {
@@ -90,57 +75,12 @@ const SearchFriendsScreen = () => {
 		[currentUser]
 	);
 
-	const checkFollowingStatus = useCallback(async () => {
-		if (!currentUser || searchResults.length === 0) return;
-
-		const statusMap: Record<string, boolean> = {};
-		await Promise.all(
-			searchResults.map(async (user) => {
-				if (user.uid === currentUser.uid) {
-					statusMap[user.uid] = false; // Can't follow yourself
-				} else {
-					const following = await isFollowing(currentUser.uid, user.uid);
-					statusMap[user.uid] = following;
-				}
-			})
-		);
-		setFollowingMap(statusMap);
-	}, [currentUser, searchResults]);
-
-	const handleFollow = async (user: UserPublicProfile) => {
-		if (!currentUser || user.uid === currentUser.uid) return;
-
-		try {
-			// Check if already following before attempting
-			const alreadyFollowing = await isFollowing(currentUser.uid, user.uid);
-			if (alreadyFollowing) {
-				setFollowingMap((prev) => ({ ...prev, [user.uid]: true }));
-				return;
-			}
-			await followUser(currentUser.uid, user.uid);
-			setFollowingMap((prev) => ({ ...prev, [user.uid]: true }));
-			// Refresh search results to update counts if needed
-			if (searchQuery.trim()) {
-				await performSearch(searchQuery.trim());
-			}
-		} catch (error: any) {
-			console.error("Error following user:", error);
-			// If already following, update state
-			if (error.message && error.message.includes("Already following")) {
-				setFollowingMap((prev) => ({ ...prev, [user.uid]: true }));
-			}
-		}
-	};
-
 	const handleUserPress = (username: string) => {
 		router.push(`/user/${username}`);
 	};
 
 	const renderUserCard = useCallback(
 		({ item: user }: { item: UserPublicProfile }) => {
-			const isOwnProfile = currentUser?.uid === user.uid;
-			const isFollowingUser = followingMap[user.uid] || false;
-
 			return (
 				<TouchableOpacity
 					style={styles.userCard}
@@ -163,23 +103,11 @@ const SearchFriendsScreen = () => {
 								</Text>
 							)}
 						</View>
-						{!isOwnProfile &&
-							(isFollowingUser ? (
-								<View style={styles.followingButton}>
-									<Text style={styles.followingButtonText}>Following</Text>
-								</View>
-							) : (
-								<TikTokButton
-									label="Follow"
-									onPress={() => handleFollow(user)}
-									variant="primary"
-								/>
-							))}
 					</View>
 				</TouchableOpacity>
 			);
 		},
-		[currentUser, followingMap, handleUserPress]
+		[handleUserPress]
 	);
 
 	return (
@@ -347,22 +275,6 @@ const styles = StyleSheet.create({
 	},
 	bio: {
 		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-	},
-	followingButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1.5,
-		borderColor: Colors.border,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.lg,
-		borderRadius: BorderRadius.md,
-		minWidth: 80,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	followingButtonText: {
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
 		color: Colors.text.secondary,
 	},
 });

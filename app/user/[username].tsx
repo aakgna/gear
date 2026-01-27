@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { Grid2x2Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MinimalHeader from "../../components/MinimalHeader";
 import TikTokButton from "../../components/TikTokButton";
@@ -35,6 +36,7 @@ import {
 	getUserByUsername,
 	fetchUserProfile,
 	fetchCreatedGames,
+	fetchLikedGames,
 	fetchFollowers,
 	fetchFollowing,
 	followUser,
@@ -55,7 +57,7 @@ import { useSessionEndRefresh } from "../../utils/sessionRefresh";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BOTTOM_NAV_HEIGHT = 70;
 
-type TabType = "created" | "completed" | "attempted";
+type TabType = "created" | "liked";
 
 const formatGameType = (type: string): string => {
 	const formatted = type
@@ -109,8 +111,7 @@ const CreatorProfileScreen = () => {
 	useSessionEndRefresh([]);
 	const [activeTab, setActiveTab] = useState<TabType>("created");
 	const [createdGames, setCreatedGames] = useState<GameSummary[]>([]);
-	const [completedGames, setCompletedGames] = useState<GameHistoryEntry[]>([]);
-	const [attemptedGames, setAttemptedGames] = useState<GameHistoryEntry[]>([]);
+	const [likedGames, setLikedGames] = useState<GameSummary[]>([]);
 	const [isFollowingUser, setIsFollowingUser] = useState(false);
 	const [isOwnProfile, setIsOwnProfile] = useState(false);
 	const [loadingFollow, setLoadingFollow] = useState(false);
@@ -123,6 +124,19 @@ const CreatorProfileScreen = () => {
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
+
+	// Tab indicator animation
+	const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		const tabIndex = activeTab === "created" ? 0 : 1;
+		Animated.spring(tabIndicatorAnim, {
+			toValue: tabIndex,
+			useNativeDriver: true,
+			tension: 100,
+			friction: 8,
+		}).start();
+	}, [activeTab]);
 
 	useEffect(() => {
 		loadProfile();
@@ -196,27 +210,9 @@ const CreatorProfileScreen = () => {
 			if (tab === "created") {
 				const games = await fetchCreatedGames(profile.uid, 50);
 				setCreatedGames(games);
-			} else if (tab === "completed") {
-				const history = await fetchGameHistory(profile.uid, {
-					action: "completed",
-					limit: 50,
-				});
-				setCompletedGames(history);
-			} else if (tab === "attempted") {
-				// Fetch both attempted and skipped
-				const attempted = await fetchGameHistory(profile.uid, {
-					action: "attempted",
-					limit: 50,
-				});
-				const skipped = await fetchGameHistory(profile.uid, {
-					action: "skipped",
-					limit: 50,
-				});
-				// Combine and sort by timestamp
-				const combined = [...attempted, ...skipped].sort(
-					(a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-				);
-				setAttemptedGames(combined.slice(0, 50));
+			} else if (tab === "liked") {
+				const games = await fetchLikedGames(profile.uid, 50);
+				setLikedGames(games);
 			}
 			// Mark tab as loaded
 			setLoadedTabs((prev) => new Set(prev).add(tab));
@@ -370,7 +366,7 @@ const CreatorProfileScreen = () => {
 			puzzleId = gameId;
 		} else {
 			// Need to construct puzzleId (GameSummary case)
-		const gameType = "gameType" in game ? game.gameType : game.category || "";
+			const gameType = "gameType" in game ? game.gameType : game.category || "";
 			const difficulty =
 				"difficulty" in game ? game.difficulty : game.difficulty || "";
 			puzzleId = `${gameType}_${difficulty}_${gameId}`;
@@ -520,7 +516,7 @@ const CreatorProfileScreen = () => {
 
 					<Text style={styles.usernameText}>{profile.username}</Text>
 
-					{/* Stats Row 1 - Following, Followers, Games Created */}
+					{/* Stats Row - Following, Followers, Completed, Streak */}
 					<View style={styles.statsRow}>
 						<TouchableOpacity
 							style={styles.statItem}
@@ -535,6 +531,8 @@ const CreatorProfileScreen = () => {
 							</Text>
 							<Text style={styles.statLabel}>Following</Text>
 						</TouchableOpacity>
+						{/* Divider */}
+						<View style={styles.statDivider} />
 						<TouchableOpacity
 							style={styles.statItem}
 							onPress={() =>
@@ -548,51 +546,31 @@ const CreatorProfileScreen = () => {
 							</Text>
 							<Text style={styles.statLabel}>Followers</Text>
 						</TouchableOpacity>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{profile.createdGamesCount || 0}
-							</Text>
-							<Text style={styles.statLabel}>Games</Text>
-						</View>
-					</View>
-
-					{/* Stats Row 2 - Completed, Streak, Avg Time */}
-					<View style={styles.statsRow}>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{profile.totalGamesPlayed || 0}
-							</Text>
-							<Text style={styles.statLabel}>Completed</Text>
-						</View>
+						{/* Divider */}
+						<View style={styles.statDivider} />
 						<View style={styles.statItem}>
 							<Text style={styles.statNumber}>
 								{profile.streakCount || 0}
 							</Text>
 							<Text style={styles.statLabel}>Streak</Text>
 						</View>
-						<View style={styles.statItem}>
-							<Text style={styles.statNumber}>
-								{formatTime(profile.averageTimePerGame || 0)}
-							</Text>
-							<Text style={styles.statLabel}>Avg Time</Text>
-						</View>
 					</View>
 
 					{/* Follow/Edit Button */}
 					<View style={styles.buttonContainer}>
-					{isOwnProfile ? (
+						{isOwnProfile ? (
 							<TikTokButton
 								label="Edit Profile"
-							onPress={() => router.push("/profile")}
+								onPress={() => router.push("/profile")}
 								variant="outline"
 								fullWidth
 							/>
-					) : (
+						) : (
 							isFollowingUser ? (
 								<TikTokButton
 									label="Following"
-							onPress={handleFollow}
-							disabled={loadingFollow}
+									onPress={handleFollow}
+									disabled={loadingFollow}
 									variant="secondary"
 									fullWidth
 								/>
@@ -605,7 +583,7 @@ const CreatorProfileScreen = () => {
 									fullWidth
 								/>
 							)
-							)}
+						)}
 					</View>
 
 					{/* Bio */}
@@ -616,44 +594,78 @@ const CreatorProfileScreen = () => {
 
 				{/* Tabs */}
 				<View style={styles.tabContainer}>
+					<Animated.View
+						style={[
+							styles.tabIndicator,
+							{
+								transform: [
+									{
+										translateX: tabIndicatorAnim.interpolate({
+											inputRange: [0, 1],
+											outputRange: [0, SCREEN_WIDTH / 2],
+										}),
+									},
+								],
+							},
+						]}
+					>
+						<LinearGradient
+							colors={Gradients.primary}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 1 }}
+							style={StyleSheet.absoluteFill}
+						/>
+					</Animated.View>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "created" && styles.activeTab]}
+						style={styles.tab}
 						onPress={() => setActiveTab("created")}
+						activeOpacity={0.7}
 					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "created" && styles.activeTabText,
-							]}
-						>
-							Created
-						</Text>
+						<View style={styles.tabContent}>
+							<Grid2x2Plus
+								size={24}
+								color={
+									activeTab === "created"
+										? Colors.accent
+										: Colors.text.secondary
+								}
+								style={styles.tabIcon}
+							/>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "created" && styles.activeTabText,
+								]}
+							>
+								Created
+							</Text>
+						</View>
 					</TouchableOpacity>
 					<TouchableOpacity
-						style={[styles.tab, activeTab === "completed" && styles.activeTab]}
-						onPress={() => setActiveTab("completed")}
+						style={styles.tab}
+						onPress={() => setActiveTab("liked")}
+						activeOpacity={0.7}
 					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "completed" && styles.activeTabText,
-							]}
-						>
-							Completed
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.tab, activeTab === "attempted" && styles.activeTab]}
-						onPress={() => setActiveTab("attempted")}
-					>
-						<Text
-							style={[
-								styles.tabText,
-								activeTab === "attempted" && styles.activeTabText,
-							]}
-						>
-							Attempted
-						</Text>
+						<View style={styles.tabContent}>
+							<Ionicons
+								name={activeTab === "liked" ? "heart" : "heart-outline"}
+								size={24}
+								color={
+									activeTab === "liked"
+										? Colors.accent
+										: Colors.text.secondary
+								}
+								style={styles.tabIcon}
+							/>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === "liked" && styles.activeTabText,
+								]}
+							>
+								Liked
+							</Text>
+						</View>
 					</TouchableOpacity>
 				</View>
 
@@ -666,18 +678,15 @@ const CreatorProfileScreen = () => {
 					<View style={styles.gameGrid}>
 						{activeTab === "created" &&
 							createdGames.map((game, index) => renderGameCard(game, index))}
-						{activeTab === "completed" &&
-							completedGames.map((game, index) => renderGameCard(game, index))}
-						{activeTab === "attempted" &&
-							attemptedGames.map((game, index) => renderGameCard(game, index))}
+						{activeTab === "liked" &&
+							likedGames.map((game, index) => renderGameCard(game, index))}
 					</View>
 				)}
 
 				{/* Empty State */}
 				{!loadingGames &&
 					((activeTab === "created" && createdGames.length === 0) ||
-						(activeTab === "completed" && completedGames.length === 0) ||
-						(activeTab === "attempted" && attemptedGames.length === 0)) && (
+						(activeTab === "liked" && likedGames.length === 0)) && (
 						<View style={styles.emptyState}>
 							<Ionicons
 								name="game-controller-outline"
@@ -808,9 +817,6 @@ const styles = StyleSheet.create({
 	menuItemTextDanger: {
 		color: Colors.error,
 	},
-	menuButton: {
-		padding: Spacing.xs,
-	},
 	content: {
 		flex: 1,
 	},
@@ -850,10 +856,18 @@ const styles = StyleSheet.create({
 	},
 	statsRow: {
 		flexDirection: "row",
-		justifyContent: "space-around",
+		justifyContent: "center",
 		width: "100%",
 		paddingHorizontal: Layout.margin,
 		marginBottom: Spacing.lg,
+		gap: Spacing.lg,
+		alignItems: "center",
+	},
+	statDivider: {
+		width: 1,
+		height: 30,
+		backgroundColor: Colors.border,
+		marginHorizontal: Spacing.sm,
 	},
 	statItem: {
 		alignItems: "center",
@@ -867,44 +881,6 @@ const styles = StyleSheet.create({
 	statLabel: {
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
-	},
-	followButton: {
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.md,
-		minWidth: 120,
-		alignItems: "center",
-		marginBottom: Spacing.md,
-	},
-	followingButton: {
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary,
-	},
-	followButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.white,
-	},
-	followingButtonText: {
-		color: Colors.text.primary,
-	},
-	editButton: {
-		backgroundColor: Colors.background.secondary,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.md,
-		minWidth: 120,
-		alignItems: "center",
-		marginBottom: Spacing.md,
-		borderWidth: 1,
-		borderColor: Colors.text.secondary,
-	},
-	editButtonText: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.primary,
 	},
 	bioText: {
 		fontSize: Typography.fontSize.body,
@@ -920,6 +896,25 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.sm,
 		position: "relative",
 		overflow: "hidden",
+		paddingHorizontal: Spacing.md,
+		gap: Spacing.md,
+	},
+	tabContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: Spacing.xs,
+	},
+	tabIcon: {
+		marginRight: 0, // Gap handles spacing
+	},
+	tabIndicator: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		width: "50%",
+		height: 2,
+		zIndex: 1,
 	},
 	tab: {
 		flex: 1,
@@ -927,9 +922,6 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		zIndex: 2,
-	},
-	activeTab: {
-		// Indicator handled by animated view
 	},
 	tabText: {
 		fontSize: Typography.fontSize.caption,
@@ -991,4 +983,3 @@ const styles = StyleSheet.create({
 });
 
 export default CreatorProfileScreen;
-

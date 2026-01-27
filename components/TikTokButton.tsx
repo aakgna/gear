@@ -62,7 +62,7 @@ const TikTokButton: React.FC<TikTokButtonProps> = ({
 		if (variant === "primary") {
 			return (
 				<LinearGradient
-					colors={disabled ? ["#9CA3AF", "#6B7280"] : Gradients.button}
+					colors={disabled ? ["#9CA3AF", "#6B7280"] : ["#fcd34d", "#fbbf24"]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
 					style={[
