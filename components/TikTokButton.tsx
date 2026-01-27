@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
 		...Shadows.glowAccent,
 	},
 	secondaryButton: {
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 	},
 	outlineButton: {
 		backgroundColor: "transparent",

@@ -125,7 +125,7 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({ height }) => {
 const styles = StyleSheet.create({
 	container: {
 		width: "100%",
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		justifyContent: "center",
 		alignItems: "center",
 	},

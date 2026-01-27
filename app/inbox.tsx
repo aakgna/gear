@@ -341,11 +341,7 @@ const InboxScreen = () => {
 								style={styles.avatar}
 							/>
 						) : (
-							<Ionicons
-								name="person-circle"
-								size={56}
-								color={Colors.text.secondary}
-							/>
+							<Ionicons name="person-circle" size={56} color={Colors.accent} />
 						)}
 						<View style={styles.conversationDetails}>
 							<View style={styles.conversationHeader}>
@@ -555,11 +551,7 @@ const InboxScreen = () => {
 												style={styles.avatar}
 											/>
 										) : (
-											<Ionicons
-												name="person-circle"
-												size={50}
-												color={Colors.text.secondary}
-											/>
+											<Ionicons name="person-circle" size={50} color={Colors.accent} />
 										)}
 										<Text style={styles.username}>{item.username}</Text>
 										{isCreating ? (

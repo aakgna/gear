@@ -2700,7 +2700,7 @@ const styles = StyleSheet.create({
 		shadowColor: "transparent",
 	},
 	header: {
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 0,
 		borderBottomColor: "transparent",
 		zIndex: 10,
@@ -2723,7 +2723,7 @@ const styles = StyleSheet.create({
 	},
 	tabContainer: {
 		flexDirection: "row",
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 0,
 		borderBottomColor: "transparent",
 		position: "relative",

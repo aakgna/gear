@@ -293,7 +293,7 @@ const FollowersFollowingScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 	},
 	listContent: {
 		paddingVertical: Spacing.sm,
@@ -305,6 +305,7 @@ const styles = StyleSheet.create({
 		paddingVertical: Spacing.md,
 		borderBottomWidth: 0.5,
 		borderBottomColor: Colors.border,
+		backgroundColor: Colors.background.primary,
 	},
 	avatarContainer: {
 		marginRight: Spacing.md,

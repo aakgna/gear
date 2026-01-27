@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
 	profileHeader: {
 		alignItems: "center",
 		paddingVertical: Spacing.lg,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		marginBottom: 0,
 	},
 	buttonContainer: {
@@ -890,7 +890,7 @@ const styles = StyleSheet.create({
 	},
 	tabContainer: {
 		flexDirection: "row",
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 0.5,
 		borderBottomColor: Colors.border,
 		marginBottom: Spacing.sm,

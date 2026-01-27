@@ -77,7 +77,8 @@ const styles = StyleSheet.create({
 	},
 	container: {
 		height: 48,
-		backgroundColor: "rgba(255, 255, 255, 0.8)",
+		// backgroundColor: "rgba(255, 255, 255, 0.8)",
+		backgroundColor: Colors.background.secondary,
 		borderBottomWidth: 0.5,
 		borderBottomColor: Colors.border,
 		overflow: "hidden",
