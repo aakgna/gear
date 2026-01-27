@@ -475,6 +475,10 @@ const FeedScreen = () => {
 	// FCM notification prompt state
 	const [showNotifPrompt, setShowNotifPrompt] = useState(false);
 	const hasCheckedFCMRef = useRef(false);
+	// Prefetched recommendations buffer for instant "For You" refresh
+	// Store full Puzzle objects (not just IDs) to avoid Firestore calls on refresh
+	const prefetchedPuzzlesRef = useRef<Puzzle[]>([]);
+	const isFetchingPrefetchRef = useRef(false);
 
 	// Computed current state based on active tab (must be after activeTab declaration)
 	const currentIndex =
@@ -944,6 +948,78 @@ const FeedScreen = () => {
 	const flatListRef =
 		activeTab === "forYou" ? forYouFlatListRef : followingFlatListRef;
 
+	// Prefetch next batch of recommendations in background for instant "For You" refresh
+	// Fetches full Puzzle objects so refresh is truly instant (no Firestore calls needed)
+	const prefetchNextBatch = async () => {
+		// Don't prefetch if already fetching
+		if (isFetchingPrefetchRef.current) {
+			console.log("[Prefetch] Already fetching, skipping");
+			return;
+		}
+		
+		const user = getCurrentUser();
+		if (!user) return;
+		
+		isFetchingPrefetchRef.current = true;
+		console.log("[Prefetch] Starting background prefetch...");
+		
+		try {
+			const idToken = await auth().currentUser?.getIdToken();
+			if (!idToken) {
+				console.warn("[Prefetch] No auth token");
+				return;
+			}
+			
+			// Step 1: Get recommended game IDs from cloud function
+			const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+				method: "POST",
+				headers: { 
+					"Content-Type": "application/json", 
+					Authorization: `Bearer ${idToken}` 
+				},
+				body: JSON.stringify({ data: { excludeGameIds: [], count: 50 } }),
+			});
+			
+			const result = await res.json();
+			
+			if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
+				const gameIds = result.result.gameIds;
+				console.log(`[Prefetch] Got ${gameIds.length} game IDs, fetching full data...`);
+				
+				// Step 2: Fetch full game data from Firestore
+				const firestoreGames = await fetchGamesByIds(gameIds);
+				
+				// Step 3: Convert to Puzzle objects
+				const puzzles: Puzzle[] = [];
+				for (const gameId of gameIds) {
+					const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+					if (firestoreGame) {
+						const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
+						if (puzzle) {
+							puzzles.push(puzzle);
+						}
+					}
+				}
+				
+				// Step 4: Filter blocked users
+				const blockedUserIds = await getBlockedUsers(user.uid);
+				const blockedSet = new Set(blockedUserIds);
+				const filteredPuzzles = puzzles.filter((puzzle) => {
+					if (!puzzle.uid) return true;
+					return !blockedSet.has(puzzle.uid);
+				});
+				
+				// Step 5: Store ready-to-use puzzles
+				prefetchedPuzzlesRef.current = filteredPuzzles;
+				console.log(`[Prefetch] Buffered ${filteredPuzzles.length} ready-to-use puzzles`);
+			}
+		} catch (error) {
+			console.error("[Prefetch] Error:", error);
+		} finally {
+			isFetchingPrefetchRef.current = false;
+		}
+	};
+
 	// Handle tab press - if already on the tab, scroll to top and reload
 	const handleForYouTabPress = async () => {
 		if (activeTab === "forYou") {
@@ -954,79 +1030,127 @@ const FeedScreen = () => {
 			// Reset state and reload
 			setCurrentIndexForYou(0);
 			setCurrentPuzzleIdForYou("");
-			setLoading(true);
-			// Trigger fresh recommendations (minimal inline version)
+			
 			const user = getCurrentUser();
-			if (user) {
-				try {
-					const historyIds = await getAllGameHistoryIds(user.uid);
-					const idToken = await auth().currentUser?.getIdToken();
-					if (idToken) {
-						const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
-							method: "POST",
-							headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-							body: JSON.stringify({ data: { excludeGameIds: new Set(), count: 50 } }),
-						});
-						console.log("res", res);
-						const result = await res.json();
-						console.log("result", result);
-						if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
-							// Fetch games directly
-							const firestoreGames = await fetchGamesByIds(result.result.gameIds);
-							console.log("firestoreGames", firestoreGames);
-							// Convert to puzzles
-							const puzzles: Puzzle[] = [];
-							for (const gameId of result.result.gameIds) {
-								const firestoreGame = firestoreGames.find((g) => g.id === gameId);
-								if (firestoreGame) {
-									const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
-									if (puzzle) {
-										puzzles.push(puzzle);
-									}
+			if (!user) {
+				await loadPuzzlesFromFirestore();
+				return;
+			}
+			
+			// INSTANT PATH: Use prefetched puzzles if available (no network calls!)
+			if (prefetchedPuzzlesRef.current.length > 0) {
+				console.log(`[ForYou] INSTANT: Using ${prefetchedPuzzlesRef.current.length} prefetched puzzles`);
+				
+				// Grab the prefetched puzzles and clear the buffer
+				const prefetchedPuzzles = [...prefetchedPuzzlesRef.current];
+				prefetchedPuzzlesRef.current = [];
+				
+				// INSTANT: Just set the puzzles - no Firestore calls needed!
+				setDisplayedPuzzles(prefetchedPuzzles);
+				setAllRecommendedPuzzles(prefetchedPuzzles);
+				setPuzzles(prefetchedPuzzles);
+				
+				// Initialize elapsed times
+				const initialElapsedTimes: Record<string, number> = {};
+				prefetchedPuzzles.forEach((puzzle) => {
+					initialElapsedTimes[puzzle.id] = 0;
+				});
+				puzzleElapsedTimesRef.current = initialElapsedTimes;
+				
+				// Filter completed games in background (non-blocking)
+				getAllCompletedGameIds(user.uid).then((completedIds) => {
+					const filteredPuzzles = prefetchedPuzzles.filter(
+						(puzzle) => !completedIds.has(puzzle.id)
+					);
+					if (filteredPuzzles.length !== prefetchedPuzzles.length) {
+						setDisplayedPuzzles(filteredPuzzles);
+						setAllRecommendedPuzzles(filteredPuzzles);
+						setPuzzles(filteredPuzzles);
+					}
+				}).catch((error) => {
+					console.error("Error filtering completed games:", error);
+				});
+				
+				// BACKGROUND: Refill the buffer for next time
+				prefetchNextBatch();
+				
+				return; // Exit early - instant load complete!
+			}
+			
+			// SLOW PATH: No prefetched buffer - fetch fresh (7 second wait)
+			console.log("[ForYou] No prefetched buffer, fetching fresh recommendations...");
+			setLoading(true);
+			
+			try {
+				const idToken = await auth().currentUser?.getIdToken();
+				if (idToken) {
+					const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+						method: "POST",
+						headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+						body: JSON.stringify({ data: { excludeGameIds: [], count: 50 } }),
+					});
+					const result = await res.json();
+					
+					if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
+						// Fetch games directly
+						const firestoreGames = await fetchGamesByIds(result.result.gameIds);
+						
+						// Convert to puzzles
+						const puzzles: Puzzle[] = [];
+						for (const gameId of result.result.gameIds) {
+							const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+							if (firestoreGame) {
+								const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
+								if (puzzle) {
+									puzzles.push(puzzle);
 								}
 							}
-							console.log("puzzles", puzzles);
-							// Filter out blocked users
-							const blockedUserIds = await getBlockedUsers(user.uid);
-							const blockedSet = new Set(blockedUserIds);
-							const filteredByBlock = puzzles.filter((puzzle) => {
-								if (!puzzle.uid) return true;
-								return !blockedSet.has(puzzle.uid);
-							});
-							
-							// Set puzzles immediately (replace feed)
-							setDisplayedPuzzles(filteredByBlock);
-							setAllRecommendedPuzzles(filteredByBlock);
-							setPuzzles(filteredByBlock);
-							
-							// Initialize elapsed times
-							const initialElapsedTimes: Record<string, number> = {};
-							filteredByBlock.forEach((puzzle) => {
-								initialElapsedTimes[puzzle.id] = 0;
-							});
-							puzzleElapsedTimesRef.current = initialElapsedTimes;
-							
-							// Filter completed games in background (non-blocking)
-							getAllCompletedGameIds(user.uid).then((completedIds) => {
-								const filteredPuzzles = filteredByBlock.filter(
-									(puzzle) => !completedIds.has(puzzle.id)
-								);
-								if (filteredPuzzles.length !== filteredByBlock.length) {
-									setDisplayedPuzzles(filteredPuzzles);
-									setAllRecommendedPuzzles(filteredPuzzles);
-									setPuzzles(filteredPuzzles);
-								}
-							}).catch((error) => {
-								console.error("Error filtering completed games:", error);
-							});
-							
-							setLoading(false);
-							return; // Exit early - feed is populated
 						}
+						
+						// Filter out blocked users
+						const blockedUserIds = await getBlockedUsers(user.uid);
+						const blockedSet = new Set(blockedUserIds);
+						const filteredByBlock = puzzles.filter((puzzle) => {
+							if (!puzzle.uid) return true;
+							return !blockedSet.has(puzzle.uid);
+						});
+						
+						// Set puzzles immediately (replace feed)
+						setDisplayedPuzzles(filteredByBlock);
+						setAllRecommendedPuzzles(filteredByBlock);
+						setPuzzles(filteredByBlock);
+						
+						// Initialize elapsed times
+						const initialElapsedTimes: Record<string, number> = {};
+						filteredByBlock.forEach((puzzle) => {
+							initialElapsedTimes[puzzle.id] = 0;
+						});
+						puzzleElapsedTimesRef.current = initialElapsedTimes;
+						
+						// Filter completed games in background (non-blocking)
+						getAllCompletedGameIds(user.uid).then((completedIds) => {
+							const filteredPuzzles = filteredByBlock.filter(
+								(puzzle) => !completedIds.has(puzzle.id)
+							);
+							if (filteredPuzzles.length !== filteredByBlock.length) {
+								setDisplayedPuzzles(filteredPuzzles);
+								setAllRecommendedPuzzles(filteredPuzzles);
+								setPuzzles(filteredPuzzles);
+							}
+						}).catch((error) => {
+							console.error("Error filtering completed games:", error);
+						});
+						
+						setLoading(false);
+						
+						// BACKGROUND: Prefetch for next time
+						prefetchNextBatch();
+						
+						return; // Exit early - feed is populated
 					}
-				} catch (e) {
-					console.error("Recommendation refresh failed:", e);
 				}
+			} catch (e) {
+				console.error("Recommendation refresh failed:", e);
 			}
 			
 			await loadPuzzlesFromFirestore();
@@ -1192,6 +1316,9 @@ const FeedScreen = () => {
 					.catch((error) => {
 						console.error("Error flushing precomputed recommendations:", error);
 					});
+
+				// PREFETCH: Start prefetching next batch in background for instant "For You" refresh
+				prefetchNextBatch();
 
 				setLoading(false);
 				return; // Exit early - instant load!
@@ -1607,6 +1734,9 @@ const FeedScreen = () => {
 				// Don't await - let it run in background
 				filterDisplayedGamesInBackground(firstBatch);
 			}
+
+			// PREFETCH: Start prefetching next batch in background for instant "For You" refresh
+			prefetchNextBatch();
 		} catch (error) {
 			console.error("Error loading puzzles from Firestore:", error);
 			Alert.alert(
@@ -2837,8 +2967,15 @@ const FeedScreen = () => {
 							/>
 						) : loadingFollowing ? (
 							<View style={styles.loadingContainer}>
-								<ActivityIndicator size="large" color={Colors.accent} />
-								<Text style={styles.loadingText}>Loading...</Text>
+								<LinearGradient
+									colors={Gradients.primary}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 1 }}
+									style={styles.loadingGradient}
+								>
+									<ActivityIndicator size="large" color={Colors.text.white} />
+								</LinearGradient>
+								<Text style={styles.loadingText}>Loading puzzles...</Text>
 							</View>
 						) : (
 							<View style={styles.emptyContainer}>
