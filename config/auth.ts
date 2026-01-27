@@ -2,6 +2,8 @@
 import auth from "@react-native-firebase/auth";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { db } from "./firebase";
+import messaging from "@react-native-firebase/messaging";
+import { Platform, PermissionsAndroid, Alert } from "react-native";
 
 export interface CategoryStats {
 	completed: number;
@@ -42,6 +44,8 @@ export interface UserData {
 	bio?: string;
 	profilePicture?: string;
 	unreadNotificationCount?: number;
+	// Push notifications
+	fcmToken?: string | null; // null = opted out, undefined = never prompted, string = active token
 }
 
 // Configure Google Sign-In (call this once at app startup)
@@ -1553,6 +1557,79 @@ export const reauthenticateWithGoogle = async (): Promise<boolean> => {
 		if (error.code === "sign_in_cancelled") {
 			throw new Error("Re-authentication was cancelled");
 		}
+		throw error;
+	}
+};
+
+// FCM Push Notifications Functions
+
+// Request notification permissions (iOS & Android 13+)
+export const requestNotificationPermission = async (): Promise<boolean> => {
+	try {
+		// Android 13+ (API 33+) needs explicit POST_NOTIFICATIONS permission
+		if (Platform.OS === "android" && Platform.Version >= 33) {
+			const granted = await PermissionsAndroid.request(
+				PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+			);
+			if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+				return false;
+			}
+		}
+
+		// iOS and Android (after permission granted)
+		await messaging().registerDeviceForRemoteMessages();
+		const authStatus = await messaging().requestPermission();
+		
+		return (
+			authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+			authStatus === messaging.AuthorizationStatus.PROVISIONAL
+		);
+	} catch (error) {
+		console.error("Error requesting notification permission:", error);
+		return false;
+	}
+};
+
+// Get FCM token from device
+export const getFCMToken = async (): Promise<string | null> => {
+	try {
+		const token = await messaging().getToken();
+		return token;
+	} catch (error) {
+		console.error("Error getting FCM token:", error);
+		return null;
+	}
+};
+
+// Register FCM token in Firestore
+export const registerFCMToken = async (
+	userId: string,
+	token: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		await userRef.update({
+			fcmToken: token,
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+	} catch (error) {
+		console.error("Error registering FCM token:", error);
+		throw error;
+	}
+};
+
+// Remove FCM token from Firestore (opt-out)
+export const removeFCMToken = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const userRef = db.collection("users").doc(userId);
+		await userRef.update({
+			fcmToken: "null", // String "null" to indicate opted out
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+	} catch (error) {
+		console.error("Error removing FCM token:", error);
 		throw error;
 	}
 };

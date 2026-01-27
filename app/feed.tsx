@@ -87,6 +87,10 @@ import {
 	addSkippedGame,
 	addAttemptedGame,
 	moveFromSkippedToAttempted,
+	requestNotificationPermission,
+	getFCMToken,
+	registerFCMToken,
+	removeFCMToken,
 } from "../config/auth";
 import { fetchFollowingFeed, getBlockedUsers } from "../config/social";
 
@@ -918,6 +922,63 @@ const FeedScreen = () => {
 			// 2. User document exists but doesn't have username field (!data.username)
 			if (!data || !data.username) {
 				router.replace("/username");
+				return;
+			}
+
+			// Check if this is a first-time user (fcmToken is undefined)
+			// Only prompt on initial load to avoid showing prompt on every mount
+			if (isInitialLoad && data && data.fcmToken === undefined) {
+				// Show notification prompt after a small delay to ensure smooth UI load
+				setTimeout(() => {
+					Alert.alert(
+						"Enable Notifications?",
+						"Stay updated with new games, likes, and messages. You can change this later in your profile settings.",
+						[
+							{
+								text: "Not Now",
+								style: "cancel",
+								onPress: async () => {
+									try {
+										// Mark as opted out
+										await removeFCMToken(user.uid);
+									} catch (error) {
+										console.error("Error saving notification preference:", error);
+									}
+								},
+							},
+							{
+								text: "Enable",
+								onPress: async () => {
+									try {
+										const hasPermission = await requestNotificationPermission();
+										if (hasPermission) {
+											const token = await getFCMToken();
+											if (token) {
+												await registerFCMToken(user.uid, token);
+											} else {
+												// Failed to get token, mark as opted out
+												await removeFCMToken(user.uid);
+											}
+										} else {
+											// Permission denied, mark as opted out
+											await removeFCMToken(user.uid);
+											Alert.alert(
+												"Permission Denied",
+												"You can enable notifications later in your profile settings."
+											);
+										}
+									} catch (error) {
+										console.error("Error enabling notifications:", error);
+										Alert.alert(
+											"Error",
+											"Failed to enable notifications. You can try again later in your profile settings."
+										);
+									}
+								},
+							},
+						]
+					);
+				}, 1000);
 			}
 		}
 	};

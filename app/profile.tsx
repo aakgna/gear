@@ -20,6 +20,7 @@ import {
 	Animated,
 	Modal,
 	FlatList,
+	Switch,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
@@ -35,6 +36,10 @@ import {
 	signOut,
 	deleteAccount,
 	UserData,
+	requestNotificationPermission,
+	getFCMToken,
+	registerFCMToken,
+	removeFCMToken,
 } from "../config/auth";
 import {
 	Colors,
@@ -120,6 +125,9 @@ const ProfileScreen = () => {
 	const [blockedUsers, setBlockedUsers] = useState<UserPublicProfile[]>([]);
 	const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
 	const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
+	// Notification toggle state
+	const [showNotifModal, setShowNotifModal] = useState(false);
+	const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
@@ -217,6 +225,7 @@ const ProfileScreen = () => {
 	const searchScale = useRef(new Animated.Value(1)).current;
 	const notificationsScale = useRef(new Animated.Value(1)).current;
 	const inboxScale = useRef(new Animated.Value(1)).current;
+	const notificationToggleScale = useRef(new Animated.Value(1)).current;
 	const menuScale = useRef(new Animated.Value(1)).current;
 
 	// Animation refs for avatar bounce
@@ -375,6 +384,10 @@ const ProfileScreen = () => {
 		if (user) {
 			const data = await getUserData(user.uid);
 			setUserData(data);
+			// Check notification status
+			setNotificationsEnabled(
+				!!data?.fcmToken && data.fcmToken !== "null"
+			);
 			// Load notification count
 			const count = await getUnreadNotificationCount(user.uid);
 			setUnreadNotificationCount(count);
@@ -576,6 +589,52 @@ const ProfileScreen = () => {
 				...userData,
 				followingCount: Math.max(0, (userData.followingCount || 0) + increment),
 			});
+		}
+	};
+
+	// Notification opt-in
+	const handleOptIn = async () => {
+		try {
+			const hasPermission = await requestNotificationPermission();
+			if (hasPermission) {
+				const token = await getFCMToken();
+				if (token && currentUser) {
+					await registerFCMToken(currentUser.uid, token);
+					setNotificationsEnabled(true);
+				} else {
+					Alert.alert("Error", "Failed to get notification token.");
+				}
+			} else {
+				Alert.alert(
+					"Permission Denied",
+					"Please enable notifications in your device settings."
+				);
+			}
+		} catch (error) {
+			console.error("Error enabling notifications:", error);
+			Alert.alert("Error", "Failed to enable notifications. Please try again.");
+		}
+	};
+
+	// Notification opt-out
+	const handleOptOut = async () => {
+		try {
+			if (currentUser) {
+				await removeFCMToken(currentUser.uid);
+				setNotificationsEnabled(false);
+			}
+		} catch (error) {
+			console.error("Error disabling notifications:", error);
+			Alert.alert("Error", "Failed to disable notifications. Please try again.");
+		}
+	};
+
+	// Toggle notification switch
+	const handleNotificationToggle = async (value: boolean) => {
+		if (value) {
+			await handleOptIn();
+		} else {
+			await handleOptOut();
 		}
 	};
 
@@ -922,6 +981,23 @@ const ProfileScreen = () => {
 							)}
 						</TouchableOpacity>
 					</Animated.View>
+					<Animated.View style={{ transform: [{ scale: notificationToggleScale }] }}>
+						<TouchableOpacity
+							style={styles.headerButton}
+							onPress={() =>
+								handleIconPress(notificationToggleScale, () =>
+									setShowNotifModal(true)
+								)
+							}
+							activeOpacity={0.7}
+						>
+							<Ionicons
+								name={notificationsEnabled ? "notifications" : "notifications-off"}
+								size={22}
+								color={notificationsEnabled ? Colors.accent : Colors.text.secondary}
+							/>
+						</TouchableOpacity>
+					</Animated.View>
 					<Animated.View style={{ transform: [{ scale: menuScale }] }}>
 						<TouchableOpacity
 							style={styles.menuButton}
@@ -1231,6 +1307,37 @@ const ProfileScreen = () => {
 				</ScrollView>
 			</Animated.View>
 
+			{/* Notification Toggle Modal */}
+			<Modal
+				visible={showNotifModal}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setShowNotifModal(false)}
+			>
+				<TouchableWithoutFeedback onPress={() => setShowNotifModal(false)}>
+					<View style={styles.notifModalOverlay}>
+						<TouchableWithoutFeedback>
+							<View style={styles.notifModalContent}>
+								<Text style={styles.notifModalTitle}>Push Notifications</Text>
+								<Text style={styles.notifModalDesc}>
+									Get notified when you receive messages, likes, or when new games are available.
+								</Text>
+								<View style={styles.notifToggleRow}>
+									<Text style={styles.notifToggleLabel}>Enable Notifications</Text>
+									<Switch
+										value={notificationsEnabled}
+										onValueChange={handleNotificationToggle}
+										trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+										thumbColor={notificationsEnabled ? Colors.accent : Colors.text.secondary}
+										ios_backgroundColor={Colors.border}
+									/>
+								</View>
+							</View>
+						</TouchableWithoutFeedback>
+					</View>
+				</TouchableWithoutFeedback>
+			</Modal>
+
 			{/* Blocked Users Modal */}
 			<Modal
 				visible={showBlockedUsersModal}
@@ -1460,6 +1567,43 @@ const styles = StyleSheet.create({
 	menuItemText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.medium,
+	},
+	notifModalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.7)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	notifModalContent: {
+		width: "85%",
+		maxWidth: 400,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.xl,
+		...Shadows.medium,
+	},
+	notifModalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
+	},
+	notifModalDesc: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.lg,
+		lineHeight: 22,
+	},
+	notifToggleRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: Spacing.sm,
+	},
+	notifToggleLabel: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
 	},
 	modalContainer: {
 		flex: 1,
