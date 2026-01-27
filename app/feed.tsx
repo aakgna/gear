@@ -87,6 +87,10 @@ import {
 	addSkippedGame,
 	addAttemptedGame,
 	moveFromSkippedToAttempted,
+	requestNotificationPermission,
+	getFCMToken,
+	registerFCMToken,
+	removeFCMToken,
 } from "../config/auth";
 import { fetchFollowingFeed, getBlockedUsers } from "../config/social";
 
@@ -468,6 +472,9 @@ const FeedScreen = () => {
 	// Separate refs for each FlatList
 	const forYouFlatListRef = useRef<FlatList<Puzzle>>(null);
 	const followingFlatListRef = useRef<FlatList<Puzzle>>(null);
+	// FCM notification prompt state
+	const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+	const hasCheckedFCMRef = useRef(false);
 
 	// Computed current state based on active tab (must be after activeTab declaration)
 	const currentIndex =
@@ -555,13 +562,73 @@ const FeedScreen = () => {
 		}
 	}, []);
 
-	const shuffleArray = <T,>(array: T[]): T[] => {
-		const shuffled = [...array];
-		for (let i = shuffled.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+	// FCM notification prompt effect
+	useEffect(() => {
+		if (showNotifPrompt) {
+			Alert.alert(
+				"Enable Notifications?",
+				"Would you like to turn on notifications to stay updated on new games and social activity?",
+				[
+					{
+						text: "No, thanks",
+						style: "cancel",
+						onPress: () => {
+							setShowNotifPrompt(false);
+							handleNotificationOptOut();
+						},
+					},
+					{
+						text: "Yes",
+						onPress: () => {
+							setShowNotifPrompt(false);
+							handleNotificationOptIn();
+						},
+					},
+				]
+			);
 		}
-		return shuffled;
+	}, [showNotifPrompt]);
+
+	// Handle notification opt-in
+	const handleNotificationOptIn = async () => {
+		try {
+			const user = getCurrentUser();
+			if (!user) return;
+
+			const hasPermission = await requestNotificationPermission();
+			if (hasPermission) {
+				const token = await getFCMToken();
+				if (token) {
+					await registerFCMToken(user.uid, token);
+					console.log("[FCM] Token registered successfully");
+				} else {
+					console.warn("[FCM] Failed to get token");
+				}
+			} else {
+				// User denied permission, mark as declined
+				await removeFCMToken(user.uid);
+				Alert.alert(
+					"Notifications Disabled",
+					"You can enable notifications later in your profile settings."
+				);
+			}
+		} catch (error) {
+			console.error("[FCM] Error during opt-in:", error);
+		}
+	};
+
+	// Handle notification opt-out
+	const handleNotificationOptOut = async () => {
+		try {
+			const user = getCurrentUser();
+			if (!user) return;
+
+			// Mark as declined by removing/clearing token
+			await removeFCMToken(user.uid);
+			console.log("[FCM] User opted out of notifications");
+		} catch (error) {
+			console.error("[FCM] Error during opt-out:", error);
+		}
 	};
 
 	// Load following feed
@@ -865,7 +932,7 @@ const FeedScreen = () => {
 				}
 			}
 
-			setFollowingPuzzles(shuffleArray(puzzles));
+			setFollowingPuzzles(puzzles);
 		} catch (error) {
 			console.error("Error loading following feed:", error);
 		} finally {
@@ -898,13 +965,15 @@ const FeedScreen = () => {
 						const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
 							method: "POST",
 							headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-							body: JSON.stringify({ data: { excludeGameIds: historyIds, count: 50 } }),
+							body: JSON.stringify({ data: { excludeGameIds: new Set(), count: 50 } }),
 						});
+						console.log("res", res);
 						const result = await res.json();
+						console.log("result", result);
 						if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
 							// Fetch games directly
 							const firestoreGames = await fetchGamesByIds(result.result.gameIds);
-							
+							console.log("firestoreGames", firestoreGames);
 							// Convert to puzzles
 							const puzzles: Puzzle[] = [];
 							for (const gameId of result.result.gameIds) {
@@ -916,7 +985,7 @@ const FeedScreen = () => {
 									}
 								}
 							}
-							
+							console.log("puzzles", puzzles);
 							// Filter out blocked users
 							const blockedUserIds = await getBlockedUsers(user.uid);
 							const blockedSet = new Set(blockedUserIds);
@@ -959,7 +1028,7 @@ const FeedScreen = () => {
 					console.error("Recommendation refresh failed:", e);
 				}
 			}
-
+			
 			await loadPuzzlesFromFirestore();
 		} else {
 			setActiveTab("forYou");
@@ -1001,6 +1070,19 @@ const FeedScreen = () => {
 			// 2. User document exists but doesn't have username field (!data.username)
 			if (!data || !data.username) {
 				router.replace("/username");
+				return;
+			}
+
+			// Check for FCM token on initial load only (prompt once per session)
+			if (isInitialLoad && !hasCheckedFCMRef.current) {
+				hasCheckedFCMRef.current = true;
+				// If user doesn't have fcmToken field, prompt them for notifications
+				if (!data.fcmToken) {
+					// Small delay to let the feed load first
+					setTimeout(() => {
+						setShowNotifPrompt(true);
+					}, 1500);
+				}
 			}
 		}
 	};
