@@ -92,7 +92,7 @@ import {
 	registerFCMToken,
 	removeFCMToken,
 } from "../config/auth";
-import { fetchFollowingFeed, getBlockedUsers } from "../config/social";
+import { fetchFollowingFeed } from "../config/social";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -1001,17 +1001,9 @@ const FeedScreen = () => {
 					}
 				}
 				
-				// Step 4: Filter blocked users
-				const blockedUserIds = await getBlockedUsers(user.uid);
-				const blockedSet = new Set(blockedUserIds);
-				const filteredPuzzles = puzzles.filter((puzzle) => {
-					if (!puzzle.uid) return true;
-					return !blockedSet.has(puzzle.uid);
-				});
-				
-				// Step 5: Store ready-to-use puzzles
-				prefetchedPuzzlesRef.current = filteredPuzzles;
-				console.log(`[Prefetch] Buffered ${filteredPuzzles.length} ready-to-use puzzles`);
+				// Store ready-to-use puzzles (blocked users already filtered by cloud function)
+				prefetchedPuzzlesRef.current = puzzles;
+				console.log(`[Prefetch] Buffered ${puzzles.length} ready-to-use puzzles`);
 			}
 		} catch (error) {
 			console.error("[Prefetch] Error:", error);
@@ -1107,32 +1099,24 @@ const FeedScreen = () => {
 							}
 						}
 						
-						// Filter out blocked users
-						const blockedUserIds = await getBlockedUsers(user.uid);
-						const blockedSet = new Set(blockedUserIds);
-						const filteredByBlock = puzzles.filter((puzzle) => {
-							if (!puzzle.uid) return true;
-							return !blockedSet.has(puzzle.uid);
-						});
-						
-						// Set puzzles immediately (replace feed)
-						setDisplayedPuzzles(filteredByBlock);
-						setAllRecommendedPuzzles(filteredByBlock);
-						setPuzzles(filteredByBlock);
+						// Set puzzles immediately (blocked users already filtered by cloud function)
+						setDisplayedPuzzles(puzzles);
+						setAllRecommendedPuzzles(puzzles);
+						setPuzzles(puzzles);
 						
 						// Initialize elapsed times
 						const initialElapsedTimes: Record<string, number> = {};
-						filteredByBlock.forEach((puzzle) => {
+						puzzles.forEach((puzzle) => {
 							initialElapsedTimes[puzzle.id] = 0;
 						});
 						puzzleElapsedTimesRef.current = initialElapsedTimes;
 						
 						// Filter completed games in background (non-blocking)
 						getAllCompletedGameIds(user.uid).then((completedIds) => {
-							const filteredPuzzles = filteredByBlock.filter(
+							const filteredPuzzles = puzzles.filter(
 								(puzzle) => !completedIds.has(puzzle.id)
 							);
-							if (filteredPuzzles.length !== filteredByBlock.length) {
+							if (filteredPuzzles.length !== puzzles.length) {
 								setDisplayedPuzzles(filteredPuzzles);
 								setAllRecommendedPuzzles(filteredPuzzles);
 								setPuzzles(filteredPuzzles);
@@ -1255,51 +1239,34 @@ const FeedScreen = () => {
 							}
 						}
 
-						// Filter out games from blocked users
-						getBlockedUsers(user.uid)
-							.then((blockedUserIds) => {
-								const blockedSet = new Set(blockedUserIds);
-								const filteredByBlock = puzzles.filter((puzzle) => {
-									if (!puzzle.uid) return true; // Keep games without uid
-									return !blockedSet.has(puzzle.uid);
-								});
+						// Set games immediately (blocked users already filtered by cloud function)
+						setDisplayedPuzzles(puzzles);
+						setAllRecommendedPuzzles(puzzles);
+						setPuzzles(puzzles);
+						console.log("puzzles", puzzles.length);
+						// Initialize elapsed times
+						const initialElapsedTimes: Record<string, number> = {};
+						puzzles.forEach((puzzle) => {
+							initialElapsedTimes[puzzle.id] = 0;
+						});
+						puzzleElapsedTimesRef.current = initialElapsedTimes;
 
-								// Set games immediately (instant load!)
-								setDisplayedPuzzles(filteredByBlock);
-								setAllRecommendedPuzzles(filteredByBlock);
-								setPuzzles(filteredByBlock);
+						// Filter out completed games in background (non-blocking)
+						getAllCompletedGameIds(user.uid)
+							.then((completedIds) => {
+								const filteredPuzzles = puzzles.filter(
+									(puzzle) => !completedIds.has(puzzle.id)
+								);
 
-								// Initialize elapsed times
-								const initialElapsedTimes: Record<string, number> = {};
-								filteredByBlock.forEach((puzzle) => {
-									initialElapsedTimes[puzzle.id] = 0;
-								});
-								puzzleElapsedTimesRef.current = initialElapsedTimes;
-
-								// Filter out completed games in background (non-blocking)
-								getAllCompletedGameIds(user.uid)
-									.then((completedIds) => {
-										const filteredPuzzles = filteredByBlock.filter(
-											(puzzle) => !completedIds.has(puzzle.id)
-										);
-
-										// Update if any were filtered out
-										if (filteredPuzzles.length !== filteredByBlock.length) {
-											setDisplayedPuzzles(filteredPuzzles);
-											setAllRecommendedPuzzles(filteredPuzzles);
-											setPuzzles(filteredPuzzles);
-										}
-									})
-									.catch((error) => {
-										console.error("Error filtering completed games:", error);
-									});
+								// Update if any were filtered out
+								if (filteredPuzzles.length !== puzzles.length) {
+									setDisplayedPuzzles(filteredPuzzles);
+									setAllRecommendedPuzzles(filteredPuzzles);
+									setPuzzles(filteredPuzzles);
+								}
 							})
 							.catch((error) => {
-								console.error("Error fetching blocked users:", error);
-								// Fallback: use puzzles without filtering
-								setDisplayedPuzzles(puzzles);
-								setAllRecommendedPuzzles(puzzles);
-								setPuzzles(puzzles);
+								console.error("Error filtering completed games:", error);
 							});
 					})
 					.catch((error) => {
@@ -1325,418 +1292,76 @@ const FeedScreen = () => {
 			}
 
 			// Fallback: First time user or no pre-computed games
-			// Use existing client-side algorithm
-			const allPuzzles: Puzzle[] = [];
+			// Use compute_next_recommendations cloud function for personalized recommendations
+			console.log("[Feed] Fallback: Using compute_next_recommendations...");
 
-			// Fetch QuickMath games
-			const difficulties: Array<"easy" | "medium" | "hard"> = [
-				"easy",
-				"medium",
-				"hard",
-			];
+			const idToken = await auth().currentUser?.getIdToken();
+			if (idToken) {
+				const historyIds = await getAllGameHistoryIds(user.uid);
 
-			for (const difficulty of difficulties) {
-				// Fetch QuickMath
-				const quickMathGames = await fetchGamesFromFirestore(
-					"quickMath",
-					difficulty
-				);
-				quickMathGames.forEach((game) => {
-					if (game.questions && game.answers) {
-						allPuzzles.push({
-							id: `quickmath_${difficulty}_${game.id}`,
-							type: "quickMath",
-							data: {
-								problems: game.questions,
-								answers: game.answers,
-							} as QuickMathData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
+				const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${idToken}`,
+					},
+					body: JSON.stringify({
+						data: { excludeGameIds: Array.from(historyIds), count: 50 },
+					}),
 				});
 
-				// Fetch Wordle
-				const wordleGames = await fetchGamesFromFirestore("wordle", difficulty);
-				wordleGames.forEach((game) => {
-					if (game.qna) {
-						allPuzzles.push({
-							id: `wordle_${difficulty}_${game.id}`,
-							type: "wordle",
-							data: {
-								answer: game.qna.toUpperCase(),
-							} as WordleData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
+				const result = await res.json();
 
-				// Fetch Riddle
-				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
-				riddleGames.forEach((game) => {
-					if (game.question && game.answer && game.choices) {
-						allPuzzles.push({
-							id: `riddle_${difficulty}_${game.id}`,
-							type: "riddle",
-							data: {
-								prompt: game.question,
-								answer: game.answer,
-								choices: game.choices,
-							} as RiddleData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
+				if (result.result?.gameIds && Array.isArray(result.result.gameIds)) {
+					console.log(`[Feed] Fallback got ${result.result.gameIds.length} game IDs`);
+					
+					// Fetch full game data from Firestore
+					const firestoreGames = await fetchGamesByIds(result.result.gameIds);
 
-				// Fetch Trivia
-				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
-				triviaGames.forEach((game) => {
-					if (game.questions && Array.isArray(game.questions)) {
-						allPuzzles.push({
-							id: `trivia_${difficulty}_${game.id}`,
-							type: "trivia",
-							data: {
-								questions: game.questions as any,
-							} as TriviaData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
+					// Convert to Puzzle objects
+					const allPuzzles: Puzzle[] = [];
+					for (const gameId of result.result.gameIds) {
+						const firestoreGame = firestoreGames.find((g) => g.id === gameId);
+						if (firestoreGame) {
+							const puzzle = convertFirestoreGameToPuzzle(firestoreGame, gameId);
+							if (puzzle) {
+								allPuzzles.push(puzzle);
+							}
+						}
 					}
-				});
 
-				// Fetch Mastermind
-				const mastermindGames = await fetchGamesFromFirestore(
-					"mastermind",
-					difficulty
-				);
-				mastermindGames.forEach((game) => {
-					if (
-						game.secretCode &&
-						Array.isArray(game.secretCode) &&
-						game.maxGuesses
-					) {
-						allPuzzles.push({
-							id: `mastermind_${difficulty}_${game.id}`,
-							type: "mastermind",
-							data: {
-								secretCode: game.secretCode,
-								maxGuesses: game.maxGuesses,
-							} as MastermindData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
+					// Store all puzzles (blocked users already filtered by cloud function)
+					setPuzzles(allPuzzles);
+					setAllRecommendedPuzzles(allPuzzles);
+					setDisplayedPuzzles(allPuzzles);
+
+					// Initialize elapsed times for all puzzles to 0
+					const initialElapsedTimes: Record<string, number> = {};
+					allPuzzles.forEach((puzzle) => {
+						initialElapsedTimes[puzzle.id] = 0;
+					});
+					puzzleElapsedTimesRef.current = initialElapsedTimes;
+
+					// Filter completed games in background (non-blocking)
+					getAllCompletedGameIds(user.uid)
+						.then((completedIds) => {
+							const filteredPuzzles = allPuzzles.filter(
+								(puzzle) => !completedIds.has(puzzle.id)
+							);
+							if (filteredPuzzles.length !== allPuzzles.length) {
+								setDisplayedPuzzles(filteredPuzzles);
+								setAllRecommendedPuzzles(filteredPuzzles);
+								setPuzzles(filteredPuzzles);
+							}
+						})
+						.catch((error) => {
+							console.error("Error filtering completed games (fallback):", error);
 						});
-					}
-				});
 
-				// Fetch Sequencing
-				const sequencingGames = await fetchGamesFromFirestore(
-					"sequencing",
-					difficulty
-				);
-				sequencingGames.forEach((game) => {
-					if (
-						game.theme &&
-						game.numSlots &&
-						game.entities &&
-						Array.isArray(game.entities) &&
-						game.rules &&
-						Array.isArray(game.rules) &&
-						game.solution &&
-						Array.isArray(game.solution)
-					) {
-						allPuzzles.push({
-							id: `sequencing_${difficulty}_${game.id}`,
-							type: "sequencing",
-							data: {
-								theme: game.theme as "people" | "appointments" | "runners",
-								numSlots: game.numSlots,
-								entities: game.entities,
-								rules: game.rules.map((r: any) => ({
-									type: r.type,
-									entity1: r.entity1,
-									entity2: r.entity2,
-									position: r.position,
-									minDistance: r.minDistance,
-									description: r.description,
-								})),
-								solution: game.solution,
-							} as SequencingData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch WordChain
-				const wordChainGames = await fetchGamesFromFirestore(
-					"wordChain",
-					difficulty
-				);
-				wordChainGames.forEach((game) => {
-					if (game.startWord && game.endWord && game.answer) {
-						// Ensure answer is an array (it might be stored as string or array in Firestore)
-						const answerArray = Array.isArray(game.answer)
-							? game.answer
-							: typeof game.answer === "string"
-							? [game.answer]
-							: [];
-
-						allPuzzles.push({
-							id: `wordchain_${difficulty}_${game.id}`,
-							type: "wordChain",
-							data: {
-								startWord: game.startWord,
-								endWord: game.endWord,
-								answer: answerArray,
-								minSteps: game.minSteps || 3,
-								hint: game.hint,
-							} as WordChainData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch Alias
-				const aliasGames = await fetchGamesFromFirestore("alias", difficulty);
-				aliasGames.forEach((game) => {
-					if (game.definitions && game.answer && game.choices) {
-						allPuzzles.push({
-							id: `alias_${difficulty}_${game.id}`,
-							type: "alias",
-							data: {
-								definitions: game.definitions,
-								answer: game.answer,
-								choices: game.choices,
-								hint: game.hint,
-							} as AliasData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch Zip
-				const zipGames = await fetchGamesFromFirestore("zip", difficulty);
-				zipGames.forEach((game) => {
-					if (game.rows && game.cols && game.cells && game.solution) {
-						allPuzzles.push({
-							id: `zip_${difficulty}_${game.id}`,
-							type: "zip",
-							data: {
-								rows: game.rows,
-								cols: game.cols,
-								cells: game.cells,
-								solution: game.solution,
-							} as ZipData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch Futoshiki
-				const futoshikiGames = await fetchGamesFromFirestore(
-					"futoshiki",
-					difficulty
-				);
-				futoshikiGames.forEach((game) => {
-					if (game.size && game.grid && game.givens && game.inequalities) {
-						allPuzzles.push({
-							id: `futoshiki_${difficulty}_${game.id}`,
-							type: "futoshiki",
-							data: {
-								size: game.size,
-								grid: game.grid,
-								givens: game.givens,
-								inequalities: game.inequalities,
-							} as FutoshikiData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch Magic Square
-				const magicSquareGames = await fetchGamesFromFirestore(
-					"magicSquare",
-					difficulty
-				);
-				magicSquareGames.forEach((game) => {
-					if (
-						game.size &&
-						game.grid &&
-						game.magicConstant !== undefined &&
-						game.givens
-					) {
-						allPuzzles.push({
-							id: `magicSquare_${difficulty}_${game.id}`,
-							type: "magicSquare",
-							data: {
-								size: game.size,
-								grid: game.grid,
-								magicConstant: game.magicConstant,
-								givens: game.givens,
-							} as MagicSquareData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-
-				// Fetch Hidato
-				const hidatoGames = await fetchGamesFromFirestore("hidato", difficulty);
-				hidatoGames.forEach((game) => {
-					if (
-						game.rows &&
-						game.cols &&
-						game.startNum !== undefined &&
-						game.endNum !== undefined &&
-						game.path &&
-						game.givens
-					) {
-						allPuzzles.push({
-							id: `hidato_${difficulty}_${game.id}`,
-							type: "hidato",
-							data: {
-								rows: game.rows,
-								cols: game.cols,
-								startNum: game.startNum,
-								endNum: game.endNum,
-								path: game.path,
-								givens: game.givens,
-							} as HidatoData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
+					// PREFETCH: Start prefetching next batch in background for instant "For You" refresh
+					prefetchNextBatch();
+				}
 			}
-
-			// Fetch Sudoku games
-			for (const difficulty of ["easy", "medium", "hard"] as const) {
-				const sudokuGames = await fetchGamesFromFirestore("sudoku", difficulty);
-				sudokuGames.forEach((game) => {
-					if (game.grid && game.givens) {
-						allPuzzles.push({
-							id: `sudoku_${difficulty}_${game.id}`,
-							type: "sudoku",
-							data: {
-								grid: game.grid,
-								givens: game.givens,
-							} as SudokuData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-							uid: game.uid,
-							profilePicture: null,
-						});
-					}
-				});
-			}
-
-			// Store all puzzles
-			setPuzzles(allPuzzles);
-
-			// Initialize elapsed times for all puzzles to 0
-			const initialElapsedTimes: Record<string, number> = {};
-			allPuzzles.forEach((puzzle) => {
-				initialElapsedTimes[puzzle.id] = 0;
-			});
-			puzzleElapsedTimesRef.current = initialElapsedTimes;
-
-			// Generate recommendations and show immediately (no filtering yet!)
-			// Get simple recommendations from ALL games (no upfront filtering)
-			const recommended = getSimpleRecommendations(
-				allPuzzles,
-				userData,
-				allPuzzles.length
-			);
-
-			// LAYER 1: Deduplicate after recommendations
-			const uniqueRecommended = deduplicateGames(recommended);
-
-			// Interleave game types for visual variety
-			const interleaved = interleaveGamesByType(uniqueRecommended);
-
-			// LAYER 2: Deduplicate after interleaving (double-check)
-			const uniqueInterleaved = deduplicateGames(interleaved);
-
-			// LAYER 2.5: Filter out games from blocked users
-			const blockedUserIds = await getBlockedUsers(user.uid);
-			const blockedSet = new Set(blockedUserIds);
-			const filteredByBlock = uniqueInterleaved.filter((puzzle) => {
-				if (!puzzle.uid) return true; // Keep games without uid
-				return !blockedSet.has(puzzle.uid);
-			});
-
-			setAllRecommendedPuzzles(filteredByBlock);
-
-			// Display first 15 games immediately
-			const BATCH_SIZE = 15;
-			const firstBatch = filteredByBlock.slice(0, BATCH_SIZE);
-			setDisplayedPuzzles(firstBatch);
-
-			// Now filter displayed games in background (non-blocking)
-			// user is already declared at the top of the function
-			if (user) {
-				// Don't await - let it run in background
-				filterDisplayedGamesInBackground(firstBatch);
-			}
-
-			// PREFETCH: Start prefetching next batch in background for instant "For You" refresh
-			prefetchNextBatch();
 		} catch (error) {
 			console.error("Error loading puzzles from Firestore:", error);
 			Alert.alert(
@@ -1749,22 +1374,13 @@ const FeedScreen = () => {
 	};
 
 	// Filter displayed games in background (lazy filtering)
+	// Note: blocked users already filtered by cloud function
 	const filterDisplayedGamesInBackground = async (games: Puzzle[]) => {
 		const user = getCurrentUser();
 		if (!user) return;
 
-		// Get blocked users list
-		const blockedUserIds = await getBlockedUsers(user.uid);
-		const blockedSet = new Set(blockedUserIds);
-
-		// Filter out games from blocked users
-		const nonBlockedGames = games.filter((g) => {
-			if (!g.uid) return true; // Keep games without uid
-			return !blockedSet.has(g.uid);
-		});
-
 		// Only check games we haven't checked yet
-		const uncheckedGames = nonBlockedGames.filter(
+		const uncheckedGames = games.filter(
 			(g) => !checkedGamesRef.current.has(g.id)
 		);
 		if (uncheckedGames.length === 0) return;
@@ -2291,12 +1907,16 @@ const FeedScreen = () => {
 					if (activeTab === "forYou") {
 						// Calculate relative index within current batch (every 50 games)
 						const relativeIndex = newIndex % 50;
+						console.log("relativeIndex", relativeIndex);
 						currentGameIndexRef.current = relativeIndex;
 
 						// Trigger progressive refresh at game 35 of each batch (indices 35, 85, 135, etc.)
 						if (relativeIndex === 35 && !isRefreshingRef.current) {
+							console.log("triggering progressive refresh");
 							isRefreshingRef.current = true;
 							triggerProgressiveRefresh().finally(() => {
+								console.log("progressive refresh finished");
+								console.log("puzzle length", displayedPuzzles.length);
 								isRefreshingRef.current = false;
 							});
 						}
@@ -2408,15 +2028,9 @@ const FeedScreen = () => {
 
 		try {
 			// Get current feed game IDs (to avoid duplicates)
+			// Note: COMPUTE_NEXT_RECOMMENDATIONS_URL already filters out completed games
 			const currentFeedIds = new Set(displayedPuzzles.map((game) => game.id));
-
-			// Get all game history IDs (completed, skipped, attempted)
-			const historyIds = await getAllGameHistoryIds(user.uid);
-
-			// Combine: exclude games already in feed OR in history
-			const excludeIds = Array.from(
-				new Set([...currentFeedIds, ...historyIds])
-			);
+			const excludeIds = Array.from(currentFeedIds);
 
 			// Get auth token (using modular API to avoid deprecation warning)
 			const currentUser = auth().currentUser;
