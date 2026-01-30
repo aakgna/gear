@@ -149,11 +149,11 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
-		case "wordle":
+		case "wordform":
 			if (game.qna) {
 				return {
 					id: gameId,
-					type: "wordle",
+					type: "wordform",
 					data: {
 						answer: game.qna.toUpperCase(),
 					} as WordleData,
@@ -199,7 +199,7 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
-		case "mastermind":
+		case "codebreaker":
 			if (
 				game.secretCode &&
 				Array.isArray(game.secretCode) &&
@@ -207,7 +207,7 @@ function convertFirestoreGameToPuzzle(
 			) {
 				return {
 					id: gameId,
-					type: "mastermind",
+					type: "codebreaker",
 					data: {
 						secretCode: game.secretCode,
 						maxGuesses: game.maxGuesses,
@@ -281,11 +281,11 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
-		case "alias":
+		case "inference":
 			if (game.definitions && game.answer && game.choices) {
 				return {
 					id: gameId,
-					type: "alias",
+					type: "inference",
 					data: {
 						definitions: game.definitions,
 						answer: game.answer,
@@ -300,11 +300,11 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
-		case "zip":
+		case "maze":
 			if (game.rows && game.cols && game.cells && game.solution) {
 				return {
 					id: gameId,
-					type: "zip",
+					type: "maze",
 					data: {
 						rows: game.rows,
 						cols: game.cols,
@@ -362,7 +362,7 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
-		case "hidato":
+		case "trailfinder":
 			if (
 				game.rows &&
 				game.cols &&
@@ -373,7 +373,7 @@ function convertFirestoreGameToPuzzle(
 			) {
 				return {
 					id: gameId,
-					type: "hidato",
+					type: "trailfinder",
 					data: {
 						rows: game.rows,
 						cols: game.cols,
@@ -768,8 +768,8 @@ const FeedScreen = () => {
 						} as QuickMathData;
 						isValid = true;
 					}
-					// Handle Wordle
-					else if (game.gameType === "wordle" && gameData.qna) {
+					// Handle WordForm
+					else if (game.gameType === "wordform" && gameData.qna) {
 						puzzleData = {
 							answer: gameData.qna.toUpperCase(),
 						} as WordleData;
@@ -800,9 +800,9 @@ const FeedScreen = () => {
 						} as TriviaData;
 						isValid = true;
 					}
-					// Handle Mastermind
+					// Handle CodeBreaker
 					else if (
-						game.gameType === "mastermind" &&
+						game.gameType === "codebreaker" &&
 						gameData.secretCode &&
 						Array.isArray(gameData.secretCode) &&
 						gameData.maxGuesses
@@ -864,9 +864,9 @@ const FeedScreen = () => {
 						} as WordChainData;
 						isValid = true;
 					}
-					// Handle Alias
+					// Handle Inference
 					else if (
-						game.gameType === "alias" &&
+						game.gameType === "inference" &&
 						gameData.definitions &&
 						gameData.answer &&
 						gameData.choices
@@ -879,9 +879,9 @@ const FeedScreen = () => {
 						} as AliasData;
 						isValid = true;
 					}
-					// Handle Zip
+					// Handle Maze
 					else if (
-						game.gameType === "zip" &&
+						game.gameType === "maze" &&
 						gameData.rows &&
 						gameData.cols &&
 						gameData.cells &&
@@ -927,9 +927,9 @@ const FeedScreen = () => {
 						} as MagicSquareData;
 						isValid = true;
 					}
-					// Handle Hidato
+					// Handle TrailFinder
 					else if (
-						game.gameType === "hidato" &&
+						game.gameType === "trailfinder" &&
 						gameData.rows &&
 						gameData.cols &&
 						gameData.startNum !== undefined &&
@@ -1587,13 +1587,13 @@ const applyForYouFilters = useCallback(
 					}
 				});
 
-				// Fetch Wordle
-				const wordleGames = await fetchGamesFromFirestore("wordle", difficulty);
-				wordleGames.forEach((game) => {
+				// Fetch WordForm
+				const wordformGames = await fetchGamesFromFirestore("wordform", difficulty);
+				wordformGames.forEach((game) => {
 					if (game.qna) {
 						newGames.push({
-							id: `wordle_${difficulty}_${game.id}`,
-							type: "wordle",
+							id: `wordform_${difficulty}_${game.id}`,
+							type: "wordform",
 							data: {
 								answer: game.qna.toUpperCase(),
 							} as WordleData,
@@ -1643,20 +1643,20 @@ const applyForYouFilters = useCallback(
 					}
 				});
 
-				// Fetch Mastermind
-				const mastermindGamesPrefetch = await fetchGamesFromFirestore(
-					"mastermind",
+				// Fetch CodeBreaker
+				const codebreakerGamesPrefetch = await fetchGamesFromFirestore(
+					"codebreaker",
 					difficulty
 				);
-				mastermindGamesPrefetch.forEach((game) => {
+				codebreakerGamesPrefetch.forEach((game) => {
 					if (
 						game.secretCode &&
 						Array.isArray(game.secretCode) &&
 						game.maxGuesses
 					) {
 						newGames.push({
-							id: `mastermind_${difficulty}_${game.id}`,
-							type: "mastermind",
+							id: `codebreaker_${difficulty}_${game.id}`,
+							type: "codebreaker",
 							data: {
 								secretCode: game.secretCode,
 								maxGuesses: game.maxGuesses,
@@ -1742,13 +1742,13 @@ const applyForYouFilters = useCallback(
 					}
 				});
 
-				// Fetch Alias
-				const aliasGames = await fetchGamesFromFirestore("alias", difficulty);
-				aliasGames.forEach((game) => {
+				// Fetch Inference
+				const inferenceGames = await fetchGamesFromFirestore("inference", difficulty);
+				inferenceGames.forEach((game) => {
 					if (game.definitions && game.answer) {
 						newGames.push({
-							id: `alias_${difficulty}_${game.id}`,
-							type: "alias",
+							id: `inference_${difficulty}_${game.id}`,
+							type: "inference",
 							data: {
 								definitions: game.definitions,
 								answer: game.answer,
@@ -1762,13 +1762,13 @@ const applyForYouFilters = useCallback(
 					}
 				});
 
-				// Fetch Zip
-				const zipGames = await fetchGamesFromFirestore("zip", difficulty);
-				zipGames.forEach((game) => {
+				// Fetch Maze
+				const mazeGames = await fetchGamesFromFirestore("maze", difficulty);
+				mazeGames.forEach((game) => {
 					if (game.rows && game.cols && game.cells && game.solution) {
 						newGames.push({
-							id: `zip_${difficulty}_${game.id}`,
-							type: "zip",
+							id: `maze_${difficulty}_${game.id}`,
+							type: "maze",
 							data: {
 								rows: game.rows,
 								cols: game.cols,
@@ -1836,9 +1836,9 @@ const applyForYouFilters = useCallback(
 					}
 				});
 
-				// Fetch Hidato
-				const hidatoGames = await fetchGamesFromFirestore("hidato", difficulty);
-				hidatoGames.forEach((game) => {
+				// Fetch TrailFinder
+				const trailfinderGames = await fetchGamesFromFirestore("trailfinder", difficulty);
+				trailfinderGames.forEach((game) => {
 					if (
 						game.rows &&
 						game.cols &&
@@ -1848,8 +1848,8 @@ const applyForYouFilters = useCallback(
 						game.givens
 					) {
 						newGames.push({
-							id: `hidato_${difficulty}_${game.id}`,
-							type: "hidato",
+							id: `trailfinder_${difficulty}_${game.id}`,
+							type: "trailfinder",
 							data: {
 								rows: game.rows,
 								cols: game.cols,
@@ -2293,7 +2293,7 @@ const applyForYouFilters = useCallback(
 			// Create a placeholder puzzle object for the welcome card
 			const welcomeCard: Puzzle = {
 				id: "__welcome__",
-				type: "wordle" as PuzzleType, // Dummy type, won't be used
+				type: "wordform" as PuzzleType, // Dummy type, won't be used
 				difficulty: 1,
 				data: {} as any, // Dummy data
 				createdAt: new Date().toISOString(),
@@ -2866,18 +2866,18 @@ const applyForYouFilters = useCallback(
 								<Text style={styles.filterSectionTitle}>Game Type</Text>
 								<View style={styles.chipRow}>
 								{[
-									"wordle",
+									"wordform",
 									"quickMath",
 									"riddle",
 									"wordChain",
-									"alias",
-									"zip",
+									"inference",
+									"maze",
 									"futoshiki",
 									"magicSquare",
-									"hidato",
+									"trailfinder",
 									"sudoku",
 									"trivia",
-									"mastermind",
+									"codebreaker",
 									"sequencing",
 								].map((gameType) => {
 									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);

@@ -1,17 +1,17 @@
 // Puzzle types
 export type PuzzleType =
-	| "wordle"
+	| "wordform"
 	| "quickMath"
 	| "riddle"
 	| "wordChain"
-	| "alias"
-	| "zip"
+	| "inference"
+	| "maze"
 	| "futoshiki"
 	| "magicSquare"
-	| "hidato"
+	| "trailfinder"
 	| "sudoku"
 	| "trivia"
-	| "mastermind"
+	| "codebreaker"
 	| "sequencing";
 
 export interface Puzzle {

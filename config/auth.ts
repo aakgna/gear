@@ -816,18 +816,18 @@ const parseGameId = (
 
 	// Map all possible game types
 	const categoryMap: Record<string, string> = {
-		wordle: "wordle",
+		wordform: "wordform",
 		riddle: "riddle",
 		quickmath: "quickMath",
 		wordchain: "wordChain",
 		trivia: "trivia",
-		mastermind: "mastermind",
+		codebreaker: "codebreaker",
 		sequencing: "sequencing",
-		alias: "alias",
-		zip: "zip",
+		inference: "inference",
+		maze: "maze",
 		futoshiki: "futoshiki",
 		magicsquare: "magicSquare",
-		hidato: "hidato",
+		trailfinder: "trailfinder",
 		sudoku: "sudoku",
 	};
 

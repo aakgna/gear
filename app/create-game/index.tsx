@@ -70,36 +70,36 @@ const GameTypeButton: React.FC<{
 };
 
 type GameType =
-	| "wordle"
+	| "wordform"
 	| "riddle"
 	| "quickMath"
-	| "alias"
+	| "inference"
 	| "wordChain"
 	| "trivia"
-	| "mastermind"
+	| "codebreaker"
 	| "sequencing"
 	| "sudoku"
 	| "futoshiki"
-	| "hidato"
-	| "zip";
+	| "trailfinder"
+	| "maze";
 
 const gameTypes: Array<{
 	type: GameType;
 	name: string;
 	icon: keyof typeof Ionicons.glyphMap;
 }> = [
-	{ type: "wordle", name: "Wordle", icon: "text-outline" },
+	{ type: "wordform", name: "WordForm", icon: "text-outline" },
 	{ type: "riddle", name: "Riddle", icon: "help-circle-outline" },
 	{ type: "quickMath", name: "Quick Math", icon: "calculator-outline" },
-	{ type: "alias", name: "Alias", icon: "book-outline" },
+	{ type: "inference", name: "Inference", icon: "book-outline" },
 	{ type: "wordChain", name: "Word Chain", icon: "link-outline" },
 	{ type: "trivia", name: "Trivia", icon: "trophy-outline" },
-	{ type: "mastermind", name: "Mastermind", icon: "color-palette-outline" },
+	{ type: "codebreaker", name: "CodeBreaker", icon: "color-palette-outline" },
 	{ type: "sequencing", name: "Sequencing", icon: "list-outline" },
 	{ type: "sudoku", name: "Sudoku", icon: "grid-outline" },
 	{ type: "futoshiki", name: "Futoshiki", icon: "code-working-outline" },
-	{ type: "hidato", name: "Hidato", icon: "navigate-outline" },
-	{ type: "zip", name: "Zip", icon: "git-branch-outline" },
+	{ type: "trailfinder", name: "TrailFinder", icon: "navigate-outline" },
+	{ type: "maze", name: "Maze", icon: "git-branch-outline" },
 ];
 
 const CreateGameIndex = () => {

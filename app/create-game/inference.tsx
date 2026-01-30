@@ -25,68 +25,91 @@ import {
 } from "../../constants/DesignSystem";
 import { saveGameToFirestore } from "../../config/firebase";
 import { getCurrentUser, getUserData } from "../../config/auth";
-import words from "an-array-of-english-words";
 
 type Difficulty = "easy" | "medium" | "hard";
 
-const CreateWordlePage = () => {
+const CreateAliasPage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const [wordleWord, setWordleWord] = useState("");
+	const [definitions, setDefinitions] = useState<string[]>(["", "", ""]);
+	const [answers, setAnswers] = useState<string[]>(["", "", ""]);
+	const [correctAnswerIndex, setCorrectAnswerIndex] = useState<number | null>(null);
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 	const [loading, setLoading] = useState(false);
 
-	const getWordleLengthRange = (): { min: number; max: number } => {
+	// Get number of answer choices based on difficulty
+	const getAnswerCount = (): number => {
 		switch (difficulty) {
 			case "easy":
-				return { min: 3, max: 4 };
+				return 3;
 			case "medium":
-				return { min: 5, max: 6 };
+				return 4;
 			case "hard":
-				return { min: 7, max: 8 };
+				return 5;
 			default:
-				return { min: 3, max: 8 };
+				return 3;
 		}
 	};
 
-	const validateWordle = (): boolean => {
-		if (!wordleWord.trim()) {
-			Alert.alert("Validation Error", "Please enter a word.");
-			return false;
+	// Update answers array when difficulty changes
+	React.useEffect(() => {
+		const count = getAnswerCount();
+		setAnswers((prev) => {
+			const newAnswers = [...prev];
+			// Add empty strings if we need more
+			while (newAnswers.length < count) {
+				newAnswers.push("");
+			}
+			// Trim if we need fewer
+			if (newAnswers.length > count) {
+				newAnswers.splice(count);
+			}
+			return newAnswers;
+		});
+		// Reset correct answer if it's out of bounds
+		if (correctAnswerIndex !== null && correctAnswerIndex >= count) {
+			setCorrectAnswerIndex(null);
 		}
-		const word = wordleWord.trim().toUpperCase();
-		const { min, max } = getWordleLengthRange();
+	}, [difficulty]);
 
-		if (word.length < min || word.length > max) {
-			Alert.alert(
-				"Validation Error",
-				`Word must be between ${min} and ${max} letters for ${difficulty} difficulty.`
-			);
+	const handleDefinitionChange = (index: number, value: string) => {
+		const newDefinitions = [...definitions];
+		newDefinitions[index] = value;
+		setDefinitions(newDefinitions);
+	};
+
+	const validateAlias = (): boolean => {
+		// Check all definitions are filled (fixed 3 definitions)
+		for (let i = 0; i < 3; i++) {
+			if (!definitions[i]?.trim()) {
+				Alert.alert("Validation Error", `Please enter definition ${i + 1}.`);
+				return false;
+			}
+		}
+
+		// Check all answers are filled
+		for (let i = 0; i < answers.length; i++) {
+			if (!answers[i].trim()) {
+				Alert.alert("Validation Error", `Please fill in answer choice ${i + 1}.`);
+				return false;
+			}
+		}
+
+		// Check correct answer is selected
+		if (correctAnswerIndex === null) {
+			Alert.alert("Validation Error", "Please mark one answer as correct.");
 			return false;
 		}
-		if (!/^[A-Z]+$/.test(word)) {
-			Alert.alert("Validation Error", "Word must contain only letters.");
+
+		// Check for duplicate answers
+		const trimmedAnswers = answers.map((a) => a.trim().toLowerCase());
+		const uniqueAnswers = new Set(trimmedAnswers);
+		if (uniqueAnswers.size !== answers.length) {
+			Alert.alert("Validation Error", "All answers must be unique.");
 			return false;
 		}
-		
-		// Validate word is in the dictionary
-		if (!words.includes(word.toLowerCase())) {
-			Alert.alert(
-				"Validation Error",
-				`"${word}" is not a valid English word.`
-			);
-			return false;
-		}
-		
+
 		return true;
-	};
-
-	const handleWordleWordChange = (text: string) => {
-		const filtered = text.toUpperCase().replace(/[^A-Z]/g, "");
-		const { max } = getWordleLengthRange();
-		if (filtered.length <= max) {
-			setWordleWord(filtered);
-		}
 	};
 
 	const handleSubmit = async () => {
@@ -97,23 +120,29 @@ const CreateWordlePage = () => {
 			return;
 		}
 
-		if (!validateWordle()) return;
+		if (!validateAlias()) return;
 
 		setLoading(true);
 		try {
 			const userData = await getUserData(user.uid);
 			const username = userData?.username;
 
+			// Get correct answer and shuffle all choices
+			const correctAnswer = answers[correctAnswerIndex!].trim();
+			const allChoices = answers.map((a) => a.trim()).sort(() => Math.random() - 0.5);
+
 			await saveGameToFirestore(
-				"wordle",
+				"inference",
 				difficulty,
 				{
-					qna: wordleWord.trim().toUpperCase(),
+					definitions: definitions.slice(0, 3).map((d) => d.trim()),
+					answer: correctAnswer,
+					choices: allChoices,
 				},
 				user.uid,
 				username
 			);
-			Alert.alert("Success", "Your Wordle game has been created successfully!", [
+			Alert.alert("Success", "Your Inference game has been created successfully!", [
 				{
 					text: "OK",
 					onPress: () => router.back(),
@@ -130,12 +159,6 @@ const CreateWordlePage = () => {
 		}
 	};
 
-	const wordLength = wordleWord.length;
-	const { min, max } = getWordleLengthRange();
-	const isValidLength = wordLength >= min && wordLength <= max;
-	const difficultyText =
-		difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
@@ -146,7 +169,7 @@ const CreateWordlePage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Wordle</Text>
+				<Text style={styles.headerTitle}>Create Alias</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -160,13 +183,12 @@ const CreateWordlePage = () => {
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
-					<Text style={styles.sectionTitle}>Create Wordle Game</Text>
+					<Text style={styles.sectionTitle}>Create Inference Game</Text>
 					<Text style={styles.description}>
-						Enter a word. The length depends on difficulty: Easy (3-4 letters),
-						Medium (5-6 letters), Hard (7-8 letters).
+					Enter 3 cryptic definitions that all describe the same word. Then provide answer choices and mark the correct one.
 					</Text>
 
-					{/* Difficulty Selector */}
+					{/* Difficulty */}
 					<View style={styles.selectorContainer}>
 						<Text style={styles.label}>Difficulty</Text>
 						<View style={styles.selectorRow}>
@@ -191,32 +213,75 @@ const CreateWordlePage = () => {
 								</TouchableOpacity>
 							))}
 						</View>
+					<Text style={styles.helperText}>
+						{difficulty === "easy"
+							? "3 answer choices"
+							: difficulty === "medium"
+								? "4 answer choices"
+								: "5 answer choices"}
+					</Text>
 					</View>
 
+					{/* Definitions */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.inputLabel}>Definitions</Text>
+					<Text style={styles.helperText}>
+						Enter 3 cryptic clues that describe the same word
+					</Text>
+					{Array.from({ length: 3 }).map((_, index) => (
+						<TextInput
+							key={index}
+							style={[styles.input, styles.textArea]}
+							placeholder={`Definition ${index + 1}...`}
+							placeholderTextColor={Colors.text.disabled}
+							value={definitions[index]}
+							onChangeText={(text) => handleDefinitionChange(index, text)}
+							multiline
+							numberOfLines={2}
+						/>
+					))}
+				</View>
+
+				{/* Answer Choices */}
+				<View style={styles.inputContainer}>
+					<Text style={styles.inputLabel}>
+						Answer Choices (mark correct answer)
+					</Text>
+					{answers.map((answer, index) => (
+						<View key={index} style={styles.answerRow}>
+							<TouchableOpacity
+								style={styles.radioButton}
+								onPress={() => setCorrectAnswerIndex(index)}
+							>
+								<View
+									style={[
+										styles.radioCircle,
+										correctAnswerIndex === index && styles.radioCircleSelected,
+									]}
+								>
+									{correctAnswerIndex === index && (
+										<View style={styles.radioInner} />
+									)}
+								</View>
+							</TouchableOpacity>
 					<TextInput
-						style={[
-							styles.input,
-							wordLength > 0 && !isValidLength && styles.inputError,
-						]}
-						placeholder={`Enter word (${min}-${max} letters for ${difficultyText})`}
+								style={[
+									styles.input,
+									styles.answerInput,
+									correctAnswerIndex === index && styles.correctInput,
+								]}
+								placeholder={`Answer choice ${index + 1}...`}
 						placeholderTextColor={Colors.text.disabled}
-						value={wordleWord}
-						onChangeText={handleWordleWordChange}
-						autoCapitalize="characters"
-						maxLength={max}
+						value={answer}
+								onChangeText={(text) => {
+									const newAnswers = [...answers];
+									newAnswers[index] = text;
+									setAnswers(newAnswers);
+								}}
 					/>
-					{wordLength > 0 && (
-						<Text
-							style={[
-								styles.helperText,
-								!isValidLength && styles.helperTextError,
-							]}
-						>
-							{wordLength} letter{wordLength !== 1 ? "s" : ""}
-							{!isValidLength &&
-								` (must be between ${min}-${max} letters for ${difficultyText})`}
-						</Text>
-					)}
+						</View>
+					))}
+				</View>
 
 					<TouchableOpacity
 						style={[
@@ -254,7 +319,7 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		backgroundColor: Colors.background.secondary,
+		backgroundColor: Colors.background.primary,
 		borderBottomWidth: 1,
 		borderBottomColor: "#E5E5E5",
 		paddingHorizontal: Spacing.md,
@@ -305,6 +370,22 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 		color: Colors.text.primary,
 		marginBottom: Spacing.sm,
+		marginTop: Spacing.md,
+	},
+	inputContainer: {
+		marginBottom: Spacing.lg,
+	},
+	inputLabel: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
+	},
+	helperText: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		marginTop: Spacing.xs,
+		marginBottom: Spacing.sm,
 	},
 	selectorRow: {
 		flexDirection: "row",
@@ -339,21 +420,49 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		borderWidth: 1,
 		borderColor: "#E5E5E5",
-		marginBottom: Spacing.xs,
+		marginBottom: Spacing.md,
 		...Shadows.light,
 	},
-	inputError: {
-		borderColor: Colors.error,
+	textArea: {
+		minHeight: 60,
+		textAlignVertical: "top",
+	},
+	answerRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: Spacing.sm,
+		gap: Spacing.sm,
+	},
+	radioButton: {
+		padding: Spacing.xs,
+	},
+	radioCircle: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: "#E5E5E5",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: Colors.background.primary,
+	},
+	radioCircleSelected: {
+		borderColor: Colors.game.correct,
 		borderWidth: 2,
 	},
-	helperText: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-		marginBottom: Spacing.md,
-		marginTop: -Spacing.xs,
+	radioInner: {
+		width: 12,
+		height: 12,
+		borderRadius: 6,
+		backgroundColor: Colors.game.correct,
 	},
-	helperTextError: {
-		color: Colors.error,
+	answerInput: {
+		flex: 1,
+		marginBottom: 0,
+	},
+	correctInput: {
+		borderColor: Colors.game.correct,
+		backgroundColor: Colors.game.correct + "10",
 	},
 	submitButton: {
 		flexDirection: "row",
@@ -377,5 +486,5 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateWordlePage;
+export default CreateAliasPage;
 

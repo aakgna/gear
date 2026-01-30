@@ -62,7 +62,7 @@ const GameIntroAnimation: React.FC<{
 
 const getAnimationCount = (gameType: PuzzleType): number => {
 	switch (gameType) {
-		case "wordle":
+		case "wordform":
 			return 6;
 		case "sudoku":
 			return 9;
@@ -74,19 +74,19 @@ const getAnimationCount = (gameType: PuzzleType): number => {
 			return 6;
 		case "wordChain":
 			return 4;
-		case "alias":
+		case "inference":
 			return 5;
 		case "futoshiki":
 			return 6;
 		case "magicSquare":
 			return 9;
-		case "hidato":
+		case "trailfinder":
 			return 8;
 		case "sequencing":
 			return 5;
-		case "mastermind":
+		case "codebreaker":
 			return 6;
-		case "zip":
+		case "maze":
 			return 7;
 		default:
 			return 4;
@@ -134,7 +134,7 @@ const renderAnimation = (
 	gameColor: string
 ): React.ReactNode => {
 	switch (gameType) {
-		case "wordle":
+		case "wordform":
 			return renderWordleAnimation(anims, gameColor);
 		case "sudoku":
 			return renderSudokuAnimation(anims, gameColor);
@@ -146,19 +146,19 @@ const renderAnimation = (
 			return renderQuickMathAnimation(anims, gameColor);
 		case "wordChain":
 			return renderWordChainAnimation(anims, gameColor);
-		case "alias":
+		case "inference":
 			return renderAliasAnimation(anims, gameColor);
 		case "futoshiki":
 			return renderFutoshikiAnimation(anims, gameColor);
 		case "magicSquare":
 			return renderMagicSquareAnimation(anims, gameColor);
-		case "hidato":
+		case "trailfinder":
 			return renderHidatoAnimation(anims, gameColor);
 		case "sequencing":
 			return renderSequencingAnimation(anims, gameColor);
-		case "mastermind":
+		case "codebreaker":
 			return renderMastermindAnimation(anims, gameColor);
-		case "zip":
+		case "maze":
 			return renderZipAnimation(anims, gameColor);
 		default:
 			return null;
@@ -1003,7 +1003,10 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 	const buttonScale = useRef(new Animated.Value(1)).current;
 
 
-	const instructions = gameInstructions[gameType];
+	const instructions = gameInstructions[gameType] || {
+		instructions: ["Complete the puzzle to win!"],
+		example: "Follow the on-screen instructions.",
+	};
 	const difficultyLabel = getDifficultyLabel(difficulty);
 	const difficultyColor = getDifficultyColor(difficulty);
 	const gameColor = getGameColor(gameType); // Get game-specific color
@@ -1018,6 +1021,11 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 			quickMath: "Quick Math",
 			wordChain: "Word Chain",
 			magicSquare: "Magic Square",
+			wordform: "WordForm",
+			trailfinder: "TrailFinder",
+			maze: "Maze",
+			codebreaker: "CodeBreaker",
+			inference: "Inference",
 		};
 
 		return specialCases[type] || formatted;

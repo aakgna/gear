@@ -218,7 +218,7 @@ const CreateHidatoPage = () => {
 			});
 
 			await saveGameToFirestore(
-				"hidato",
+				"trailfinder",
 				difficulty,
 				{
 					rows,
@@ -233,7 +233,7 @@ const CreateHidatoPage = () => {
 			);
 			Alert.alert(
 				"Success",
-				"Your Hidato game has been created successfully!",
+				"Your TrailFinder game has been created successfully!",
 				[
 					{
 						text: "OK",
@@ -267,7 +267,7 @@ const CreateHidatoPage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Hidato</Text>
+				<Text style={styles.headerTitle}>Create TrailFinder</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -276,7 +276,7 @@ const CreateHidatoPage = () => {
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
 			>
-				<Text style={styles.sectionTitle}>Create Hidato Game</Text>
+				<Text style={styles.sectionTitle}>Create TrailFinder Game</Text>
 				<Text style={styles.description}>
 					{step === 1
 						? `Step 1: Build a path from ${startNum} to your end number. Each step must be adjacent (horizontally, vertically, or diagonally). Minimum ${minPathLength} steps, maximum ${maxPathLength}.`

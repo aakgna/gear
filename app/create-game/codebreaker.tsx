@@ -127,7 +127,7 @@ const CreateMastermindPage = () => {
 			const username = userData?.username;
 
 			await saveGameToFirestore(
-				"mastermind",
+				"codebreaker",
 				difficulty,
 				{
 					secretCode: secretCode as string[],
@@ -138,7 +138,7 @@ const CreateMastermindPage = () => {
 			);
 			Alert.alert(
 				"Success",
-				"Your Mastermind game has been created successfully!",
+				"Your CodeBreaker game has been created successfully!",
 				[
 				{
 					text: "OK",
@@ -173,7 +173,7 @@ const CreateMastermindPage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Mastermind</Text>
+				<Text style={styles.headerTitle}>Create CodeBreaker</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -182,7 +182,7 @@ const CreateMastermindPage = () => {
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
 			>
-				<Text style={styles.sectionTitle}>Create Mastermind Game</Text>
+				<Text style={styles.sectionTitle}>Create CodeBreaker Game</Text>
 				<Text style={styles.description}>
 					Create a 6-position secret code by selecting colors. Players will try
 					to guess your code.

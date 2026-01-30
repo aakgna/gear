@@ -24,7 +24,7 @@ import GameHeader from "../GameHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-interface ZipGameProps {
+interface MazeGameProps {
 	inputData: ZipData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
@@ -34,7 +34,7 @@ interface ZipGameProps {
 	isActive?: boolean;
 }
 
-const ZipGame: React.FC<ZipGameProps> = ({
+const MazeGame: React.FC<MazeGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -45,7 +45,7 @@ const ZipGame: React.FC<ZipGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const gameColor = getGameColor("zip"); // Get game-specific emerald color (#10B981)
+	const gameColor = getGameColor("maze"); // Get game-specific emerald color (#10B981)
 	const { rows, cols, cells, solution } = inputData;
 	const totalCells = rows * cols;
 	const [userPath, setUserPath] = useState<number[]>([]);
@@ -812,4 +812,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default ZipGame;
+export default MazeGame;

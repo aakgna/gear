@@ -24,7 +24,7 @@ import GameHeader from "../GameHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-interface HidatoGameProps {
+interface TrailFinderGameProps {
 	inputData: HidatoData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
@@ -34,7 +34,7 @@ interface HidatoGameProps {
 	isActive?: boolean;
 }
 
-const HidatoGame: React.FC<HidatoGameProps> = ({
+const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -45,7 +45,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const gameColor = getGameColor("hidato"); // Get game-specific amber color (#F59E0B)
+	const gameColor = getGameColor("trailfinder"); // Get game-specific amber color (#F59E0B)
 	const { rows, cols, startNum, endNum, path, givens } = inputData;
 
 	// Create solution grid from path
@@ -482,7 +482,7 @@ const HidatoGame: React.FC<HidatoGameProps> = ({
 			>
 				{/* Header */}
 				<GameHeader
-					title="Hidato"
+					title="TrailFinder"
 					elapsedTime={elapsedTime}
 					showDifficulty={false}
 				/>
@@ -808,4 +808,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default HidatoGame;
+export default TrailFinderGame;

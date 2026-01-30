@@ -22,7 +22,7 @@ import {
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
-interface AliasGameProps {
+interface InferenceGameProps {
 	inputData: AliasData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
@@ -32,7 +32,7 @@ interface AliasGameProps {
 	isActive?: boolean;
 }
 
-const AliasGame: React.FC<AliasGameProps> = ({
+const InferenceGame: React.FC<InferenceGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -43,7 +43,7 @@ const AliasGame: React.FC<AliasGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const gameColor = getGameColor("alias"); // Get game-specific pink color (#EC4899)
+	const gameColor = getGameColor("inference"); // Get game-specific pink color (#EC4899)
 	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
@@ -231,7 +231,7 @@ const AliasGame: React.FC<AliasGameProps> = ({
 	return (
 		<View style={styles.container}>
 			<GameHeader
-				title="Alias"
+				title="Inference"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 			/>
@@ -547,4 +547,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default AliasGame;
+export default InferenceGame;

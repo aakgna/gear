@@ -269,19 +269,19 @@ export const Layout = {
 // Game-Specific Color Themes
 // Each game gets a unique color to create visual distinction and variety
 export const GameColors: Record<PuzzleType, string> = {
-	wordle: "#3B82F6", // Vibrant blue
+	wordform: "#3B82F6", // Vibrant blue
 	sudoku: "#8B5CF6", // Deep purple
 	riddle: "#F59E0B", // Orange
 	trivia: "#14B8A6", // Teal
 	quickMath: "#EF4444", // Red
 	wordChain: "#10B981", // Green
-	alias: "#EC4899", // Pink
+	inference: "#EC4899", // Pink
 	futoshiki: "#6366F1", // Indigo
 	magicSquare: "#06B6D4", // Cyan
-	hidato: "#F59E0B", // Amber
+	trailfinder: "#F59E0B", // Amber
 	sequencing: "#8B5CF6", // Violet
-	mastermind: "#F43F5E", // Rose
-	zip: "#10B981", // Emerald
+	codebreaker: "#F43F5E", // Rose
+	maze: "#10B981", // Emerald
 };
 
 /**

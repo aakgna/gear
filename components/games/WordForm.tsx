@@ -23,7 +23,7 @@ import GameHeader from "../GameHeader";
 
 const { width, height } = Dimensions.get("window");
 
-interface WordleGameProps {
+interface WordFormGameProps {
 	inputData: WordleData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
@@ -38,7 +38,7 @@ interface TileState {
 	status: "empty" | "present" | "correct" | "absent";
 }
 
-const WordleGame: React.FC<WordleGameProps> = ({
+const WordFormGame: React.FC<WordFormGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -63,7 +63,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 	const answer = inputData.answer.toUpperCase();
 	const wordLength = answer.length;
 	const maxGuesses = 6;
-	const gameColor = getGameColor("wordle");
+	const gameColor = getGameColor("wordform");
 
 	const validWordLength = wordLength >= 3 && wordLength <= 8;
 
@@ -454,7 +454,7 @@ const WordleGame: React.FC<WordleGameProps> = ({
 					}}
 				>
 					<GameHeader
-						title="Wordle"
+						title="WordForm"
 						elapsedTime={elapsedTime}
 						showDifficulty={false}
 					/>
@@ -860,4 +860,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default WordleGame;
+export default WordFormGame;

@@ -6,7 +6,7 @@ export interface GameInstruction {
 }
 
 export const gameInstructions: Record<PuzzleType, GameInstruction> = {
-	wordle: {
+	wordform: {
 		instructions: [
 			"Guess the hidden word in 5 attempts",
 			"Each guess must be a valid word of the correct length",
@@ -48,7 +48,7 @@ export const gameInstructions: Record<PuzzleType, GameInstruction> = {
 		example:
 			"Example: CAT → BAT → BIT → BOT → COT. Each step changes one letter to form a valid word.",
 	},
-	alias: {
+	inference: {
 		instructions: [
 			"Read all the cryptic definitions",
 			"Find the single word that fits all definitions",
@@ -58,7 +58,7 @@ export const gameInstructions: Record<PuzzleType, GameInstruction> = {
 		example:
 			"Example: Definitions: 'A fruit', 'A color', 'A company'. Answer: Apple (fruit, color, company).",
 	},
-	zip: {
+	maze: {
 		instructions: [
 			"Connect numbered cells to form a continuous path",
 			"Start from the lowest number and end at the highest",
@@ -88,7 +88,7 @@ export const gameInstructions: Record<PuzzleType, GameInstruction> = {
 		example:
 			"Example: In a 3x3 magic square, all rows, columns, and diagonals sum to 15. Numbers 1-9 are used exactly once.",
 	},
-	hidato: {
+	trailfinder: {
 		instructions: [
 			"Fill the grid with consecutive numbers",
 			"Start from the given start number and end at the given end number",
@@ -118,7 +118,7 @@ export const gameInstructions: Record<PuzzleType, GameInstruction> = {
 		example:
 			"Example: 'What is the capital of France?' Options: London, Berlin, Paris, Madrid. Answer: Paris.",
 	},
-	mastermind: {
+	codebreaker: {
 		instructions: [
 			"Guess the secret color code",
 			"Select colors for each position in your guess",

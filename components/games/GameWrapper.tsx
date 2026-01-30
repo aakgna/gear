@@ -19,18 +19,18 @@ import {
 	GameResult,
 	PuzzleStats as PuzzleStatsType,
 } from "../../config/types";
-import WordleGame from "./WordleGame";
+import WordFormGame from "./WordForm";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
 import TriviaGame from "./TriviaGame";
-import MastermindGame from "./MastermindGame";
+import CodeBreakerGame from "./CodeBreaker";
 import SequencingGame from "./SequencingGame";
 import WordChainGame from "./WordChainGame";
-import AliasGame from "./AliasGame";
-import ZipGame from "./ZipGame";
+import InferenceGame from "./InferenceGame";
+import MazeGame from "./MazeGame";
 import FutoshikiGame from "./FutoshikiGame";
 import MagicSquareGame from "./MagicSquareGame";
-import HidatoGame from "./HidatoGame";
+import TrailFinderGame from "./TrailFinder";
 import SudokuGame from "./SudokuGame";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
@@ -415,6 +415,11 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			quickMath: "Quick Math",
 			wordChain: "Word Chain",
 			magicSquare: "Magic Square",
+			wordform: "WordForm",
+			trailfinder: "TrailFinder",
+			maze: "Maze",
+			codebreaker: "CodeBreaker",
+			inference: "Inference",
 		};
 
 		return specialCases[type] || formatted;
@@ -584,9 +589,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		const gameStartTime = gameStarted ? actualStartTime : undefined;
 
 		switch (puzzle.type) {
-			case "wordle":
+			case "wordform":
 				return (
-					<WordleGame
+					<WordFormGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -636,9 +641,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						isActive={isActive && gameStarted}
 					/>
 				);
-			case "mastermind":
+			case "codebreaker":
 				return (
-					<MastermindGame
+					<CodeBreakerGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -675,9 +680,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						isActive={isActive && gameStarted}
 					/>
 				);
-			case "alias":
+			case "inference":
 				return (
-					<AliasGame
+					<InferenceGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -688,9 +693,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						isActive={isActive && gameStarted}
 					/>
 				);
-			case "zip":
+			case "maze":
 				return (
-					<ZipGame
+					<MazeGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -727,9 +732,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						isActive={isActive && gameStarted}
 					/>
 				);
-			case "hidato":
+			case "trailfinder":
 				return (
-					<HidatoGame
+					<TrailFinderGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}

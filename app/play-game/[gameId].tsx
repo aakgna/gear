@@ -111,8 +111,8 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as QuickMathData;
 			isValid = true;
 		}
-		// Handle Wordle
-		else if (normalizedGameType === "wordle" && gameData.qna) {
+		// Handle WordForm
+		else if (normalizedGameType === "wordform" && gameData.qna) {
 			puzzleData = {
 				answer: gameData.qna.toUpperCase(),
 			} as WordleData;
@@ -139,9 +139,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as TriviaData;
 			isValid = true;
 		}
-		// Handle Mastermind
+		// Handle CodeBreaker
 		else if (
-			normalizedGameType === "mastermind" &&
+			normalizedGameType === "codebreaker" &&
 			gameData.secretCode &&
 			Array.isArray(gameData.secretCode) &&
 			gameData.maxGuesses
@@ -201,9 +201,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as WordChainData;
 			isValid = true;
 		}
-		// Handle Alias
+		// Handle Inference
 		else if (
-			normalizedGameType === "alias" &&
+			normalizedGameType === "inference" &&
 			gameData.definitions &&
 			gameData.answer &&
 			gameData.choices
@@ -215,9 +215,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as AliasData;
 			isValid = true;
 		}
-		// Handle Zip
+		// Handle Maze
 		else if (
-			normalizedGameType === "zip" &&
+			normalizedGameType === "maze" &&
 			gameData.rows &&
 			gameData.cols &&
 			gameData.cells &&
@@ -261,9 +261,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as MagicSquareData;
 			isValid = true;
 		}
-		// Handle Hidato
+		// Handle TrailFinder
 		else if (
-			normalizedGameType === "hidato" &&
+			normalizedGameType === "trailfinder" &&
 			gameData.size &&
 			gameData.startNum &&
 			gameData.endNum &&

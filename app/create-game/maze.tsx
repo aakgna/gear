@@ -377,7 +377,7 @@ const CreateZipPage = () => {
 			const username = userData?.username;
 
 			await saveGameToFirestore(
-				"zip",
+				"maze",
 				difficulty,
 				{
 					rows,
@@ -388,7 +388,7 @@ const CreateZipPage = () => {
 				user.uid,
 				username
 			);
-			Alert.alert("Success", "Your Zip game has been created successfully!", [
+			Alert.alert("Success", "Your Maze game has been created successfully!", [
 				{
 					text: "OK",
 					onPress: () => router.back(),
@@ -446,7 +446,7 @@ const CreateZipPage = () => {
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
 			>
-				<Text style={styles.sectionTitle}>Create Zip Game</Text>
+				<Text style={styles.sectionTitle}>Create Maze Game</Text>
 				<Text style={styles.description}>
 					Draw a path, then fill the first and last cells with numbers. Cell 1
 					is pre-filled. You can optionally number other cells as hints.

@@ -69,6 +69,11 @@ const formatGameType = (type: string): string => {
 		quickMath: "Quick Math",
 		wordChain: "Word Chain",
 		magicSquare: "Magic Square",
+		wordform: "WordForm",
+		trailfinder: "TrailFinder",
+		maze: "Maze",
+		codebreaker: "CodeBreaker",
+		inference: "Inference",
 	};
 
 	return specialCases[type] || formatted;
@@ -384,7 +389,7 @@ const CreatorProfileScreen = () => {
 		index: number
 	) => {
 		const gameType =
-			"gameType" in item ? item.gameType : item.category || "wordle";
+			"gameType" in item ? item.gameType : item.category || "wordform";
 		const gameColor = getGameColor(gameType as PuzzleType);
 		const cardWidth = (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm) / 2;
 

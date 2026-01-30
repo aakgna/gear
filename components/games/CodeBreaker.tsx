@@ -21,7 +21,7 @@ import {
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
-interface MastermindGameProps {
+interface CodeBreakerGameProps {
 	inputData: MastermindData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
@@ -56,7 +56,7 @@ interface GuessHistory {
 	};
 }
 
-const MastermindGame: React.FC<MastermindGameProps> = ({
+const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 	inputData,
 	onComplete,
 	onAttempt,
@@ -67,7 +67,7 @@ const MastermindGame: React.FC<MastermindGameProps> = ({
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const gameColor = getGameColor("mastermind"); // Get game-specific rose color (#F43F5E)
+	const gameColor = getGameColor("codebreaker"); // Get game-specific rose color (#F43F5E)
 	const codeLength = inputData.secretCode.length;
 	const [currentGuess, setCurrentGuess] = useState<(string | null)[]>(
 		new Array(codeLength).fill(null)
@@ -843,4 +843,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default MastermindGame;
+export default CodeBreakerGame;

@@ -102,17 +102,17 @@ export interface GameHistoryEntry {
 export const fetchGamesFromFirestore = async (
 	gameType:
 		| "quickMath"
-		| "wordle"
+		| "wordform"
 		| "riddle"
 		| "trivia"
-		| "mastermind"
+		| "codebreaker"
 		| "sequencing"
 		| "wordChain"
-		| "alias"
-		| "zip"
+		| "inference"
+		| "maze"
 		| "futoshiki"
 		| "magicSquare"
-		| "hidato"
+		| "trailfinder"
 		| "sudoku",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
@@ -151,14 +151,14 @@ export const fetchGamesFromFirestore = async (
 export const fetchAllGamesForType = async (
 	gameType:
 		| "quickMath"
-		| "wordle"
+		| "wordform"
 		| "riddle"
 		| "wordChain"
-		| "alias"
-		| "zip"
+		| "inference"
+		| "maze"
 		| "futoshiki"
 		| "magicSquare"
-		| "hidato"
+		| "trailfinder"
 		| "sudoku"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
@@ -178,17 +178,17 @@ export const fetchAllGamesForType = async (
 export const saveGameToFirestore = async (
 	gameType:
 		| "quickMath"
-		| "wordle"
+		| "wordform"
 		| "riddle"
 		| "wordChain"
-		| "alias"
-		| "zip"
+		| "inference"
+		| "maze"
 		| "futoshiki"
 		| "magicSquare"
-		| "hidato"
+		| "trailfinder"
 		| "sudoku"
 		| "trivia"
-		| "mastermind"
+		| "codebreaker"
 		| "sequencing",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
