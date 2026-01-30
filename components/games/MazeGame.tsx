@@ -9,7 +9,7 @@ import {
 	Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameResult, ZipData } from "../../config/types";
+import { GameResult, MazeData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -25,7 +25,7 @@ import GameHeader from "../GameHeader";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface MazeGameProps {
-	inputData: ZipData;
+	inputData: MazeData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -533,7 +533,7 @@ const MazeGame: React.FC<MazeGameProps> = ({
 	return (
 		<View style={styles.container}>
 			<GameHeader
-				title="Zip"
+				title="Maze"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 			/>

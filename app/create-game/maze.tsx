@@ -29,7 +29,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 type Difficulty = "easy" | "medium" | "hard";
 type Step = "path" | "numbers";
 
-const CreateZipPage = () => {
+const CreateMazePage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -281,7 +281,7 @@ const CreateZipPage = () => {
 		}
 	};
 
-	const validateZip = (): boolean => {
+	const validateMaze = (): boolean => {
 		if (solution.length === 0) {
 			Alert.alert("Validation Error", "Please draw a complete path first.");
 			return false;
@@ -405,7 +405,7 @@ const CreateZipPage = () => {
 		}
 	};
 
-	// Calculate cell size based on grid dimensions - same as ZipGame.tsx
+	// Calculate cell size based on grid dimensions - same as MazeGame.tsx
 	const gridPadding = Spacing.xl * 2;
 	const availableWidth = SCREEN_WIDTH - gridPadding;
 	const cellMargin = 2; // Margin between cells
@@ -437,7 +437,7 @@ const CreateZipPage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Zip</Text>
+				<Text style={styles.headerTitle}>Create Maze</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -1114,4 +1114,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateZipPage;
+export default CreateMazePage;

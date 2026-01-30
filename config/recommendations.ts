@@ -441,17 +441,17 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 	// Group by type
 	const byType: Record<string, Puzzle[]> = {
 		quickMath: [],
-		wordle: [],
+		wordform: [],
 		wordChain: [],
 		riddle: [],
 		trivia: [],
-		mastermind: [],
+		codebreaker: [],
 		sequencing: [],
-		alias: [],
-		zip: [],
+		inference: [],
+		maze: [],
 		futoshiki: [],
 		magicSquare: [],
-		hidato: [],
+		trailfinder: [],
 		sudoku: [],
 	};
 

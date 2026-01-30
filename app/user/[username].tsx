@@ -81,18 +81,18 @@ const formatGameType = (type: string): string => {
 
 const getGameIcon = (gameType: string): keyof typeof Ionicons.glyphMap => {
 	const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-		wordle: "text-outline",
+		wordform: "text-outline",
 		riddle: "help-circle-outline",
 		quickMath: "calculator-outline",
-		alias: "book-outline",
+		inference: "book-outline",
 		wordChain: "link-outline",
 		trivia: "trophy-outline",
-		mastermind: "color-palette-outline",
+		codebreaker: "color-palette-outline",
 		sequencing: "list-outline",
 		sudoku: "grid-outline",
 		futoshiki: "code-working-outline",
-		hidato: "navigate-outline",
-		zip: "git-branch-outline",
+		trailfinder: "navigate-outline",
+		maze: "git-branch-outline",
 		magicSquare: "square-outline",
 	};
 	return iconMap[gameType] || "game-controller-outline";

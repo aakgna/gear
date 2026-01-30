@@ -8,7 +8,7 @@ import {
 	ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameResult, MastermindData } from "../../config/types";
+import { GameResult, CodeBreakerData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -22,7 +22,7 @@ import {
 import GameHeader from "../GameHeader";
 
 interface CodeBreakerGameProps {
-	inputData: MastermindData;
+	inputData: CodeBreakerData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -244,7 +244,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 		};
 	}, [puzzleId, propStartTime, startTime, isActive]);
 
-	// Handle color selection (Wordle-like: click color to fill next empty slot)
+	// Handle color selection (click color to fill next empty slot)
 	const handleColorSelect = (color: string) => {
 		if (gameWon || gameLost) return;
 
@@ -351,7 +351,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 		>
 			{/* Header */}
 			<GameHeader
-				title="Mastermind"
+				title="CodeBreaker"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 				subtitle={`Guesses: ${attemptsUsed}/${inputData.maxGuesses}`}

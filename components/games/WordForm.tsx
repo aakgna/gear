@@ -8,7 +8,7 @@ import {
 	Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WordleData, GameResult } from "../../config/types";
+import { WordFormData, GameResult } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -24,7 +24,7 @@ import GameHeader from "../GameHeader";
 const { width, height } = Dimensions.get("window");
 
 interface WordFormGameProps {
-	inputData: WordleData;
+	inputData: WordFormData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -259,7 +259,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 						}),
 					]).start();
 					onComplete({
-						puzzleId: puzzleId || `wordle_${Date.now()}`,
+						puzzleId: puzzleId || `wordform_${Date.now()}`,
 						completed: true,
 						timeTaken,
 						attempts: newAttempts,
@@ -297,7 +297,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 						}),
 					]).start();
 					onComplete({
-						puzzleId: puzzleId || `wordle_${Date.now()}`,
+						puzzleId: puzzleId || `wordform_${Date.now()}`,
 						completed: false,
 						timeTaken,
 						attempts: newAttempts,
@@ -406,7 +406,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 		const headerEstimate = 60; // Reduced
 		const bottomNavEstimate = 70;
 		const safeAreaEstimate = 40; // Reduced
-		const estimatedKeyboardHeight = 200; // Increased from 100 to match NYT Wordle ratio
+		const estimatedKeyboardHeight = 200; // Keyboard height estimate
 
 		const availableHeight =
 			screenHeight - headerEstimate - bottomNavEstimate - safeAreaEstimate;
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.sm,
 		alignItems: "center",
 		justifyContent: "center",
-		minHeight: 50, // Increased from 35 to match NYT Wordle
+		minHeight: 50, // Minimum tile height
 		...Shadows.light,
 	},
 	regularKey: {

@@ -43,17 +43,17 @@ import {
 	PuzzleType,
 	GameResult,
 	QuickMathData,
-	WordleData,
+	WordFormData,
 	RiddleData,
 	WordChainData,
-	AliasData,
-	ZipData,
+	InferenceData,
+	MazeData,
 	FutoshikiData,
 	MagicSquareData,
-	HidatoData,
+	TrailFinderData,
 	SudokuData,
 	TriviaData,
-	MastermindData,
+	CodeBreakerData,
 	SequencingData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
@@ -156,7 +156,7 @@ function convertFirestoreGameToPuzzle(
 					type: "wordform",
 					data: {
 						answer: game.qna.toUpperCase(),
-					} as WordleData,
+					} as WordFormData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -211,7 +211,7 @@ function convertFirestoreGameToPuzzle(
 					data: {
 						secretCode: game.secretCode,
 						maxGuesses: game.maxGuesses,
-					} as MastermindData,
+					} as CodeBreakerData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -291,7 +291,7 @@ function convertFirestoreGameToPuzzle(
 						answer: game.answer,
 						choices: game.choices,
 						hint: game.hint,
-					} as AliasData,
+					} as InferenceData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -310,7 +310,7 @@ function convertFirestoreGameToPuzzle(
 						cols: game.cols,
 						cells: game.cells,
 						solution: game.solution,
-					} as ZipData,
+					} as MazeData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -381,7 +381,7 @@ function convertFirestoreGameToPuzzle(
 						endNum: game.endNum,
 						path: game.path,
 						givens: game.givens,
-					} as HidatoData,
+					} as TrailFinderData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -772,7 +772,7 @@ const FeedScreen = () => {
 					else if (game.gameType === "wordform" && gameData.qna) {
 						puzzleData = {
 							answer: gameData.qna.toUpperCase(),
-						} as WordleData;
+						} as WordFormData;
 						isValid = true;
 					}
 					// Handle Riddle
@@ -810,7 +810,7 @@ const FeedScreen = () => {
 						puzzleData = {
 							secretCode: gameData.secretCode,
 							maxGuesses: gameData.maxGuesses,
-						} as MastermindData;
+						} as CodeBreakerData;
 						isValid = true;
 					}
 					// Handle Sequencing
@@ -876,7 +876,7 @@ const FeedScreen = () => {
 							answer: gameData.answer,
 							choices: gameData.choices,
 							hint: gameData.hint,
-						} as AliasData;
+						} as InferenceData;
 						isValid = true;
 					}
 					// Handle Maze
@@ -892,7 +892,7 @@ const FeedScreen = () => {
 							cols: gameData.cols,
 							cells: gameData.cells,
 							solution: gameData.solution,
-						} as ZipData;
+						} as MazeData;
 						isValid = true;
 					}
 					// Handle Futoshiki
@@ -944,7 +944,7 @@ const FeedScreen = () => {
 							endNum: gameData.endNum,
 							path: gameData.path,
 							givens: gameData.givens,
-						} as HidatoData;
+						} as TrailFinderData;
 						isValid = true;
 					}
 					// Handle Sudoku
@@ -1596,7 +1596,7 @@ const applyForYouFilters = useCallback(
 							type: "wordform",
 							data: {
 								answer: game.qna.toUpperCase(),
-							} as WordleData,
+							} as WordFormData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -1660,7 +1660,7 @@ const applyForYouFilters = useCallback(
 							data: {
 								secretCode: game.secretCode,
 								maxGuesses: game.maxGuesses,
-							} as MastermindData,
+							} as CodeBreakerData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -1753,7 +1753,7 @@ const applyForYouFilters = useCallback(
 								definitions: game.definitions,
 								answer: game.answer,
 								hint: game.hint,
-							} as AliasData,
+							} as InferenceData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -1774,7 +1774,7 @@ const applyForYouFilters = useCallback(
 								cols: game.cols,
 								cells: game.cells,
 								solution: game.solution,
-							} as ZipData,
+							} as MazeData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),
@@ -1857,7 +1857,7 @@ const applyForYouFilters = useCallback(
 								endNum: game.endNum,
 								path: game.path,
 								givens: game.givens,
-							} as HidatoData,
+							} as TrailFinderData,
 							difficulty:
 								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
 							createdAt: new Date().toISOString(),

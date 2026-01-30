@@ -28,7 +28,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type Difficulty = "easy" | "medium" | "hard";
 
-const CreateHidatoPage = () => {
+const CreateTrailFinderPage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -252,7 +252,7 @@ const CreateHidatoPage = () => {
 		}
 	};
 
-	// Calculate cell size based on grid dimensions - same as Hidato game
+	// Calculate cell size based on grid dimensions - same as TrailFinder game
 	const maxGridWidth = SCREEN_WIDTH - Spacing.xl * 2;
 	const cellSize = Math.floor((maxGridWidth - (cols - 1) * 8) / cols);
 	const cellSizeClamped = Math.min(cellSize, 80);
@@ -709,4 +709,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateHidatoPage;
+export default CreateTrailFinderPage;

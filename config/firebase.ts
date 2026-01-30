@@ -28,7 +28,7 @@ export interface FirestoreGame {
 	// QuickMath structure
 	questions?: string[];
 	answers?: string[];
-	// Wordle structure
+	// WordForm structure
 	qna?: string;
 	// Riddle structure
 	question?: string;
@@ -39,9 +39,9 @@ export interface FirestoreGame {
 	endWord?: string;
 	validWords?: string[];
 	minSteps?: number;
-	// Alias structure
+	// Inference structure
 	definitions?: string[];
-	// Zip structure
+	// Maze structure
 	rows?: number;
 	cols?: number;
 	cells?: Array<{ pos: number; number: number }>;
@@ -59,7 +59,7 @@ export interface FirestoreGame {
 	}>;
 	// Magic Square structure
 	magicConstant?: number;
-	// Hidato structure
+	// TrailFinder structure
 	startNum?: number;
 	endNum?: number;
 	path?: Array<{ row: number; col: number; value?: number }>;
@@ -67,7 +67,7 @@ export interface FirestoreGame {
 	hint?: string;
 	// Trivia structure - reuses questions field name but with different type
 	// questions?: Array<{ question: string; answer: string; choices: string[] }>;
-	// Mastermind structure
+	// CodeBreaker structure
 	secretCode?: string[]; // Array of 6 color names
 	maxGuesses?: number; // Max attempts allowed
 	// Sequencing structure
@@ -82,7 +82,7 @@ export interface FirestoreGame {
 		minDistance?: number;
 		description: string;
 	}>;
-	// Note: solution field is shared by Zip and Sequencing (both use number[])
+	// Note: solution field is shared by Maze and Sequencing (both use number[])
 }
 
 // Game History Entry interface
@@ -364,7 +364,7 @@ export const parsePuzzleId = (
 	} else if (gameType === "magicsquare") {
 		gameType = "magicSquare";
 	}
-	// wordle, riddle, alias, zip, and futoshiki are already correct
+	// wordform, riddle, inference, maze, and futoshiki are already correct
 
 	return { gameType, difficulty, gameId };
 };
@@ -374,10 +374,10 @@ export const savePuzzleCompletion = async (
 	puzzleId: string,
 	userId: string,
 	timeTaken: number,
-	attempts?: number, // for wordle/riddle/wordChain/trivia
+	attempts?: number, // for wordform/riddle/wordChain/trivia
 	mistakes?: number, // for quickMath/trivia
 	answerRevealed?: boolean, // true if user used "Show Answer" feature
-	higherIsBetter?: boolean // true for trivia (higher score is better), false for wordle (fewer tries is better)
+	higherIsBetter?: boolean // true for trivia (higher score is better), false for wordform (fewer tries is better)
 ): Promise<void> => {
 	// Skip stats update if answer was revealed
 	// Game is still marked as completed in user's history, but doesn't affect leaderboard
@@ -459,7 +459,7 @@ export const savePuzzleCompletion = async (
 			}
 
 			// Update attempts stats if provided
-			// For Wordle/Riddle/etc: LOWEST number is best (fewest tries)
+			// For WordForm/Riddle/etc: LOWEST number is best (fewest tries)
 			// For Trivia: HIGHEST number is best (most correct answers)
 			if (
 				attempts !== undefined &&
@@ -537,7 +537,7 @@ export const trackGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			const currentSkipped =
 				typeof existingStats.skipped === "number" &&
-				isFinite(existingStats.skipped)
+					isFinite(existingStats.skipped)
 					? existingStats.skipped
 					: 0;
 
@@ -594,7 +594,7 @@ export const trackGameAttempted = async (puzzleId: string): Promise<void> => {
 
 			const currentAttempted =
 				typeof existingStats.attempted === "number" &&
-				isFinite(existingStats.attempted)
+					isFinite(existingStats.attempted)
 					? existingStats.attempted
 					: 0;
 
@@ -652,7 +652,7 @@ export const trackGameCompleted = async (puzzleId: string): Promise<void> => {
 
 			const currentCompleted =
 				typeof existingStats.completed === "number" &&
-				isFinite(existingStats.completed)
+					isFinite(existingStats.completed)
 					? existingStats.completed
 					: 0;
 
@@ -712,7 +712,7 @@ export const decrementGameSkipped = async (puzzleId: string): Promise<void> => {
 
 			const currentSkipped =
 				typeof existingStats.skipped === "number" &&
-				isFinite(existingStats.skipped)
+					isFinite(existingStats.skipped)
 					? existingStats.skipped
 					: 0;
 
@@ -813,7 +813,7 @@ const parseGameIdForHistory = (
 	const parts = gameId.split("_");
 	if (parts.length >= 2) {
 		return {
-			category: parts[0], // wordle, riddle, quickmath, wordchain
+			category: parts[0], // wordform, riddle, quickmath, wordchain
 			difficulty: parts[1], // easy, medium, hard
 		};
 	}

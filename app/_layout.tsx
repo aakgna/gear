@@ -39,7 +39,7 @@ export default function RootLayout() {
 	// Routes that use MainAppContainer (main app screens that stay mounted)
 	const mainAppRoutes = ["/feed", "/profile", "/create-game"];
 	const isMainAppRoute = mainAppRoutes.includes(pathname);
-	// Check if we're on a create-game sub-route (like /create-game/wordle)
+	// Check if we're on a create-game sub-route (like /create-game/wordform)
 	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
 	// Check if we're on a play-game route (games opened from profile)
 	const isPlayGameRoute = pathname?.startsWith("/play-game/");

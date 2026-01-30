@@ -29,14 +29,14 @@ import words from "an-array-of-english-words";
 
 type Difficulty = "easy" | "medium" | "hard";
 
-const CreateWordlePage = () => {
+const CreateWordFormPage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const [wordleWord, setWordleWord] = useState("");
+	const [wordFormWord, setWordFormWord] = useState("");
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 	const [loading, setLoading] = useState(false);
 
-	const getWordleLengthRange = (): { min: number; max: number } => {
+	const getWordFormLengthRange = (): { min: number; max: number } => {
 		switch (difficulty) {
 			case "easy":
 				return { min: 3, max: 4 };
@@ -49,13 +49,13 @@ const CreateWordlePage = () => {
 		}
 	};
 
-	const validateWordle = (): boolean => {
-		if (!wordleWord.trim()) {
+	const validateWordForm = (): boolean => {
+		if (!wordFormWord.trim()) {
 			Alert.alert("Validation Error", "Please enter a word.");
 			return false;
 		}
-		const word = wordleWord.trim().toUpperCase();
-		const { min, max } = getWordleLengthRange();
+		const word = wordFormWord.trim().toUpperCase();
+		const { min, max } = getWordFormLengthRange();
 
 		if (word.length < min || word.length > max) {
 			Alert.alert(
@@ -81,11 +81,11 @@ const CreateWordlePage = () => {
 		return true;
 	};
 
-	const handleWordleWordChange = (text: string) => {
+	const handleWordFormWordChange = (text: string) => {
 		const filtered = text.toUpperCase().replace(/[^A-Z]/g, "");
-		const { max } = getWordleLengthRange();
+		const { max } = getWordFormLengthRange();
 		if (filtered.length <= max) {
-			setWordleWord(filtered);
+			setWordFormWord(filtered);
 		}
 	};
 
@@ -97,7 +97,7 @@ const CreateWordlePage = () => {
 			return;
 		}
 
-		if (!validateWordle()) return;
+		if (!validateWordForm()) return;
 
 		setLoading(true);
 		try {
@@ -108,7 +108,7 @@ const CreateWordlePage = () => {
 				"wordform",
 				difficulty,
 				{
-					qna: wordleWord.trim().toUpperCase(),
+					qna: wordFormWord.trim().toUpperCase(),
 				},
 				user.uid,
 				username
@@ -130,8 +130,8 @@ const CreateWordlePage = () => {
 		}
 	};
 
-	const wordLength = wordleWord.length;
-	const { min, max } = getWordleLengthRange();
+	const wordLength = wordFormWord.length;
+	const { min, max } = getWordFormLengthRange();
 	const isValidLength = wordLength >= min && wordLength <= max;
 	const difficultyText =
 		difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -146,7 +146,7 @@ const CreateWordlePage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Wordle</Text>
+				<Text style={styles.headerTitle}>Create WordForm</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -200,8 +200,8 @@ const CreateWordlePage = () => {
 						]}
 						placeholder={`Enter word (${min}-${max} letters for ${difficultyText})`}
 						placeholderTextColor={Colors.text.disabled}
-						value={wordleWord}
-						onChangeText={handleWordleWordChange}
+						value={wordFormWord}
+						onChangeText={handleWordFormWordChange}
 						autoCapitalize="characters"
 						maxLength={max}
 					/>
@@ -377,5 +377,5 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateWordlePage;
+export default CreateWordFormPage;
 

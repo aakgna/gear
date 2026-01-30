@@ -18,18 +18,18 @@ export interface Puzzle {
 	id: string;
 	type: PuzzleType;
 	data:
-		| WordleData
+		| WordFormData
 		| QuickMathData
 		| RiddleData
 		| WordChainData
-		| AliasData
-		| ZipData
+		| InferenceData
+		| MazeData
 		| FutoshikiData
 		| MagicSquareData
-		| HidatoData
+		| TrailFinderData
 		| SudokuData
 		| TriviaData
-		| MastermindData
+		| CodeBreakerData
 		| SequencingData;
 	difficulty: number;
 	createdAt: string;
@@ -38,7 +38,7 @@ export interface Puzzle {
 	profilePicture?: string | null; // Creator profile picture
 }
 
-export interface WordleData {
+export interface WordFormData {
 	answer: string; // From Firestore 'qna' field
 	hints?: string[];
 }
@@ -66,14 +66,14 @@ export interface WordChainData {
 	hint?: string;
 }
 
-export interface AliasData {
+export interface InferenceData {
 	definitions: string[]; // Array of cryptic definitions (3-5 items)
 	answer: string; // The single word that fits all definitions
 	choices: string[]; // MCQ choices (includes correct answer, shuffled)
 	hint?: string;
 }
 
-export interface ZipData {
+export interface MazeData {
 	rows: number;
 	cols: number;
 	cells: Array<{ pos: number; number: number }>; // Numbered cells with positions
@@ -100,7 +100,7 @@ export interface MagicSquareData {
 	givens: Array<{ row: number; col: number; value: number }>;
 }
 
-export interface HidatoData {
+export interface TrailFinderData {
 	rows: number;
 	cols: number;
 	startNum: number;
@@ -124,7 +124,7 @@ export interface TriviaData {
 	questions: TriviaQuestion[]; // Array of questions (3 for easy, 4 for medium, 5 for hard)
 }
 
-export interface MastermindData {
+export interface CodeBreakerData {
 	secretCode: string[]; // Array of 6 color names
 	maxGuesses: number; // Max attempts allowed (12 for easy, 10 for medium, 8 for hard)
 }
@@ -151,7 +151,7 @@ export interface GameResult {
 	puzzleId: string;
 	completed: boolean;
 	timeTaken: number; // in seconds
-	attempts?: number; // for wordle/riddle
+	attempts?: number; // for wordform/riddle
 	mistakes?: number; // for quickMath - number of incorrect submissions
 	accuracy?: number; // for quick math score percentage
 	completedAt: string;
@@ -187,7 +187,7 @@ export interface PuzzleCompletion {
 	userId: string;
 	username?: string;
 	timeTaken: number; // in seconds
-	attempts?: number; // for wordle/riddle - number of tries
+	attempts?: number; // for wordform/riddle - number of tries
 	mistakes?: number; // for quickMath - number of incorrect answers before getting all correct
 	completedAt: string;
 }
@@ -196,7 +196,7 @@ export interface PuzzleStats {
 	totalCompletions: number;
 	averageTime: number;
 	fastestTime: number;
-	bestAttempts?: number; // for wordle/riddle - lowest number of tries
+	bestAttempts?: number; // for wordform/riddle - lowest number of tries
 	likeCount?: number; // Number of likes on the game
 }
 

@@ -37,7 +37,7 @@ export const Colors = {
 	game: {
 		correct: "#10b981",        // Green for correct answers
 		incorrect: "#ef4444",      // Red for incorrect
-		present: "#fbbf24",        // Yellow for "present" (Wordle)
+		present: "#fbbf24",        // Yellow for "present" (WordForm)
 		absent: "#d6d3d1",         // Warm gray for absent
 	},
 

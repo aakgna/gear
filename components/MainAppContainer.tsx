@@ -13,7 +13,7 @@ const MainAppContainer = () => {
 	const isProfileRoute = pathname === "/profile";
 	const isCreateGameIndexRoute = pathname === "/create-game";
 	
-	// Check if we're on a create-game sub-route (like /create-game/wordle)
+	// Check if we're on a create-game sub-route (like /create-game/wordform)
 	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
 
 	return (

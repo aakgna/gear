@@ -8,7 +8,7 @@ import {
 	ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameResult, AliasData } from "../../config/types";
+import { GameResult, InferenceData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -23,7 +23,7 @@ import {
 import GameHeader from "../GameHeader";
 
 interface InferenceGameProps {
-	inputData: AliasData;
+	inputData: InferenceData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -182,7 +182,7 @@ const InferenceGame: React.FC<InferenceGameProps> = ({
 				}),
 			]).start();
 			onComplete({
-				puzzleId: puzzleId || `alias_${Date.now()}`,
+				puzzleId: puzzleId || `inference_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				attempts: attempts + 1,

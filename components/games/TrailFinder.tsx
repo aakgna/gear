@@ -9,7 +9,7 @@ import {
 	Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameResult, HidatoData } from "../../config/types";
+import { GameResult, TrailFinderData } from "../../config/types";
 import {
 	Colors,
 	Typography,
@@ -25,7 +25,7 @@ import GameHeader from "../GameHeader";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface TrailFinderGameProps {
-	inputData: HidatoData;
+	inputData: TrailFinderData;
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	startTime?: number;
@@ -314,7 +314,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 			]).start();
 
 			onComplete({
-				puzzleId: puzzleId || `hidato_${Date.now()}`,
+				puzzleId: puzzleId || `trailfinder_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				attempts: attempts,
@@ -348,7 +348,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 			]).start();
 
 			onComplete({
-				puzzleId: puzzleId || `hidato_${Date.now()}`,
+				puzzleId: puzzleId || `trailfinder_${Date.now()}`,
 				completed: true,
 				timeTaken,
 				attempts: attempts,
@@ -388,7 +388,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 		setElapsedTime(timeTaken);
 
 		onComplete({
-			puzzleId: puzzleId || `hidato_${Date.now()}`,
+			puzzleId: puzzleId || `trailfinder_${Date.now()}`,
 			completed: false,
 			timeTaken,
 			attempts: attempts,

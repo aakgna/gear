@@ -28,7 +28,7 @@ import { getCurrentUser, getUserData } from "../../config/auth";
 
 type Difficulty = "easy" | "medium" | "hard";
 
-const CreateAliasPage = () => {
+const CreateInferencePage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const [definitions, setDefinitions] = useState<string[]>(["", "", ""]);
@@ -78,7 +78,7 @@ const CreateAliasPage = () => {
 		setDefinitions(newDefinitions);
 	};
 
-	const validateAlias = (): boolean => {
+	const validateInference = (): boolean => {
 		// Check all definitions are filled (fixed 3 definitions)
 		for (let i = 0; i < 3; i++) {
 			if (!definitions[i]?.trim()) {
@@ -120,7 +120,7 @@ const CreateAliasPage = () => {
 			return;
 		}
 
-		if (!validateAlias()) return;
+		if (!validateInference()) return;
 
 		setLoading(true);
 		try {
@@ -169,7 +169,7 @@ const CreateAliasPage = () => {
 				>
 					<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Create Alias</Text>
+				<Text style={styles.headerTitle}>Create Inference</Text>
 				<View style={styles.headerSpacer} />
 			</View>
 
@@ -486,5 +486,5 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateAliasPage;
+export default CreateInferencePage;
 

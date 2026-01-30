@@ -16,17 +16,17 @@ import {
 	PuzzleType,
 	GameResult,
 	QuickMathData,
-	WordleData,
+	WordFormData,
 	RiddleData,
 	WordChainData,
-	AliasData,
-	ZipData,
+	InferenceData,
+	MazeData,
 	FutoshikiData,
 	MagicSquareData,
-	HidatoData,
+	TrailFinderData,
 	SudokuData,
 	TriviaData,
-	MastermindData,
+	CodeBreakerData,
 	SequencingData,
 } from "../../config/types";
 import {
@@ -72,7 +72,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 		} else if (gameType === "magicsquare") {
 			gameType = "magicSquare";
 		}
-		// Other game types (wordle, riddle, trivia, mastermind, sequencing, alias, zip, futoshiki, hidato, sudoku) use lowercase in both
+		// Other game types (wordform, riddle, trivia, codebreaker, sequencing, inference, maze, futoshiki, trailfinder, sudoku) use lowercase in both
 
 		// Fetch game from Firestore
 		const gameDoc = await db
@@ -115,7 +115,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 		else if (normalizedGameType === "wordform" && gameData.qna) {
 			puzzleData = {
 				answer: gameData.qna.toUpperCase(),
-			} as WordleData;
+			} as WordFormData;
 			isValid = true;
 		}
 		// Handle Riddle
@@ -149,7 +149,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			puzzleData = {
 				secretCode: gameData.secretCode,
 				maxGuesses: gameData.maxGuesses,
-			} as MastermindData;
+			} as CodeBreakerData;
 			isValid = true;
 		}
 		// Handle Sequencing
@@ -212,7 +212,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				definitions: gameData.definitions,
 				answer: gameData.answer,
 				choices: gameData.choices,
-			} as AliasData;
+			} as InferenceData;
 			isValid = true;
 		}
 		// Handle Maze
@@ -228,7 +228,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				cols: gameData.cols,
 				cells: gameData.cells,
 				solution: gameData.solution,
-			} as ZipData;
+			} as MazeData;
 			isValid = true;
 		}
 		// Handle Futoshiki
@@ -274,7 +274,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				startNum: gameData.startNum,
 				endNum: gameData.endNum,
 				path: gameData.path,
-			} as HidatoData;
+			} as TrailFinderData;
 			isValid = true;
 		}
 		// Handle Sudoku

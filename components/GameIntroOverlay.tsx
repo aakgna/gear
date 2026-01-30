@@ -135,7 +135,7 @@ const renderAnimation = (
 ): React.ReactNode => {
 	switch (gameType) {
 		case "wordform":
-			return renderWordleAnimation(anims, gameColor);
+			return renderWordFormAnimation(anims, gameColor);
 		case "sudoku":
 			return renderSudokuAnimation(anims, gameColor);
 		case "riddle":
@@ -147,26 +147,26 @@ const renderAnimation = (
 		case "wordChain":
 			return renderWordChainAnimation(anims, gameColor);
 		case "inference":
-			return renderAliasAnimation(anims, gameColor);
+			return renderInferenceAnimation(anims, gameColor);
 		case "futoshiki":
 			return renderFutoshikiAnimation(anims, gameColor);
 		case "magicSquare":
 			return renderMagicSquareAnimation(anims, gameColor);
 		case "trailfinder":
-			return renderHidatoAnimation(anims, gameColor);
+			return renderTrailFinderAnimation(anims, gameColor);
 		case "sequencing":
 			return renderSequencingAnimation(anims, gameColor);
 		case "codebreaker":
-			return renderMastermindAnimation(anims, gameColor);
+			return renderCodeBreakerAnimation(anims, gameColor);
 		case "maze":
-			return renderZipAnimation(anims, gameColor);
+			return renderMazeAnimation(anims, gameColor);
 		default:
 			return null;
 	}
 };
 
-// Wordle: Floating letter tiles
-const renderWordleAnimation = (anims: Animated.Value[], gameColor: string) => {
+// WordForm: Floating letter tiles
+const renderWordFormAnimation = (anims: Animated.Value[], gameColor: string) => {
 	const letters = ["W", "O", "R", "D", "L", "E"];
 	const startPositions = [
 		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
@@ -221,7 +221,7 @@ const renderWordleAnimation = (anims: Animated.Value[], gameColor: string) => {
 					},
 				]}
 			>
-				<Text style={[styles.wordleLetter, { color: gameColor }]}>
+				<Text style={[styles.wordFormLetter, { color: gameColor }]}>
 					{letter}
 				</Text>
 			</Animated.View>
@@ -527,8 +527,8 @@ const renderWordChainAnimation = (
 	});
 };
 
-// Alias: Words appearing and connecting
-const renderAliasAnimation = (anims: Animated.Value[], gameColor: string) => {
+// Inference: Words appearing and connecting
+const renderInferenceAnimation = (anims: Animated.Value[], gameColor: string) => {
 	const words = ["WORD", "MEAN", "GUESS", "CLUE", "HINT"];
 	const startPositions = [
 		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
@@ -582,7 +582,7 @@ const renderAliasAnimation = (anims: Animated.Value[], gameColor: string) => {
 					},
 				]}
 			>
-				<Text style={[styles.aliasText, { color: gameColor }]}>{word}</Text>
+				<Text style={[styles.inferenceText, { color: gameColor }]}>{word}</Text>
 			</Animated.View>
 		);
 	});
@@ -727,8 +727,8 @@ const renderMagicSquareAnimation = (
 	});
 };
 
-// Hidato: Path connecting numbers
-const renderHidatoAnimation = (anims: Animated.Value[], gameColor: string) => {
+// TrailFinder: Path connecting numbers
+const renderTrailFinderAnimation = (anims: Animated.Value[], gameColor: string) => {
 	const path = [1, 2, 3, 4, 5, 6, 7, 8];
 	const startPositions = [
 		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
@@ -788,7 +788,7 @@ const renderHidatoAnimation = (anims: Animated.Value[], gameColor: string) => {
 					},
 				]}
 			>
-				<Text style={[styles.hidatoNumber, { color: gameColor }]}>{num}</Text>
+				<Text style={[styles.trailFinderNumber, { color: gameColor }]}>{num}</Text>
 			</Animated.View>
 		);
 	});
@@ -854,8 +854,8 @@ const renderSequencingAnimation = (
 	});
 };
 
-// Mastermind: Color pegs appearing
-const renderMastermindAnimation = (
+// CodeBreaker: Color pegs appearing
+const renderCodeBreakerAnimation = (
 	anims: Animated.Value[],
 	gameColor: string
 ) => {
@@ -911,14 +911,14 @@ const renderMastermindAnimation = (
 					},
 				]}
 			>
-				<Text style={styles.mastermindEmoji}>{color}</Text>
+				<Text style={styles.codeBreakerEmoji}>{color}</Text>
 			</Animated.View>
 		);
 	});
 };
 
-// Zip: Path connecting cells
-const renderZipAnimation = (anims: Animated.Value[], gameColor: string) => {
+// Maze: Path connecting cells
+const renderMazeAnimation = (anims: Animated.Value[], gameColor: string) => {
 	const cells = [1, 2, 3, 4, 5, 6, 7];
 	const startPositions = [
 		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.08 },
@@ -1433,7 +1433,7 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 0 },
 		shadowColor: "transparent",
 	},
-	wordleLetter: {
+	wordFormLetter: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
 	},
@@ -1537,7 +1537,7 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 0 },
 		shadowColor: "transparent",
 	},
-	aliasText: {
+	inferenceText: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
 	},
@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 0 },
 		shadowColor: "transparent",
 	},
-	hidatoNumber: {
+	trailFinderNumber: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 	},
@@ -1620,7 +1620,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	mastermindEmoji: {
+	codeBreakerEmoji: {
 		fontSize: 32,
 	},
 	zipCell: {

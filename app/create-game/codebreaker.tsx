@@ -43,7 +43,7 @@ const AVAILABLE_COLORS = [
 	{ name: "lime", emoji: "🟩" },
 ];
 
-const CreateMastermindPage = () => {
+const CreateCodeBreakerPage = () => {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
@@ -100,7 +100,7 @@ const CreateMastermindPage = () => {
 		setSecretCode(newCode);
 	};
 
-	const validateMastermind = (): boolean => {
+	const validateCodeBreaker = (): boolean => {
 		if (secretCode.some((c) => c === null)) {
 			Alert.alert(
 				"Validation Error",
@@ -119,7 +119,7 @@ const CreateMastermindPage = () => {
 			return;
 		}
 
-		if (!validateMastermind()) return;
+		if (!validateCodeBreaker()) return;
 
 		setLoading(true);
 		try {
@@ -483,4 +483,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default CreateMastermindPage;
+export default CreateCodeBreakerPage;
