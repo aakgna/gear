@@ -70,6 +70,7 @@ interface GameWrapperProps {
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	onSkipped?: () => void;
+	onStartGame?: () => void;
 	startTime?: number;
 	isActive?: boolean;
 	onElapsedTimeUpdate?: (puzzleId: string, elapsedTime: number) => void;
@@ -81,6 +82,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onComplete,
 	onAttempt,
 	onSkipped,
+	onStartGame,
 	startTime,
 	isActive = true,
 	onElapsedTimeUpdate,
@@ -222,6 +224,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Handle play button click
 	const handlePlay = () => {
+		onStartGame?.();
 		const now = Date.now();
 		// Mark intro as dismissed for this puzzle globally
 		dismissedIntros.add(puzzle.id);

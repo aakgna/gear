@@ -19,6 +19,8 @@ import {
 	Keyboard,
 	AppState,
 	InteractionManager,
+	Modal,
+	TouchableWithoutFeedback,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -467,6 +469,43 @@ const FeedScreen = () => {
 	const hasLoadedRef = useRef(false);
 	// Feed tabs state
 	const [activeTab, setActiveTab] = useState<"forYou" | "following">("forYou");
+	// Filter modal visibility (UI only for now)
+	const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+	const [isFilterPillVisible, setIsFilterPillVisible] = useState(true);
+	// Active filter selections
+	const [selectedDifficulties, setSelectedDifficulties] = useState<number[]>([]);
+	const [selectedGameTypes, setSelectedGameTypes] = useState<PuzzleType[]>([]);
+
+	// Applied (committed) filters — only updated when user presses Apply
+	const appliedDifficultiesRef = useRef<number[]>([]);
+	const appliedGameTypesRef = useRef<PuzzleType[]>([]);
+
+	type ForYouStreamCache = {
+		all: Puzzle[];
+		displayed: Puzzle[];
+		hasMore: boolean;
+		prefetched: Puzzle[];
+	};
+
+	const forYouStreamCacheRef = useRef<Record<string, ForYouStreamCache>>({});
+	const activeFilterKeyRef = useRef<string>("all");
+
+	const makeFilterKey = (d: number[], t: PuzzleType[]) =>
+		JSON.stringify({
+			d: [...d].sort((a, b) => a - b),
+			t: [...t].sort(),
+		});
+
+	const getAppliedFilterPayload = () => ({
+		difficulties: appliedDifficultiesRef.current.length
+			? appliedDifficultiesRef.current
+			: undefined,
+		// IMPORTANT: backend expects these exact strings (camelCase for quickMath/wordChain/magicSquare)
+		gameTypes: appliedGameTypesRef.current.length
+			? appliedGameTypesRef.current
+			: undefined,
+	});
+
 	const [followingPuzzles, setFollowingPuzzles] = useState<Puzzle[]>([]);
 	const [loadingFollowing, setLoadingFollowing] = useState(false);
 	// Separate refs for each FlatList
@@ -523,6 +562,18 @@ const FeedScreen = () => {
 			]),
 		]).start();
 	}, [activeTab]);
+
+	// Keep For You stream cached per applied filter key so switching filters preserves games
+	useEffect(() => {
+		if (activeTab !== "forYou") return;
+
+		forYouStreamCacheRef.current[activeFilterKeyRef.current] = {
+			all: allRecommendedPuzzles,
+			displayed: displayedPuzzles,
+			hasMore: hasMoreGamesToFetch,
+			prefetched: prefetchedPuzzlesRef.current,
+		};
+	}, [activeTab, allRecommendedPuzzles, displayedPuzzles, hasMoreGamesToFetch]);
 
 	// Listen to keyboard events to disable FlatList scrolling
 	useEffect(() => {
@@ -977,7 +1028,13 @@ const FeedScreen = () => {
 					"Content-Type": "application/json", 
 					Authorization: `Bearer ${idToken}` 
 				},
-				body: JSON.stringify({ data: { excludeGameIds: [], count: 50 } }),
+				body: JSON.stringify({ 
+				data: { 
+					excludeGameIds: [], 
+					count: 50,
+					...getAppliedFilterPayload(),
+				} 
+			}),
 			});
 			
 			const result = await res.json();
@@ -1037,10 +1094,11 @@ const FeedScreen = () => {
 				const prefetchedPuzzles = [...prefetchedPuzzlesRef.current];
 				prefetchedPuzzlesRef.current = [];
 				
-				// INSTANT: Just set the puzzles - no Firestore calls needed!
-				setDisplayedPuzzles(prefetchedPuzzles);
-				setAllRecommendedPuzzles(prefetchedPuzzles);
-				setPuzzles(prefetchedPuzzles);
+				// INSTANT: Apply committed filters and set puzzles - no Firestore calls needed!
+				const filteredPrefetched = applyAppliedFiltersLocal(prefetchedPuzzles);
+				setDisplayedPuzzles(filteredPrefetched);
+				setAllRecommendedPuzzles(filteredPrefetched);
+				setPuzzles(filteredPrefetched);
 				
 				// Initialize elapsed times
 				const initialElapsedTimes: Record<string, number> = {};
@@ -1051,10 +1109,10 @@ const FeedScreen = () => {
 				
 				// Filter completed games in background (non-blocking)
 				getAllCompletedGameIds(user.uid).then((completedIds) => {
-					const filteredPuzzles = prefetchedPuzzles.filter(
+					const filteredPuzzles = filteredPrefetched.filter(
 						(puzzle) => !completedIds.has(puzzle.id)
 					);
-					if (filteredPuzzles.length !== prefetchedPuzzles.length) {
+					if (filteredPuzzles.length !== filteredPrefetched.length) {
 						setDisplayedPuzzles(filteredPuzzles);
 						setAllRecommendedPuzzles(filteredPuzzles);
 						setPuzzles(filteredPuzzles);
@@ -1079,7 +1137,13 @@ const FeedScreen = () => {
 					const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
 						method: "POST",
 						headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-						body: JSON.stringify({ data: { excludeGameIds: [], count: 50 } }),
+						body: JSON.stringify({ 
+							data: { 
+								excludeGameIds: [], 
+								count: 50,
+								...getAppliedFilterPayload(),
+							} 
+						}),					
 					});
 					const result = await res.json();
 					
@@ -1306,7 +1370,11 @@ const FeedScreen = () => {
 						Authorization: `Bearer ${idToken}`,
 					},
 					body: JSON.stringify({
-						data: { excludeGameIds: Array.from(historyIds), count: 50 },
+						data: { 
+							excludeGameIds: Array.from(historyIds), 
+							count: 50,
+							...getAppliedFilterPayload(),
+						},
 					}),
 				});
 
@@ -1412,6 +1480,50 @@ const FeedScreen = () => {
 			);
 		}
 	};
+
+	// Apply difficulty + game-type filters to a list of puzzles
+const applyForYouFilters = useCallback(
+  (puzzles: Puzzle[]): Puzzle[] => {
+    if (selectedDifficulties.length === 0 && selectedGameTypes.length === 0) {
+      return puzzles;
+    }
+
+    return puzzles.filter((puzzle) => {
+      // Difficulty filter
+      if (
+        selectedDifficulties.length > 0 &&
+        !selectedDifficulties.includes(puzzle.difficulty)
+      ) {
+        return false;
+      }
+
+      // Game type filter
+      if (
+        selectedGameTypes.length > 0 &&
+        !selectedGameTypes.includes(puzzle.type)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  },
+  [selectedDifficulties, selectedGameTypes]
+);
+
+	// Apply filters based on the committed (applied) refs (not live chip selection)
+	const applyAppliedFiltersLocal = useCallback((puzzles: Puzzle[]): Puzzle[] => {
+		const diffs = appliedDifficultiesRef.current;
+		const types = appliedGameTypesRef.current;
+
+		if (diffs.length === 0 && types.length === 0) return puzzles;
+
+		return puzzles.filter((p) => {
+			if (diffs.length > 0 && !diffs.includes(p.difficulty)) return false;
+			if (types.length > 0 && !types.includes(p.type)) return false;
+			return true;
+		});
+	}, []);
 
 	// Fetch more games from Firestore for infinite scroll
 	const fetchMoreGamesFromFirestore = async () => {
@@ -1830,17 +1942,80 @@ const FeedScreen = () => {
 			return;
 		}
 
-		if (
-			loadingMore ||
-			displayedPuzzles.length >= allRecommendedPuzzles.length
-		) {
-			return; // Already loading or no more games
+		if (loadingMore) return;
+
+		// If we're at the end of the current stream, fetch more from backend (endless scrolling)
+		if (displayedPuzzles.length >= allRecommendedPuzzles.length) {
+			if (hasMoreGamesToFetch) {
+				setLoadingMore(true);
+				try {
+					const user = getCurrentUser();
+					if (!user) return;
+
+					const idToken = await auth().currentUser?.getIdToken();
+					if (!idToken) return;
+
+					const excludeIds = allRecommendedPuzzles.map((p) => p.id);
+					const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${idToken}`,
+						},
+						body: JSON.stringify({
+							data: {
+								excludeGameIds: excludeIds,
+								count: 50,
+								...getAppliedFilterPayload(),
+							},
+						}),
+					});
+
+					const result = await res.json();
+					const gameIds: string[] = Array.isArray(result.result?.gameIds)
+						? result.result.gameIds
+						: [];
+
+					if (gameIds.length === 0) {
+						setHasMoreGamesToFetch(false);
+						return;
+					}
+
+					const firestoreGames = await fetchGamesByIds(gameIds);
+					const newPuzzles: Puzzle[] = [];
+					for (const gameId of gameIds) {
+						const fg = firestoreGames.find((g) => g.id === gameId);
+						if (!fg) continue;
+						const puzzle = convertFirestoreGameToPuzzle(fg, gameId);
+						if (puzzle) newPuzzles.push(puzzle);
+					}
+
+					if (newPuzzles.length === 0) {
+						setHasMoreGamesToFetch(false);
+						return;
+					}
+
+					setAllRecommendedPuzzles((prev) => [...prev, ...newPuzzles]);
+					setDisplayedPuzzles((prev) => [...prev, ...newPuzzles]);
+				} finally {
+					setLoadingMore(false);
+				}
+			}
+			return;
 		}
 
 		// PREFETCH: At 90%, fetch more games in background
 		const percentageViewed =
 			displayedPuzzles.length / allRecommendedPuzzles.length;
-		if (percentageViewed >= 0.9 && !isFetchingMore && hasMoreGamesToFetch) {
+		const appliedHasFilters =
+			appliedDifficultiesRef.current.length > 0 ||
+			appliedGameTypesRef.current.length > 0;
+		if (
+			!appliedHasFilters &&
+			percentageViewed >= 0.9 &&
+			!isFetchingMore &&
+			hasMoreGamesToFetch
+		) {
 			fetchMoreGamesFromFirestore(); // Don't await - background operation
 		}
 
@@ -1853,11 +2028,14 @@ const FeedScreen = () => {
 		);
 
 		if (nextBatch.length > 0) {
+			// Apply committed filters to the batch first
+			const filteredBatch = applyAppliedFiltersLocal(nextBatch);
+			
 			// Check completion for this batch only
-			await filterDisplayedGamesInBackground(nextBatch);
+			await filterDisplayedGamesInBackground(filteredBatch);
 
 			// Add non-completed games
-			const filtered = nextBatch.filter(
+			const filtered = filteredBatch.filter(
 				(g) => !initialCompletedGamesRef.current.has(g.id)
 			);
 
@@ -1865,8 +2043,6 @@ const FeedScreen = () => {
 				// LAYER 4: Deduplicate before adding to displayed list
 				const displayedIds = new Set(displayedPuzzles.map((p) => p.id));
 				const uniqueBatch = filtered.filter((g) => !displayedIds.has(g.id));
-
-				// Deduplication handled silently
 
 				if (uniqueBatch.length > 0) {
 					setDisplayedPuzzles([...displayedPuzzles, ...uniqueBatch]);
@@ -1882,6 +2058,7 @@ const FeedScreen = () => {
 		loadingMore,
 		isFetchingMore,
 		hasMoreGamesToFetch,
+		applyAppliedFiltersLocal,
 	]);
 
 	// Handle viewable items changed (TikTok-like scrolling)
@@ -1903,6 +2080,10 @@ const FeedScreen = () => {
 						: currentPuzzleIdFollowing;
 
 				if (newPuzzleId && newPuzzleId !== currentTabPuzzleId) {
+					// If user swiped to a new game, show the filter pill again (For You only)
+					if (activeTab === "forYou") {
+						setIsFilterPillVisible(true);
+					}
 					// Update current game index for progressive loading
 					if (activeTab === "forYou") {
 						// Calculate relative index within current batch (every 50 games)
@@ -2056,6 +2237,7 @@ const FeedScreen = () => {
 					data: {
 						excludeGameIds: excludeIds,
 						count: 50,
+						...getAppliedFilterPayload(),
 					},
 				}),
 			});
@@ -2103,6 +2285,25 @@ const FeedScreen = () => {
 		() => displayedPuzzles.map((g) => g.id),
 		[displayedPuzzles]
 	);
+
+	// Create data array with welcome card as permanent first item (only for "For You" tab)
+	const feedData = useMemo(() => {
+		// Always show welcome card as first item in "For You" tab
+		if (activeTab === "forYou") {
+			// Create a placeholder puzzle object for the welcome card
+			const welcomeCard: Puzzle = {
+				id: "__welcome__",
+				type: "wordle" as PuzzleType, // Dummy type, won't be used
+				difficulty: 1,
+				data: {} as any, // Dummy data
+				createdAt: new Date().toISOString(),
+				uid: "",
+				username: "",
+			};
+			return [welcomeCard, ...displayedPuzzles];
+		}
+		return displayedPuzzles;
+	}, [displayedPuzzles, activeTab]);
 
 	// Use shared session end refresh hook (only sets up listener if user is authenticated)
 	useSessionEndRefresh(displayedPuzzleIds);
@@ -2214,25 +2415,6 @@ const FeedScreen = () => {
 		);
 	}, [feedHeight, headerHeight]);
 
-	// Create data array with welcome card as permanent first item (only for "For You" tab)
-	const feedData = useMemo(() => {
-		// Always show welcome card as first item in "For You" tab
-		if (activeTab === "forYou") {
-			// Create a placeholder puzzle object for the welcome card
-			const welcomeCard: Puzzle = {
-				id: "__welcome__",
-				type: "wordle" as PuzzleType, // Dummy type, won't be used
-				difficulty: "easy",
-				data: {} as any, // Dummy data
-				createdAt: new Date(),
-				uid: "",
-				username: "",
-			};
-			return [welcomeCard, ...displayedPuzzles];
-		}
-		return displayedPuzzles;
-	}, [displayedPuzzles, activeTab]);
-
 	const renderPuzzleCard = useCallback(
 		({ item, index }: { item: Puzzle; index: number }) => {
 			// Check if this is the welcome card
@@ -2288,6 +2470,11 @@ const FeedScreen = () => {
 						puzzle={item}
 						onComplete={handleGameComplete}
 						onAttempt={handleGameAttempt}
+						onStartGame={
+							activeTab === "forYou"
+								? () => setIsFilterPillVisible(false)
+								: undefined
+						}
 						startTime={puzzleStartTime}
 						isActive={isActive}
 						onElapsedTimeUpdate={handleElapsedTimeUpdate}
@@ -2303,6 +2490,7 @@ const FeedScreen = () => {
 			handleGameComplete,
 			handleGameAttempt,
 			handleElapsedTimeUpdate,
+			setIsFilterPillVisible,
 		]
 	);
 
@@ -2312,21 +2500,21 @@ const FeedScreen = () => {
 			inputRange: [0, 1],
 			outputRange: [0, tabWidth],
 		});
+		const forYouColors = Gradients.primary as any;
+		const followingColors = ([...(Gradients.primary as any)].reverse() as any);
 
 		return (
 			<>
 				{/* Glassmorphism header */}
 				<View
-					style={[styles.header, { paddingTop: insets.top}]}
+					style={[styles.header, { paddingTop: insets.top }]}
 					onLayout={(e) => {
 						const height = e.nativeEvent.layout.height;
 						if (height > 0 && height !== headerHeight) {
 							setHeaderHeight(height);
 						}
 					}}
-				>
-
-				</View>
+				/>
 
 				{/* Tabs with animated indicator */}
 				<View style={styles.tabContainer}>
@@ -2339,11 +2527,7 @@ const FeedScreen = () => {
 						]}
 					>
 						<LinearGradient
-							colors={
-								activeTab === "following" 
-									? [...Gradients.primary].reverse() 
-									: Gradients.primary
-							}
+							colors={(activeTab === "following" ? followingColors : forYouColors) as any}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 1 }}
 							style={StyleSheet.absoluteFill}
@@ -2398,6 +2582,24 @@ const FeedScreen = () => {
 
 			{/* Header */}
 			{renderHeader()}
+
+			{/* Filter pill - positioned just below the tabs, similar to Games Completed counter */}
+			{activeTab === "forYou" && isFilterPillVisible && (
+				<TouchableOpacity
+					style={[
+						styles.filterPill,
+						{ top: headerHeight + 44 + Spacing.xs }, // header + tab height
+					]}
+					onPress={() => setIsFilterModalVisible(true)}
+					activeOpacity={0.85}
+				>
+					<Ionicons
+						name="options-outline"
+						size={16}
+						color={Colors.accent}
+					/>
+				</TouchableOpacity>
+			)}
 
 			{/* Loading state with animated gradient */}
 			{loading ? (
@@ -2601,6 +2803,192 @@ const FeedScreen = () => {
 					</View>
 				</View>
 			)}
+
+			{/* Filter Modal - simple UI shell for now */}
+			<Modal
+				visible={isFilterModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setIsFilterModalVisible(false)}
+			>
+				<TouchableWithoutFeedback
+					onPress={() => setIsFilterModalVisible(false)}
+				>
+					<View style={styles.filterBackdrop}>
+						<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+							<View style={styles.filterCard}>
+							<Text style={styles.filterTitle}>Filter Games</Text>
+
+							{/* Difficulty section */}
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Difficulty</Text>
+								<View style={styles.chipRow}>
+								{[1, 2, 3].map((difficulty) => {
+									const isSelected = selectedDifficulties.includes(difficulty);
+									const labels: Record<number, string> = {
+									1: "Easy",
+									2: "Medium",
+									3: "Hard",
+									};
+									return (
+									<TouchableOpacity
+										key={difficulty}
+										style={[styles.chip, isSelected && styles.chipSelected]}
+										onPress={() => {
+										if (isSelected) {
+											setSelectedDifficulties(
+											selectedDifficulties.filter((d) => d !== difficulty)
+											);
+										} else {
+											setSelectedDifficulties([
+											...selectedDifficulties,
+											difficulty,
+											]);
+										}
+										}}
+									>
+										<Text
+										style={[
+											styles.chipLabel,
+											isSelected && styles.chipLabelSelected,
+										]}
+										>
+										{labels[difficulty]}
+										</Text>
+									</TouchableOpacity>
+									);
+								})}
+								</View>
+							</View>
+
+							{/* Game type section */}
+							<View style={styles.filterSection}>
+								<Text style={styles.filterSectionTitle}>Game Type</Text>
+								<View style={styles.chipRow}>
+								{[
+									"wordle",
+									"quickMath",
+									"riddle",
+									"wordChain",
+									"alias",
+									"zip",
+									"futoshiki",
+									"magicSquare",
+									"hidato",
+									"sudoku",
+									"trivia",
+									"mastermind",
+									"sequencing",
+								].map((gameType) => {
+									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);
+									return (
+									<TouchableOpacity
+										key={gameType}
+										style={[styles.chip, isSelected && styles.chipSelected]}
+										onPress={() => {
+										if (isSelected) {
+											setSelectedGameTypes(
+											selectedGameTypes.filter((t) => t !== gameType)
+											);
+										} else {
+											setSelectedGameTypes([
+											...selectedGameTypes,
+											gameType as PuzzleType,
+											]);
+										}
+										}}
+									>
+										<Text
+										style={[
+											styles.chipLabel,
+											isSelected && styles.chipLabelSelected,
+										]}
+										>
+										{gameType.charAt(0).toUpperCase() + gameType.slice(1)}
+										</Text>
+									</TouchableOpacity>
+									);
+								})}
+								</View>
+							</View>
+
+							{/* Apply button */}
+							<View style={styles.filterActions}>
+								<TouchableOpacity
+								style={styles.applyButton}
+								onPress={async () => {
+									// Commit filters
+									appliedDifficultiesRef.current = [...selectedDifficulties];
+									appliedGameTypesRef.current = [...selectedGameTypes];
+
+									const nextKey = makeFilterKey(
+										appliedDifficultiesRef.current,
+										appliedGameTypesRef.current
+									);
+
+									// Save current stream into cache before switching
+									forYouStreamCacheRef.current[activeFilterKeyRef.current] = {
+										all: allRecommendedPuzzles,
+										displayed: displayedPuzzles,
+										hasMore: hasMoreGamesToFetch,
+										prefetched: prefetchedPuzzlesRef.current,
+									};
+
+									// Switch active key
+									activeFilterKeyRef.current = nextKey;
+
+									// Restore from cache if available
+									const cached = forYouStreamCacheRef.current[nextKey];
+									if (cached) {
+										prefetchedPuzzlesRef.current = cached.prefetched;
+										setHasMoreGamesToFetch(cached.hasMore);
+										setAllRecommendedPuzzles(cached.all);
+										setDisplayedPuzzles(cached.displayed);
+
+										setCurrentIndexForYou(0);
+										setCurrentPuzzleIdForYou("");
+										forYouFlatListRef.current?.scrollToOffset({
+											offset: 0,
+											animated: true,
+										});
+
+										setIsFilterModalVisible(false);
+										return;
+									}
+
+									// New filter stream: clear old stream + prefetch and fetch first page
+									prefetchedPuzzlesRef.current = [];
+									setHasMoreGamesToFetch(true);
+									setAllRecommendedPuzzles([]);
+									setDisplayedPuzzles([]);
+
+									setCurrentIndexForYou(0);
+									setCurrentPuzzleIdForYou("");
+									forYouFlatListRef.current?.scrollToOffset({
+										offset: 0,
+										animated: true,
+									});
+
+									await handleForYouTabPress();
+									setIsFilterModalVisible(false);
+								}}
+								activeOpacity={0.9}
+								>
+								<LinearGradient
+									colors={Gradients.primary}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 1 }}
+									style={styles.applyButtonGradient}
+								>
+									<Text style={styles.applyButtonText}>Apply</Text>
+								</LinearGradient>
+								</TouchableOpacity>
+							</View>
+							</View>
+						</TouchableWithoutFeedback>
+					</View>
+				</TouchableWithoutFeedback>
+			</Modal>
 		</View>
 	);
 };
@@ -2773,6 +3161,96 @@ const styles = StyleSheet.create({
 		padding: Spacing.lg,
 		alignItems: "center",
 		justifyContent: "center",
+	},
+	filterPill: {
+		position: "absolute",
+		right: Spacing.lg,
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.xs,
+		zIndex: 20,
+		elevation: 2,
+		borderRadius: BorderRadius.pill,
+		justifyContent: "center",
+		backgroundColor: Colors.background.quaternary,
+		...Shadows.medium,
+	},
+	filterBackdrop: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.4)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	filterCard: {
+		width: SCREEN_WIDTH * 0.85,
+		padding: Spacing.xl,
+		borderRadius: BorderRadius.lg,
+		backgroundColor: Colors.background.primary,
+		...Shadows.medium,
+	},
+	filterTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
+	},
+	filterSubtitle: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+	},
+	filterSection: {
+		marginTop: Spacing.lg,
+	},
+	filterSectionTitle: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.sm,
+	},
+	chipRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: Spacing.sm,
+	},
+	chip: {
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.xs,
+		borderRadius: BorderRadius.pill,
+		borderWidth: 1,
+		borderColor: Colors.border,
+		backgroundColor: Colors.background.secondary,
+	},
+	chipSelected: {
+		backgroundColor: Colors.accent,
+		borderColor: Colors.accent,
+	},
+	chipLabel: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	chipLabelSelected: {
+		color: Colors.text.white,
+		fontWeight: Typography.fontWeight.semiBold,
+	},
+	filterActions: {
+		marginTop: Spacing.xl,
+	},
+	applyButton: {
+		borderRadius: BorderRadius.md,
+		overflow: "hidden",
+	},
+	applyButtonGradient: {
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	applyButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.white,
 	},
 });
 
