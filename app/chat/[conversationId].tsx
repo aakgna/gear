@@ -395,7 +395,7 @@ const ChatScreen = () => {
 		<KeyboardAvoidingView
 			style={styles.container}
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
-			keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+			keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
 		>
 			<StatusBar style="dark" />
 
@@ -505,18 +505,11 @@ const ChatScreen = () => {
 					onPress={handleSendMessage}
 					disabled={!newMessage.trim() || sending}
 				>
-					<LinearGradient
-						colors={Gradients.button}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-						style={StyleSheet.absoluteFill}
-					>
-						{sending ? (
-							<ActivityIndicator size="small" color={Colors.text.white} />
-						) : (
-							<Ionicons name="send" size={20} color={Colors.text.white} />
-						)}
-					</LinearGradient>
+					{sending ? (
+						<ActivityIndicator size="small" color={Colors.text.white} />
+					) : (
+						<Ionicons name="send" size={20} color={Colors.text.white} />
+					)}
 				</TouchableOpacity>
 			</View>
 		</KeyboardAvoidingView>

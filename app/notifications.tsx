@@ -143,9 +143,17 @@ const NotificationsScreen = () => {
 			}
 		}
 
-		// Navigate to user profile
+		// Navigate based on notification type
 		if (notification.type === "follow" && notification.fromUsername) {
 			router.push(`/user/${notification.fromUsername}`);
+		} else if (
+			(notification.type === "game_like" || notification.type === "comment_like") &&
+			notification.gameId &&
+			notification.gameType &&
+			notification.difficulty
+		) {
+			// Navigate to game
+			router.push(`/play-game/${notification.gameId}`);
 		}
 	};
 
@@ -199,12 +207,60 @@ const NotificationsScreen = () => {
 		}
 	};
 
+	// Format notification text based on type and grouping
+	const formatNotificationText = (notification: Notification): string => {
+		const username = notification.fromUsername || "Someone";
+
+		if (notification.type === "follow") {
+			return `${username} followed you`;
+		}
+
+		const likeCount = notification.likeCount || 1;
+		const fromUserIds = notification.fromUserIds || [notification.fromUserId];
+		const otherCount = likeCount - 1;
+
+		if (notification.type === "game_like") {
+			if (otherCount === 0) {
+				return `${username} liked your game`;
+			} else if (otherCount === 1) {
+				return `${username} and 1 other liked your game`;
+			} else {
+				return `${username} and ${otherCount} others liked your game`;
+			}
+		}
+
+		if (notification.type === "comment_like") {
+			if (otherCount === 0) {
+				return `${username} liked your comment`;
+			} else if (otherCount === 1) {
+				return `${username} and 1 other liked your comment`;
+			} else {
+				return `${username} and ${otherCount} others liked your comment`;
+			}
+		}
+
+		return "";
+	};
+
+	// Get icon for notification type
+	const getNotificationIcon = (type: Notification["type"]): string => {
+		switch (type) {
+			case "follow":
+				return "person-add";
+			case "game_like":
+				return "game-controller";
+			case "comment_like":
+				return "chatbubble-ellipses";
+			default:
+				return "notifications";
+		}
+	};
+
 	const renderNotification = useCallback(
 		({ item: notification }: { item: Notification }) => {
-			if (notification.type !== "follow") return null;
-
 			const isFollowingUser = followingMap[notification.fromUserId] || false;
 			const isUnread = !notification.read;
+			const isFollowType = notification.type === "follow";
 
 			return (
 				<TouchableOpacity
@@ -214,8 +270,10 @@ const NotificationsScreen = () => {
 				>
 					<TouchableOpacity
 						onPress={() => {
-							if (notification.fromUsername) {
+							if (isFollowType && notification.fromUsername) {
 								router.push(`/user/${notification.fromUsername}`);
+							} else {
+								handleNotificationPress(notification);
 							}
 						}}
 					>
@@ -225,20 +283,25 @@ const NotificationsScreen = () => {
 								style={styles.avatar}
 							/>
 						) : (
-							<Ionicons name="person-circle" size={50} color={Colors.accent} />
+							<View style={styles.avatarPlaceholder}>
+								<Ionicons
+									name={getNotificationIcon(notification.type) as any}
+									size={30}
+									color={Colors.accent}
+								/>
+							</View>
 						)}
 					</TouchableOpacity>
 					<View style={styles.notificationContent}>
 						<Text style={styles.notificationText}>
-							<Text style={styles.username}>{notification.fromUsername}</Text>
-							{" followed you"}
+							{formatNotificationText(notification)}
 						</Text>
 						<Text style={styles.timestamp}>
 							{formatTimestamp(notification.createdAt)}
 						</Text>
 					</View>
 					<View style={styles.rightActions}>
-						{!isFollowingUser && (
+						{isFollowType && !isFollowingUser && (
 							<TikTokButton
 								label="Follow Back"
 								onPress={() => handleFollowBack(notification)}
@@ -320,6 +383,7 @@ const NotificationsScreen = () => {
 						index,
 					})}
 					contentContainerStyle={{
+						paddingTop: Spacing.sm,
 						paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg,
 					}}
 					showsVerticalScrollIndicator={false}
@@ -384,6 +448,15 @@ const styles = StyleSheet.create({
 		height: 50,
 		borderRadius: 25,
 		marginRight: Spacing.md,
+	},
+	avatarPlaceholder: {
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		marginRight: Spacing.md,
+		backgroundColor: Colors.background.secondary,
+		justifyContent: "center",
+		alignItems: "center",
 	},
 	notificationContent: {
 		flex: 1,

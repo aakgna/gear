@@ -33,13 +33,186 @@ export interface GameSummary {
 
 export interface Notification {
 	id: string;
-	type: string;
+	type: "follow" | "game_like" | "comment_like";
 	fromUserId: string;
 	fromUsername: string;
 	fromProfilePicture?: string | null;
 	createdAt: any;
 	read: boolean;
+	// New fields for grouping
+	gameId?: string;        // For game_like and comment_like
+	commentId?: string;     // For comment_like only
+	gameType?: string;       // For navigation
+	difficulty?: string;     // For navigation
+	likeCount?: number;      // Aggregated count for grouped notifications
+	// For grouped notifications - array of user IDs who performed the action
+	fromUserIds?: string[];  // All users who liked (for grouping)
 }
+
+// ============================================================================
+// NOTIFICATION HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Generates a unique key for grouping notifications
+ * - Game likes: gameId
+ * - Comment likes: gameId + "_" + commentId
+ * - Follow: null (no grouping)
+ */
+const getNotificationGroupKey = (
+	type: "follow" | "game_like" | "comment_like",
+	gameId?: string,
+	commentId?: string
+): string | null => {
+	if (type === "follow") {
+		return null;
+	}
+	if (type === "game_like" && gameId) {
+		return gameId;
+	}
+	if (type === "comment_like" && gameId && commentId) {
+		return `${gameId}_${commentId}`;
+	}
+	return null;
+};
+
+/**
+ * Creates or updates a grouped notification
+ * If a notification with the same group key exists, updates it
+ * Otherwise, creates a new notification
+ */
+const createOrUpdateGroupedNotification = async (
+	recipientUid: string,
+	type: "game_like" | "comment_like",
+	fromUserId: string,
+	fromUsername: string,
+	fromProfilePicture: string | null | undefined,
+	gameId: string,
+	gameType?: string,
+	difficulty?: string,
+	commentId?: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		const groupKey = getNotificationGroupKey(type, gameId, commentId);
+		
+		if (!groupKey) {
+			throw new Error("Invalid group key for notification type");
+		}
+
+		// Query for existing notification with same group key
+		const notificationsRef = db
+			.collection("users")
+			.doc(recipientUid)
+			.collection("notifications");
+
+		// For game_like, query by gameId
+		// For comment_like, query by gameId and commentId
+		let query = notificationsRef.where("type", "==", type);
+		
+		if (type === "game_like") {
+			query = query.where("gameId", "==", gameId);
+		} else if (type === "comment_like") {
+			query = query.where("gameId", "==", gameId).where("commentId", "==", commentId);
+		}
+
+		const existingSnapshot = await query.get();
+
+		if (!existingSnapshot.empty) {
+			// Update existing notification
+			const existingDoc = existingSnapshot.docs[0];
+			const existingData = existingDoc.data();
+			const existingFromUserIds = existingData?.fromUserIds || [];
+			const existingLikeCount = existingData?.likeCount || 1;
+
+			// Check if user already in the group
+			if (existingFromUserIds.includes(fromUserId)) {
+				// User already liked, no need to update
+				return;
+			}
+
+			// Add user to the group and increment count
+			const batch = db.batch();
+			batch.update(existingDoc.ref, {
+				fromUserIds: firestore.FieldValue.arrayUnion(fromUserId),
+				likeCount: firestore.FieldValue.increment(1),
+				createdAt: firestore.FieldValue.serverTimestamp(), // Update timestamp to most recent
+				// Update primary user info if this is the most recent like
+				fromUserId: fromUserId,
+				fromUsername: fromUsername,
+				fromProfilePicture: fromProfilePicture,
+			});
+
+			// Update unread count if notification was read (new like makes it unread again)
+			const userRef = db.collection("users").doc(recipientUid);
+			const userDoc = await userRef.get();
+			if (docExists(userDoc)) {
+				const wasRead = existingData?.read || false;
+				if (wasRead) {
+					// Mark as unread and increment count
+					batch.update(existingDoc.ref, {
+						read: false,
+					});
+					batch.update(userRef, {
+						unreadNotificationCount: firestore.FieldValue.increment(1),
+						updatedAt: firestore.FieldValue.serverTimestamp(),
+					});
+				}
+			}
+
+			await batch.commit();
+		} else {
+			// Create new notification
+			const notificationRef = notificationsRef.doc();
+			const batch = db.batch();
+
+			const notificationData: any = {
+				type,
+				fromUserId,
+				fromUsername,
+				fromProfilePicture: fromProfilePicture || null,
+				createdAt: firestore.FieldValue.serverTimestamp(),
+				read: false,
+				gameId,
+				gameType,
+				difficulty,
+				likeCount: 1,
+				fromUserIds: [fromUserId],
+			};
+
+			if (commentId) {
+				notificationData.commentId = commentId;
+			}
+
+			batch.set(notificationRef, notificationData);
+
+			// Increment unread count
+			const userRef = db.collection("users").doc(recipientUid);
+			const userDoc = await userRef.get();
+			if (docExists(userDoc)) {
+				const currentUnreadCount = userDoc.data()?.unreadNotificationCount ?? 0;
+				batch.update(userRef, {
+					unreadNotificationCount: firestore.FieldValue.increment(1),
+					updatedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			} else {
+				batch.set(
+					userRef,
+					{
+						unreadNotificationCount: 1,
+						updatedAt: firestore.FieldValue.serverTimestamp(),
+					},
+					{ merge: true }
+				);
+			}
+
+			await batch.commit();
+		}
+	} catch (error: any) {
+		console.error("[createOrUpdateGroupedNotification] Error:", error);
+		throw error;
+	}
+};
 
 // Follow a user (creates bidirectional relationship)
 export const followUser = async (
@@ -1531,6 +1704,7 @@ export const likeGameComment = async (
 
 		const commentData = commentDoc.data();
 		const likedBy = commentData?.likedBy || [];
+		const commentAuthorId = commentData?.userId;
 
 		if (likedBy.includes(userId)) {
 			// Already liked, do nothing
@@ -1542,6 +1716,30 @@ export const likeGameComment = async (
 			likedBy: firestore.FieldValue.arrayUnion(userId),
 			likes: firestore.FieldValue.increment(1),
 		});
+
+		// Create notification for comment author (skip if user is liking their own comment)
+		if (commentAuthorId && commentAuthorId !== userId) {
+			try {
+				// Get user data for notification
+				const userDoc = await db.collection("users").doc(userId).get();
+				const userData = userDoc.data();
+
+				await createOrUpdateGroupedNotification(
+					commentAuthorId,
+					"comment_like",
+					userId,
+					userData?.username || "",
+					userData?.profilePicture || null,
+					gameId,
+					gameType,
+					difficulty,
+					commentId
+				);
+			} catch (notifError) {
+				// Don't fail the like operation if notification fails
+				console.error("[likeGameComment] Error creating notification:", notifError);
+			}
+		}
 	} catch (error: any) {
 		console.error("[likeGameComment] Error:", error);
 		throw error;
@@ -1579,6 +1777,7 @@ export const unlikeGameComment = async (
 
 		const commentData = commentDoc.data();
 		const likedBy = commentData?.likedBy || [];
+		const commentAuthorId = commentData?.userId;
 
 		if (!likedBy.includes(userId)) {
 			// Not liked, do nothing
@@ -1590,6 +1789,80 @@ export const unlikeGameComment = async (
 			likedBy: firestore.FieldValue.arrayRemove(userId),
 			likes: firestore.FieldValue.increment(-1),
 		});
+
+		// Update notification for comment author (remove user from group or delete if count reaches 0)
+		if (commentAuthorId && commentAuthorId !== userId) {
+			try {
+				const notificationsRef = db
+					.collection("users")
+					.doc(commentAuthorId)
+					.collection("notifications");
+
+				// Find notification for this comment like
+				const notificationSnapshot = await notificationsRef
+					.where("type", "==", "comment_like")
+					.where("gameId", "==", gameId)
+					.where("commentId", "==", commentId)
+					.get();
+
+				if (!notificationSnapshot.empty) {
+					const notificationDoc = notificationSnapshot.docs[0];
+					const notificationData = notificationDoc.data();
+					const fromUserIds = notificationData?.fromUserIds || [];
+					const likeCount = notificationData?.likeCount || 1;
+
+					// Remove user from the group
+					if (fromUserIds.includes(userId)) {
+						const newFromUserIds = fromUserIds.filter((id: string) => id !== userId);
+						const newLikeCount = Math.max(0, likeCount - 1);
+
+						if (newLikeCount === 0 || newFromUserIds.length === 0) {
+							// Delete notification if no one liked anymore
+							const wasUnread = !notificationData?.read;
+							await notificationDoc.ref.delete();
+
+							// Update unread count if needed
+							if (wasUnread) {
+								const userRef = db.collection("users").doc(commentAuthorId);
+								await userRef.update({
+									unreadNotificationCount: firestore.FieldValue.increment(-1),
+									updatedAt: firestore.FieldValue.serverTimestamp(),
+								});
+							}
+						} else {
+							// Update notification with new count and user list
+							// If the removed user was the primary user, update to the most recent user
+							const batch = db.batch();
+							const updateData: any = {
+								fromUserIds: newFromUserIds,
+								likeCount: newLikeCount,
+							};
+
+							// If we removed the primary user, set a new primary user (most recent)
+							if (notificationData?.fromUserId === userId && newFromUserIds.length > 0) {
+								// Get the most recent user's data
+								const mostRecentUserId = newFromUserIds[newFromUserIds.length - 1];
+								const mostRecentUserDoc = await db
+									.collection("users")
+									.doc(mostRecentUserId)
+									.get();
+								const mostRecentUserData = mostRecentUserDoc.data();
+
+								updateData.fromUserId = mostRecentUserId;
+								updateData.fromUsername = mostRecentUserData?.username || "";
+								updateData.fromProfilePicture = mostRecentUserData?.profilePicture || null;
+							}
+
+							batch.update(notificationDoc.ref, updateData);
+							await batch.commit();
+						}
+					}
+				}
+			} catch (notifError) {
+				// Don't fail the unlike operation if notification update fails
+				console.error("[unlikeGameComment] Error updating notification:", notifError);
+			}
+		}
 	} catch (error: any) {
 		console.error("[unlikeGameComment] Error:", error);
 		throw error;
@@ -1784,6 +2057,25 @@ export const likeGame = async (
 			return;
 		}
 
+		// Fetch game document to get creator ID
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		const gameDoc = await gameRef.get();
+		if (!docExists(gameDoc)) {
+			throw new Error("Game not found");
+		}
+
+		const gameData = gameDoc.data();
+		const creatorId = gameData?.createdBy || gameData?.uid;
+
+		// Get user data for notification
+		const userDoc = await db.collection("users").doc(userId).get();
+		const userData = userDoc.data();
+
 		// Add like document
 		await likesRef.set({
 			createdAt: firestore.FieldValue.serverTimestamp(),
@@ -1801,12 +2093,6 @@ export const likeGame = async (
 		});
 
 		// Increment like count in game stats using FieldValue.increment for atomicity
-		const gameRef = db
-			.collection("games")
-			.doc(gameType)
-			.collection(difficulty)
-			.doc(actualGameId);
-
 		await gameRef.set(
 			{
 				stats: {
@@ -1815,6 +2101,25 @@ export const likeGame = async (
 			},
 			{ merge: true }
 		);
+
+		// Create notification for creator (skip if user is liking their own game)
+		if (creatorId && creatorId !== userId) {
+			try {
+				await createOrUpdateGroupedNotification(
+					creatorId,
+					"game_like",
+					userId,
+					userData?.username || "",
+					userData?.profilePicture || null,
+					gameId,
+					gameType,
+					difficulty
+				);
+			} catch (notifError) {
+				// Don't fail the like operation if notification fails
+				console.error("[likeGame] Error creating notification:", notifError);
+			}
+		}
 
 		// Invalidate cache since count and like status changed
 		invalidateSocialDataCache(gameId, userId);
@@ -1863,6 +2168,17 @@ export const unlikeGame = async (
 			return;
 		}
 
+		// Fetch game document to get creator ID
+		const gameRef = db
+			.collection("games")
+			.doc(gameType)
+			.collection(difficulty)
+			.doc(actualGameId);
+
+		const gameDoc = await gameRef.get();
+		const gameData = gameDoc.data();
+		const creatorId = gameData?.createdBy || gameData?.uid;
+
 		// Remove like
 		await likesRef.delete();
 
@@ -1877,12 +2193,6 @@ export const unlikeGame = async (
 
 		// Decrement like count in game stats using FieldValue.increment for atomicity
 		const firestore = require("@react-native-firebase/firestore").default;
-		const gameRef = db
-			.collection("games")
-			.doc(gameType)
-			.collection(difficulty)
-			.doc(actualGameId);
-
 		await gameRef.set(
 			{
 				stats: {
@@ -1891,6 +2201,79 @@ export const unlikeGame = async (
 			},
 			{ merge: true }
 		);
+
+		// Update notification for creator (remove user from group or delete if count reaches 0)
+		if (creatorId && creatorId !== userId) {
+			try {
+				const notificationsRef = db
+					.collection("users")
+					.doc(creatorId)
+					.collection("notifications");
+
+				// Find notification for this game like
+				const notificationSnapshot = await notificationsRef
+					.where("type", "==", "game_like")
+					.where("gameId", "==", gameId)
+					.get();
+
+				if (!notificationSnapshot.empty) {
+					const notificationDoc = notificationSnapshot.docs[0];
+					const notificationData = notificationDoc.data();
+					const fromUserIds = notificationData?.fromUserIds || [];
+					const likeCount = notificationData?.likeCount || 1;
+
+					// Remove user from the group
+					if (fromUserIds.includes(userId)) {
+						const newFromUserIds = fromUserIds.filter((id: string) => id !== userId);
+						const newLikeCount = Math.max(0, likeCount - 1);
+
+						if (newLikeCount === 0 || newFromUserIds.length === 0) {
+							// Delete notification if no one liked anymore
+							const wasUnread = !notificationData?.read;
+							await notificationDoc.ref.delete();
+
+							// Update unread count if needed
+							if (wasUnread) {
+								const userRef = db.collection("users").doc(creatorId);
+								await userRef.update({
+									unreadNotificationCount: firestore.FieldValue.increment(-1),
+									updatedAt: firestore.FieldValue.serverTimestamp(),
+								});
+							}
+						} else {
+							// Update notification with new count and user list
+							// If the removed user was the primary user, update to the most recent user
+							const batch = db.batch();
+							const updateData: any = {
+								fromUserIds: newFromUserIds,
+								likeCount: newLikeCount,
+							};
+
+							// If we removed the primary user, set a new primary user (most recent)
+							if (notificationData?.fromUserId === userId && newFromUserIds.length > 0) {
+								// Get the most recent user's data
+								const mostRecentUserId = newFromUserIds[newFromUserIds.length - 1];
+								const mostRecentUserDoc = await db
+									.collection("users")
+									.doc(mostRecentUserId)
+									.get();
+								const mostRecentUserData = mostRecentUserDoc.data();
+
+								updateData.fromUserId = mostRecentUserId;
+								updateData.fromUsername = mostRecentUserData?.username || "";
+								updateData.fromProfilePicture = mostRecentUserData?.profilePicture || null;
+							}
+
+							batch.update(notificationDoc.ref, updateData);
+							await batch.commit();
+						}
+					}
+				}
+			} catch (notifError) {
+				// Don't fail the unlike operation if notification update fails
+				console.error("[unlikeGame] Error updating notification:", notifError);
+			}
+		}
 
 		// Invalidate cache since count and like status changed
 		invalidateSocialDataCache(gameId, userId);
