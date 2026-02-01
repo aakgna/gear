@@ -549,7 +549,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 				)}
 
 				{/* Feedback */}
-				{feedback && (
+				{feedback && !completed && !answerRevealed && (
 					<View style={styles.feedbackContainer}>
 						<Text style={styles.feedbackText}>{feedback}</Text>
 					</View>
@@ -793,16 +793,17 @@ const styles = StyleSheet.create({
 	viewStatsButton: {
 		marginTop: Spacing.xl,
 		backgroundColor: "#F59E0B", // Game-specific amber
-		borderRadius: BorderRadius.lg,
+		borderRadius: ComponentStyles.button.borderRadius,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
+		minHeight: 52,
 		alignItems: "center",
 		justifyContent: "center",
-		minHeight: 52,
+		width: "100%",
 		...Shadows.medium,
 	},
 	viewStatsButtonText: {
-		fontSize: Typography.fontSize.body,
+		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.white,
 	},

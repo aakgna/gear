@@ -319,7 +319,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 
 		onComplete({
 			puzzleId: puzzleIdRef.current || "",
-			completed: won,
+			completed: true,
 			timeTaken: finalTime,
 			attempts: attempts,
 			completedAt: new Date().toISOString(),
@@ -825,18 +825,19 @@ const styles = StyleSheet.create({
 		letterSpacing: 0.5,
 	},
 	statsButton: {
-		backgroundColor: ComponentStyles.button.backgroundColor,
+		marginTop: Spacing.xl,
+		backgroundColor: "#F43F5E",
 		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
-		minHeight: 48,
+		minHeight: 52,
 		alignItems: "center",
 		justifyContent: "center",
 		width: "100%",
 		...Shadows.medium,
 	},
 	statsButtonText: {
-		fontSize: Typography.fontSize.body,
+		fontSize: Typography.fontSize.h3,
 		color: Colors.text.white,
 		fontWeight: Typography.fontWeight.bold,
 		letterSpacing: 0.5,

@@ -562,26 +562,28 @@ const MazeGame: React.FC<MazeGameProps> = ({
 					</View>
 				</Animated.View>
 
-				<View style={styles.controls}>
-					<TouchableOpacity
-						style={[styles.button, styles.clearButton]}
-						onPress={handleClear}
-						disabled={completed || userPath.length === 0}
-						activeOpacity={0.7}
-					>
-						<Text style={styles.buttonText}>Clear</Text>
-					</TouchableOpacity>
-
-					{completed && (
+				{!completed && (
+					<View style={styles.controls}>
 						<TouchableOpacity
-							style={[styles.button, styles.statsButton]}
-							onPress={onShowStats}
+							style={[styles.button, styles.clearButton]}
+							onPress={handleClear}
+							disabled={userPath.length === 0}
 							activeOpacity={0.7}
 						>
-							<Text style={styles.buttonText}>View Stats</Text>
+							<Text style={styles.buttonText}>Clear</Text>
 						</TouchableOpacity>
-					)}
-				</View>
+					</View>
+				)}
+
+				{completed && (
+					<TouchableOpacity
+						style={styles.viewStatsButton}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.viewStatsButtonText}>View Stats</Text>
+					</TouchableOpacity>
+				)}
 
 				{/* Show Answer Button */}
 				{!completed && !answerRevealed && (
@@ -594,7 +596,7 @@ const MazeGame: React.FC<MazeGameProps> = ({
 					</TouchableOpacity>
 				)}
 
-				{feedback && (
+				{feedback && !completed && (
 					<View
 						style={[
 							styles.feedbackContainer,
@@ -783,6 +785,23 @@ const styles = StyleSheet.create({
 	statsButton: {
 		backgroundColor: "#10B981", // Game-specific emerald
 		...Shadows.medium,
+	},
+	viewStatsButton: {
+		marginTop: Spacing.xl,
+		backgroundColor: "#10B981", // Game-specific emerald
+		borderRadius: ComponentStyles.button.borderRadius,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
+		minHeight: 52,
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
 	},
 	buttonText: {
 		fontSize: Typography.fontSize.body,

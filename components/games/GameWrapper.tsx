@@ -7,6 +7,7 @@ import {
 	Platform,
 	ScrollView,
 	TouchableOpacity,
+	TouchableWithoutFeedback,
 	Animated,
 	Dimensions,
 	Share,
@@ -790,10 +791,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			) : (
 				gameStarted && (
 					<View
-						style={[
-							styles.gameContainer,
-							showStats && styles.gameContainerWithStats,
-						]}
+						style={styles.gameContainer}
 					>
 						{renderGame()}
 						{/* Social Overlay - rendered directly in GameWrapper for instant display */}
@@ -971,34 +969,45 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				)
 			)}
 
-			{/* Stats Container - always visible when shown, fixed at bottom */}
-			{showStats && completedResult && (
-				<View style={styles.statsContainer}>
-					<View style={styles.statsHeader}>
-						<Text style={styles.statsHeaderText}>Comparison Stats</Text>
-						<TouchableOpacity
-							onPress={() => setShowStats(false)}
-							style={styles.closeButton}
-						>
-							<Ionicons name="close" size={24} color={Colors.text.primary} />
-						</TouchableOpacity>
+			{/* Stats Modal */}
+			<Modal
+				visible={showStats && !!completedResult}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setShowStats(false)}
+			>
+				<TouchableWithoutFeedback onPress={() => setShowStats(false)}>
+					<View style={styles.modalOverlay}>
+						<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+							<View style={styles.statsModal}>
+								<View style={styles.statsHeader}>
+									<Text style={styles.statsHeaderText}>Comparison Stats</Text>
+									<TouchableOpacity
+										onPress={() => setShowStats(false)}
+										style={styles.closeButton}
+									>
+										<Ionicons name="close" size={24} color={Colors.text.primary} />
+									</TouchableOpacity>
+								</View>
+								<ScrollView
+									style={styles.statsScrollView}
+									contentContainerStyle={styles.statsContent}
+									showsVerticalScrollIndicator={true}
+								>
+									<PuzzleStats
+										stats={puzzleStats}
+										puzzleType={puzzle.type}
+										loading={loadingStats}
+										userTime={completedResult?.timeTaken ?? 0}
+										userAttempts={completedResult?.attempts}
+										userMistakes={completedResult?.mistakes}
+									/>
+								</ScrollView>
+							</View>
+						</TouchableWithoutFeedback>
 					</View>
-					<ScrollView
-						style={styles.statsScrollView}
-						contentContainerStyle={styles.statsContent}
-						showsVerticalScrollIndicator={true}
-					>
-						<PuzzleStats
-							stats={puzzleStats}
-							puzzleType={puzzle.type}
-							loading={loadingStats}
-							userTime={completedResult.timeTaken}
-							userAttempts={completedResult.attempts}
-							userMistakes={completedResult.mistakes}
-						/>
-					</ScrollView>
-				</View>
-			)}
+				</TouchableWithoutFeedback>
+			</Modal>
 
 			{/* Comments Modal */}
 			<CommentsModal
@@ -1137,22 +1146,25 @@ const styles = StyleSheet.create({
 	gameContainerWithStats: {
 		flex: 0.55, // Takes 55% when stats are shown
 	},
-	statsContainer: {
-		flex: 0.45, // Takes 45% when shown
-		backgroundColor: Colors.background.secondary,
-		borderTopWidth: 2,
-		borderTopColor: Colors.accent,
-		elevation: 0,
-		shadowOpacity: 0,
-		shadowRadius: 0,
-		shadowOffset: { width: 0, height: 0 },
-		shadowColor: "transparent",
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.4)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	statsModal: {
+		width: "85%",
+		maxHeight: "75%",
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		...Shadows.medium,
 	},
 	statsHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
 		padding: Spacing.lg,
+		paddingBottom: Spacing.md,
 		borderBottomWidth: 1,
 		borderBottomColor: "rgba(255, 255, 255, 0.1)",
 	},
@@ -1165,10 +1177,11 @@ const styles = StyleSheet.create({
 		padding: Spacing.xs,
 	},
 	statsScrollView: {
-		flex: 1,
+		maxHeight: 400,
 	},
 	statsContent: {
-		paddingBottom: Spacing.xl,
+		padding: Spacing.lg,
+		paddingTop: Spacing.md,
 	},
 	error: {
 		flex: 1,
