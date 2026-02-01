@@ -334,14 +334,11 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				</View>
 			)}
 
-			{/* Completion Message */}
+			{/* View Stats Button */}
 			{completed && (
-				<View style={styles.completionContainer}>
-					<Text style={styles.completionText}>🎉 Puzzle Complete!</Text>
-					<TouchableOpacity style={styles.statsButton} onPress={onShowStats}>
-						<Text style={styles.statsButtonText}>View Stats</Text>
-					</TouchableOpacity>
-				</View>
+				<TouchableOpacity style={styles.viewStatsButton} onPress={onShowStats}>
+					<Text style={styles.viewStatsButtonText}>View Stats</Text>
+				</TouchableOpacity>
 			)}
 		</ScrollView>
 	);
@@ -573,6 +570,23 @@ const styles = StyleSheet.create({
 		...Typography.buttonLarge,
 		color: ComponentStyles.button.textColor,
 		fontWeight: Typography.fontWeight.semiBold,
+	},
+	viewStatsButton: {
+		backgroundColor: "#8B5CF6", // Game-specific violet
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: Spacing.lg,
+		minHeight: 52,
+		width: "100%",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
 	},
 });
 

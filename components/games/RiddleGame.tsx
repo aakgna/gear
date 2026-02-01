@@ -302,19 +302,27 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					</View>
 				)}
 
-				<TouchableOpacity
-					style={[
-						styles.submit,
-						(!selectedChoice || completed) && styles.submitDisabled,
-					]}
-					onPress={completed ? onShowStats : submit}
-					activeOpacity={0.7}
-					disabled={!selectedChoice && !completed}
-				>
-					<Text style={styles.submitText}>
-						{completed ? "Submitted, View Stats" : "Submit Answer"}
-					</Text>
-				</TouchableOpacity>
+				{!completed ? (
+					<TouchableOpacity
+						style={[
+							styles.submit,
+							!selectedChoice && styles.submitDisabled,
+						]}
+						onPress={submit}
+						activeOpacity={0.7}
+						disabled={!selectedChoice}
+					>
+						<Text style={styles.submitText}>Submit Answer</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.submit}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.submitText}>View Stats</Text>
+					</TouchableOpacity>
+				)}
 			</ScrollView>
 		</View>
 	);

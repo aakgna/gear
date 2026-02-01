@@ -467,15 +467,23 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 					</View>
 				</Animated.View>
 
-				<TouchableOpacity
-					style={[styles.submit, submitted && styles.submitDisabled]}
-					onPress={submitted ? onShowStats : handleSubmit}
-					activeOpacity={0.7}
-				>
-					<Text style={styles.submitText}>
-						{submitted ? "Submitted, View Stats" : "Submit Answers"}
-					</Text>
-				</TouchableOpacity>
+				{!submitted ? (
+					<TouchableOpacity
+						style={styles.submit}
+						onPress={handleSubmit}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.submitText}>Submit Answers</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.submit}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.submitText}>View Stats</Text>
+					</TouchableOpacity>
+				)}
 
 				{!submitted && !answerRevealed && (
 					<TouchableOpacity

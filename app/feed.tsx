@@ -2974,14 +2974,9 @@ const applyForYouFilters = useCallback(
 								}}
 								activeOpacity={0.9}
 								>
-								<LinearGradient
-									colors={Gradients.primary}
-									start={{ x: 0, y: 0 }}
-									end={{ x: 1, y: 1 }}
-									style={styles.applyButtonGradient}
-								>
+								<View style={styles.applyButtonInner}>
 									<Text style={styles.applyButtonText}>Apply</Text>
-								</LinearGradient>
+								</View>
 								</TouchableOpacity>
 							</View>
 							</View>
@@ -3241,11 +3236,13 @@ const styles = StyleSheet.create({
 		borderRadius: BorderRadius.md,
 		overflow: "hidden",
 	},
-	applyButtonGradient: {
+	applyButtonInner: {
+		backgroundColor: Colors.accent,
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
+		borderRadius: BorderRadius.md,
 	},
 	applyButtonText: {
 		fontSize: Typography.fontSize.body,

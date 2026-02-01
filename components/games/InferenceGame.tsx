@@ -322,19 +322,27 @@ const InferenceGame: React.FC<InferenceGameProps> = ({
 					</View>
 				)}
 
-				<TouchableOpacity
-					style={[
-						styles.submit,
-						(!selectedChoice || completed) && styles.submitDisabled,
-					]}
-					onPress={completed ? onShowStats : submit}
-					activeOpacity={0.7}
-					disabled={!selectedChoice && !completed}
-				>
-					<Text style={styles.submitText}>
-						{completed ? "Submitted, View Stats" : "Submit Answer"}
-					</Text>
-				</TouchableOpacity>
+				{!completed ? (
+					<TouchableOpacity
+						style={[
+							styles.submit,
+							!selectedChoice && styles.submitDisabled,
+						]}
+						onPress={submit}
+						activeOpacity={0.7}
+						disabled={!selectedChoice}
+					>
+						<Text style={styles.submitText}>Submit Answer</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.submit}
+						onPress={onShowStats}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.submitText}>View Stats</Text>
+					</TouchableOpacity>
+				)}
 
 				{feedback && !completed && (
 					<View style={styles.feedbackContainer}>
@@ -512,13 +520,14 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	submit: {
-		backgroundColor: ComponentStyles.button.backgroundColor,
+		marginTop: Spacing.xl,
+		backgroundColor: "#EC4899",
 		borderRadius: ComponentStyles.button.borderRadius,
 		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
-		minHeight: ComponentStyles.button.minHeight,
-		alignItems: ComponentStyles.button.alignItems,
-		justifyContent: ComponentStyles.button.justifyContent,
+		minHeight: 52,
+		alignItems: "center",
+		justifyContent: "center",
 		width: "100%",
 		...Shadows.medium,
 	},
@@ -526,7 +535,6 @@ const styles = StyleSheet.create({
 		color: Colors.text.white,
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		letterSpacing: 0.5,
 	},
 	submitDisabled: {
 		opacity: 0.6,
