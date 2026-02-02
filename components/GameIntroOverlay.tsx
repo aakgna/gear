@@ -7,8 +7,11 @@ import {
 	ScrollView,
 	Animated,
 	Dimensions,
+	Modal,
+	TouchableWithoutFeedback,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { PuzzleType } from "../config/types";
 import {
@@ -996,6 +999,7 @@ const GameIntroScreen: React.FC<GameIntroScreenProps> = ({
 	onPlay,
 }) => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const [showInstructions, setShowInstructions] = useState(false);
 	const rotateAnim = useRef(new Animated.Value(0)).current;
 	const heightAnim = useRef(new Animated.Value(0)).current;

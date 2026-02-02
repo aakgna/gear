@@ -457,6 +457,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 						title="WordForm"
 						elapsedTime={elapsedTime}
 						showDifficulty={false}
+						gameType="wordform"
 					/>
 				</View>
 

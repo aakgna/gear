@@ -464,6 +464,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				title="Word Chain"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="wordChain"
 			/>
 
 			<ScrollView

@@ -278,6 +278,7 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 				title="Trivia"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="trivia"
 				subtitle={`Question ${currentQuestionIndex + 1} of ${inputData.questions.length}`}
 			/>
 

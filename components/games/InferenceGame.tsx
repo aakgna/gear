@@ -234,6 +234,7 @@ const InferenceGame: React.FC<InferenceGameProps> = ({
 				title="Inference"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="inference"
 			/>
 
 			<ScrollView

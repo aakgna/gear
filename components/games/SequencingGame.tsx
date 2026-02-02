@@ -237,6 +237,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				title="Sequencing"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="sequencing"
 				subtitle={`Placements: ${placementCount}`}
 			/>
 

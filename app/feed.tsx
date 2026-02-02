@@ -21,6 +21,7 @@ import {
 	InteractionManager,
 	Modal,
 	TouchableWithoutFeedback,
+	Share,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -472,6 +473,14 @@ const FeedScreen = () => {
 	// Filter modal visibility (UI only for now)
 	const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 	const [isFilterPillVisible, setIsFilterPillVisible] = useState(true);
+	// Current visible index for For You (0 = welcome card, 1+ = puzzle) — for fixed share pill
+	const [currentVisibleIndexForYou, setCurrentVisibleIndexForYou] = useState(0);
+	const currentVisibleIndexForYouRef = useRef(0);
+	const [isShareMenuVisible, setIsShareMenuVisible] = useState(false);
+	const shareHandlersRef = useRef<{
+		puzzleId: string;
+		handlers: { shareExternal: () => void; shareInternal: () => void };
+	} | null>(null);
 	// Active filter selections
 	const [selectedDifficulties, setSelectedDifficulties] = useState<number[]>([]);
 	const [selectedGameTypes, setSelectedGameTypes] = useState<PuzzleType[]>([]);
@@ -2068,7 +2077,12 @@ const applyForYouFilters = useCallback(
 				const newIndex = viewableItems[0].index ?? 0;
 				const newPuzzleId = viewableItems[0].item?.id;
 
-				// Skip welcome card in viewability tracking
+				// Track visible index for For You (0 = welcome, 1+ = puzzle) so share pill stays fixed
+				if (activeTab === "forYou") {
+					setCurrentVisibleIndexForYou(newIndex);
+				}
+
+				// Skip welcome card in viewability tracking (puzzle-specific logic below)
 				if (newPuzzleId === "__welcome__") {
 					return;
 				}
@@ -2415,6 +2429,26 @@ const applyForYouFilters = useCallback(
 		);
 	}, [feedHeight, headerHeight]);
 
+	const registerShareHandlers = useCallback(
+		(
+			handlers: {
+				shareExternal: () => void;
+				shareInternal: () => void;
+				openShareMenu: () => void;
+			} | null,
+			puzzleId: string
+		) => {
+			if (handlers === null) {
+				if (shareHandlersRef.current?.puzzleId === puzzleId) {
+					shareHandlersRef.current = null;
+				}
+			} else {
+				shareHandlersRef.current = { puzzleId, handlers };
+			}
+		},
+		[]
+	);
+
 	const renderPuzzleCard = useCallback(
 		({ item, index }: { item: Puzzle; index: number }) => {
 			// Check if this is the welcome card
@@ -2478,6 +2512,7 @@ const applyForYouFilters = useCallback(
 						startTime={puzzleStartTime}
 						isActive={isActive}
 						onElapsedTimeUpdate={handleElapsedTimeUpdate}
+						onRegisterShareHandlers={registerShareHandlers}
 					/>
 				</View>
 			);
@@ -2491,6 +2526,7 @@ const applyForYouFilters = useCallback(
 			handleGameAttempt,
 			handleElapsedTimeUpdate,
 			setIsFilterPillVisible,
+			registerShareHandlers,
 		]
 	);
 
@@ -2583,6 +2619,37 @@ const applyForYouFilters = useCallback(
 			{/* Header */}
 			{renderHeader()}
 
+			{/* Share pill - fixed like filter, shows on welcome card and puzzle intro */}
+			{activeTab === "forYou" && isFilterPillVisible && (
+				<TouchableOpacity
+					style={[
+						styles.sharePill,
+						{ top: headerHeight + 90 + Spacing.xs },
+					]}
+					onPress={() => {
+						const visibleIndex = currentVisibleIndexForYouRef.current;
+						if (visibleIndex === 0) {
+							setIsShareMenuVisible(true);
+							return;
+						}
+						// Prefer GameWrapper's share menu (touch in same tree so Share.share works on iOS)
+						const openMenu = shareHandlersRef.current?.handlers?.openShareMenu;
+						if (typeof openMenu === "function") {
+							openMenu();
+						} else {
+							setIsShareMenuVisible(true);
+						}
+					}}
+					activeOpacity={0.85}
+				>
+					<Ionicons
+						name="share-outline"
+						size={16}
+						color={Colors.accent}
+					/>
+				</TouchableOpacity>
+			)}
+
 			{/* Filter pill - positioned just below the tabs, similar to Games Completed counter */}
 			{activeTab === "forYou" && isFilterPillVisible && (
 				<TouchableOpacity
@@ -2600,6 +2667,71 @@ const applyForYouFilters = useCallback(
 					/>
 				</TouchableOpacity>
 			)}
+
+			{/* Share menu modal - fixed at feed level */}
+			<Modal
+				visible={isShareMenuVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setIsShareMenuVisible(false)}
+			>
+				<TouchableWithoutFeedback onPress={() => setIsShareMenuVisible(false)}>
+					<View style={styles.shareMenuOverlay}>
+						<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+							<View style={styles.shareMenuContainer}>
+								{currentVisibleIndexForYou === 0 ? (
+									<TouchableOpacity
+										style={styles.shareMenuItem}
+										onPress={async () => {
+											setIsShareMenuVisible(false);
+											try {
+												await Share.share({
+													message:
+														"Check out ThinkTok – swipe through puzzles, compete with friends, and sharpen your mind!",
+													url: "https://apps.apple.com/app/thinktok/id6739000000",
+												});
+											} catch (e: any) {
+												if (e?.message !== "User did not share") {
+													console.error("Share error:", e);
+												}
+											}
+										}}
+										activeOpacity={0.7}
+									>
+										<Ionicons name="share-outline" size={24} color={Colors.text.primary} />
+										<Text style={styles.shareMenuText}>Share app</Text>
+									</TouchableOpacity>
+								) : (
+									<>
+										<TouchableOpacity
+											style={styles.shareMenuItem}
+											onPress={() => {
+												setIsShareMenuVisible(false);
+												setTimeout(() => shareHandlersRef.current?.handlers?.shareInternal(), 150);
+											}}
+											activeOpacity={0.7}
+										>
+											<Ionicons name="chatbubbles-outline" size={24} color={Colors.text.primary} />
+											<Text style={styles.shareMenuText}>Send to Friend</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={styles.shareMenuItem}
+											onPress={() => {
+												setIsShareMenuVisible(false);
+												shareHandlersRef.current?.handlers?.shareExternal?.();
+											}}
+											activeOpacity={0.7}
+										>
+											<Ionicons name="share-outline" size={24} color={Colors.text.primary} />
+											<Text style={styles.shareMenuText}>Share Externally</Text>
+										</TouchableOpacity>
+									</>
+								)}
+							</View>
+						</TouchableWithoutFeedback>
+					</View>
+				</TouchableWithoutFeedback>
+			</Modal>
 
 			{/* Loading state with animated gradient */}
 			{loading ? (
@@ -3157,19 +3289,56 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
+	sharePill: {
+		position: "absolute",
+		right: Spacing.lg,
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: "center",
+		justifyContent: "center",
+		zIndex: 20,
+		elevation: 2,
+		backgroundColor: Colors.background.quaternary,
+		...Shadows.medium,
+	},
 	filterPill: {
 		position: "absolute",
 		right: Spacing.lg,
-		flexDirection: "row",
+		width: 36,
+		height: 36,
+		borderRadius: 18,
 		alignItems: "center",
-		paddingHorizontal: Spacing.md,
-		paddingVertical: Spacing.xs,
+		justifyContent: "center",
 		zIndex: 20,
 		elevation: 2,
-		borderRadius: BorderRadius.pill,
-		justifyContent: "center",
 		backgroundColor: Colors.background.quaternary,
 		...Shadows.medium,
+	},
+	shareMenuOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	shareMenuContainer: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.sm,
+		minWidth: 200,
+		...Shadows.heavy,
+	},
+	shareMenuItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.md,
+		borderRadius: BorderRadius.md,
+	},
+	shareMenuText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
 	},
 	filterBackdrop: {
 		flex: 1,

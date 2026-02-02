@@ -66,6 +66,12 @@ const dismissedIntros = new Set<string>();
 // Global storage for completed game results (persists across tab switches)
 const completedGameResults = new Map<string, GameResult>();
 
+export type ShareHandlers = {
+	shareExternal: () => void;
+	shareInternal: () => void;
+	openShareMenu: () => void;
+};
+
 interface GameWrapperProps {
 	puzzle: Puzzle;
 	onComplete: (result: GameResult) => void;
@@ -76,6 +82,7 @@ interface GameWrapperProps {
 	isActive?: boolean;
 	onElapsedTimeUpdate?: (puzzleId: string, elapsedTime: number) => void;
 	forceShowIntro?: boolean; // Force show intro regardless of dismissal state
+	onRegisterShareHandlers?: (handlers: ShareHandlers | null, puzzleId: string) => void;
 }
 
 const GameWrapper: React.FC<GameWrapperProps> = ({
@@ -88,6 +95,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	isActive = true,
 	onElapsedTimeUpdate,
 	forceShowIntro = false,
+	onRegisterShareHandlers,
 }) => {
 	const router = useRouter();
 	const [showStats, setShowStats] = useState(false);
@@ -510,6 +518,45 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			});
 		}
 	};
+
+	// Handle share before play (from intro screen - top left share icon)
+	const handleShareBeforePlay = async () => {
+		try {
+			const gameLink = `thinktok://game/${puzzle.id}`;
+			const iosAppStoreLink = "https://apps.apple.com/app/thinktok/id6739000000";
+			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
+			const message = `Try this ${formatGameType(puzzle.type)} puzzle on ThinkTok!\n\nPlay: ${gameLink}\nOr search for game ID: ${puzzle.id} in ThinkTok\n\nDon't have ThinkTok? Download it:\niOS: ${iosAppStoreLink}\nAndroid: ${androidPlayStoreLink}`;
+			const shareOptions: any = { message };
+			if (Platform.OS === "android") {
+				shareOptions.title = "Share Game";
+			}
+			await Share.share(shareOptions);
+		} catch (error: any) {
+			if (error?.message !== "User did not share") {
+				console.error("Error sharing:", error);
+			}
+		}
+	};
+
+	// Register share handlers with feed so fixed share pill can trigger intro share
+	useEffect(() => {
+		if (!onRegisterShareHandlers) return;
+		if (showIntro && isActive) {
+			onRegisterShareHandlers(
+				{
+					shareExternal: handleShareBeforePlay,
+					shareInternal: () => setShowShareModal(true),
+					openShareMenu: () => setShowShareMenu(true),
+				},
+				puzzle.id
+			);
+		} else {
+			onRegisterShareHandlers(null, puzzle.id);
+		}
+		return () => {
+			onRegisterShareHandlers(null, puzzle.id);
+		};
+	}, [showIntro, isActive, puzzle.id, onRegisterShareHandlers]);
 
 	// Handle share
 	const handleShare = async () => {
@@ -967,6 +1014,47 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 							)}
 					</View>
 				)
+			)}
+
+			{/* Share menu when on intro (opened from feed pill) - same flow as sidebar so Share.share works */}
+			{showIntro && (
+				<Modal
+					visible={showShareMenu}
+					transparent={true}
+					animationType="fade"
+					onRequestClose={() => setShowShareMenu(false)}
+				>
+					<TouchableOpacity
+						style={socialOverlayStyles.shareMenuOverlay}
+						activeOpacity={1}
+						onPress={() => setShowShareMenu(false)}
+					>
+						<View style={socialOverlayStyles.shareMenuContainer}>
+							<TouchableOpacity
+								style={socialOverlayStyles.shareMenuItem}
+								onPress={() => {
+									setShowShareMenu(false);
+									setShowShareModal(true);
+								}}
+								activeOpacity={0.7}
+							>
+								<Ionicons name="chatbubbles-outline" size={24} color={Colors.text.primary} />
+								<Text style={socialOverlayStyles.shareMenuText}>Share to DM</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={socialOverlayStyles.shareMenuItem}
+								onPress={() => {
+									setShowShareMenu(false);
+									handleShareBeforePlay();
+								}}
+								activeOpacity={0.7}
+							>
+								<Ionicons name="share-outline" size={24} color={Colors.text.primary} />
+								<Text style={socialOverlayStyles.shareMenuText}>Share game</Text>
+							</TouchableOpacity>
+						</View>
+					</TouchableOpacity>
+				</Modal>
 			)}
 
 			{/* Stats Modal */}
