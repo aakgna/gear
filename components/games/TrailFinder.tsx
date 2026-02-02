@@ -389,7 +389,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 
 		onComplete({
 			puzzleId: puzzleId || `trailfinder_${Date.now()}`,
-			completed: false,
+			completed: true,
 			timeTaken,
 			attempts: attempts,
 			completedAt: new Date().toISOString(),

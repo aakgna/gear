@@ -393,7 +393,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 
 		onComplete({
 			puzzleId: puzzleId || `sudoku_${Date.now()}`,
-			completed: false,
+			completed: true,
 			timeTaken,
 			attempts: attempts,
 			completedAt: new Date().toISOString(),

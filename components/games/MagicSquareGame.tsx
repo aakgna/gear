@@ -376,7 +376,7 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 
 		onComplete({
 			puzzleId: puzzleId || `magicSquare_${Date.now()}`,
-			completed: false,
+			completed: true,
 			timeTaken,
 			attempts: attempts,
 			completedAt: new Date().toISOString(),

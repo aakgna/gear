@@ -298,7 +298,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 					]).start();
 					onComplete({
 						puzzleId: puzzleId || `wordform_${Date.now()}`,
-						completed: false,
+						completed: true,
 						timeTaken,
 						attempts: newAttempts,
 						completedAt: new Date().toISOString(),
