@@ -479,7 +479,7 @@ const FeedScreen = () => {
 	const [isShareMenuVisible, setIsShareMenuVisible] = useState(false);
 	const shareHandlersRef = useRef<{
 		puzzleId: string;
-		handlers: { shareExternal: () => void; shareInternal: () => void };
+		handlers: { shareExternal: () => void; shareInternal: () => void; openShareMenu: () => void };
 	} | null>(null);
 	// Active filter selections
 	const [selectedDifficulties, setSelectedDifficulties] = useState<number[]>([]);
@@ -2340,6 +2340,7 @@ const applyForYouFilters = useCallback(
 		}
 	}, [feedData, currentPuzzleId, setCurrentPuzzleId, setCurrentIndex]);
 
+
 	// Handle elapsed time updates from games
 	const handleElapsedTimeUpdate = useCallback(
 		(puzzleId: string, elapsedTime: number) => {
@@ -2683,18 +2684,24 @@ const applyForYouFilters = useCallback(
 									<TouchableOpacity
 										style={styles.shareMenuItem}
 										onPress={async () => {
+											// Close modal first - iOS can't present Share sheet from within a modal
 											setIsShareMenuVisible(false);
-											try {
-												await Share.share({
-													message:
-														"Check out ThinkTok – swipe through puzzles, compete with friends, and sharpen your mind!",
-													url: "https://apps.apple.com/app/thinktok/id6739000000",
-												});
-											} catch (e: any) {
-												if (e?.message !== "User did not share") {
-													console.error("Share error:", e);
+											
+											// Wait for modal to fully close before calling Share API
+											// This matches the pattern in GameSocialOverlay
+											setTimeout(async () => {
+												try {
+													await Share.share({
+														message:
+															"Check out ThinkTok – swipe through puzzles, compete with friends, and sharpen your mind!",
+														url: "https://apps.apple.com/app/thinktok/id6739000000",
+													});
+												} catch (e: any) {
+													if (e?.message !== "User did not share") {
+														console.error("Share error:", e);
+													}
 												}
-											}
+											}, 300); // Wait for modal to fully close (matches GameSocialOverlay)
 										}}
 										activeOpacity={0.7}
 									>
@@ -2716,9 +2723,31 @@ const applyForYouFilters = useCallback(
 										</TouchableOpacity>
 										<TouchableOpacity
 											style={styles.shareMenuItem}
-											onPress={() => {
-												setIsShareMenuVisible(false);
-												shareHandlersRef.current?.handlers?.shareExternal?.();
+											onPress={async () => {
+												const shareExternal = shareHandlersRef.current?.handlers?.shareExternal;
+												
+												if (typeof shareExternal === 'function') {
+													// Close modal first - iOS can't present Share sheet from within a modal
+													setIsShareMenuVisible(false);
+													
+													// Wait for modal to fully close before calling Share API
+													// This matches the pattern in GameSocialOverlay
+													setTimeout(async () => {
+														try {
+															// Call the function - it may return a Promise (even though type says void)
+															// @ts-ignore - handleShareBeforePlay is async but typed as void
+															const result: any = shareExternal();
+															// If it returns a promise, handle it
+															if (result && typeof result.then === 'function') {
+																await result;
+															}
+														} catch (error) {
+															console.error('[FeedScreen] Error calling shareExternal():', error);
+														}
+													}, 300); // Wait for modal to fully close (matches GameSocialOverlay)
+												} else {
+													setIsShareMenuVisible(false);
+												}
 											}}
 											activeOpacity={0.7}
 										>
