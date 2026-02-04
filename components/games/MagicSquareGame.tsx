@@ -468,6 +468,7 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 					elapsedTime={elapsedTime}
 					showDifficulty={false}
 					gameType="magicSquare"
+					puzzleId={puzzleId}
 				/>
 
 				{/* Magic Constant Display */}

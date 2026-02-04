@@ -590,6 +590,7 @@ const FutoshikiGame: React.FC<FutoshikiGameProps> = ({
 					elapsedTime={elapsedTime}
 					showDifficulty={false}
 					gameType="futoshiki"
+					puzzleId={puzzleId}
 				/>
 
 				{/* Grid */}

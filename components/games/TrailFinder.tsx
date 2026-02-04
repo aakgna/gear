@@ -486,6 +486,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 					elapsedTime={elapsedTime}
 					showDifficulty={false}
 					gameType="trailfinder"
+					puzzleId={puzzleId}
 				/>
 
 				{/* Range Display */}

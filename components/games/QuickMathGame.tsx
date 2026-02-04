@@ -392,6 +392,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 				gameType="quickMath"
+				puzzleId={puzzleId}
 			/>
 
 			<ScrollView

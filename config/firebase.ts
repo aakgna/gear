@@ -242,6 +242,16 @@ export const saveGameToFirestore = async (
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
 
+		// Check if user has too many game strikes (cannot create games if > 7)
+		const userRef = db.collection("users").doc(userId);
+		const userDoc = await userRef.get();
+		const userData = userDoc.data();
+		const gameStrikeCount = userData?.gameStrikeCount || 0;
+		
+		if (gameStrikeCount > 7) {
+			throw new Error("You have too many strikes. Game creation has been disabled for your account.");
+		}
+
 		// Save to games/{gameType}/{difficulty}/{gameId}
 		// Structure: games (collection) -> gameType (doc) -> difficulty (subcollection) -> gameId (doc)
 		// This matches the structure of regular games, so user-created games appear in the same place
@@ -283,7 +293,7 @@ export const saveGameToFirestore = async (
 		});
 
 		// Increment user's createdGamesCount
-		const userRef = db.collection("users").doc(userId);
+		// Reuse userRef from earlier check
 		await userRef.update({
 			createdGamesCount: firestore.FieldValue.increment(1),
 			updatedAt: firestore.FieldValue.serverTimestamp(),

@@ -239,6 +239,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				showDifficulty={false}
 				gameType="sequencing"
 				subtitle={`Placements: ${placementCount}`}
+				puzzleId={puzzleId}
 			/>
 
 			{/* Rules Display */}

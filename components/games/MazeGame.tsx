@@ -537,6 +537,7 @@ const MazeGame: React.FC<MazeGameProps> = ({
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 				gameType="maze"
+				puzzleId={puzzleId}
 			/>
 
 			<ScrollView

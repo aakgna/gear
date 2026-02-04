@@ -280,6 +280,7 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 				showDifficulty={false}
 				gameType="trivia"
 				subtitle={`Question ${currentQuestionIndex + 1} of ${inputData.questions.length}`}
+				puzzleId={puzzleId}
 			/>
 
 			{/* Progress bar */}

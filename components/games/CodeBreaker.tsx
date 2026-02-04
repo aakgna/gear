@@ -356,6 +356,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 				showDifficulty={false}
 				gameType="codebreaker"
 				subtitle={`Guesses: ${attemptsUsed}/${inputData.maxGuesses}`}
+				puzzleId={puzzleId}
 			/>
 
 			{/* Game Won/Lost Message */}

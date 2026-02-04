@@ -45,6 +45,7 @@ export interface UserData {
 	bio?: string;
 	profilePicture?: string;
 	unreadNotificationCount?: number;
+	gameStrikeCount?: number; // Number of strikes for game moderation
 	// Push notifications
 	fcmToken?: string | null; // null = opted out, undefined = never prompted, string = active token
 }

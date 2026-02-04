@@ -230,6 +230,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
 				gameType="riddle"
+				puzzleId={puzzleId}
 			/>
 
 			<ScrollView

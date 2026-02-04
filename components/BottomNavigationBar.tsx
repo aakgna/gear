@@ -5,6 +5,7 @@ import {
 	StyleSheet,
 	Text,
 	Animated,
+	Alert,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { Home, Plus, User } from "lucide-react-native";
@@ -20,6 +21,8 @@ import {
 	Gradients,
 	Animation,
 } from "../constants/DesignSystem";
+import { getCurrentUser } from "../config/auth";
+import { db } from "../config/firebase";
 
 const BottomNavigationBar = () => {
 	const router = useRouter();
@@ -86,6 +89,53 @@ const BottomNavigationBar = () => {
 			}),
 		]).start();
 		navigateTo(route);
+	};
+
+	// Handle create game button press - check gameStrikeCount first
+	const handleCreateGamePress = async (scaleAnim: Animated.Value) => {
+		// Animate button press
+		Animated.sequence([
+			Animated.spring(scaleAnim, {
+				toValue: 0.95,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				useNativeDriver: true,
+				tension: 300,
+				friction: 10,
+			}),
+		]).start();
+
+		// Check if user has too many game strikes
+		const user = getCurrentUser();
+		if (!user) {
+			// If not logged in, navigate normally (they'll be prompted to sign in)
+			navigateTo("/create-game");
+			return;
+		}
+
+		try {
+			const userDoc = await db.collection("users").doc(user.uid).get();
+			const userData = userDoc.data();
+			const gameStrikeCount = userData?.gameStrikeCount || 0;
+
+			if (gameStrikeCount > 7) {
+				Alert.alert(
+					"Game Creation Disabled",
+					"You have too many strikes. Game creation has been disabled for your account."
+				);
+				return;
+			}
+
+			// If checks pass, navigate to create game
+			navigateTo("/create-game");
+		} catch (error) {
+			// If error checking, allow navigation (fail open)
+			navigateTo("/create-game");
+		}
 	};
 
 	return (
@@ -165,7 +215,7 @@ const BottomNavigationBar = () => {
 			<Animated.View style={{ transform: [{ scale: createScale }] }}>
 				<TouchableOpacity
 					style={styles.createButton}
-					onPress={() => handlePress(createScale, "/create-game")}
+					onPress={() => handleCreateGamePress(createScale)}
 					activeOpacity={0.7}
 				>
 					<LinearGradient

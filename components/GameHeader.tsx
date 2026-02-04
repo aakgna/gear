@@ -8,9 +8,12 @@ import {
 	Modal,
 	TouchableWithoutFeedback,
 	ScrollView,
+	Alert,
+	ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import auth from "@react-native-firebase/auth";
 import {
 	Colors,
 	Typography,
@@ -26,6 +29,8 @@ import {
 	gameInstructions,
 } from "../config/gameInstructions";
 import { PuzzleType } from "../config/types";
+import { db, parsePuzzleId } from "../config/firebase";
+import { getCurrentUser } from "../config/auth";
 
 interface GameHeaderProps {
 	title: string;
@@ -34,6 +39,7 @@ interface GameHeaderProps {
 	showDifficulty?: boolean;
 	subtitle?: string;
 	gameType?: PuzzleType;
+	puzzleId?: string; // Add puzzleId prop for reporting
 }
 
 const GameHeader: React.FC<GameHeaderProps> = ({
@@ -43,11 +49,15 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 	showDifficulty = true,
 	subtitle,
 	gameType,
+	puzzleId,
 }) => {
 	const [showHelp, setShowHelp] = useState(false);
+	const [showReportModal, setShowReportModal] = useState(false);
+	const [reporting, setReporting] = useState(false);
 	
 	const instructions = gameType ? gameInstructions[gameType] : null;
 	const gameColor = gameType ? getGameColor(gameType) : Colors.accent;
+	const currentUser = getCurrentUser();
 	// Animation for entrance
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(-10)).current;
@@ -81,8 +91,241 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 	const difficultyColor = getDifficultyColor(difficulty);
 
 	// Create gradient colors for difficulty badge
-	const getDifficultyGradient = (color: string) => {
+	const getDifficultyGradient = (color: string): [string, string] => {
 		return [color, color + "DD"];
+	};
+
+	const handleOpenReportModal = async () => {
+		if (!puzzleId || !currentUser) {
+			Alert.alert("Error", "Unable to report game. Please try again.");
+			return;
+		}
+
+		try {
+			const firestore = require("@react-native-firebase/firestore").default;
+			
+			// Check if user has already reported this game
+			const reportRef = db
+				.collection("users")
+				.doc(currentUser.uid)
+				.collection("reports")
+				.doc(puzzleId);
+
+			const existingReport = await reportRef.get();
+			const reportExists = typeof existingReport.exists === "function" 
+				? existingReport.exists() 
+				: existingReport.exists;
+			if (reportExists) {
+				Alert.alert("Already Reported", "You have already reported this game.");
+				return;
+			}
+
+			// If not already reported, open the modal
+			setShowHelp(false);
+			setShowReportModal(true);
+		} catch (error: any) {
+			console.error("Error checking report status:", error);
+			Alert.alert("Error", "Failed to check report status. Please try again.");
+		}
+	};
+
+	const handleReportGame = async (reportType: "wrong_solution" | "offensive") => {
+		if (!puzzleId || !currentUser) {
+			Alert.alert("Error", "Unable to report game. Please try again.");
+			return;
+		}
+
+		setReporting(true);
+		try {
+			const firestore = require("@react-native-firebase/firestore").default;
+			const parsed = parsePuzzleId(puzzleId);
+			
+			if (!parsed) {
+				throw new Error("Invalid puzzleId format");
+			}
+
+			// Create reportRef for storing the report
+			const reportRef = db
+				.collection("users")
+				.doc(currentUser.uid)
+				.collection("reports")
+				.doc(puzzleId);
+
+			const { gameType, difficulty, gameId } = parsed;
+			const gameRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(gameId);
+
+			const gameDoc = await gameRef.get();
+			const gameExists = typeof gameDoc.exists === "function" 
+				? gameDoc.exists() 
+				: gameDoc.exists;
+			if (!gameExists) {
+				throw new Error("Game not found");
+			}
+
+			const gameData = gameDoc.data();
+			const creatorUserId = gameData?.uid || gameData?.createdBy;
+
+			if (reportType === "wrong_solution") {
+				// Handle wrong solution report
+				const currentDownVote = gameData?.downVote || 0;
+				const newDownVote = currentDownVote + 1;
+
+				// Update downVote using increment (atomic operation)
+				// FieldValue.increment(1) on non-existent field creates it as 1
+				const updateData: any = {
+					downVote: firestore.FieldValue.increment(1),
+				};
+
+				// If downVote reaches 10, set visible to false
+				if (newDownVote == 10) {
+					updateData.visible = false;
+
+					// Increment gameStrikeCount of creator
+					if (creatorUserId) {
+						const creatorRef = db.collection("users").doc(creatorUserId);
+						const creatorDoc = await creatorRef.get();
+						const creatorData = creatorDoc.data();
+						const currentGameStrikeCount = creatorData?.gameStrikeCount || 0;
+
+						await creatorRef.update({
+							gameStrikeCount: currentGameStrikeCount + 1,
+							updatedAt: firestore.FieldValue.serverTimestamp(),
+						});
+					}
+				}
+
+				await gameRef.update(updateData);
+
+				// Store the report in user's reports collection
+				await reportRef.set({
+					gameId: puzzleId,
+					reportType: reportType,
+					reportedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			} else if (reportType === "offensive") {
+				// Handle offensive report
+				// Check each field individually for better detection
+				const excludedFields = ["uid", "createdBy", "username", "approved", "createdAt", "downVote", "visible"];
+				const fieldsToCheck = Object.entries(gameData || {})
+					.filter(([key]) => !excludedFields.includes(key));
+
+				let hasAnyViolations = false;
+
+				// Get auth token once
+				const currentAuthUser = auth().currentUser;
+				if (!currentAuthUser) {
+					throw new Error("Not authenticated");
+				}
+
+				const idToken = await currentAuthUser.getIdToken();
+				const analyzeUrl = "https://us-central1-gear-ff009.cloudfunctions.net/analyze_game";
+
+				// Check each field individually
+				for (const [key, value] of fieldsToCheck) {
+					// Convert field value to string for analysis
+					let fieldString = "";
+					if (Array.isArray(value)) {
+						// For arrays, check the whole array as JSON
+						fieldString = JSON.stringify(value);
+					} else if (typeof value === "object" && value !== null) {
+						// For objects, convert to JSON string
+						fieldString = JSON.stringify(value);
+					} else {
+						// For primitives, convert to string
+						fieldString = String(value);
+					}
+
+				// Skip empty strings
+				if (!fieldString || fieldString.trim().length === 0) {
+					continue;
+				}
+
+				// Call Firebase function to analyze this field
+				const analyzeResponse = await fetch(analyzeUrl, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${idToken}`,
+					},
+					body: JSON.stringify({
+						data: {
+							gameData: fieldString,
+						},
+					}),
+				});
+
+				if (analyzeResponse.ok) {
+					const analyzeResult = await analyzeResponse.json();
+					const result = analyzeResult.result || analyzeResult;
+
+					if (result.hasViolations === true) {
+						hasAnyViolations = true;
+						break; // Found violation, no need to check other fields
+					}
+				}
+				}
+
+				// Always increment downVote for offensive reports
+				const currentDownVote = gameData?.downVote || 0;
+				const newDownVote = currentDownVote + 1;
+
+				const updateData: any = {
+					downVote: firestore.FieldValue.increment(1),
+				};
+
+				// If any field has violations, set visible to false
+				if (hasAnyViolations) {
+					updateData.visible = false;
+				}
+
+				// If downVote reaches 10, increment gameStrikeCount
+				if (newDownVote >= 10) {
+					if (creatorUserId) {
+						const creatorRef = db.collection("users").doc(creatorUserId);
+						const creatorDoc = await creatorRef.get();
+						const creatorData = creatorDoc.data();
+						const currentGameStrikeCount = creatorData?.gameStrikeCount || 0;
+
+						await creatorRef.update({
+							gameStrikeCount: currentGameStrikeCount + 1,
+							updatedAt: firestore.FieldValue.serverTimestamp(),
+						});
+					}
+				}
+
+				await gameRef.update(updateData);
+
+				// Store the report in user's reports collection
+				await reportRef.set({
+					gameId: puzzleId,
+					reportType: reportType,
+					reportedAt: firestore.FieldValue.serverTimestamp(),
+				});
+			}
+
+			// Reset reporting state first, then close modal after a brief delay
+			// This ensures loading stays visible during modal close animation
+			setTimeout(() => {
+				setShowReportModal(false);
+				setTimeout(() => {
+					setReporting(false);
+					Alert.alert("Success", "Thank you for reporting. The game has been reviewed.");
+				}, 300);
+			}, 100);
+		} catch (error: any) {
+			console.error("Error reporting game:", error);
+			setTimeout(() => {
+				setShowReportModal(false);
+				setTimeout(() => {
+					setReporting(false);
+					Alert.alert("Error", "Failed to report game. Please try again.");
+				}, 300);
+			}, 100);
+		}
 	};
 
 	return (
@@ -186,10 +429,85 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 											</Text>
 										</View>
 									</ScrollView>
+									{puzzleId && currentUser && (
+										<TouchableOpacity
+											style={styles.reportButton}
+											onPress={handleOpenReportModal}
+											activeOpacity={0.7}
+										>
+											<Ionicons name="flag-outline" size={18} color={Colors.text.secondary} />
+											<Text style={styles.reportButtonText}>Report Game</Text>
+										</TouchableOpacity>
+									)}
 								</View>
 							</TouchableWithoutFeedback>
 						</View>
 					</TouchableWithoutFeedback>
+				</Modal>
+			)}
+
+			{/* Report Modal */}
+			{puzzleId && (
+				<Modal
+					visible={showReportModal}
+					transparent={true}
+					animationType="fade"
+					onRequestClose={() => {
+						if (!reporting) {
+							setShowReportModal(false);
+						}
+					}}
+				>
+					<View style={styles.modalOverlay}>
+						<View style={styles.reportModalContent}>
+							<View style={styles.reportModalHeader}>
+								<Text style={styles.reportModalTitle}>Report Game</Text>
+								<TouchableOpacity
+									onPress={() => {
+										if (!reporting) {
+											setShowReportModal(false);
+										}
+									}}
+									style={styles.closeButton}
+								>
+									<Ionicons name="close" size={24} color={Colors.text.primary} />
+								</TouchableOpacity>
+							</View>
+
+							{reporting ? (
+								<View style={styles.reportLoadingContainer}>
+									<ActivityIndicator size="large" color={Colors.accent} />
+									<Text style={styles.reportLoadingText}>Processing report...</Text>
+								</View>
+							) : (
+								<View style={styles.reportOptionsContainer}>
+									<TouchableOpacity
+										style={styles.reportOptionButton}
+										onPress={() => handleReportGame("wrong_solution")}
+										activeOpacity={0.7}
+									>
+										<Ionicons name="close-circle-outline" size={24} color={Colors.error} />
+										<View style={styles.reportOptionTextContainer}>
+											<Text style={styles.reportOptionTitle}>Wrong Solution or No Solution</Text>
+											<Text style={styles.reportOptionSubtitle}>The game has incorrect answers or no valid solution</Text>
+										</View>
+									</TouchableOpacity>
+
+									<TouchableOpacity
+										style={styles.reportOptionButton}
+										onPress={() => handleReportGame("offensive")}
+										activeOpacity={0.7}
+									>
+										<Ionicons name="warning-outline" size={24} color={Colors.secondaryAccent} />
+										<View style={styles.reportOptionTextContainer}>
+											<Text style={styles.reportOptionTitle}>Offensive</Text>
+											<Text style={styles.reportOptionSubtitle}>The game contains inappropriate content</Text>
+										</View>
+									</TouchableOpacity>
+								</View>
+							)}
+						</View>
+					</View>
 				</Modal>
 			)}
 		</>
@@ -346,6 +664,77 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.secondary,
 		lineHeight: 20,
+	},
+	reportButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: Spacing.xs,
+		padding: Spacing.md,
+		marginTop: Spacing.lg,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(255, 255, 255, 0.1)",
+	},
+	reportButtonText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+	},
+	reportModalContent: {
+		width: "85%",
+		maxWidth: 400,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.xl,
+		...Shadows.heavy,
+	},
+	reportModalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: Spacing.lg,
+		paddingBottom: Spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+	},
+	reportModalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	reportLoadingContainer: {
+		alignItems: "center",
+		padding: Spacing.xl,
+	},
+	reportLoadingText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginTop: Spacing.md,
+	},
+	reportOptionsContainer: {
+		padding: Spacing.lg,
+		gap: Spacing.md,
+	},
+	reportOptionButton: {
+		flexDirection: "row",
+		alignItems: "flex-start",
+		gap: Spacing.md,
+		padding: Spacing.md,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1,
+		borderColor: Colors.text.secondary + "20",
+	},
+	reportOptionTextContainer: {
+		flex: 1,
+	},
+	reportOptionTitle: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xs,
+	},
+	reportOptionSubtitle: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
 	},
 });
 

@@ -506,6 +506,7 @@ const SudokuGame: React.FC<SudokuGameProps> = ({
 					elapsedTime={elapsedTime}
 					showDifficulty={false}
 					gameType="sudoku"
+					puzzleId={puzzleId}
 				/>
 
 				{/* Grid */}
