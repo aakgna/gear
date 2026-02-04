@@ -129,6 +129,49 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 		}
 	};
 
+	// Helper function to update all users' liked subcollections when a game is hidden
+	const updateLikedCollections = async (
+		gameType: string,
+		difficulty: string,
+		actualGameId: string,
+		fullPuzzleId: string
+	) => {
+		try {
+			// Get all users who liked this game
+			const likesRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(actualGameId)
+				.collection("likes");
+
+			const likesSnapshot = await likesRef.get();
+
+			if (likesSnapshot.empty) {
+				return;
+			}
+
+			// Update each user's liked subcollection
+			const updatePromises = likesSnapshot.docs.map((likeDoc) => {
+				const userId = likeDoc.id;
+				const userLikedRef = db
+					.collection("users")
+					.doc(userId)
+					.collection("liked")
+					.doc(fullPuzzleId);
+				return userLikedRef.update({
+					visible: false,
+				});
+			});
+
+			// Execute all updates in parallel
+			await Promise.all(updatePromises);
+		} catch (error) {
+			// Log error but don't fail the main operation
+			console.error("Error updating liked collections:", error);
+		}
+	};
+
 	const handleReportGame = async (reportType: "wrong_solution" | "offensive") => {
 		if (!puzzleId || !currentUser) {
 			Alert.alert("Error", "Unable to report game. Please try again.");
@@ -195,7 +238,18 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 							gameStrikeCount: currentGameStrikeCount + 1,
 							updatedAt: firestore.FieldValue.serverTimestamp(),
 						});
+
+						// Also update the game in creator's createdGames collection
+						const creatorGameRef = creatorRef
+							.collection("createdGames")
+							.doc(gameId);
+						await creatorGameRef.update({
+							visible: false,
+						});
 					}
+
+					// Update all users' liked subcollections
+					await updateLikedCollections(gameType, difficulty, gameId, puzzleId);
 				}
 
 				await gameRef.update(updateData);
@@ -280,10 +334,27 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 				// If any field has violations, set visible to false
 				if (hasAnyViolations) {
 					updateData.visible = false;
+
+					// Update creator's createdGames collection
+					if (creatorUserId) {
+						const creatorGameRef = db
+							.collection("users")
+							.doc(creatorUserId)
+							.collection("createdGames")
+							.doc(gameId);
+						await creatorGameRef.update({
+							visible: false,
+						});
+					}
+
+					// Update all users' liked subcollections
+					await updateLikedCollections(gameType, difficulty, gameId, puzzleId);
 				}
 
-				// If downVote reaches 10, increment gameStrikeCount
+				// If downVote reaches 10, set visible to false and increment gameStrikeCount
 				if (newDownVote >= 10) {
+					updateData.visible = false;
+
 					if (creatorUserId) {
 						const creatorRef = db.collection("users").doc(creatorUserId);
 						const creatorDoc = await creatorRef.get();
@@ -294,6 +365,21 @@ const GameHeader: React.FC<GameHeaderProps> = ({
 							gameStrikeCount: currentGameStrikeCount + 1,
 							updatedAt: firestore.FieldValue.serverTimestamp(),
 						});
+
+						// Also update the game in creator's createdGames collection (if not already done)
+						if (!hasAnyViolations) {
+							const creatorGameRef = creatorRef
+								.collection("createdGames")
+								.doc(gameId);
+							await creatorGameRef.update({
+								visible: false,
+							});
+						}
+					}
+
+					// Update all users' liked subcollections (if not already done)
+					if (!hasAnyViolations) {
+						await updateLikedCollections(gameType, difficulty, gameId, puzzleId);
 					}
 				}
 
