@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
+import { Colors } from "../constants/DesignSystem";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import BottomNavigationBar from "../components/BottomNavigationBar";
@@ -67,7 +68,7 @@ export default function RootLayout() {
 					{/* Stack for auth screens - these can unmount */}
 					<Stack screenOptions={{ headerShown: false }}>
 						<Stack.Screen name="index" options={{ headerShown: false }} />
-						<Stack.Screen name="signin" options={{ headerShown: false }} />
+						<Stack.Screen name="signin" options={{ headerShown: false, contentStyle: { backgroundColor: Colors.background.secondary } }} />
 						<Stack.Screen
 							name="username"
 							options={{ headerShown: false, gestureEnabled: true }}

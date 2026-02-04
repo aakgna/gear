@@ -116,7 +116,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#FFFFFF",
+		backgroundColor: Colors.background.secondary,
 	},
 	content: {
 		flex: 1,

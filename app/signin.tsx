@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ActivityIndicator,
-	Alert,
-	Image,
-} from "react-native";
+import { View, Text, StyleSheet, Alert, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import TikTokButton from "../components/TikTokButton";
 import {
@@ -25,7 +16,6 @@ import {
 	Spacing,
 	BorderRadius,
 	Shadows,
-	Gradients,
 } from "../constants/DesignSystem";
 
 const SignInScreen = () => {
@@ -76,42 +66,80 @@ const SignInScreen = () => {
 	return (
 		<View style={styles.container}>
 			<StatusBar style="dark" />
-			<LinearGradient
-				colors={Colors.background.gradient as [string, string]}
-				style={StyleSheet.absoluteFill}
-			/>
-
 			<View style={styles.content}>
+				{/* Logo stays the same */}
 				<View style={styles.logoContainer}>
 					<Image
 						source={require("../assets/images/logo_transparent.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.subtitle}>
-						Brain training, one puzzle at a time
-					</Text>
 				</View>
 
-				<View style={styles.signInContainer}>
-					<Text style={styles.welcomeText}>Welcome!</Text>
+				{/* New: soft card container (background stays the same) */}
+				<View style={styles.card}>
+					{/* subtle accent strip (very low pop) */}
+					<View style={styles.cardAccent} />
+
+					<Text style={styles.welcomeText}>Get Kracked!</Text>
 					<Text style={styles.descriptionText}>
-						Sign in to track your progress and unlock personalized puzzle
-						recommendations.
+						Start your brain training journey today
 					</Text>
 
-					<TikTokButton
-						label="Continue with Google"
-						onPress={handleGoogleSignIn}
-						disabled={loading}
-						loading={loading}
-						icon={<Ionicons name="logo-google" size={20} color={Colors.text.white} />}
-						fullWidth
-					/>
+					{/* Feature bullets like screenshot 2 */}
+					<View style={styles.features}>
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>
+								Personalized puzzle recommendations
+							</Text>
+						</View>
+
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>Track your progress and streaks</Text>
+						</View>
+
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>
+								Compete on global leaderboards
+							</Text>
+						</View>
+					</View>
+
+					<View style={styles.buttonWrap}>
+						<TikTokButton
+							label="Continue with Google"
+							onPress={handleGoogleSignIn}
+							disabled={loading}
+							loading={loading}
+							icon={
+								<Ionicons
+									name="logo-google"
+									size={20}
+									color={Colors.text.white}
+								/>
+							}
+							fullWidth
+						/>
+					</View>
 
 					<Text style={styles.privacyText}>
 						By continuing, you agree to our Terms of Service and Privacy Policy
 					</Text>
 				</View>
+
+				{/* Optional subtle footer like screenshot 2 */}
+				<Text style={styles.secureText}>
+					<Ionicons name="lock-closed" size={14} color={Colors.text.secondary} />
+					{"  "}Secure authentication powered by Google
+				</Text>
 			</View>
 		</View>
 	);
@@ -120,7 +148,8 @@ const SignInScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		// Background stays the same as your current page
+		backgroundColor: Colors.background.secondary,
 	},
 	content: {
 		flex: 1,
@@ -131,7 +160,9 @@ const styles = StyleSheet.create({
 	logoContainer: {
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: Spacing.xxl,
+		// Slightly tighter than before to match the card layout
+		marginTop: Spacing.xl,
+		marginBottom: Spacing.sm,
 	},
 	logoImage: {
 		width: 180,
@@ -139,64 +170,92 @@ const styles = StyleSheet.create({
 		resizeMode: "contain",
 		marginBottom: Spacing.md,
 	},
-	logo: {
-		fontSize: 48,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.sm,
-		textShadowColor: Colors.accent,
-		textShadowOffset: { width: 0, height: 0 },
-		textShadowRadius: 12,
-	},
-	subtitle: {
-		fontSize: Typography.fontSize.h3,
-		color: Colors.text.secondary,
-		textAlign: "center",
-	},
-	signInContainer: {
+
+	// New card styles (screenshot 2 vibe)
+	card: {
 		width: "100%",
-		alignItems: "center",
+		backgroundColor: Colors.background.tertiary, // your card bg (#fffcf9)
+		borderRadius: BorderRadius.xl,
+		paddingVertical: Spacing.xl,
+		paddingHorizontal: Spacing.xl,
+		...Shadows.medium,
+		overflow: "hidden",
+		marginBottom: Spacing.lg,
+
+		// very subtle separation (keeps it from "popping")
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.035)",
 	},
+
+	// Subtle accent strip (low opacity)
+	cardAccent: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		height: 5,
+		backgroundColor: Colors.accent,
+		opacity: 0.2,
+	},
+
 	welcomeText: {
 		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.sm,
 		textAlign: "center",
 	},
 	descriptionText: {
-		fontSize: Typography.fontSize.body,
+		fontSize: 15,
 		color: Colors.text.secondary,
 		textAlign: "center",
-		marginBottom: Spacing.xl,
+		marginBottom: Spacing.lg,
 		lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.body,
 	},
-	googleButton: {
-		flexDirection: "row",
+
+	features: {
+		width: "100%",
+		marginBottom: Spacing.xl,
+	},
+	checkmarkCircle: {
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: Colors.accent,
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.lg,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.lg,
+	},
+	featureRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: Spacing.md,
+	},
+	featureText: {
+		marginLeft: Spacing.md,
+		fontSize: 13,
+		color: Colors.text.primary,
+		opacity: 0.9,
+		flex: 1,
+	},
+
+	buttonWrap: {
 		width: "100%",
 		marginBottom: Spacing.lg,
-		...Shadows.medium,
 	},
-	buttonDisabled: {
-		opacity: 0.7,
-	},
-	googleButtonText: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.white,
-		marginLeft: Spacing.md,
-	},
+
 	privacyText: {
 		fontSize: Typography.fontSize.small,
 		color: Colors.text.secondary,
 		textAlign: "center",
+		opacity: 0.85,
+	},
+
+	secureText: {
+		marginTop: Spacing.lg,
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
 		opacity: 0.8,
+		textAlign: "center",
 	},
 });
 
