@@ -1004,6 +1004,10 @@ export const fetchCreatedGames = async (
 		const games: GameSummary[] = [];
 		snapshot.forEach((doc) => {
 			const data = doc.data();
+			// Skip games where visible is false
+			if (data?.visible === false) {
+				return;
+			}
 			games.push({
 				gameId: doc.id,
 				gameType: data?.gameType || "",
@@ -1039,7 +1043,13 @@ export const fetchLikedGames = async (
 			return [];
 		}
 
-		const gameIds = likedSnapshot.docs.map((doc) => doc.id);
+		// Filter out games where visible is false in the liked subcollection
+		const gameIds = likedSnapshot.docs
+			.filter((doc) => {
+				const data = doc.data();
+				return data?.visible !== false;
+			})
+			.map((doc) => doc.id);
 
 		// Group games by gameType and difficulty for better organization
 		const gameGroups = new Map<
@@ -1091,6 +1101,10 @@ export const fetchLikedGames = async (
 
 						if (docExists(gameDoc)) {
 							const gameData = gameDoc.data();
+							// Skip games where visible is false
+							if (gameData?.visible === false) {
+								return null;
+							}
 							return {
 								gameId: originalIds[index], // Return FULL puzzleId (gameType_difficulty_docId) to match fetchCreatedGames
 								gameType: gameType as any,
