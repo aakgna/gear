@@ -173,6 +173,32 @@ const TriviaGame: React.FC<TriviaGameProps> = ({
 		newAnsweredQuestions[currentQuestionIndex] = true;
 		setAnsweredQuestions(newAnsweredQuestions);
 
+		// Complete game on last answer so social overlay shows immediately
+		if (currentQuestionIndex === inputData.questions.length - 1) {
+			if (timerIntervalRef.current) {
+				clearInterval(timerIntervalRef.current);
+				timerIntervalRef.current = null;
+			}
+			const timeTaken = startTime != null ? Math.floor((Date.now() - startTime) / 1000) : 0;
+			setElapsedTime(timeTaken);
+			setCompleted(true);
+			const finalChoices = [...selectedChoices];
+			finalChoices[currentQuestionIndex] = selectedChoice;
+			const correctAnswers = finalChoices.filter(
+				(c, i) => c && inputData.questions[i].answer.toLowerCase() === c.toLowerCase()
+			).length;
+			const totalQuestions = inputData.questions.length;
+			onComplete({
+				puzzleId: puzzleId || `trivia_${Date.now()}`,
+				completed: true,
+				timeTaken,
+				attempts: correctAnswers,
+				mistakes: totalQuestions - correctAnswers,
+				accuracy: (correctAnswers / totalQuestions) * 100,
+				completedAt: new Date().toISOString(),
+			});
+		}
+
 		const isCorrect =
 			selectedChoice.toLowerCase() === currentQuestion.answer.toLowerCase();
 

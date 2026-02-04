@@ -3255,7 +3255,7 @@ const styles = StyleSheet.create({
 	},
 	puzzleCard: {
 		width: SCREEN_WIDTH,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		overflow: "hidden",
 		position: "relative",
 		elevation: 0,
