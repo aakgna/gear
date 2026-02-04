@@ -23,6 +23,7 @@ export interface UserData {
 	totalPlayTime?: number; // in seconds
 	averageTimePerGame?: number;
 	streakCount?: number;
+	strikeCount?: number; // Number of strikes for moderation
 	lastPlayedAt?: any; // Firestore timestamp
 	statsByCategory?: {
 		[category: string]: {

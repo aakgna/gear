@@ -12,7 +12,9 @@ import {
 	ActivityIndicator,
 	Image,
 	Animated,
+	Alert,
 } from "react-native";
+import LeoProfanity from "leo-profanity";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -25,7 +27,8 @@ import {
 	Shadows,
 	Layout,
 } from "../constants/DesignSystem";
-import { getCurrentUser } from "../config/auth";
+import { getCurrentUser, getUserData } from "../config/auth";
+import auth from "@react-native-firebase/auth";
 import {
 	fetchGameComments,
 	addGameComment,
@@ -58,18 +61,23 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 	const [newComment, setNewComment] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
+	const [reportModalVisible, setReportModalVisible] = useState(false);
+	const [selectedComment, setSelectedComment] = useState<GameComment | null>(null);
+	const [reporting, setReporting] = useState(false);
 	// Animation refs for each comment's like button (TikTok-style pulse)
 	const likeAnimationsRef = useRef<Map<string, Animated.Value>>(new Map());
 
 	useEffect(() => {
 		let unsubscribe: (() => void) | undefined;
-
+		LeoProfanity.add(["fag", "faggot", "retard", "nigga", "nigger"])
 		if (visible) {
 			loadComments();
 			unsubscribe = setupListener();
 		} else {
 			setComments([]);
 			setNewComment("");
+			setReportModalVisible(false);
+			setSelectedComment(null);
 		}
 
 		return () => {
@@ -93,7 +101,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 			);
 			setComments(filteredComments);
 		} catch (error) {
-			console.error("[CommentsModal] Error loading comments:", error);
+			// Error loading comments
 		} finally {
 			setLoading(false);
 		}
@@ -143,7 +151,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 				}
 			},
 			(error) => {
-				console.error("[CommentsModal] Listener error:", error);
+				// Listener error
 			}
 		);
 
@@ -151,18 +159,63 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 	};
 
 	const handleSubmitComment = async () => {
-		if (!currentUser || !newComment.trim()) return;
+		if (!currentUser || !newComment.trim()) {
+			return;
+		}
+
+		// Check user's strike count - must be less than 10 to comment
+		try {
+			const userData = await getUserData(currentUser.uid);
+			const strikeCount = userData?.strikeCount || 0;
+			
+			if (strikeCount >= 10) {
+				Alert.alert(
+					"Commenting Disabled",
+					"You have reached the maximum number of strikes. Commenting has been disabled for your account.",
+					[{ text: "OK" }]
+				);
+				return;
+			}
+		} catch (error) {
+			// If we can't fetch user data, allow the comment (fail open)
+			// This prevents blocking users due to network issues
+		}
+
+		// Check for bad words using leo-profanity
+		const commentText = newComment.trim();
+		
+		try {
+			// Simple check with leo-profanity
+			const hasProfanity = LeoProfanity.check(commentText);
+			
+			if (hasProfanity) {
+				Alert.alert(
+					"Invalid Comment",
+					"Your comment contains inappropriate language. Please revise your message.",
+					[{ text: "OK" }]
+				);
+				return;
+			}
+		} catch (error) {
+			// If there's an error with profanity checking, block the comment to be safe
+			Alert.alert(
+				"Error",
+				"Unable to validate comment. Please try again.",
+				[{ text: "OK" }]
+			);
+			return;
+		}
 
 		setSubmitting(true);
 		try {
-			await addGameComment(gameId, currentUser.uid, newComment.trim());
+			await addGameComment(gameId, currentUser.uid, commentText);
 			setNewComment("");
 			// Notify parent that a comment was added (for optimistic UI updates)
 			if (onCommentAdded) {
 				onCommentAdded();
 			}
 		} catch (error) {
-			console.error("[CommentsModal] Error submitting comment:", error);
+			// Error submitting comment
 		} finally {
 			setSubmitting(false);
 		}
@@ -229,7 +282,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		if (wasLiked) {
 			unlikeGameComment(gameId, commentId, currentUser.uid).catch((error) => {
 				// On error, revert optimistic update
-				console.error("[CommentsModal] Error unliking comment:", error);
 				setComments((prevComments) =>
 					prevComments.map((c) => {
 						if (c.id === commentId) {
@@ -246,7 +298,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		} else {
 			likeGameComment(gameId, commentId, currentUser.uid).catch((error) => {
 				// On error, revert optimistic update
-				console.error("[CommentsModal] Error liking comment:", error);
 				setComments((prevComments) =>
 					prevComments.map((c) => {
 						if (c.id === commentId) {
@@ -288,6 +339,88 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		}
 	};
 
+	const handleCommentLongPress = (comment: GameComment) => {
+		setSelectedComment(comment);
+		setReportModalVisible(true);
+	};
+
+	const handleReportComment = async (reason: string) => {
+		if (!currentUser || !selectedComment) return;
+
+		setReporting(true);
+		try {
+			// Get auth token
+			const currentAuthUser = auth().currentUser;
+			if (!currentAuthUser) {
+				Alert.alert("Error", "You must be logged in to report comments.");
+				return;
+			}
+
+			const idToken = await currentAuthUser.getIdToken();
+
+			// Parse gameId to extract gameType, difficulty, and actualGameId
+			const parsed = parsePuzzleId(gameId);
+			if (!parsed) {
+				throw new Error("Invalid gameId format");
+			}
+
+			const { gameType, difficulty, gameId: actualGameId } = parsed;
+
+			// Build comment ID in format: {gameType}_{difficulty}_{gameId}_{commentId}
+			const commentId = `${gameType}_${difficulty}_${actualGameId}_${selectedComment.id}`;
+
+			// Call analyze_comment function immediately (don't wait for reason selection)
+			const analyzeUrl = "https://us-central1-gear-ff009.cloudfunctions.net/analyze_comment";
+			const analyzeResponse = await fetch(analyzeUrl, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${idToken}`,
+				},
+				body: JSON.stringify({
+					data: {
+						text: selectedComment.text,
+						userId: selectedComment.userId,
+						commentId: commentId,
+					},
+				}),
+			});
+
+			if (!analyzeResponse.ok) {
+				throw new Error(`HTTP error! status: ${analyzeResponse.status}`);
+			}
+
+			const analyzeResult = await analyzeResponse.json();
+			const analysisResult = analyzeResult.result || analyzeResult;
+
+			// Save report to Firestore under the reporting user's reports subcollection
+			const firestore = require("@react-native-firebase/firestore").default;
+			const reportRef = db
+				.collection("users")
+				.doc(currentUser.uid)
+				.collection("reports")
+				.doc();
+
+			await reportRef.set({
+				commentId: commentId,
+				commentText: selectedComment.text,
+				commentUserId: selectedComment.userId,
+				commentUsername: selectedComment.username,
+				reason: reason,
+				analysisResult: analysisResult,
+				reportedAt: firestore.FieldValue.serverTimestamp(),
+			});
+
+			Alert.alert("Success", "Comment reported successfully.");
+			setReportModalVisible(false);
+			setSelectedComment(null);
+		} catch (error: any) {
+			Alert.alert("Error", "Failed to report comment. Please try again.");
+		} finally {
+			setReporting(false);
+		}
+	};
+
 	const renderComment = ({ item }: { item: GameComment }) => {
 		const isLiked =
 			currentUser && (item.likedBy?.includes(currentUser.uid) || false);
@@ -299,7 +432,12 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 		const pulseAnim = likeAnimationsRef.current.get(item.id)!;
 
 		return (
-			<View style={styles.commentItem}>
+			<TouchableOpacity
+				style={styles.commentItem}
+				onLongPress={() => handleCommentLongPress(item)}
+				delayLongPress={2000}
+				activeOpacity={0.7}
+			>
 				<View style={styles.commentHeader}>
 					<TouchableOpacity
 						onPress={() => handleProfilePress(item.username)}
@@ -360,7 +498,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 						</View>
 					</View>
 				</View>
-			</View>
+			</TouchableOpacity>
 		);
 	};
 
@@ -441,6 +579,69 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 					)}
 				</View>
 			</KeyboardAvoidingView>
+
+			{/* Report Modal */}
+			<Modal
+				visible={reportModalVisible}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => {
+					if (!reporting) {
+						setReportModalVisible(false);
+						setSelectedComment(null);
+					}
+				}}
+			>
+				<View style={styles.reportModalOverlay}>
+					<View style={styles.reportModalContent}>
+						<Text style={styles.reportModalTitle}>Report Comment</Text>
+						<Text style={styles.reportModalSubtitle}>
+							Why are you reporting this comment?
+						</Text>
+
+						{reporting ? (
+							<View style={styles.reportLoadingContainer}>
+								<ActivityIndicator size="large" color={Colors.accent} />
+								<Text style={styles.reportLoadingText}>
+									Analyzing comment...
+								</Text>
+							</View>
+						) : (
+							<View style={styles.reportReasonsContainer}>
+								{[
+									"Inappropriate content",
+									"Spam",
+									"Harassment",
+									"False information",
+									"Other",
+								].map((reason) => (
+									<TouchableOpacity
+										key={reason}
+										style={styles.reportReasonButton}
+										onPress={() => handleReportComment(reason)}
+										activeOpacity={0.7}
+									>
+										<Text style={styles.reportReasonText}>{reason}</Text>
+									</TouchableOpacity>
+								))}
+							</View>
+						)}
+
+						{!reporting && (
+							<TouchableOpacity
+								style={styles.reportCancelButton}
+								onPress={() => {
+									setReportModalVisible(false);
+									setSelectedComment(null);
+								}}
+								activeOpacity={0.7}
+							>
+								<Text style={styles.reportCancelText}>Cancel</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				</View>
+			</Modal>
 		</Modal>
 	);
 };
@@ -482,6 +683,7 @@ const styles = StyleSheet.create({
 	},
 	commentsList: {
 		padding: Layout.margin,
+		paddingTop: Spacing.sm,
 	},
 	commentItem: {
 		marginBottom: Spacing.lg,
@@ -571,6 +773,66 @@ const styles = StyleSheet.create({
 	},
 	sendButtonDisabled: {
 		opacity: 0.5,
+	},
+	reportModalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	reportModalContent: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.xl,
+		padding: Spacing.xl,
+		width: "85%",
+		maxWidth: 400,
+		...Shadows.heavy,
+	},
+	reportModalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xs,
+		textAlign: "center",
+	},
+	reportModalSubtitle: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.lg,
+		textAlign: "center",
+	},
+	reportLoadingContainer: {
+		alignItems: "center",
+		padding: Spacing.xl,
+	},
+	reportLoadingText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginTop: Spacing.md,
+	},
+	reportReasonsContainer: {
+		gap: Spacing.sm,
+	},
+	reportReasonButton: {
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.md,
+		borderWidth: 1,
+		borderColor: Colors.text.secondary + "20",
+	},
+	reportReasonText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		textAlign: "center",
+	},
+	reportCancelButton: {
+		marginTop: Spacing.lg,
+		padding: Spacing.md,
+	},
+	reportCancelText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		textAlign: "center",
 	},
 });
 
