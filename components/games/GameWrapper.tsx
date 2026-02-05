@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import {
 	Puzzle,
+	PuzzleType,
 	GameResult,
 	PuzzleStats as PuzzleStatsType,
 } from "../../config/types";
@@ -98,6 +99,28 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onRegisterShareHandlers,
 }) => {
 	const router = useRouter();
+	
+	// Format game type for display
+	const formatGameType = (type: PuzzleType): string => {
+		const formatted = type
+			.replace(/([A-Z])/g, " $1")
+			.replace(/^./, (str) => str.toUpperCase())
+			.trim();
+
+		const specialCases: Record<string, string> = {
+			quickMath: "Quick Math",
+			wordChain: "Word Chain",
+			magicSquare: "Magic Square",
+			wordform: "WordForm",
+			trailfinder: "TrailFinder",
+			maze: "Maze",
+			codebreaker: "CodeBreaker",
+			inference: "Inference",
+		};
+
+		return specialCases[type] || formatted;
+	};
+	
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
@@ -501,10 +524,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	// Handle share before play (from intro screen - top left share icon)
 	const handleShareBeforePlay = async () => {
 		try {
-			const gameLink = `thinktok://game/${puzzle.id}`;
-			const iosAppStoreLink = "https://apps.apple.com/app/thinktok/id6739000000";
+			const gameLink = `kracked://game/${puzzle.id}`;
+			const iosAppStoreLink = "https://apps.apple.com/app/kracked/id6739000000";
 			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
-			const message = `Try this ${formatGameType(puzzle.type)} puzzle on ThinkTok!\n\nPlay: ${gameLink}\nOr search for game ID: ${puzzle.id} in ThinkTok\n\nDon't have ThinkTok? Download it:\niOS: ${iosAppStoreLink}\nAndroid: ${androidPlayStoreLink}`;
+			const message = `Try this ${formatGameType(puzzle.type)} puzzle on Kracked!\n\nPlay: ${gameLink}\nOr search for game ID: ${puzzle.id} in Kracked\n\nDon't have Kracked? Download it:\niOS: ${iosAppStoreLink}\nAndroid: ${androidPlayStoreLink}`;
 			const shareOptions: any = { message };
 			if (Platform.OS === "android") {
 				shareOptions.title = "Share Game";
@@ -547,15 +570,15 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		try {
 			console.log("[handleShare] Starting share...");
 			// Create shareable link - using game ID that can be used in the app
-			const gameLink = `thinktok://game/${puzzle.id}`;
+			const gameLink = `kracked://game/${puzzle.id}`;
 			
 			// App store links for users without the app
-			const iosAppStoreLink = "https://apps.apple.com/app/thinktok/id6739000000"; // Update with actual App Store ID
+			const iosAppStoreLink = "https://apps.apple.com/app/kracked/id6739000000"; // Update with actual App Store ID
 			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
 
 			let message = `I just completed ${formatGameType(
 				puzzle.type
-			)} on ThinkTok!\n\n`;
+			)} on Kracked!\n\n`;
 			message += `Time: ${formatTime(completedResult.timeTaken)}\n`;
 
 			if (completedResult.attempts !== undefined) {
@@ -564,8 +587,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 			message += `\nCan you beat my score?\n\n`;
 			message += `Play this game: ${gameLink}\n\n`;
-			message += `Or search for game ID: ${puzzle.id} in ThinkTok\n\n`;
-			message += `Don't have ThinkTok? Download it:\n`;
+			message += `Or search for game ID: ${puzzle.id} in Kracked\n\n`;
+			message += `Don't have Kracked? Download it:\n`;
 			message += `iOS: ${iosAppStoreLink}\n`;
 			message += `Android: ${androidPlayStoreLink}`;
 
