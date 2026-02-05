@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
 	View,
 	StyleSheet,
@@ -111,6 +111,7 @@ const ChatScreen = () => {
 	const scrollOffsetRef = useRef<number>(0);
 	const loadingMoreTriggeredRef = useRef<boolean>(false);
 	const listenerSetupRef = useRef<boolean>(false);
+	const initialScrollToEndDoneRef = useRef(false);
 
 	useEffect(() => {
 		let unsubscribe: (() => void) | undefined;
@@ -287,6 +288,8 @@ const ChatScreen = () => {
 		[router]
 	);
 
+	const messagesReversed = useMemo(() => [...messages].reverse(), [messages]);
+
 	const renderMessage = useCallback(
 		({ item }: { item: Message }) => {
 			const isFromMe = item.senderId === currentUser?.uid;
@@ -337,14 +340,21 @@ const ChatScreen = () => {
 										},
 									]}
 								>
-									<Ionicons
-										name="game-controller-outline"
-										size={24}
-										color={
-											getGameColor(item.gameShare.gameType as PuzzleType) ||
-											Colors.accent
-										}
-									/>
+									<View style={styles.gameShareCardIconsRow}>
+										<Ionicons
+											name="game-controller-outline"
+											size={24}
+											color={
+												getGameColor(item.gameShare.gameType as PuzzleType) ||
+												Colors.accent
+											}
+										/>
+										<Ionicons
+											name="play-circle"
+											size={24}
+											color={Colors.accent}
+										/>
+									</View>
 									<View style={styles.gameShareInfo}>
 										<Text style={styles.gameShareTitle}>
 											{formatGameType(item.gameShare.gameType)}
@@ -353,11 +363,6 @@ const ChatScreen = () => {
 											{item.gameShare.difficulty}
 										</Text>
 									</View>
-									<Ionicons
-										name="play-circle"
-										size={24}
-										color={Colors.accent}
-									/>
 								</View>
 							</TouchableOpacity>
 						) : (
@@ -402,18 +407,29 @@ const ChatScreen = () => {
 			<MinimalHeader
 				title={otherParticipant?.username || "user"}
 				rightAction={
-					otherParticipant?.profilePicture ? (
-						<Image
-							source={{ uri: otherParticipant.profilePicture }}
-							style={styles.headerAvatar}
-						/>
-					) : (
-						<Ionicons
-							name="person-circle"
-							size={28}
-							color={Colors.text.secondary}
-						/>
-					)
+					<TouchableOpacity
+						onPress={() => {
+							if (otherParticipant?.username) {
+								router.push(`/user/${otherParticipant.username}`);
+							}
+						}}
+						activeOpacity={0.7}
+						disabled={!otherParticipant?.username}
+						hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+					>
+						{otherParticipant?.profilePicture ? (
+							<Image
+								source={{ uri: otherParticipant.profilePicture }}
+								style={styles.headerAvatar}
+							/>
+						) : (
+							<Ionicons
+								name="person-circle"
+								size={28}
+								color={Colors.text.secondary}
+							/>
+						)}
+					</TouchableOpacity>
 				}
 			/>
 
@@ -425,39 +441,34 @@ const ChatScreen = () => {
 			) : (
 				<FlatList
 					ref={flatListRef}
-					data={messages}
+					data={messagesReversed}
 					renderItem={renderMessage}
 					keyExtractor={(item) => item.id}
+					inverted
 					windowSize={5}
-					initialNumToRender={10}
-					maxToRenderPerBatch={5}
-					updateCellsBatchingPeriod={50}
-					removeClippedSubviews={true}
+					initialNumToRender={15}
+					maxToRenderPerBatch={10}
 					contentContainerStyle={[
 						styles.messagesList,
-						{
-							paddingBottom:
-								BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.md + 60,
-						},
+						{ paddingTop: Spacing.md, paddingBottom: Spacing.md },
 					]}
-					onContentSizeChange={() => {
-						flatListRef.current?.scrollToEnd({ animated: true });
-					}}
 					onScroll={(event) => {
-						const offsetY = event.nativeEvent.contentOffset.y;
-						scrollOffsetRef.current = offsetY;
-						
-						// Load more messages when scrolling near the top (offset < 100)
-						// Messages are displayed oldest first, so scrolling up (towards top) loads older messages
+						const { contentOffset, contentSize, layoutMeasurement } =
+							event.nativeEvent;
+						scrollOffsetRef.current = contentOffset.y;
+						// Inverted list: load older messages when scrolled near top
+						const scrollable = contentSize.height > layoutMeasurement.height + 100;
+						const nearTop =
+							scrollable &&
+							contentSize.height - layoutMeasurement.height - contentOffset.y < 120;
 						if (
-							offsetY < 100 &&
+							nearTop &&
 							hasMoreMessages &&
 							!loadingMore &&
 							!loadingMoreTriggeredRef.current
 						) {
 							loadingMoreTriggeredRef.current = true;
 							loadMoreMessages().finally(() => {
-								// Reset trigger after a delay to allow loading again
 								setTimeout(() => {
 									loadingMoreTriggeredRef.current = false;
 								}, 1000);
@@ -465,7 +476,7 @@ const ChatScreen = () => {
 						}
 					}}
 					scrollEventThrottle={200}
-					ListHeaderComponent={
+					ListFooterComponent={
 						loadingMore ? (
 							<View style={styles.loadingMoreContainer}>
 								<ActivityIndicator size="small" color={Colors.accent} />
@@ -558,7 +569,7 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 	},
 	messageBubble: {
-		maxWidth: "75%",
+		maxWidth: "90%",
 		padding: Spacing.md,
 		borderRadius: BorderRadius.md,
 	},
@@ -589,20 +600,28 @@ const styles = StyleSheet.create({
 		marginTop: Spacing.xxs,
 	},
 	gameShareCard: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.sm,
+		flexDirection: "column",
+		alignItems: "stretch",
 		padding: Spacing.md,
 		borderRadius: BorderRadius.md,
 		borderWidth: 2,
 		backgroundColor: Colors.background.primary,
 		marginBottom: Spacing.xxs,
+		width: "100%",
+		maxWidth: "100%",
+		overflow: "hidden",
+	},
+	gameShareCardIconsRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: Spacing.sm,
 	},
 	gameShareInfo: {
-		flex: 1,
+		width: "100%",
 	},
 	gameShareTitle: {
-		fontSize: Typography.fontSize.caption,
+		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
 		marginBottom: Spacing.xxs,

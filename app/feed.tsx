@@ -2620,8 +2620,11 @@ const applyForYouFilters = useCallback(
 			{/* Header */}
 			{renderHeader()}
 
-			{/* Share pill - fixed like filter, shows on welcome card and puzzle intro */}
-			{activeTab === "forYou" && isFilterPillVisible && (
+			{/* Share pill - fixed like filter, shows on welcome card and puzzle intro; hide on completed games (social overlay) */}
+			{activeTab === "forYou" &&
+				isFilterPillVisible &&
+				(currentVisibleIndexForYou === 0 ||
+					!completedPuzzlesRef.current.has(currentPuzzleIdForYou)) && (
 				<TouchableOpacity
 					style={[
 						styles.sharePill,

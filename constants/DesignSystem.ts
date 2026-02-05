@@ -292,3 +292,28 @@ export const GameColors: Record<PuzzleType, string> = {
 export const getGameColor = (gameType: PuzzleType): string => {
 	return GameColors[gameType] || Colors.accent; // Fallback to default accent if type not found
 };
+
+/** Display name for a game type (single source of truth; use for UI labels) */
+export const formatGameType = (type: string): string => {
+	const formatted = type
+		.replace(/([A-Z])/g, " $1")
+		.replace(/^./, (str) => str.toUpperCase())
+		.trim();
+	const specialCases: Record<string, string> = {
+		quickMath: "Quick Math",
+		wordChain: "Word Chain",
+		magicSquare: "Magic Square",
+		wordform: "Word Form",
+		trailfinder: "Trail Finder",
+		maze: "Maze",
+		codebreaker: "Codebreaker",
+		inference: "Inference",
+		wordForm: "Word Form",
+		sudoku: "Sudoku",
+		riddle: "Riddle",
+		trivia: "Trivia",
+		futoshiki: "Futoshiki",
+		sequencing: "Sequencing",
+	};
+	return specialCases[type] || formatted;
+};

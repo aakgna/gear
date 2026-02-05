@@ -8,6 +8,9 @@ import {
 } from "../config/auth";
 import { Colors, Typography, Spacing } from "../constants/DesignSystem";
 
+// DEV: set to true to keep splash visible and work on it; set to false when done
+const DEV_SPLASH_ONLY = false;
+
 export default function SplashScreen() {
 	const router = useRouter();
 	const [checkingAuth, setCheckingAuth] = useState(true);
@@ -24,6 +27,7 @@ export default function SplashScreen() {
 		let unsubscribe: (() => void) | null = null;
 
 		const navigate = async (path: "/feed" | "/signin" | "/username") => {
+			  if (DEV_SPLASH_ONLY) return;
 			// Use requestAnimationFrame to ensure router is ready
 			requestAnimationFrame(() => {
 				try {
@@ -62,6 +66,7 @@ export default function SplashScreen() {
 		const timer = setTimeout(() => {
 			// Check auth state
 			unsubscribe = onAuthStateChanged(async (user) => {
+				if (DEV_SPLASH_ONLY) return;
 				setCheckingAuth(false);
 				if (user) {
 					// User is signed in, check if they have username
@@ -93,13 +98,9 @@ export default function SplashScreen() {
 			<View style={styles.content}>
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo_transparent.png")}
+						source={require("../assets/images/kracked.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.logo}>ThinkTok</Text>
-					<Text style={styles.subtitle}>
-						Brain training, one puzzle at a time
-					</Text>
 				</View>
 				{checkingAuth && (
 					<ActivityIndicator
@@ -127,25 +128,13 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		marginBottom: Spacing.xxl,
+		overflow: "visible",
 	},
 	logoImage: {
 		width: 180,
 		height: 180,
 		resizeMode: "contain",
 		marginBottom: Spacing.md,
-	},
-	logo: {
-		fontSize: 48,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.sm,
-		textShadowColor: Colors.accent,
-		textShadowOffset: { width: 0, height: 0 },
-		textShadowRadius: 12,
-	},
-	subtitle: {
-		fontSize: Typography.fontSize.h3,
-		color: Colors.text.secondary,
-		textAlign: "center",
+		transform: [{ scale: 2.5 }],
 	},
 });

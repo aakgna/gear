@@ -70,7 +70,7 @@ const SignInScreen = () => {
 				{/* Logo stays the same */}
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo_transparent.png")}
+						source={require("../assets/images/kracked.png")}
 						style={styles.logoImage}
 					/>
 				</View>
@@ -80,9 +80,8 @@ const SignInScreen = () => {
 					{/* subtle accent strip (very low pop) */}
 					<View style={styles.cardAccent} />
 
-					<Text style={styles.welcomeText}>Get Kracked!</Text>
 					<Text style={styles.descriptionText}>
-						Start your brain training journey today
+						Start your brain training journey today!
 					</Text>
 
 					{/* Feature bullets like screenshot 2 */}
@@ -163,12 +162,14 @@ const styles = StyleSheet.create({
 		// Slightly tighter than before to match the card layout
 		marginTop: Spacing.xl,
 		marginBottom: Spacing.sm,
+		overflow: "visible",
 	},
 	logoImage: {
 		width: 180,
 		height: 180,
 		resizeMode: "contain",
 		marginBottom: Spacing.md,
+		transform: [{ scale: 2.5 }],
 	},
 
 	// New card styles (screenshot 2 vibe)
@@ -206,11 +207,13 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	descriptionText: {
-		fontSize: 15,
-		color: Colors.text.secondary,
-		textAlign: "center",
-		marginBottom: Spacing.lg,
-		lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.body,
+	fontSize: 24,
+	fontWeight: Typography.fontWeight.bold,
+	color: Colors.text.primary,
+	textAlign: "center",
+	marginBottom: Spacing.lg,
+	lineHeight: 30,
+	letterSpacing: 0.3,
 	},
 
 	features: {

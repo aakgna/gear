@@ -413,27 +413,6 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 	};
 
-	// Format game type helper
-	const formatGameType = (type: string): string => {
-		const formatted = type
-			.replace(/([A-Z])/g, " $1")
-			.replace(/^./, (str) => str.toUpperCase())
-			.trim();
-
-		const specialCases: Record<string, string> = {
-			quickMath: "Quick Math",
-			wordChain: "Word Chain",
-			magicSquare: "Magic Square",
-			wordform: "WordForm",
-			trailfinder: "TrailFinder",
-			maze: "Maze",
-			codebreaker: "CodeBreaker",
-			inference: "Inference",
-		};
-
-		return specialCases[type] || formatted;
-	};
-
 	// Social overlay handlers - merged directly into GameWrapper
 	const handleFollowPress = async () => {
 		const user = getCurrentUser();
