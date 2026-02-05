@@ -4,7 +4,7 @@
 		"slug": "gear",
 		"version": "1.0.28",
 		"orientation": "portrait",
-		"icon": "./assets/images/kracked.png",
+		"icon": "./assets/images/Kracked_logo.png",
 		"scheme": "kracked",
 		"userInterfaceStyle": "light",
 		"newArchEnabled": true,
@@ -45,7 +45,7 @@
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/kracked.png",
+					"image": "./assets/images/Kracked_logo.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
 					"backgroundColor": "#FFFFFF"
