@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LeoProfanity from "leo-profanity";
 import {
 	Colors,
 	Typography,
@@ -92,6 +93,28 @@ const CreateQuickMathPage = () => {
 	};
 
 	const handleQuickMathQuestionChange = (index: number, value: string) => {
+		// Check for profanity
+		if (value.trim()) {
+			try {
+				const hasProfanity = LeoProfanity.check(value);
+				if (hasProfanity) {
+					Alert.alert(
+						"Inappropriate Language",
+						"Your question contains inappropriate language. Please revise your text.",
+						[{ text: "OK" }]
+					);
+					// Clear the question
+					const newQuestions = [...quickMathQuestions];
+					newQuestions[index] = "";
+					setQuickMathQuestions(newQuestions);
+					return;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, allow the input
+				// to prevent blocking users due to technical issues
+			}
+		}
+		
 		const newQuestions = [...quickMathQuestions];
 		newQuestions[index] = value;
 		setQuickMathQuestions(newQuestions);
@@ -101,6 +124,24 @@ const CreateQuickMathPage = () => {
 		for (let i = 0; i < numQuestions; i++) {
 			if (!quickMathQuestions[i]?.trim()) {
 				Alert.alert("Validation Error", `Please enter question ${i + 1}.`);
+				return false;
+			}
+			
+			// Final profanity check before submission
+			try {
+				if (LeoProfanity.check(quickMathQuestions[i].trim())) {
+					Alert.alert(
+						"Validation Error",
+						`Question ${i + 1} contains inappropriate language. Please revise your text.`
+					);
+					return false;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, block submission to be safe
+				Alert.alert(
+					"Validation Error",
+					"Unable to validate content. Please try again."
+				);
 				return false;
 			}
 		}

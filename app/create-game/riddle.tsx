@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LeoProfanity from "leo-profanity";
 import {
 	Colors,
 	Typography,
@@ -78,10 +79,46 @@ const CreateRiddlePage = () => {
 			return false;
 		}
 
+		// Final profanity check for question before submission
+		try {
+			if (LeoProfanity.check(riddleQuestion.trim())) {
+				Alert.alert(
+					"Validation Error",
+					"Your question contains inappropriate language. Please revise your text."
+				);
+				return false;
+			}
+		} catch (error) {
+			// If there's an error with profanity checking, block submission to be safe
+			Alert.alert(
+				"Validation Error",
+				"Unable to validate content. Please try again."
+			);
+			return false;
+		}
+
 		// Check all answers are filled
 		for (let i = 0; i < answers.length; i++) {
 			if (!answers[i].trim()) {
 				Alert.alert("Validation Error", `Please fill in answer choice ${i + 1}.`);
+				return false;
+			}
+			
+			// Final profanity check for answers before submission
+			try {
+				if (LeoProfanity.check(answers[i].trim())) {
+					Alert.alert(
+						"Validation Error",
+						`Answer choice ${i + 1} contains inappropriate language. Please revise your text.`
+					);
+					return false;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, block submission to be safe
+				Alert.alert(
+					"Validation Error",
+					"Unable to validate content. Please try again."
+				);
 				return false;
 			}
 		}
@@ -221,7 +258,28 @@ const CreateRiddlePage = () => {
 						placeholder="Enter riddle question..."
 						placeholderTextColor={Colors.text.disabled}
 						value={riddleQuestion}
-						onChangeText={setRiddleQuestion}
+						onChangeText={(text) => {
+							// Check for profanity
+							if (text.trim()) {
+								try {
+									const hasProfanity = LeoProfanity.check(text);
+									if (hasProfanity) {
+										Alert.alert(
+											"Inappropriate Language",
+											"Your question contains inappropriate language. Please revise your text.",
+											[{ text: "OK" }]
+										);
+										// Clear the question
+										setRiddleQuestion("");
+										return;
+									}
+								} catch (error) {
+									// If there's an error with profanity checking, allow the input
+									// to prevent blocking users due to technical issues
+								}
+							}
+							setRiddleQuestion(text);
+						}}
 						multiline
 						numberOfLines={4}
 					/>
@@ -259,6 +317,28 @@ const CreateRiddlePage = () => {
 						placeholderTextColor={Colors.text.disabled}
 								value={answer}
 								onChangeText={(text) => {
+									// Check for profanity
+									if (text.trim()) {
+										try {
+											const hasProfanity = LeoProfanity.check(text);
+											if (hasProfanity) {
+												Alert.alert(
+													"Inappropriate Language",
+													"Your answer contains inappropriate language. Please revise your text.",
+													[{ text: "OK" }]
+												);
+												// Clear the answer
+												const newAnswers = [...answers];
+												newAnswers[index] = "";
+												setAnswers(newAnswers);
+												return;
+											}
+										} catch (error) {
+											// If there's an error with profanity checking, allow the input
+											// to prevent blocking users due to technical issues
+										}
+									}
+									
 									const newAnswers = [...answers];
 									newAnswers[index] = text;
 									setAnswers(newAnswers);

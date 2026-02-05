@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LeoProfanity from "leo-profanity";
 import {
 	Colors,
 	Typography,
@@ -69,6 +70,24 @@ const CreateWordFormPage = () => {
 			return false;
 		}
 		
+		// Final profanity check before submission
+		try {
+			if (LeoProfanity.check(word)) {
+				Alert.alert(
+					"Validation Error",
+					"Your word contains inappropriate language. Please revise your text."
+				);
+				return false;
+			}
+		} catch (error) {
+			// If there's an error with profanity checking, block submission to be safe
+			Alert.alert(
+				"Validation Error",
+				"Unable to validate content. Please try again."
+			);
+			return false;
+		}
+		
 		// Validate word is in the dictionary
 		if (!words.includes(word.toLowerCase())) {
 			Alert.alert(
@@ -84,6 +103,27 @@ const CreateWordFormPage = () => {
 	const handleWordFormWordChange = (text: string) => {
 		const filtered = text.toUpperCase().replace(/[^A-Z]/g, "");
 		const { max } = getWordFormLengthRange();
+		
+		// Check for profanity
+		if (filtered.trim()) {
+			try {
+				const hasProfanity = LeoProfanity.check(filtered);
+				if (hasProfanity) {
+					Alert.alert(
+						"Inappropriate Language",
+						"Your word contains inappropriate language. Please revise your text.",
+						[{ text: "OK" }]
+					);
+					// Clear the word
+					setWordFormWord("");
+					return;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, allow the input
+				// to prevent blocking users due to technical issues
+			}
+		}
+		
 		if (filtered.length <= max) {
 			setWordFormWord(filtered);
 		}

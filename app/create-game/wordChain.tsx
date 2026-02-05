@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LeoProfanity from "leo-profanity";
 import {
 	Colors,
 	Typography,
@@ -69,6 +70,29 @@ const CreateWordChainPage = () => {
 			.toUpperCase()
 			.replace(/[^A-Z]/g, "")
 			.slice(0, wordLength);
+		
+		// Check for profanity
+		if (sanitized.trim()) {
+			try {
+				const hasProfanity = LeoProfanity.check(sanitized);
+				if (hasProfanity) {
+					Alert.alert(
+						"Inappropriate Language",
+						"Your word contains inappropriate language. Please revise your text.",
+						[{ text: "OK" }]
+					);
+					// Clear the word
+					const newChainWords = [...chainWords];
+					newChainWords[index] = "";
+					setChainWords(newChainWords);
+					return;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, allow the input
+				// to prevent blocking users due to technical issues
+			}
+		}
+		
 		const newChainWords = [...chainWords];
 		newChainWords[index] = sanitized;
 		setChainWords(newChainWords);
@@ -88,6 +112,30 @@ const CreateWordChainPage = () => {
 				Alert.alert(
 					"Validation Error",
 					`All words must be ${wordLength} letters long.`
+				);
+				return false;
+			}
+			
+			// Final profanity check before submission
+			try {
+				if (LeoProfanity.check(chainWords[i])) {
+					const wordLabel =
+						i === 0
+							? "Start word"
+							: i === chainWords.length - 1
+							? "End word"
+							: `Chain word ${i + 1}`;
+					Alert.alert(
+						"Validation Error",
+						`${wordLabel} contains inappropriate language. Please revise your text.`
+					);
+					return false;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, block submission to be safe
+				Alert.alert(
+					"Validation Error",
+					"Unable to validate content. Please try again."
 				);
 				return false;
 			}

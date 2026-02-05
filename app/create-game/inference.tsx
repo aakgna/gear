@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LeoProfanity from "leo-profanity";
 import {
 	Colors,
 	Typography,
@@ -73,6 +74,28 @@ const CreateInferencePage = () => {
 	}, [difficulty]);
 
 	const handleDefinitionChange = (index: number, value: string) => {
+		// Check for profanity
+		if (value.trim()) {
+			try {
+				const hasProfanity = LeoProfanity.check(value);
+				if (hasProfanity) {
+					Alert.alert(
+						"Inappropriate Language",
+						"Your definition contains inappropriate language. Please revise your text.",
+						[{ text: "OK" }]
+					);
+					// Clear the definition
+					const newDefinitions = [...definitions];
+					newDefinitions[index] = "";
+					setDefinitions(newDefinitions);
+					return;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, allow the input
+				// to prevent blocking users due to technical issues
+			}
+		}
+		
 		const newDefinitions = [...definitions];
 		newDefinitions[index] = value;
 		setDefinitions(newDefinitions);
@@ -85,12 +108,48 @@ const CreateInferencePage = () => {
 				Alert.alert("Validation Error", `Please enter definition ${i + 1}.`);
 				return false;
 			}
+			
+			// Final profanity check before submission
+			try {
+				if (LeoProfanity.check(definitions[i].trim())) {
+					Alert.alert(
+						"Validation Error",
+						`Definition ${i + 1} contains inappropriate language. Please revise your text.`
+					);
+					return false;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, block submission to be safe
+				Alert.alert(
+					"Validation Error",
+					"Unable to validate content. Please try again."
+				);
+				return false;
+			}
 		}
 
 		// Check all answers are filled
 		for (let i = 0; i < answers.length; i++) {
 			if (!answers[i].trim()) {
 				Alert.alert("Validation Error", `Please fill in answer choice ${i + 1}.`);
+				return false;
+			}
+			
+			// Final profanity check for answers before submission
+			try {
+				if (LeoProfanity.check(answers[i].trim())) {
+					Alert.alert(
+						"Validation Error",
+						`Answer choice ${i + 1} contains inappropriate language. Please revise your text.`
+					);
+					return false;
+				}
+			} catch (error) {
+				// If there's an error with profanity checking, block submission to be safe
+				Alert.alert(
+					"Validation Error",
+					"Unable to validate content. Please try again."
+				);
 				return false;
 			}
 		}
@@ -274,6 +333,28 @@ const CreateInferencePage = () => {
 						placeholderTextColor={Colors.text.disabled}
 						value={answer}
 								onChangeText={(text) => {
+									// Check for profanity
+									if (text.trim()) {
+										try {
+											const hasProfanity = LeoProfanity.check(text);
+											if (hasProfanity) {
+												Alert.alert(
+													"Inappropriate Language",
+													"Your answer contains inappropriate language. Please revise your text.",
+													[{ text: "OK" }]
+												);
+												// Clear the answer
+												const newAnswers = [...answers];
+												newAnswers[index] = "";
+												setAnswers(newAnswers);
+												return;
+											}
+										} catch (error) {
+											// If there's an error with profanity checking, allow the input
+											// to prevent blocking users due to technical issues
+										}
+									}
+									
 									const newAnswers = [...answers];
 									newAnswers[index] = text;
 									setAnswers(newAnswers);
