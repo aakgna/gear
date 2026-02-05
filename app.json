@@ -1,11 +1,11 @@
 {
 	"expo": {
-		"name": "ThinkTok",
+		"name": "Kracked",
 		"slug": "gear",
-		"version": "1.0.22",
+		"version": "1.0.28",
 		"orientation": "portrait",
-		"icon": "./assets/images/logo.png",
-		"scheme": "thinktok",
+		"icon": "./assets/images/kracked.png",
+		"scheme": "kracked",
 		"userInterfaceStyle": "light",
 		"newArchEnabled": true,
 		"ios": {
@@ -45,7 +45,7 @@
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/logo_transparent.png",
+					"image": "./assets/images/kracked.png",
 					"imageWidth": 200,
 					"resizeMode": "contain",
 					"backgroundColor": "#FFFFFF"

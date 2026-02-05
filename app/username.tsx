@@ -146,7 +146,7 @@ const UsernameScreen = () => {
 							source={require("../assets/images/logo_transparent.png")}
 							style={styles.logoImage}
 						/>
-						<Text style={styles.logo}>ThinkTok</Text>
+						<Text style={styles.logo}>Kracked</Text>
 						<Text style={styles.subtitle}>Choose your username</Text>
 					</View>
 

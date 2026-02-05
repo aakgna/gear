@@ -2696,8 +2696,8 @@ const applyForYouFilters = useCallback(
 												try {
 													await Share.share({
 														message:
-															"Check out ThinkTok – swipe through puzzles, compete with friends, and sharpen your mind!",
-														url: "https://apps.apple.com/app/thinktok/id6739000000",
+															"Check out Kracked – swipe through puzzles, compete with friends, and sharpen your mind!",
+														url: "https://apps.apple.com/app/kracked/id6739000000",
 													});
 												} catch (e: any) {
 													if (e?.message !== "User did not share") {
