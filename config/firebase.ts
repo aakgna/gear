@@ -395,6 +395,15 @@ export const savePuzzleCompletion = async (
 		return;
 	}
 
+	// Validate and sanitize timeTaken before using it
+	// This prevents NaN from propagating into time-related stats
+	const sanitizedTimeTaken = 
+		typeof timeTaken === "number" && 
+		isFinite(timeTaken) && 
+		timeTaken >= 0
+			? timeTaken
+			: 0;
+
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
 
@@ -456,16 +465,33 @@ export const savePuzzleCompletion = async (
 			};
 
 			// Build new stats object with only valid Firestore values
+			// IMPORTANT: Preserve likeCount and commentCount - they should only be changed by like/comment operations
 			const newStats: Record<string, number | null> = {
 				totalCompletions: currentStats.totalCompletions + 1,
-				sumTime: currentStats.sumTime + timeTaken,
+				sumTime: currentStats.sumTime + sanitizedTimeTaken,
 			};
 
+			// Preserve likeCount and commentCount if they exist
+			if (typeof existingStats.likeCount === "number" && existingStats.likeCount >= 0) {
+				newStats.likeCount = existingStats.likeCount;
+			}
+			if (typeof existingStats.commentCount === "number" && existingStats.commentCount >= 0) {
+				newStats.commentCount = existingStats.commentCount;
+			}
+
 			// Handle fastestTime (best time)
-			if (currentStats.fastestTime === null) {
-				newStats.fastestTime = timeTaken;
+			// Don't set fastestTime if timeTaken is 0 (invalid/error case)
+			if (sanitizedTimeTaken > 0) {
+				if (currentStats.fastestTime === null) {
+					newStats.fastestTime = sanitizedTimeTaken;
+				} else {
+					newStats.fastestTime = Math.min(sanitizedTimeTaken, currentStats.fastestTime);
+				}
 			} else {
-				newStats.fastestTime = Math.min(timeTaken, currentStats.fastestTime);
+				// Preserve existing fastestTime if timeTaken is 0
+				if (currentStats.fastestTime !== null) {
+					newStats.fastestTime = currentStats.fastestTime;
+				}
 			}
 
 			// Update attempts stats if provided
