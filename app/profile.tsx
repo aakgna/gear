@@ -51,7 +51,7 @@ import {
 	getGameColor,
 	Gradients,
 } from "../constants/DesignSystem";
-import { fetchGameHistory, GameHistoryEntry } from "../config/firebase";
+import { fetchGameHistory, GameHistoryEntry, parsePuzzleId } from "../config/firebase";
 import {
 	fetchCreatedGames,
 	fetchLikedGames,
@@ -143,6 +143,11 @@ const ProfileScreen = () => {
 	const popupTranslateY = useRef(new Animated.Value(-20)).current;
 	const counterButtonRef = useRef<View>(null);
 	const [counterButtonLayout, setCounterButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+	// Delete game modal state
+	const [showDeleteModal, setShowDeleteModal] = useState(false);
+	const [selectedGameToDelete, setSelectedGameToDelete] = useState<GameSummary | null>(null);
+	const [deletingGame, setDeletingGame] = useState(false);
 
 	const totalAttemptedGames = useMemo(() => {
 		if (!userData?.statsByCategory) return 0;
@@ -688,6 +693,324 @@ const ProfileScreen = () => {
 		} as any);
 	};
 
+	// Helper function to delete game from all users' liked subcollections
+	const deleteFromLikedCollections = async (
+		gameType: string,
+		difficulty: string,
+		actualGameId: string,
+		fullPuzzleId: string
+	) => {
+		try {
+			// Get all users who liked this game
+			const likesRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(actualGameId)
+				.collection("likes");
+
+			const likesSnapshot = await likesRef.get();
+
+			if (likesSnapshot.empty) {
+				console.log("[deleteFromLikedCollections] No likes found for this game");
+				return;
+			}
+
+			console.log(`[deleteFromLikedCollections] Found ${likesSnapshot.docs.length} users who liked this game`);
+
+			// Helper function to convert lowercase gameType to camelCase
+			const toCamelCase = (gameType: string): string => {
+				if (gameType === "quickmath") return "quickMath";
+				if (gameType === "wordchain") return "wordChain";
+				if (gameType === "magicsquare") return "magicSquare";
+				return gameType; // wordform, riddle, inference, maze, futoshiki are already correct
+			};
+
+			// Generate both lowercase and camelCase versions of puzzleId
+			const parts = fullPuzzleId.split("_");
+			let camelCasePuzzleId: string | null = null;
+			if (parts.length >= 3) {
+				const gameTypeLower = parts[0];
+				const gameTypeCamel = toCamelCase(gameTypeLower);
+				if (gameTypeCamel !== gameTypeLower) {
+					camelCasePuzzleId = `${gameTypeCamel}_${parts[1]}_${parts.slice(2).join("_")}`;
+				}
+			}
+
+			// Delete from each user's liked subcollection
+			const deletePromises = likesSnapshot.docs.map(async (likeDoc) => {
+				const userId = likeDoc.id;
+				
+				// Try lowercase version first
+				const userLikedRef = db
+					.collection("users")
+					.doc(userId)
+					.collection("liked")
+					.doc(fullPuzzleId);
+				
+				console.log(`[deleteFromLikedCollections] Attempting to delete puzzleId "${fullPuzzleId}" from user ${userId}'s liked collection`);
+				
+				try {
+					// Check if document exists with lowercase puzzleId
+					let likedDoc = await userLikedRef.get();
+					let exists = typeof likedDoc.exists === "function" 
+						? likedDoc.exists() 
+						: likedDoc.exists;
+					
+					// If not found and we have a camelCase version, try that
+					if (!exists && camelCasePuzzleId) {
+						console.log(`[deleteFromLikedCollections] Trying camelCase version: "${camelCasePuzzleId}"`);
+						const camelCaseRef = db
+							.collection("users")
+							.doc(userId)
+							.collection("liked")
+							.doc(camelCasePuzzleId);
+						likedDoc = await camelCaseRef.get();
+						exists = typeof likedDoc.exists === "function" 
+							? likedDoc.exists() 
+							: likedDoc.exists;
+						
+						if (exists) {
+							await camelCaseRef.delete();
+							console.log(`[deleteFromLikedCollections] ✓ Deleted camelCase version from user ${userId}'s liked collection`);
+							return;
+						}
+					}
+					
+					if (exists) {
+						await userLikedRef.delete();
+						console.log(`[deleteFromLikedCollections] ✓ Deleted from user ${userId}'s liked collection`);
+					} else {
+						console.log(`[deleteFromLikedCollections] ⚠ Game not found in user ${userId}'s liked collection (tried both formats)`);
+						// Try to find what's actually in their liked collection
+						const userLikedSnapshot = await db
+							.collection("users")
+							.doc(userId)
+							.collection("liked")
+							.get();
+						const likedIds = userLikedSnapshot.docs.map(doc => doc.id);
+						// Check if any match our game (case-insensitive comparison)
+						const matchingIds = likedIds.filter(id => {
+							const idParts = id.split("_");
+							const ourParts = fullPuzzleId.split("_");
+							if (idParts.length >= 3 && ourParts.length >= 3) {
+								return idParts[0].toLowerCase() === ourParts[0].toLowerCase() &&
+								       idParts[1] === ourParts[1] &&
+								       idParts.slice(2).join("_") === ourParts.slice(2).join("_");
+							}
+							return false;
+						});
+						if (matchingIds.length > 0) {
+							console.log(`[deleteFromLikedCollections] Found matching game with different casing:`, matchingIds[0]);
+							// Delete the matching one
+							const matchingRef = db
+								.collection("users")
+								.doc(userId)
+								.collection("liked")
+								.doc(matchingIds[0]);
+							await matchingRef.delete();
+							console.log(`[deleteFromLikedCollections] ✓ Deleted matching game from user ${userId}'s liked collection`);
+						} else {
+							console.log(`[deleteFromLikedCollections] User ${userId} has ${likedIds.length} liked games. Sample IDs:`, likedIds.slice(0, 3));
+						}
+					}
+				} catch (error) {
+					console.error(`[deleteFromLikedCollections] Error deleting from user ${userId}:`, error);
+					throw error; // Re-throw to be caught by Promise.all
+				}
+			});
+
+			// Execute all deletes in parallel
+			await Promise.all(deletePromises);
+			console.log("[deleteFromLikedCollections] Successfully deleted from all users' liked collections");
+		} catch (error) {
+			// Log error but don't fail the main operation
+			console.error("[deleteFromLikedCollections] Error deleting from liked collections:", error);
+			throw error; // Re-throw so caller can handle it
+		}
+	};
+
+	// Helper function to delete all subcollections within a game document
+	const deleteGameSubcollections = async (
+		gameType: string,
+		difficulty: string,
+		actualGameId: string
+	) => {
+		try {
+			const gameRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(actualGameId);
+
+			// List of known subcollections to delete
+			const subcollections = ["likes", "comments"];
+
+			// Delete all documents in each subcollection
+			const deletePromises = subcollections.map(async (subcollectionName) => {
+				try {
+					const subcollectionRef = gameRef.collection(subcollectionName);
+					const snapshot = await subcollectionRef.get();
+
+					if (snapshot.empty) {
+						return;
+					}
+
+					// Firestore batch limit is 500 operations, so handle in batches if needed
+					const batchSize = 500;
+					const docs = snapshot.docs;
+					
+					for (let i = 0; i < docs.length; i += batchSize) {
+						const batch = db.batch();
+						const batchDocs = docs.slice(i, i + batchSize);
+						
+						batchDocs.forEach((doc) => {
+							batch.delete(doc.ref);
+						});
+
+						await batch.commit();
+					}
+				} catch (error) {
+					// Log error but continue with other subcollections
+					console.error(`Error deleting ${subcollectionName} subcollection:`, error);
+				}
+			});
+
+			// Execute all subcollection deletions in parallel
+			await Promise.all(deletePromises);
+		} catch (error) {
+			// Log error but don't fail the main operation
+			console.error("Error deleting game subcollections:", error);
+		}
+	};
+
+	// Handle long press on game card (2 seconds)
+	const handleGameLongPress = (game: GameSummary) => {
+		// Only allow deletion on created tab
+		if (activeTab !== "created" || !currentUser) return;
+
+		setSelectedGameToDelete(game);
+		setShowDeleteModal(true);
+	};
+
+	// Handle delete game
+	const handleDeleteGame = async () => {
+		if (!selectedGameToDelete || !currentUser || deletingGame) return;
+
+		setDeletingGame(true);
+		try {
+			const firestore = require("@react-native-firebase/firestore").default;
+			
+			// Get the full puzzleId
+			// For created games, gameId is just the document ID, so we need to construct the full puzzleId
+			const gameId = selectedGameToDelete.gameId;
+			const parts = gameId.split("_");
+			let puzzleId: string;
+
+			if (parts.length >= 3) {
+				// Already a full puzzleId - normalize gameType to lowercase
+				const gameTypePart = parts[0].toLowerCase();
+				const difficultyPart = parts[1];
+				const actualGameIdPart = parts.slice(2).join("_");
+				puzzleId = `${gameTypePart}_${difficultyPart}_${actualGameIdPart}`;
+			} else {
+				// Need to construct puzzleId
+				// Convert gameType to lowercase for puzzleId format (parsePuzzleId expects lowercase)
+				const gameTypeLower = (selectedGameToDelete.gameType || "").toLowerCase();
+				const difficulty = selectedGameToDelete.difficulty || "";
+				puzzleId = `${gameTypeLower}_${difficulty}_${gameId}`;
+			}
+
+			console.log(`[handleDeleteGame] Constructed puzzleId: ${puzzleId}`);
+
+			// Parse puzzleId to get gameType, difficulty, and actualGameId
+			const parsed = parsePuzzleId(puzzleId);
+			if (!parsed) {
+				throw new Error("Invalid puzzleId format");
+			}
+
+			const { gameType, difficulty, gameId: actualGameId } = parsed;
+			console.log(`[handleDeleteGame] Parsed - gameType: ${gameType}, difficulty: ${difficulty}, actualGameId: ${actualGameId}`);
+
+			// Get game reference
+			const gameRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(actualGameId);
+
+			const gameDoc = await gameRef.get();
+			const gameExists = typeof gameDoc.exists === "function" 
+				? gameDoc.exists() 
+				: gameDoc.exists;
+			
+			if (!gameExists) {
+				throw new Error("Game not found");
+			}
+
+			const gameData = gameDoc.data();
+			const creatorUserId = gameData?.uid || gameData?.createdBy;
+
+			// Verify this is the creator
+			if (creatorUserId !== currentUser.uid) {
+				setDeletingGame(false);
+				setShowDeleteModal(false);
+				setSelectedGameToDelete(null);
+				setTimeout(() => {
+					Alert.alert("Error", "You can only delete games you created.");
+				}, 300);
+				return;
+			}
+
+			// Step 1: Delete from all users' liked subcollections
+			try {
+				await deleteFromLikedCollections(gameType, difficulty, actualGameId, puzzleId);
+			} catch (error) {
+				console.error("[handleDeleteGame] Error in deleteFromLikedCollections:", error);
+				// Continue with deletion even if this step fails
+			}
+
+			// Step 2: Delete all subcollections within the game document (likes, comments, etc.)
+			await deleteGameSubcollections(gameType, difficulty, actualGameId);
+
+			// Step 3: Delete from creator's createdGames subcollection
+			const creatorGameRef = db
+				.collection("users")
+				.doc(currentUser.uid)
+				.collection("createdGames")
+				.doc(actualGameId);
+			await creatorGameRef.delete();
+
+			// Step 4: Delete the actual game document
+			await gameRef.delete();
+
+			// Remove from local state
+			setCreatedGames((prev) => prev.filter((g) => g.gameId !== selectedGameToDelete.gameId));
+
+			// Close modal first
+			setShowDeleteModal(false);
+			setSelectedGameToDelete(null);
+			setDeletingGame(false);
+
+			// Show success alert after modal closes
+			setTimeout(() => {
+				Alert.alert("Success", "Game deleted successfully.");
+			}, 300);
+		} catch (error: any) {
+			console.error("Error deleting game:", error);
+			
+			// Close modal first
+			setShowDeleteModal(false);
+			setSelectedGameToDelete(null);
+			setDeletingGame(false);
+
+			// Show error alert after modal closes
+			setTimeout(() => {
+				Alert.alert("Error", error.message || "Failed to delete game. Please try again.");
+			}, 300);
+		}
+	};
+
 	const renderGameCard = useCallback(
 		(item: GameSummary | GameHistoryEntry, index: number) => {
 			const gameType =
@@ -714,10 +1037,9 @@ const ProfileScreen = () => {
 					? `${documentId.substring(0, maxIdLength)}...`
 					: documentId;
 
-			// Check if this is a GameHistoryEntry with completionCount (only show on completed tab)
+			// Check if this is a GameHistoryEntry with completionCount
 			const isGameHistoryEntry = "action" in item;
 			const showCompletionCount =
-				activeTab === "completed" &&
 				isGameHistoryEntry &&
 				item.completionCount !== undefined &&
 				item.completionCount > 0;
@@ -739,7 +1061,14 @@ const ProfileScreen = () => {
 							{ width: cardWidth, borderColor: gameColor },
 						]}
 						onPress={() => handleGamePress(item)}
+						onLongPress={() => {
+							// Only allow long press on created tab for GameSummary items
+							if (activeTab === "created" && "gameType" in item) {
+								handleGameLongPress(item as GameSummary);
+							}
+						}}
 						activeOpacity={0.7}
+						delayLongPress={2000}
 					>
 						{showCompletionCount && (
 							<View style={styles.completionBadge}>
@@ -1114,7 +1443,6 @@ const ProfileScreen = () => {
 									source={{ uri: userData.profilePicture }}
 									style={styles.avatar}
 									resizeMode="cover"
-									cache="force-cache"
 								/>
 							) : (
 								<Ionicons
@@ -1472,6 +1800,86 @@ const ProfileScreen = () => {
 						</TouchableWithoutFeedback>
 					</Animated.View>
 				</TouchableWithoutFeedback>
+			</Modal>
+
+			{/* Delete Game Modal */}
+			<Modal
+				visible={showDeleteModal}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => {
+					if (!deletingGame) {
+						setShowDeleteModal(false);
+						setSelectedGameToDelete(null);
+					}
+				}}
+			>
+				<View style={styles.deleteModalOverlay}>
+					<View style={styles.deleteModalContent}>
+						<View style={styles.deleteModalHeader}>
+							<Text style={styles.deleteModalTitle}>Delete Game</Text>
+							{!deletingGame && (
+								<TouchableOpacity
+									style={styles.closeButton}
+									onPress={() => {
+										setShowDeleteModal(false);
+										setSelectedGameToDelete(null);
+									}}
+								>
+									<Ionicons name="close" size={24} color={Colors.text.primary} />
+								</TouchableOpacity>
+							)}
+						</View>
+
+						{deletingGame ? (
+							<View style={styles.deleteLoadingContainer}>
+								<ActivityIndicator size="large" color={Colors.accent} />
+								<Text style={styles.deleteLoadingText}>Deleting game...</Text>
+							</View>
+						) : (
+							<>
+								<View style={styles.deleteModalBody}>
+									<Ionicons
+										name="warning-outline"
+										size={48}
+										color={Colors.error}
+										style={styles.deleteWarningIcon}
+									/>
+									<Text style={styles.deleteModalText}>
+										Are you sure you want to delete this game? This action cannot be undone.
+									</Text>
+									{selectedGameToDelete && (
+										<View style={styles.deleteGameInfo}>
+											<Text style={styles.deleteGameInfoLabel}>Game Type:</Text>
+											<Text style={styles.deleteGameInfoValue}>
+												{formatGameType(selectedGameToDelete.gameType || "")}
+											</Text>
+										</View>
+									)}
+								</View>
+								<View style={styles.deleteModalActions}>
+									<TouchableOpacity
+										style={styles.deleteConfirmButton}
+										onPress={handleDeleteGame}
+										activeOpacity={0.7}
+									>
+										<Text style={styles.deleteConfirmButtonText}>Delete</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={styles.deleteCancelButton}
+										onPress={() => {
+											setShowDeleteModal(false);
+											setSelectedGameToDelete(null);
+										}}
+										activeOpacity={0.7}
+									>
+										<Text style={styles.deleteCancelButtonText}>Cancel</Text>
+									</TouchableOpacity>
+								</View>
+							</>
+						)}
+					</View>
+				</View>
 			</Modal>
 		</View>
 	);
@@ -1949,6 +2357,113 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
+	},
+	// Delete game modal styles (matching report modal design)
+	deleteModalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.4)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	deleteModalContent: {
+		width: "85%",
+		maxWidth: 400,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.xl,
+		...Shadows.heavy,
+	},
+	deleteModalHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		padding: Spacing.lg,
+		paddingBottom: Spacing.md,
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255, 255, 255, 0.1)",
+	},
+	deleteModalTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	closeButton: {
+		padding: Spacing.xs,
+	},
+	deleteModalBody: {
+		padding: Spacing.lg,
+		alignItems: "center",
+	},
+	deleteWarningIcon: {
+		marginBottom: Spacing.md,
+	},
+	deleteModalText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		textAlign: "center",
+		marginBottom: Spacing.md,
+		lineHeight: 22,
+	},
+	deleteGameInfo: {
+		width: "100%",
+		padding: Spacing.md,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
+		marginTop: Spacing.sm,
+	},
+	deleteGameInfoLabel: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.xs,
+	},
+	deleteGameInfoValue: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	deleteModalActions: {
+		flexDirection: "column",
+		gap: Spacing.md,
+		padding: Spacing.lg,
+		paddingTop: Spacing.md,
+		borderTopWidth: 1,
+		borderTopColor: "rgba(255, 255, 255, 0.1)",
+	},
+	deleteConfirmButton: {
+		width: "100%",
+		paddingVertical: Spacing.md,
+		borderRadius: BorderRadius.md,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: Colors.error,
+	},
+	deleteConfirmButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
+	},
+	deleteCancelButton: {
+		width: "100%",
+		paddingVertical: Spacing.md,
+		borderRadius: BorderRadius.md,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: Colors.background.secondary,
+		borderWidth: 1,
+		borderColor: Colors.text.secondary + "20",
+	},
+	deleteCancelButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	deleteLoadingContainer: {
+		alignItems: "center",
+		padding: Spacing.xl,
+	},
+	deleteLoadingText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginTop: Spacing.md,
 	},
 });
 
