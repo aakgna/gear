@@ -31,6 +31,7 @@ interface WordFormGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 interface TileState {
@@ -46,6 +47,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70;
@@ -95,22 +97,41 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 	useEffect(() => {
 		if (puzzleIdRef.current !== answer) {
 			puzzleIdRef.current = answer;
-			setElapsedTime(0);
-			setGameWon(false);
-			setGameLost(false);
-			setCurrentGuess("");
-			setGuesses([]);
-			setAttempts(0);
-			hasAttemptedRef.current = false;
-			setBoard(initializeBoard());
-			setKeyStates({});
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setGameWon(true);
+				setGameLost(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setAttempts(initialCompletedResult.attempts || 0);
+				setCurrentGuess("");
+				setGuesses([]);
+				hasAttemptedRef.current = true;
+				// Board will be empty but game shows as won
+				setBoard(initializeBoard());
+				setKeyStates({});
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setGameWon(false);
+				setGameLost(false);
+				setCurrentGuess("");
+				setGuesses([]);
+				setAttempts(0);
+				hasAttemptedRef.current = false;
+				setBoard(initializeBoard());
+				setKeyStates({});
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			const newElapsed = Math.floor((Date.now() - propStartTime) / 1000);
@@ -125,7 +146,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [answer, propStartTime, startTime]);
+	}, [answer, propStartTime, startTime, initialCompletedResult]);
 
 	useEffect(() => {
 		if (!startTime) {

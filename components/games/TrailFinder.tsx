@@ -32,6 +32,7 @@ interface TrailFinderGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
@@ -42,6 +43,7 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -108,25 +110,44 @@ const TrailFinderGame: React.FC<TrailFinderGameProps> = ({
 	useEffect(() => {
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
-			setElapsedTime(0);
-			setCompleted(false);
-			setAnswerRevealed(false);
-			setUserGrid(initializeUserGrid());
-			setSelectedCell(null);
-			setFeedback(null);
-			hasAttemptedRef.current = false;
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setCompleted(true);
+				setAnswerRevealed(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				// Restore user grid from solution grid
+				const restoredGrid = solutionGrid.map((row) => [...row]);
+				setUserGrid(restoredGrid);
+				setSelectedCell(null);
+				setFeedback(null);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+					timerIntervalRef.current = null;
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setCompleted(false);
+				setAnswerRevealed(false);
+				setUserGrid(initializeUserGrid());
+				setSelectedCell(null);
+				setFeedback(null);
+				hasAttemptedRef.current = false;
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			setStartTime(propStartTime);
 		} else if (!propStartTime && startTime !== undefined) {
 			setStartTime(undefined);
 		}
-	}, [puzzleSignature, propStartTime, startTime]);
+	}, [puzzleSignature, propStartTime, startTime, initialCompletedResult, solutionGrid]);
 
 	useEffect(() => {
 		if (!startTime) {

@@ -34,6 +34,7 @@ interface QuickMathProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 function evaluateExpression(expression: string): number {
@@ -54,6 +55,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -87,21 +89,38 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 		// Only reset if this is a different puzzle
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
-			setElapsedTime(0);
-			setSubmitted(false);
-			setAnswerRevealed(false);
-			setFeedback(null);
-			setAnswers(Array(problems.length).fill(""));
-			setMistakes(0);
-			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setSubmitted(true);
+				setAnswerRevealed(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setMistakes(initialCompletedResult.mistakes || 0);
+				// Restore answers from inputData.answers (the correct answers)
+				setAnswers([...inputData.answers]);
+				setFeedback(null);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setSubmitted(false);
+				setAnswerRevealed(false);
+				setFeedback(null);
+				setAnswers(Array(problems.length).fill(""));
+				setMistakes(0);
+				hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			// startTime prop changed - could be initial start or resume from pause
@@ -118,7 +137,7 @@ const QuickMathGame: React.FC<QuickMathProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [puzzleSignature, problems.length, propStartTime, startTime]);
+	}, [puzzleSignature, problems.length, propStartTime, startTime, initialCompletedResult, inputData.answers]);
 
 	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {

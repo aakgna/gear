@@ -28,6 +28,7 @@ interface SequencingGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const SequencingGame: React.FC<SequencingGameProps> = ({
@@ -38,6 +39,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -89,18 +91,36 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		// Reset if puzzle changed
 		if (puzzleId && puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId;
-			setElapsedTime(0);
-			setCompleted(false);
-			setCurrentPlacement(new Array(inputData.numSlots).fill(null));
-			setSelectedEntity(null);
-			setIsCorrect(false);
-			setPlacementCount(0);
-			hasAttemptedRef.current = false;
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setCompleted(true);
+				setIsCorrect(true);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				// Restore placement from solution
+				setCurrentPlacement([...inputData.solution]);
+				setSelectedEntity(null);
+				setPlacementCount(inputData.numSlots);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+					timerIntervalRef.current = null;
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setCompleted(false);
+				setCurrentPlacement(new Array(inputData.numSlots).fill(null));
+				setSelectedEntity(null);
+				setIsCorrect(false);
+				setPlacementCount(0);
+				hasAttemptedRef.current = false;
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			setStartTime(propStartTime);
@@ -124,7 +144,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				timerIntervalRef.current = null;
 			}
 		};
-	}, [puzzleId, propStartTime, inputData.numSlots]);
+	}, [puzzleId, propStartTime, inputData.numSlots, initialCompletedResult, inputData.solution]);
 
 	// Validate on placement change
 	useEffect(() => {

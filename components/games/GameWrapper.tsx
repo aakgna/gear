@@ -57,15 +57,13 @@ import {
 } from "../../config/social";
 import { useRouter } from "expo-router";
 import { Image, Modal } from "react-native";
+import { completedGameResults } from "../../config/gameCompletion";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Global tracker for dismissed intro screens (per puzzle ID)
 // This persists across tab switches and component re-renders
 const dismissedIntros = new Set<string>();
-
-// Global storage for completed game results (persists across tab switches)
-const completedGameResults = new Map<string, GameResult>();
 
 export type ShareHandlers = {
 	shareExternal: () => void;
@@ -84,6 +82,7 @@ interface GameWrapperProps {
 	onElapsedTimeUpdate?: (puzzleId: string, elapsedTime: number) => void;
 	forceShowIntro?: boolean; // Force show intro regardless of dismissal state
 	onRegisterShareHandlers?: (handlers: ShareHandlers | null, puzzleId: string) => void;
+	initialCompletedResult?: GameResult | null; // Pass completion result from Feed
 }
 
 const GameWrapper: React.FC<GameWrapperProps> = ({
@@ -97,6 +96,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onElapsedTimeUpdate,
 	forceShowIntro = false,
 	onRegisterShareHandlers,
+	initialCompletedResult,
 }) => {
 	const router = useRouter();
 	
@@ -205,7 +205,8 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			setCompletedInSession(false);
 
 			// Check if this puzzle has a completed result stored
-			const storedResult = completedGameResults.get(puzzle.id);
+			// Prefer initialCompletedResult from Feed, then check global map
+			const storedResult = initialCompletedResult || completedGameResults.get(puzzle.id);
 			if (storedResult) {
 				// Game was completed, show the game with stats available
 				setCompletedResult(storedResult);
@@ -635,8 +636,9 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		}
 	};
 	const renderGame = () => {
-		// Use actualStartTime if game has started, otherwise don't pass startTime
-		const gameStartTime = gameStarted ? actualStartTime : undefined;
+		// Use actualStartTime if game has started and not completed, otherwise don't pass startTime
+		// This prevents timers from running on completed games
+		const gameStartTime = (gameStarted && !completedResult) ? actualStartTime : undefined;
 
 		switch (puzzle.type) {
 			case "wordform":
@@ -650,6 +652,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "quickMath":
@@ -663,6 +666,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "riddle":
@@ -676,6 +680,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "trivia":
@@ -689,6 +694,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "codebreaker":
@@ -702,6 +708,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "sequencing":
@@ -715,6 +722,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "wordChain":
@@ -728,6 +736,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "inference":
@@ -741,6 +750,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "maze":
@@ -754,6 +764,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "futoshiki":
@@ -767,6 +778,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "magicSquare":
@@ -780,6 +792,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "trailfinder":
@@ -793,6 +806,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "sudoku":
@@ -806,6 +820,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			default:
@@ -845,7 +860,6 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						{renderGame()}
 						{/* Social Overlay - rendered directly in GameWrapper for instant display */}
 						{gameStarted &&
-							completedInSession &&
 							completedResult &&
 							getCurrentUser() && (
 								<View style={socialOverlayStyles.container}>

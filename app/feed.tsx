@@ -95,6 +95,7 @@ import {
 	registerFCMToken,
 	removeFCMToken,
 } from "../config/auth";
+import { completedGameResults, setCompletedResult } from "../config/gameCompletion";
 import { fetchFollowingFeed } from "../config/social";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -2468,25 +2469,33 @@ const applyForYouFilters = useCallback(
 					: currentPuzzleIdFollowing;
 			const isActive = currentTabPuzzleId === item.id;
 
+			// Check if this puzzle is completed and get its completion result
+			const isCompleted = completedPuzzlesRef.current.has(item.id);
+			const completedResult = completedGameResults.get(item.id);
+
 			// Calculate startTime based on saved elapsed time
 			// Only recalculate when transitioning from inactive to active
-			let puzzleStartTime = puzzleStartTimesRef.current[item.id];
-			const previousActiveId =
-				activeTab === "forYou"
-					? previousActivePuzzleIdRef.current.forYou
-					: previousActivePuzzleIdRef.current.following;
-			const wasActive = previousActiveId === item.id;
+			// Don't calculate startTime for completed games (prevents timer from running)
+			let puzzleStartTime: number | undefined = undefined;
+			if (!isCompleted) {
+				puzzleStartTime = puzzleStartTimesRef.current[item.id];
+				const previousActiveId =
+					activeTab === "forYou"
+						? previousActivePuzzleIdRef.current.forYou
+						: previousActivePuzzleIdRef.current.following;
+				const wasActive = previousActiveId === item.id;
 
-			if (isActive && !wasActive) {
-				// Game just became active - recalculate startTime based on saved elapsed time
-				const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
-				puzzleStartTime = Date.now() - elapsedTime * 1000;
-				puzzleStartTimesRef.current[item.id] = puzzleStartTime;
-			} else if (!puzzleStartTime) {
-				// If not set yet, calculate based on elapsed time
-				const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
-				puzzleStartTime = Date.now() - elapsedTime * 1000;
-				puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+				if (isActive && !wasActive) {
+					// Game just became active - recalculate startTime based on saved elapsed time
+					const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+					puzzleStartTime = Date.now() - elapsedTime * 1000;
+					puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+				} else if (!puzzleStartTime) {
+					// If not set yet, calculate based on elapsed time
+					const elapsedTime = puzzleElapsedTimesRef.current[item.id] || 0;
+					puzzleStartTime = Date.now() - elapsedTime * 1000;
+					puzzleStartTimesRef.current[item.id] = puzzleStartTime;
+				}
 			}
 
 			// Update previous active puzzle ref for the current tab
@@ -2514,6 +2523,7 @@ const applyForYouFilters = useCallback(
 						isActive={isActive}
 						onElapsedTimeUpdate={handleElapsedTimeUpdate}
 						onRegisterShareHandlers={registerShareHandlers}
+						initialCompletedResult={completedResult || null}
 					/>
 				</View>
 			);

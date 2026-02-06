@@ -29,6 +29,7 @@ interface CodeBreakerGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 // Color mapping from string to emoji
@@ -64,6 +65,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -207,18 +209,42 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 		// Reset if puzzle changed
 		if (puzzleId && puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId;
-			setElapsedTime(0);
-			setGameWon(false);
-			setGameLost(false);
-			setAttemptsUsed(0);
-			setCurrentGuess(new Array(inputData.secretCode.length).fill(null));
-			setGuessHistory([]);
-			hasAttemptedRef.current = false;
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setGameWon(true);
+				setGameLost(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setAttemptsUsed(initialCompletedResult.attempts || 0);
+				// Restore current guess to secret code
+				setCurrentGuess([...inputData.secretCode]);
+				// Create a winning guess history entry
+				const winningFeedback = {
+					correctPosition: inputData.secretCode.length,
+					correctColor: 0,
+					correctPositions: new Array(inputData.secretCode.length).fill(true),
+				};
+				setGuessHistory([{ guess: [...inputData.secretCode], feedback: winningFeedback }]);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+					timerIntervalRef.current = null;
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setGameWon(false);
+				setGameLost(false);
+				setAttemptsUsed(0);
+				setCurrentGuess(new Array(inputData.secretCode.length).fill(null));
+				setGuessHistory([]);
+				hasAttemptedRef.current = false;
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			setStartTime(propStartTime);
@@ -242,7 +268,7 @@ const CodeBreakerGame: React.FC<CodeBreakerGameProps> = ({
 				timerIntervalRef.current = null;
 			}
 		};
-	}, [puzzleId, propStartTime, startTime, isActive]);
+	}, [puzzleId, propStartTime, startTime, isActive, initialCompletedResult, inputData.secretCode]);
 
 	// Handle color selection (click color to fill next empty slot)
 	const handleColorSelect = (color: string) => {

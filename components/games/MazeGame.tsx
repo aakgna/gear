@@ -32,6 +32,7 @@ interface MazeGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const MazeGame: React.FC<MazeGameProps> = ({
@@ -42,6 +43,7 @@ const MazeGame: React.FC<MazeGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
@@ -80,21 +82,38 @@ const MazeGame: React.FC<MazeGameProps> = ({
 	useEffect(() => {
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
-			setElapsedTime(0);
-			setCompleted(false);
-			setUserPath([]);
-			setAttempts(0);
-			setFeedback(null);
-			setAnswerRevealed(false);
-			hasAttemptedRef.current = false;
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setCompleted(true);
+				setAnswerRevealed(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setAttempts(initialCompletedResult.attempts || 0);
+				// Restore user path from solution
+				setUserPath([...solution]);
+				setFeedback(null);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setCompleted(false);
+				setUserPath([]);
+				setAttempts(0);
+				setFeedback(null);
+				setAnswerRevealed(false);
+				hasAttemptedRef.current = false;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			// startTime prop changed - could be initial start or resume from pause
@@ -111,7 +130,7 @@ const MazeGame: React.FC<MazeGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [puzzleSignature, propStartTime, startTime]);
+	}, [puzzleSignature, propStartTime, startTime, initialCompletedResult, solution]);
 
 	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
