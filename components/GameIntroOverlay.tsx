@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -10,7 +10,7 @@ import {
 	Modal,
 	TouchableWithoutFeedback,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { PuzzleType } from "../config/types";
@@ -38,23 +38,29 @@ const GameIntroAnimation: React.FC<{
 }> = ({ gameType, gameColor }) => {
 	const anims = useRef<Animated.Value[]>([]).current;
 
+	// Initialize animated values when game type or color changes
 	useEffect(() => {
-		// Initialize animations based on game type
 		const animationCount = getAnimationCount(gameType);
 		for (let i = 0; i < animationCount; i++) {
 			if (!anims[i]) {
 				anims[i] = new Animated.Value(0);
 			}
 		}
-
-		// Start animations
-		const animations = createAnimations(gameType, anims, gameColor);
-		Animated.loop(Animated.parallel(animations)).start();
-
-		return () => {
-			animations.forEach((anim) => anim.stop());
-		};
 	}, [gameType, gameColor]);
+
+	// Start/stop animations only when the screen is focused
+	useFocusEffect(
+		useCallback(() => {
+			const animations = createAnimations(gameType, anims, gameColor);
+			const loop = Animated.loop(Animated.parallel(animations));
+			loop.start();
+
+			return () => {
+				loop.stop();
+				animations.forEach((anim) => anim.stop());
+			};
+		}, [gameType, gameColor])
+	);
 
 	return (
 		<View style={styles.animationContainer}>
