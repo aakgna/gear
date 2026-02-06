@@ -23,7 +23,9 @@ import {
 	Shadows,
 	Layout,
 	Gradients,
+	getGameColor,
 } from "../../constants/DesignSystem";
+import type { PuzzleType } from "../../config/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -34,6 +36,7 @@ const GameTypeButton: React.FC<{
 	index: number;
 }> = ({ game, onPress, index }) => {
 	const scaleAnim = useRef(new Animated.Value(1)).current;
+	const gameColor = getGameColor(game.type as PuzzleType);
 
 	const handlePress = () => {
 		Animated.sequence([
@@ -60,10 +63,21 @@ const GameTypeButton: React.FC<{
 				onPress={handlePress}
 				activeOpacity={0.8}
 			>
-				<View style={styles.gameIconWrapper}>
-					<Ionicons name={game.icon} size={28} color={Colors.accent} />
+				<View
+					style={[
+						styles.gameIconWrapper,
+						{ backgroundColor: gameColor + "15" },
+					]}
+				>
+					<Ionicons name={game.icon} size={24} color={gameColor} />
 				</View>
-				<Text style={styles.gameTypeText}>{game.name}</Text>
+				<Text
+					style={styles.gameTypeText}
+					numberOfLines={1}
+					ellipsizeMode="tail"
+				>
+					{game.name}
+				</Text>
 			</TouchableOpacity>
 		</Animated.View>
 	);
@@ -175,23 +189,24 @@ const styles = StyleSheet.create({
 		flexDirection: "row",
 		flexWrap: "wrap",
 		justifyContent: "space-between",
-		marginBottom: Spacing.xl,
+		marginBottom: Spacing.sm,
 		gap: Spacing.sm,
 	},
 	gameTypeButton: {
 		width: (SCREEN_WIDTH - Layout.margin * 2 - Spacing.sm * 2) / 3,
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.lg,
-		padding: Spacing.lg,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.sm,
 		alignItems: "center",
 		justifyContent: "center",
 		borderWidth: 0,
 		...Shadows.light,
-		minHeight: 100,
+		minHeight: 96,
 	},
 	gameIconWrapper: {
-		width: 56,
-		height: 56,
+		width: 48,
+		height: 48,
 		borderRadius: BorderRadius.md,
 		backgroundColor: Colors.accent + "15",
 		alignItems: "center",
@@ -199,7 +214,7 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.sm,
 	},
 	gameTypeText: {
-		fontSize: Typography.fontSize.caption,
+		fontSize: Typography.fontSize.small,
 		fontWeight: Typography.fontWeight.semiBold,
 		color: Colors.text.primary,
 		textAlign: "center",

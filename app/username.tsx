@@ -15,9 +15,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import MinimalHeader from "../components/MinimalHeader";
-import TikTokInput from "../components/TikTokInput";
-import TikTokButton from "../components/TikTokButton";
 import {
 	checkUsernameAvailability,
 	saveUsername,
@@ -32,6 +29,8 @@ import {
 	Shadows,
 } from "../constants/DesignSystem";
 
+const MAX_LEN = 20;
+
 const UsernameScreen = () => {
 	const router = useRouter();
 	const [username, setUsername] = useState("");
@@ -40,13 +39,11 @@ const UsernameScreen = () => {
 	const [error, setError] = useState("");
 
 	useEffect(() => {
-		// Check if user already has a username (shouldn't happen, but safety check)
 		const checkExistingUsername = async () => {
 			const user = getCurrentUser();
 			if (user) {
 				const userData = await getUserData(user.uid);
 				if (userData?.username) {
-					// User already has username, go to feed
 					router.replace("/feed");
 				}
 			}
@@ -56,12 +53,8 @@ const UsernameScreen = () => {
 
 	const validateUsername = (text: string): string | null => {
 		const trimmed = text.trim();
-		if (trimmed.length < 3) {
-			return "Username must be at least 3 characters";
-		}
-		if (trimmed.length > 20) {
-			return "Username must be less than 20 characters";
-		}
+		if (trimmed.length < 3) return "Username must be at least 3 characters";
+		if (trimmed.length > 20) return "Username must be less than 20 characters";
 		if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
 			return "Username can only contain letters, numbers, and underscores";
 		}
@@ -82,7 +75,6 @@ const UsernameScreen = () => {
 		try {
 			const isAvailable = await checkUsernameAvailability(trimmed);
 			if (isAvailable) {
-				// Username is available, proceed to save
 				await handleSaveUsername(trimmed);
 			} else {
 				setError("This username is already taken. Please choose another.");
@@ -106,7 +98,6 @@ const UsernameScreen = () => {
 			}
 
 			await saveUsername(user.uid, usernameToSave);
-			// Success! Navigate to feed
 			router.replace("/feed");
 		} catch (error: any) {
 			console.error("Error saving username:", error);
@@ -121,10 +112,10 @@ const UsernameScreen = () => {
 
 	const handleUsernameChange = (text: string) => {
 		setUsername(text);
-		if (error) {
-			setError("");
-		}
+		if (error) setError("");
 	};
+
+	const progressPct = Math.min(username.length / MAX_LEN, 1) * 100;
 
 	return (
 		<View style={styles.container}>
@@ -134,8 +125,6 @@ const UsernameScreen = () => {
 				style={StyleSheet.absoluteFill}
 			/>
 
-			<MinimalHeader title="Choose Username" />
-
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.keyboardView}
@@ -143,72 +132,94 @@ const UsernameScreen = () => {
 				<View style={styles.content}>
 					<View style={styles.logoContainer}>
 						<Image
-							source={require("../assets/images/logo_transparent.png")}
+							source={require("../assets/images/kracked.png")}
 							style={styles.logoImage}
 						/>
-						<Text style={styles.logo}>Kracked</Text>
-						<Text style={styles.subtitle}>Choose your username</Text>
 					</View>
 
-					<View style={styles.formContainer}>
-						{/* <Text style={styles.welcomeText}>Welcome!</Text> */}
-						<Text style={styles.descriptionText}>
-							Pick a unique username to get started. You can use letters,
-							numbers, and underscores.
-						</Text>
+					<Text style={styles.title}>Choose Your Username</Text>
 
-						<View style={styles.inputContainer}>
+					<View style={styles.card}>
+						<Text style={styles.inputLabel}>Username</Text>
+
+						<View style={styles.inputWrapper}>
 							<TextInput
 								style={[styles.input, error && styles.inputError]}
-								placeholder="Enter username"
 								placeholderTextColor={Colors.text.secondary}
 								value={username}
 								onChangeText={handleUsernameChange}
 								autoCapitalize="none"
 								autoCorrect={false}
-								maxLength={20}
+								maxLength={MAX_LEN}
 								editable={!loading && !checking}
 							/>
-							{error ? (
-								<View style={styles.errorContainer}>
-									<Ionicons
-										name="alert-circle"
-										size={16}
-										color={Colors.error}
-									/>
-									<Text style={styles.errorText}>{error}</Text>
+							{username.length === 0 && (
+								<View style={styles.placeholderOverlay} pointerEvents="none">
+									<Text style={styles.placeholderOverlayText}>
+										your_username
+									</Text>
 								</View>
-							) : null}
+							)}
 						</View>
+
+						{/* progress + count */}
+						<View style={styles.progressRow}>
+							<View style={styles.progressTrack}>
+								<View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+							</View>
+							<Text style={styles.countText}>
+								{username.length}/{MAX_LEN}
+							</Text>
+						</View>
+
+						{/* bullets */}
+						<View style={styles.bullets}>
+							<View style={styles.bulletRow}>
+								<Text style={styles.bulletDot}>•</Text>
+								<Text style={styles.bulletText}>3-20 characters</Text>
+							</View>
+							<View style={styles.bulletRow}>
+								<Text style={styles.bulletDot}>•</Text>
+								<Text style={styles.bulletText}>
+									Letters, numbers, and underscores only
+								</Text>
+							</View>
+						</View>
+
+						{error ? (
+							<View style={styles.errorContainer}>
+								<Ionicons name="alert-circle" size={16} color={Colors.error} />
+								<Text style={styles.errorText}>{error}</Text>
+							</View>
+						) : null}
 
 						<TouchableOpacity
 							style={[
 								styles.submitButton,
-								(loading || checking || !username.trim()) &&
-									styles.buttonDisabled,
+								(loading || checking || !username.trim()) && styles.buttonDisabled,
 							]}
 							onPress={handleCheckAvailability}
 							disabled={loading || checking || !username.trim()}
 						>
 							{loading || checking ? (
-							<ActivityIndicator color={Colors.text.white} />
+								<ActivityIndicator color={Colors.text.white} />
 							) : (
 								<>
 									<Text style={styles.submitButtonText}>Continue</Text>
 									<Ionicons
 										name="arrow-forward"
 										size={20}
-									color={Colors.text.white}
+										color={Colors.text.white}
 										style={styles.arrowIcon}
 									/>
 								</>
 							)}
 						</TouchableOpacity>
-
-						<Text style={styles.hintText}>
-							3-20 characters • Letters, numbers, and underscores only
-						</Text>
 					</View>
+
+					<Text style={styles.footerText}>
+						You can change your username later in settings
+					</Text>
 				</View>
 			</KeyboardAvoidingView>
 		</View>
@@ -220,114 +231,138 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.background.primary,
 	},
-	header: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: Spacing.lg,
-		paddingTop: 50,
-		paddingBottom: Spacing.md,
-		zIndex: 10,
-	},
-	backButton: {
-		padding: Spacing.xs,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.primary + "E6",
-		borderWidth: 1,
-		borderColor: Colors.accent + "4D",
-		backdropFilter: "blur(10px)",
-	},
 	keyboardView: {
 		flex: 1,
 	},
 	content: {
 		flex: 1,
-		justifyContent: "center",
 		alignItems: "center",
 		paddingHorizontal: Spacing.xl,
+		paddingTop: 70,
 	},
 	logoContainer: {
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: Spacing.md,
+		marginTop: 10,
+		overflow: "visible",
 	},
 	logoImage: {
 		width: 180,
 		height: 180,
 		resizeMode: "contain",
-		marginBottom: Spacing.md,
+		transform: [{ scale: 2.5 }],
 	},
-	logo: {
-		fontSize: 48,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.sm,
-		textShadowColor: Colors.accent,
-		textShadowOffset: { width: 0, height: 0 },
-		textShadowRadius: 12,
-	},
-	subtitle: {
-		fontSize: Typography.fontSize.h3,
-		color: Colors.text.secondary,
-		textAlign: "center",
-	},
-	formContainer: {
-		width: "100%",
-		alignItems: "center",
-	},
-	welcomeText: {
-		fontSize: Typography.fontSize.h1,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.md,
-		textAlign: "center",
-	},
-	descriptionText: {
-		fontSize: Typography.fontSize.body,
-		color: Colors.text.secondary,
+	title: {
+		fontSize: 28,
+		fontWeight: 900,
+		color: "black",
 		textAlign: "center",
 		marginBottom: Spacing.xl,
-		lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.body,
 	},
-	inputContainer: {
+
+	card: {
 		width: "100%",
-		marginBottom: Spacing.md,
+		backgroundColor: Colors.background.primary,
+		alignSelf: "center",
+		borderRadius: 28,
+		padding: Spacing.xl,
+		...Shadows.medium,
+	},
+	inputLabel: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.semiBold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
+	},
+	inputWrapper: {
+		position: "relative",
+		width: "100%",
+	},
+	placeholderOverlay: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		top: 0,
+		bottom: 0,
+		justifyContent: "center",
+		paddingHorizontal: Spacing.lg,
+	},
+	placeholderOverlayText: {
+		fontSize: 16,
+		color: Colors.text.secondary,
 	},
 	input: {
-		backgroundColor: Colors.background.primary,
+		backgroundColor: "#F6F6F6",
 		borderWidth: 1,
 		borderColor: "#E5E5E5",
-		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.lg,
+		borderRadius: 18,
+		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.lg,
 		fontSize: Typography.fontSize.h3,
 		color: Colors.text.primary,
-		...Shadows.light,
 	},
 	inputError: {
 		borderColor: Colors.error,
 	},
+	progressRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: Spacing.md,
+	},
+	progressTrack: {
+		flex: 1,
+		height: 6,
+		backgroundColor: "#E6E6E6",
+		borderRadius: 999,
+		overflow: "hidden",
+	},
+	progressFill: {
+		height: "100%",
+		backgroundColor: "#CFCFCF",
+	},
+	countText: {
+		marginLeft: Spacing.md,
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
+	},
+	bullets: {
+		marginTop: Spacing.lg,
+		marginBottom: Spacing.lg,
+	},
+	bulletRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: Spacing.sm,
+	},
+	bulletDot: {
+		fontSize: 16,
+		color: Colors.text.secondary,
+		marginRight: Spacing.sm,
+	},
+	bulletText: {
+		fontSize: 14,
+		color: Colors.text.secondary,
+	},
 	errorContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginTop: Spacing.sm,
-		paddingHorizontal: Spacing.sm,
+		marginBottom: Spacing.md,
 	},
 	errorText: {
 		fontSize: Typography.fontSize.small,
 		color: Colors.error,
 		marginLeft: Spacing.xs,
+		flex: 1,
 	},
 	submitButton: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.lg,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		borderRadius: 18,
 		width: "100%",
-		marginBottom: Spacing.md,
-		...Shadows.medium,
+		...Shadows.light,
 	},
 	buttonDisabled: {
 		opacity: 0.7,
@@ -340,7 +375,8 @@ const styles = StyleSheet.create({
 	arrowIcon: {
 		marginLeft: Spacing.sm,
 	},
-	hintText: {
+	footerText: {
+		marginTop: Spacing.xl,
 		fontSize: Typography.fontSize.small,
 		color: Colors.text.secondary,
 		textAlign: "center",
