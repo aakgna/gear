@@ -2352,6 +2352,25 @@ const applyForYouFilters = useCallback(
 		[]
 	);
 
+	// Handle when game starts from intro screen
+	const handleGameStart = useCallback(
+		(puzzleId: string) => {
+			// Reset elapsed time to 0 when starting fresh from intro
+			// This ensures timer always starts at 0 seconds
+			puzzleElapsedTimesRef.current[puzzleId] = 0;
+			// Reset the visible time so it doesn't accumulate
+			puzzleVisibleTimesRef.current[puzzleId] = Date.now();
+			// Clear startTime so it gets recalculated fresh
+			delete puzzleStartTimesRef.current[puzzleId];
+			
+			// Hide filter pill if needed
+			if (activeTab === "forYou") {
+				setIsFilterPillVisible(false);
+			}
+		},
+		[activeTab]
+	);
+
 	// Handle when user first interacts with a game
 	const handleGameAttempt = (puzzleId: string) => {
 		// Mark puzzle as attempted in this session
@@ -2514,11 +2533,7 @@ const applyForYouFilters = useCallback(
 						puzzle={item}
 						onComplete={handleGameComplete}
 						onAttempt={handleGameAttempt}
-						onStartGame={
-							activeTab === "forYou"
-								? () => setIsFilterPillVisible(false)
-								: undefined
-						}
+						onStartGame={() => handleGameStart(item.id)}
 						startTime={puzzleStartTime}
 						isActive={isActive}
 						onElapsedTimeUpdate={handleElapsedTimeUpdate}
@@ -2535,6 +2550,7 @@ const applyForYouFilters = useCallback(
 			itemHeight,
 			handleGameComplete,
 			handleGameAttempt,
+			handleGameStart,
 			handleElapsedTimeUpdate,
 			setIsFilterPillVisible,
 			registerShareHandlers,
