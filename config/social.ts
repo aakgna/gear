@@ -1,6 +1,7 @@
 // Social features: follow/unfollow, fetch followers/following, creator profiles
 import { db, docExists } from "./firebase";
 import { invalidateBlockedUsersCache } from "./blockedUsersCache";
+import auth from "@react-native-firebase/auth";
 
 export interface UserSummary {
 	uid: string;
@@ -361,6 +362,49 @@ export const followUser = async (
 		
 		// Invalidate following cache
 		invalidateFollowingCache(currentUid, targetUid);
+
+		// Send push notification to target user via Firebase Cloud Function
+		try {
+			const currentAuthUser = auth().currentUser;
+			if (currentAuthUser) {
+				const idToken = await currentAuthUser.getIdToken(true); // Force refresh token
+				const username = currentUserData?.username || "Someone";
+
+				// Call Firebase Cloud Function to send push notification
+				const notificationUrl =
+					"https://us-central1-gear-ff009.cloudfunctions.net/send_notification_to_user";
+				const response = await fetch(notificationUrl, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${idToken}`,
+					},
+					body: JSON.stringify({
+						data: {
+							userId: targetUid,
+							title: "New Follower",
+							body: `${username} started following you`,
+						},
+					}),
+				});
+
+				if (!response.ok) {
+					const errorText = await response.text();
+					throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+				}
+
+				const result = await response.json();
+				if (!result?.result?.success && !result?.success) {
+					console.log(
+						"[followUser] Push notification not sent (user may not have FCM token):",
+						result
+					);
+				}
+			}
+		} catch (pushError) {
+			// Don't fail the follow operation if push notification fails
+			console.error("[followUser] Error sending push notification:", pushError);
+		}
 	} catch (error: any) {
 		console.error("[followUser] Error:", error);
 		// Log more details about the error
@@ -1622,6 +1666,10 @@ export const addGameComment = async (
 			.collection(difficulty)
 			.doc(actualGameId);
 
+		const gameDoc = await gameRef.get();
+		const gameData = gameDoc.data();
+		const creatorId = gameData?.createdBy || gameData?.uid;
+
 		await gameRef.set(
 			{
 				stats: {
@@ -1630,6 +1678,54 @@ export const addGameComment = async (
 			},
 			{ merge: true }
 		);
+
+		// Send push notification to game creator (skip if user is commenting on their own game)
+		if (creatorId && creatorId !== userId) {
+			try {
+				const currentAuthUser = auth().currentUser;
+				if (currentAuthUser) {
+					const idToken = await currentAuthUser.getIdToken(true); // Force refresh token
+
+				// Get game title from gameData, or create a default title
+				const gameTitle = gameData?.title || `${gameType} ${difficulty}`;
+				const username = userData?.username || "Someone";
+
+				// Call Firebase Cloud Function to send push notification
+				const notificationUrl =
+					"https://us-central1-gear-ff009.cloudfunctions.net/send_notification_to_user";
+				const response = await fetch(notificationUrl, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${idToken}`,
+					},
+					body: JSON.stringify({
+						data: {
+							userId: creatorId,
+							title: "New Comment",
+							body: `${username} commented on your game: "${gameTitle}"`,
+						},
+					}),
+				});
+
+				if (!response.ok) {
+					const errorText = await response.text();
+					throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+				}
+
+				const result = await response.json();
+				if (!result?.result?.success && !result?.success) {
+					console.log(
+						"[addGameComment] Push notification not sent (user may not have FCM token):",
+						result
+					);
+				}
+				}
+			} catch (notifError) {
+				// Don't fail the comment operation if notification fails
+				console.error("[addGameComment] Error sending push notification:", notifError);
+			}
+		}
 
 		// Invalidate cache since count changed
 		invalidateSocialDataCache(gameId, userId);
@@ -1731,13 +1827,14 @@ export const likeGameComment = async (
 			likes: firestore.FieldValue.increment(1),
 		});
 
-		// Create notification for comment author (skip if user is liking their own comment)
+		// Create in-app notification and send push notification to comment author (skip if user is liking their own comment)
 		if (commentAuthorId && commentAuthorId !== userId) {
 			try {
 				// Get user data for notification
 				const userDoc = await db.collection("users").doc(userId).get();
 				const userData = userDoc.data();
 
+				// Create/update in-app Firestore notification (for notifications screen)
 				await createOrUpdateGroupedNotification(
 					commentAuthorId,
 					"comment_like",
@@ -1749,6 +1846,61 @@ export const likeGameComment = async (
 					difficulty,
 					commentId
 				);
+
+				// Send push notification via Firebase Cloud Function
+				const currentAuthUser = auth().currentUser;
+				if (currentAuthUser) {
+					try {
+						const idToken = await currentAuthUser.getIdToken(true); // Force refresh token
+
+						// Get game data to get game title
+						const gameRef = db
+							.collection("games")
+							.doc(gameType)
+							.collection(difficulty)
+							.doc(actualGameId);
+						const gameDoc = await gameRef.get();
+						const gameData = gameDoc.data();
+
+						// Get game title from gameData, or create a default title
+						const gameTitle = gameData?.title || `${gameType} ${difficulty}`;
+						const username = userData?.username || "Someone";
+
+						// Call Firebase Cloud Function to send push notification
+						const notificationUrl =
+							"https://us-central1-gear-ff009.cloudfunctions.net/send_notification_to_user";
+						const response = await fetch(notificationUrl, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${idToken}`,
+							},
+							body: JSON.stringify({
+								data: {
+									userId: commentAuthorId,
+									title: "Comment Liked",
+									body: `${username} liked your comment on "${gameTitle}"`,
+								},
+							}),
+						});
+
+						if (!response.ok) {
+							const errorText = await response.text();
+							throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+						}
+
+						const result = await response.json();
+						if (!result?.result?.success && !result?.success) {
+							console.log(
+								"[likeGameComment] Push notification not sent (user may not have FCM token):",
+								result
+							);
+						}
+					} catch (pushError) {
+						// Don't fail if push notification fails
+						console.error("[likeGameComment] Error sending push notification:", pushError);
+					}
+				}
 			} catch (notifError) {
 				// Don't fail the like operation if notification fails
 				console.error("[likeGameComment] Error creating notification:", notifError);
@@ -2116,9 +2268,10 @@ export const likeGame = async (
 			{ merge: true }
 		);
 
-		// Create notification for creator (skip if user is liking their own game)
+		// Create in-app notification and send push notification to creator (skip if user is liking their own game)
 		if (creatorId && creatorId !== userId) {
 			try {
+				// Create/update in-app Firestore notification (for notifications screen)
 				await createOrUpdateGroupedNotification(
 					creatorId,
 					"game_like",
@@ -2129,6 +2282,52 @@ export const likeGame = async (
 					gameType,
 					difficulty
 				);
+
+				// Send push notification via Firebase Cloud Function
+				const currentAuthUser = auth().currentUser;
+				if (currentAuthUser) {
+					try {
+						const idToken = await currentAuthUser.getIdToken(true); // Force refresh token
+
+						// Get game title from gameData, or create a default title
+						const gameTitle = gameData?.title || `${gameType} ${difficulty}`;
+						const username = userData?.username || "Someone";
+
+						// Call Firebase Cloud Function to send push notification
+						const notificationUrl =
+							"https://us-central1-gear-ff009.cloudfunctions.net/send_notification_to_user";
+						const response = await fetch(notificationUrl, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${idToken}`,
+							},
+							body: JSON.stringify({
+								data: {
+									userId: creatorId,
+									title: "Game Liked",
+									body: `${username} liked your game: ${gameTitle}`,
+								},
+							}),
+						});
+
+						if (!response.ok) {
+							const errorText = await response.text();
+							throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+						}
+
+						const result = await response.json();
+						if (!result?.result?.success && !result?.success) {
+							console.log(
+								"[likeGame] Push notification not sent (user may not have FCM token):",
+								result
+							);
+						}
+					} catch (pushError) {
+						// Don't fail if push notification fails
+						console.error("[likeGame] Error sending push notification:", pushError);
+					}
+				}
 			} catch (notifError) {
 				// Don't fail the like operation if notification fails
 				console.error("[likeGame] Error creating notification:", notifError);
