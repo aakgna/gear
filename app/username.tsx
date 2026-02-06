@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import LeoProfanity from "leo-profanity";
 import {
 	checkUsernameAvailability,
 	saveUsername,
@@ -53,11 +54,26 @@ const UsernameScreen = () => {
 
 	const validateUsername = (text: string): string | null => {
 		const trimmed = text.trim();
-		if (trimmed.length < 3) return "Username must be at least 3 characters";
-		if (trimmed.length > 20) return "Username must be less than 20 characters";
+
+		if (trimmed.length < 3) {
+			return "Username must be at least 3 characters";
+		}
+		if (trimmed.length > 20) {
+			return "Username must be less than 20 characters";
+		}
 		if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
 			return "Username can only contain letters, numbers, and underscores";
 		}
+
+		// Profanity check (client-side only)
+		try {
+			if (LeoProfanity.check(trimmed)) {
+				return "This username contains inappropriate language. Please choose another.";
+			}
+		} catch {
+			// Fail-open on client errors so we don't block sign-up
+		}
+
 		return null;
 	};
 

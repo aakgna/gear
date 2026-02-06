@@ -376,7 +376,7 @@ const InferenceGame: React.FC<InferenceGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		elevation: 0,
 		shadowOpacity: 0,
 		shadowRadius: 0,

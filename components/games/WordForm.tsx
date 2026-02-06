@@ -595,7 +595,7 @@ const WordFormGame: React.FC<WordFormGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
 		paddingHorizontal: Spacing.md,
 		elevation: 0,
 		shadowOpacity: 0,
