@@ -992,7 +992,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 														color={Colors.text.primary}
 													/>
 													<Text style={socialOverlayStyles.shareMenuText}>
-														Share to DM
+														Send to Friend
 													</Text>
 												</TouchableOpacity>
 												{completedResult && (
@@ -1019,7 +1019,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 															color={Colors.text.primary}
 														/>
 														<Text style={socialOverlayStyles.shareMenuText}>
-															Share Result
+															Share Externally
 														</Text>
 													</TouchableOpacity>
 												)}
@@ -1055,7 +1055,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 								activeOpacity={0.7}
 							>
 								<Ionicons name="chatbubbles-outline" size={24} color={Colors.text.primary} />
-								<Text style={socialOverlayStyles.shareMenuText}>Share to DM</Text>
+								<Text style={socialOverlayStyles.shareMenuText}>Send to Friend</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={socialOverlayStyles.shareMenuItem}
@@ -1066,7 +1066,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 								activeOpacity={0.7}
 							>
 								<Ionicons name="share-outline" size={24} color={Colors.text.primary} />
-								<Text style={socialOverlayStyles.shareMenuText}>Share game</Text>
+								<Text style={socialOverlayStyles.shareMenuText}>Share Externally</Text>
 							</TouchableOpacity>
 						</View>
 					</TouchableOpacity>

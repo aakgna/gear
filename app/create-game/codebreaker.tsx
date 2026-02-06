@@ -185,7 +185,7 @@ const CreateCodeBreakerPage = () => {
 				<Text style={styles.sectionTitle}>Create CodeBreaker Game</Text>
 				<Text style={styles.description}>
 					Create a 6-position secret code by selecting colors. Players will try
-					to guess your code.
+					to guess your code. Repeat colors are allowed.
 				</Text>
 
 				{/* Difficulty Selector */}
