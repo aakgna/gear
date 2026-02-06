@@ -15,12 +15,14 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LeoProfanity from "leo-profanity";
 import {
 	checkUsernameAvailability,
 	saveUsername,
 	getCurrentUser,
 	getUserData,
+	signOut,
 } from "../config/auth";
 import {
 	Colors,
@@ -34,6 +36,7 @@ const MAX_LEN = 20;
 
 const UsernameScreen = () => {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const [username, setUsername] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [checking, setChecking] = useState(false);
@@ -131,6 +134,17 @@ const UsernameScreen = () => {
 		if (error) setError("");
 	};
 
+	const handleBack = async () => {
+		try {
+			await signOut();
+			router.replace("/signin");
+		} catch (error: any) {
+			console.error("Error signing out:", error);
+			// Still navigate to signin even if sign out fails
+			router.replace("/signin");
+		}
+	};
+
 	const progressPct = Math.min(username.length / MAX_LEN, 1) * 100;
 
 	return (
@@ -145,6 +159,18 @@ const UsernameScreen = () => {
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 				style={styles.keyboardView}
 			>
+				{/* Header with back button */}
+				<View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+					<TouchableOpacity
+						style={styles.backButton}
+						onPress={handleBack}
+						disabled={loading || checking}
+					>
+						<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+					</TouchableOpacity>
+					<View style={styles.headerSpacer} />
+				</View>
+
 				<View style={styles.content}>
 					<View style={styles.logoContainer}>
 						<Image
@@ -250,11 +276,27 @@ const styles = StyleSheet.create({
 	keyboardView: {
 		flex: 1,
 	},
+	header: {
+		flexDirection: "row",
+		justifyContent: "flex-start",
+		alignItems: "center",
+		paddingHorizontal: Spacing.lg,
+		paddingBottom: Spacing.sm,
+		zIndex: 10,
+	},
+	headerSpacer: {
+		flex: 1,
+	},
+	backButton: {
+		padding: Spacing.xs,
+		alignItems: "center",
+		justifyContent: "center",
+	},
 	content: {
 		flex: 1,
 		alignItems: "center",
 		paddingHorizontal: Spacing.xl,
-		paddingTop: 70,
+		paddingTop: 20,
 	},
 	logoContainer: {
 		alignItems: "center",

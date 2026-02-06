@@ -1,5 +1,5 @@
 /**
- * Design System for ThinkTok - Logic Puzzle App
+ * Design System for Kracked - Logic Puzzle App
  * Vibrant & Energetic theme with modern visual effects
  */
 

@@ -41,15 +41,6 @@
 						"useFrameworks": "static"
 					}
 				}
-			],
-			[
-				"expo-splash-screen",
-				{
-					"image": "./assets/images/Kracked_logo.png",
-					"imageWidth": 200,
-					"resizeMode": "contain",
-					"backgroundColor": "#FFFFFF"
-				}
 			]
 		],
 		"experiments": {
