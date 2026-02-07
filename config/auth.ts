@@ -1736,6 +1736,793 @@ export const removeFCMToken = async (userId: string): Promise<void> => {
 	}
 };
 
+// ============================================================================
+// ACCOUNT DELETION HELPER FUNCTIONS
+// ============================================================================
+
+// Helper to import parsePuzzleId and docExists
+const { parsePuzzleId, docExists } = require("./firebase");
+
+// 1. Cleanup Following/Followers Relationships
+const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all users this person follows
+		const followingRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("following");
+		const followingSnapshot = await followingRef.get();
+		
+		// Fetch all users following this person
+		const followersRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("followers");
+		const followersSnapshot = await followersRef.get();
+		
+		let batch = db.batch();
+		let batchCount = 0;
+		const BATCH_SIZE = 500;
+		
+		// Helper to commit and create new batch
+		const commitBatch = async () => {
+			if (batchCount > 0) {
+				await batch.commit();
+				batch = db.batch();
+				batchCount = 0;
+			}
+		};
+		
+		// Process followed users: remove from their followers list and decrement counts
+		for (const followingDoc of followingSnapshot.docs) {
+			const followedUserId = followingDoc.id;
+			const followedUserRef = db.collection("users").doc(followedUserId);
+			const followedUserFollowersRef = followedUserRef
+				.collection("followers")
+				.doc(userId);
+			
+			// Remove from followed user's followers
+			batch.delete(followedUserFollowersRef);
+			
+			// Decrement followerCount on followed user
+			batch.update(followedUserRef, {
+				followerCount: firestore.FieldValue.increment(-1),
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			});
+			
+			batchCount += 2;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Process followers: remove from their following list and decrement counts
+		for (const followerDoc of followersSnapshot.docs) {
+			const followerUserId = followerDoc.id;
+			const followerUserRef = db.collection("users").doc(followerUserId);
+			const followerUserFollowingRef = followerUserRef
+				.collection("following")
+				.doc(userId);
+			
+			// Remove from follower's following
+			batch.delete(followerUserFollowingRef);
+			
+			// Decrement followingCount on follower
+			batch.update(followerUserRef, {
+				followingCount: firestore.FieldValue.increment(-1),
+				updatedAt: firestore.FieldValue.serverTimestamp(),
+			});
+			
+			batchCount += 2;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Delete user's own following and followers subcollections
+		for (const doc of followingSnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		for (const doc of followersSnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Commit any remaining operations
+		await commitBatch();
+		
+		console.log(`[cleanupFollowingFollowers] Cleaned up following/followers for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupFollowingFollowers] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 2. Cleanup Liked Games
+const cleanupLikedGames = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all liked games
+		const likedRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("liked");
+		const likedSnapshot = await likedRef.get();
+		
+		let batch = db.batch();
+		let batchCount = 0;
+		const BATCH_SIZE = 500;
+		
+		// Helper to commit and create new batch
+		const commitBatch = async () => {
+			if (batchCount > 0) {
+				await batch.commit();
+				batch = db.batch();
+				batchCount = 0;
+			}
+		};
+		
+		// Process each liked game
+		for (const likedDoc of likedSnapshot.docs) {
+			const gameId = likedDoc.id;
+			const parsed = parsePuzzleId(gameId);
+			
+			if (parsed) {
+				const { gameType, difficulty, gameId: actualGameId } = parsed;
+				
+				// Delete like from game's likes subcollection
+				const gameLikesRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId)
+					.collection("likes")
+					.doc(userId);
+				
+				batch.delete(gameLikesRef);
+				
+				// Decrement likeCount in game stats
+				const gameRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId);
+				
+				batch.update(gameRef, {
+					"stats.likeCount": firestore.FieldValue.increment(-1),
+				});
+				
+				batchCount += 2;
+			}
+			
+			// Delete from user's liked subcollection
+			batch.delete(likedDoc.ref);
+			batchCount++;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Commit any remaining operations
+		await commitBatch();
+		
+		console.log(`[cleanupLikedGames] Cleaned up liked games for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupLikedGames] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 3. Cleanup Created Games
+const cleanupCreatedGames = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all created games
+		const createdGamesRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("createdGames");
+		const createdGamesSnapshot = await createdGamesRef.get();
+		
+		// Process each created game
+		for (const createdGameDoc of createdGamesSnapshot.docs) {
+			const gameData = createdGameDoc.data();
+			const gameType = gameData?.gameType;
+			const difficulty = gameData?.difficulty;
+			const actualGameId = createdGameDoc.id;
+			
+			if (!gameType || !difficulty) {
+				console.warn(`[cleanupCreatedGames] Invalid game data for ${actualGameId}`);
+				continue;
+			}
+			
+			// Construct full puzzleId
+			const puzzleId = `${gameType}_${difficulty}_${actualGameId}`;
+			
+			// Delete from all users' liked subcollections (reuse pattern from profile.tsx)
+			try {
+				const likesRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId)
+					.collection("likes");
+				
+				const likesSnapshot = await likesRef.get();
+				
+				// Helper to convert lowercase gameType to camelCase
+				const toCamelCase = (gt: string): string => {
+					if (gt === "quickmath") return "quickMath";
+					if (gt === "wordchain") return "wordChain";
+					if (gt === "magicsquare") return "magicSquare";
+					return gt;
+				};
+				
+				// Generate both lowercase and camelCase versions
+				const parts = puzzleId.split("_");
+				let camelCasePuzzleId: string | null = null;
+				if (parts.length >= 3) {
+					const gameTypeLower = parts[0];
+					const gameTypeCamel = toCamelCase(gameTypeLower);
+					if (gameTypeCamel !== gameTypeLower) {
+						camelCasePuzzleId = `${gameTypeCamel}_${parts[1]}_${parts.slice(2).join("_")}`;
+					}
+				}
+				
+				// Delete from each user's liked subcollection
+				for (const likeDoc of likesSnapshot.docs) {
+					const likedUserId = likeDoc.id;
+					
+					// Try lowercase version first
+					const userLikedRef = db
+						.collection("users")
+						.doc(likedUserId)
+						.collection("liked")
+						.doc(puzzleId);
+					
+					try {
+						const likedDoc = await userLikedRef.get();
+						if (docExists(likedDoc)) {
+							await userLikedRef.delete();
+						} else if (camelCasePuzzleId) {
+							// Try camelCase version
+							const camelCaseRef = db
+								.collection("users")
+								.doc(likedUserId)
+								.collection("liked")
+								.doc(camelCasePuzzleId);
+							const camelCaseDoc = await camelCaseRef.get();
+							if (docExists(camelCaseDoc)) {
+								await camelCaseRef.delete();
+							}
+						}
+					} catch (error) {
+						console.error(`[cleanupCreatedGames] Error deleting from user ${likedUserId}:`, error);
+					}
+				}
+			} catch (error) {
+				console.error(`[cleanupCreatedGames] Error deleting from liked collections:`, error);
+			}
+			
+			// Delete game subcollections (likes, comments)
+			try {
+				const gameRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId);
+				
+				const subcollections = ["likes", "comments"];
+				
+				for (const subcollectionName of subcollections) {
+					const subcollectionRef = gameRef.collection(subcollectionName);
+					const snapshot = await subcollectionRef.get();
+					
+					if (!snapshot.empty) {
+						const batchSize = 500;
+						const docs = snapshot.docs;
+						
+						for (let i = 0; i < docs.length; i += batchSize) {
+							const batch = db.batch();
+							const batchDocs = docs.slice(i, i + batchSize);
+							
+							batchDocs.forEach((doc) => {
+								batch.delete(doc.ref);
+							});
+							
+							await batch.commit();
+						}
+					}
+				}
+			} catch (error) {
+				console.error(`[cleanupCreatedGames] Error deleting subcollections:`, error);
+			}
+			
+			// Delete the game document
+			try {
+				const gameRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId);
+				await gameRef.delete();
+			} catch (error) {
+				console.error(`[cleanupCreatedGames] Error deleting game document:`, error);
+			}
+		}
+		
+		// Delete user's createdGames subcollection
+		const batch = db.batch();
+		for (const doc of createdGamesSnapshot.docs) {
+			batch.delete(doc.ref);
+		}
+		if (!createdGamesSnapshot.empty) {
+			await batch.commit();
+		}
+		
+		console.log(`[cleanupCreatedGames] Cleaned up created games for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupCreatedGames] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 4. Cleanup Comments (Efficient GameHistory-based)
+const cleanupComments = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all games from gameHistory (any action)
+		const gameHistoryRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory");
+		const gameHistorySnapshot = await gameHistoryRef.get();
+		
+		// Get unique game IDs
+		const gameIds = new Set<string>();
+		gameHistorySnapshot.forEach((doc) => {
+			const data = doc.data();
+			if (data?.gameId) {
+				gameIds.add(data.gameId);
+			}
+		});
+		
+		// Process each game
+		for (const gameId of gameIds) {
+			const parsed = parsePuzzleId(gameId);
+			if (!parsed) continue;
+			
+			const { gameType, difficulty, gameId: actualGameId } = parsed;
+			
+			const commentsRef = db
+				.collection("games")
+				.doc(gameType)
+				.collection(difficulty)
+				.doc(actualGameId)
+				.collection("comments");
+			
+			// Find all comments by this user
+			const userCommentsSnapshot = await commentsRef
+				.where("userId", "==", userId)
+				.get();
+			
+			// Delete user's comments and decrement commentCount
+			if (!userCommentsSnapshot.empty) {
+				const batch = db.batch();
+				let commentCount = 0;
+				
+				userCommentsSnapshot.forEach((doc) => {
+					batch.delete(doc.ref);
+					commentCount++;
+				});
+				
+				// Decrement commentCount in game stats
+				const gameRef = db
+					.collection("games")
+					.doc(gameType)
+					.collection(difficulty)
+					.doc(actualGameId);
+				
+				batch.update(gameRef, {
+					"stats.commentCount": firestore.FieldValue.increment(-commentCount),
+				});
+				
+				await batch.commit();
+			}
+			
+			// Remove user from likedBy arrays in all comments on this game
+			const allCommentsSnapshot = await commentsRef.get();
+			
+			if (!allCommentsSnapshot.empty) {
+				const batch = db.batch();
+				let updateCount = 0;
+				
+				allCommentsSnapshot.forEach((doc) => {
+					const data = doc.data();
+					const likedBy = data?.likedBy || [];
+					
+					if (likedBy.includes(userId)) {
+						const newLikedBy = likedBy.filter((id: string) => id !== userId);
+						const newLikes = Math.max(0, (data?.likes || 0) - 1);
+						
+						batch.update(doc.ref, {
+							likedBy: newLikedBy,
+							likes: newLikes,
+						});
+						
+						updateCount++;
+					}
+				});
+				
+				if (updateCount > 0) {
+					await batch.commit();
+				}
+			}
+		}
+		
+		console.log(`[cleanupComments] Cleaned up comments for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupComments] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 5. Cleanup Notifications
+const cleanupNotifications = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Delete all notifications from user's notifications subcollection
+		const notificationsRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("notifications");
+		const notificationsSnapshot = await notificationsRef.get();
+		
+		let batch = db.batch();
+		let batchCount = 0;
+		const BATCH_SIZE = 500;
+		
+		// Helper to commit and create new batch
+		const commitBatch = async () => {
+			if (batchCount > 0) {
+				await batch.commit();
+				batch = db.batch();
+				batchCount = 0;
+			}
+		};
+		
+		for (const doc of notificationsSnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		await commitBatch();
+		
+		// Find and update grouped notifications where this user is the sender
+		// We need to query all users' notifications to find ones where fromUserId == userId
+		// This is expensive but necessary for complete cleanup
+		// Note: If you have a collection group index, you could use that instead
+		try {
+			// Get all users (this is expensive but necessary for complete cleanup)
+			const usersSnapshot = await db.collection("users").limit(1000).get();
+			
+			for (const userDoc of usersSnapshot.docs) {
+				const otherUserId = userDoc.id;
+				if (otherUserId === userId) continue;
+				
+				const otherNotificationsRef = db
+					.collection("users")
+					.doc(otherUserId)
+					.collection("notifications");
+				
+				// Find notifications where fromUserId == userId
+				const fromUserNotifications = await otherNotificationsRef
+					.where("fromUserId", "==", userId)
+					.get();
+				
+				// Find grouped notifications where fromUserIds contains userId
+				const groupedNotifications = await otherNotificationsRef
+					.where("fromUserIds", "array-contains", userId)
+					.get();
+				
+				const updateBatch = db.batch();
+				let updateCount = 0;
+				
+				// Process fromUserId notifications (delete them)
+				fromUserNotifications.forEach((doc) => {
+					updateBatch.delete(doc.ref);
+					updateCount++;
+				});
+				
+				// Process grouped notifications (remove userId from array, decrement count)
+				groupedNotifications.forEach((doc) => {
+					const data = doc.data();
+					const fromUserIds = data?.fromUserIds || [];
+					const likeCount = data?.likeCount || 0;
+					
+					const newFromUserIds = fromUserIds.filter((id: string) => id !== userId);
+					const newLikeCount = Math.max(0, likeCount - 1);
+					
+					if (newFromUserIds.length === 0 || newLikeCount === 0) {
+						// Delete notification if no users left
+						updateBatch.delete(doc.ref);
+					} else {
+						// Update notification
+						updateBatch.update(doc.ref, {
+							fromUserIds: newFromUserIds,
+							likeCount: newLikeCount,
+						});
+					}
+					updateCount++;
+				});
+				
+				if (updateCount > 0) {
+					await updateBatch.commit();
+				}
+			}
+		} catch (error) {
+			console.error(`[cleanupNotifications] Error cleaning up grouped notifications:`, error);
+			// Continue - this is a best-effort cleanup
+		}
+		
+		console.log(`[cleanupNotifications] Cleaned up notifications for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupNotifications] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 6. Cleanup Conversations/Messages
+const cleanupConversations = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all conversations from user's conversations subcollection
+		const userConversationsRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("conversations");
+		const userConversationsSnapshot = await userConversationsRef.get();
+		
+		// Process each conversation
+		for (const conversationDoc of userConversationsSnapshot.docs) {
+			const conversationId = conversationDoc.id;
+			
+			try {
+				// Get conversation data to find participants
+				const conversationRef = db.collection("conversations").doc(conversationId);
+				const conversationData = (await conversationRef.get()).data();
+				
+				if (!conversationData) {
+					// Conversation doesn't exist, just delete from user's subcollection
+					await conversationDoc.ref.delete();
+					continue;
+				}
+				
+				const participants = conversationData.participants || [];
+				
+				// Delete all messages in the conversation (use pagination pattern)
+				const messagesRef = conversationRef.collection("messages");
+				let lastDoc: any = null;
+				const BATCH_SIZE = 500;
+				
+				while (true) {
+					let query = messagesRef.orderBy("createdAt", "desc").limit(BATCH_SIZE);
+					if (lastDoc) {
+						query = query.startAfter(lastDoc);
+					}
+					
+					const snapshot = await query.get();
+					if (snapshot.empty) {
+						break;
+					}
+					
+					const batch = db.batch();
+					snapshot.forEach((doc) => {
+						batch.delete(doc.ref);
+					});
+					await batch.commit();
+					
+					if (snapshot.size < BATCH_SIZE) {
+						break;
+					}
+					lastDoc = snapshot.docs[snapshot.docs.length - 1];
+				}
+				
+				// Delete conversation from main collection
+				await conversationRef.delete();
+				
+				// Remove conversation from other participant's conversations subcollection
+				for (const participantId of participants) {
+					if (participantId !== userId) {
+						const participantConversationRef = db
+							.collection("users")
+							.doc(participantId)
+							.collection("conversations")
+							.doc(conversationId);
+						await participantConversationRef.delete();
+					}
+				}
+			} catch (error) {
+				console.error(`[cleanupConversations] Error processing conversation ${conversationId}:`, error);
+			}
+		}
+		
+		// Delete user's conversations subcollection
+		const batch = db.batch();
+		for (const doc of userConversationsSnapshot.docs) {
+			batch.delete(doc.ref);
+		}
+		if (!userConversationsSnapshot.empty) {
+			await batch.commit();
+		}
+		
+		console.log(`[cleanupConversations] Cleaned up conversations for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupConversations] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 7. Cleanup Blocking Relationships
+const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all users this person blocked
+		const blockedRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("blocked");
+		const blockedSnapshot = await blockedRef.get();
+		
+		// Fetch all users who blocked this person
+		const blockedByRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("blockedBy");
+		const blockedBySnapshot = await blockedByRef.get();
+		
+		let batch = db.batch();
+		let batchCount = 0;
+		const BATCH_SIZE = 500;
+		
+		// Helper to commit and create new batch
+		const commitBatch = async () => {
+			if (batchCount > 0) {
+				await batch.commit();
+				batch = db.batch();
+				batchCount = 0;
+			}
+		};
+		
+		// Remove from blocked users' blockedBy collections
+		for (const blockedDoc of blockedSnapshot.docs) {
+			const blockedUserId = blockedDoc.id;
+			const blockedUserBlockedByRef = db
+				.collection("users")
+				.doc(blockedUserId)
+				.collection("blockedBy")
+				.doc(userId);
+			
+			batch.delete(blockedUserBlockedByRef);
+			batchCount++;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Remove from blockers' blocked collections
+		for (const blockedByDoc of blockedBySnapshot.docs) {
+			const blockerUserId = blockedByDoc.id;
+			const blockerUserBlockedRef = db
+				.collection("users")
+				.doc(blockerUserId)
+				.collection("blocked")
+				.doc(userId);
+			
+			batch.delete(blockerUserBlockedRef);
+			batchCount++;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Delete user's blocked and blockedBy subcollections
+		for (const doc of blockedSnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		for (const doc of blockedBySnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Commit any remaining operations
+		await commitBatch();
+		
+		console.log(`[cleanupBlockingRelationships] Cleaned up blocking relationships for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupBlockingRelationships] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
+// 8. Cleanup Game History
+const cleanupGameHistory = async (userId: string): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+		
+		// Fetch all game history entries
+		const gameHistoryRef = db
+			.collection("users")
+			.doc(userId)
+			.collection("gameHistory");
+		const gameHistorySnapshot = await gameHistoryRef.get();
+		
+		// Delete in batches
+		let batch = db.batch();
+		let batchCount = 0;
+		const BATCH_SIZE = 500;
+		
+		// Helper to commit and create new batch
+		const commitBatch = async () => {
+			if (batchCount > 0) {
+				await batch.commit();
+				batch = db.batch();
+				batchCount = 0;
+			}
+		};
+		
+		for (const doc of gameHistorySnapshot.docs) {
+			batch.delete(doc.ref);
+			batchCount++;
+			
+			if (batchCount >= BATCH_SIZE) {
+				await commitBatch();
+			}
+		}
+		
+		// Commit any remaining operations
+		await commitBatch();
+		
+		console.log(`[cleanupGameHistory] Cleaned up game history for user ${userId}`);
+	} catch (error) {
+		console.error(`[cleanupGameHistory] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
 // Delete user account (iOS App Store requirement)
 export const deleteAccount = async (
 	userId: string,
@@ -1750,9 +2537,29 @@ export const deleteAccount = async (
 			throw new Error("No user currently signed in");
 		}
 
-		// 2. Delete user document from Firestore
-		const userRef = db.collection("users").doc(userId);
-		await userRef.delete();
+		// 2. BEFORE deleting user document, clean up all related data
+		// Execute all cleanup functions (errors are logged but don't stop the process)
+		console.log(`[deleteAccount] Starting comprehensive cleanup for user ${userId}`);
+		
+		// Execute cleanup functions (each has its own try-catch, so errors won't stop the process)
+		const cleanupPromises = [
+			cleanupFollowingFollowers(userId),
+			cleanupLikedGames(userId),
+			cleanupCreatedGames(userId),
+			cleanupComments(userId),
+			cleanupNotifications(userId),
+			cleanupConversations(userId),
+			cleanupBlockingRelationships(userId),
+			cleanupGameHistory(userId),
+		];
+		
+		// Wait for all cleanup operations (errors are handled within each function)
+		await Promise.all(cleanupPromises.map(p => p.catch(err => {
+			// Errors are already logged in the helper functions
+			return null;
+		})));
+		
+		console.log(`[deleteAccount] Completed cleanup operations for user ${userId}`);
 
 		// 3. Delete username document if it exists
 		if (username) {
@@ -1761,9 +2568,14 @@ export const deleteAccount = async (
 			await usernameRef.delete();
 		}
 
-		// 4. Delete Firebase Auth account (this automatically signs out the user)
+		// 4. Delete user document from Firestore
+		const userRef = db.collection("users").doc(userId);
+		await userRef.delete();
+
+		// 5. Delete Firebase Auth account (this automatically signs out the user)
 		await currentUser.delete();
 
+		console.log(`[deleteAccount] Successfully deleted account for user ${userId}`);
 		// Note: No need to call signOut() - delete() already signs out the user
 	} catch (error: any) {
 		console.error("Error deleting account:", error);
