@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Alert, Image } from "react-native";
+import { View, Text, StyleSheet, Alert, Image, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -130,7 +130,18 @@ const SignInScreen = () => {
 					</View>
 
 					<Text style={styles.privacyText}>
-						By continuing, you agree to our Terms of Service and Privacy Policy
+						By continuing, you agree to our{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/terms")}>
+							Terms of Service
+						</Text>
+						,{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/privacy")}>
+							Privacy Policy
+						</Text>
+						, and{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/eula")}>
+							End User License Agreement (EULA)
+						</Text>
 					</Text>
 				</View>
 

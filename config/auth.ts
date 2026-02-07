@@ -2523,6 +2523,23 @@ const cleanupGameHistory = async (userId: string): Promise<void> => {
 	}
 };
 
+// 9. Cleanup Developer Signup
+const cleanupDeveloperSignup = async (userId: string): Promise<void> => {
+	try {
+		// Delete developer signup document if it exists
+		const developerRef = db.collection("developer").doc(userId);
+		const developerDoc = await developerRef.get();
+		
+		if (docExists(developerDoc)) {
+			await developerRef.delete();
+			console.log(`[cleanupDeveloperSignup] Cleaned up developer signup for user ${userId}`);
+		}
+	} catch (error) {
+		console.error(`[cleanupDeveloperSignup] Error:`, error);
+		// Don't throw - continue with other cleanup operations
+	}
+};
+
 // Delete user account (iOS App Store requirement)
 export const deleteAccount = async (
 	userId: string,
@@ -2551,6 +2568,7 @@ export const deleteAccount = async (
 			cleanupConversations(userId),
 			cleanupBlockingRelationships(userId),
 			cleanupGameHistory(userId),
+			cleanupDeveloperSignup(userId),
 		];
 		
 		// Wait for all cleanup operations (errors are handled within each function)
@@ -2603,6 +2621,42 @@ export const deleteAccount = async (
 		}
 		throw new Error(
 			error.message || "Failed to delete account. Please try again."
+		);
+	}
+};
+
+// Save developer program signup to Firestore
+export const saveDeveloperSignup = async (
+	userId: string,
+	username: string,
+	email: string,
+	phoneNumber: string,
+	gameIdea: string
+): Promise<void> => {
+	try {
+		const firestore = require("@react-native-firebase/firestore").default;
+
+		const developerRef = db.collection("developer").doc(userId);
+
+		await developerRef.set({
+			username: username,
+			email: email,
+			phoneNumber: phoneNumber,
+			gameIdea: gameIdea,
+			createdAt: firestore.FieldValue.serverTimestamp(),
+			updatedAt: firestore.FieldValue.serverTimestamp(),
+		});
+
+		console.log(`[saveDeveloperSignup] Successfully saved developer signup for user ${userId}`);
+	} catch (error: any) {
+		console.error("Error saving developer signup:", error);
+		if (error?.code === "firestore/permission-denied") {
+			throw new Error(
+				"Permission denied. Please check your Firestore security rules."
+			);
+		}
+		throw new Error(
+			error.message || "Failed to save developer signup. Please try again."
 		);
 	}
 };

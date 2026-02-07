@@ -145,9 +145,34 @@ const CreateGameIndex = () => {
 							game={game}
 							onPress={() => handleGameTypeSelect(game.type)}
 							index={index}
-							/>
+						/>
 					))}
 				</View>
+
+				{/* Developer Program Button - Spans 3 columns */}
+				<TouchableOpacity
+					style={styles.developerButton}
+					onPress={() => router.push("/developer-signup")}
+					activeOpacity={0.8}
+				>
+					<LinearGradient
+						colors={[Colors.accent, Colors.accent + "DD"]}
+						style={styles.developerButtonGradient}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 0 }}
+					>
+						<View style={styles.developerButtonContent}>
+							<Ionicons name="code-working" size={24} color={Colors.text.primary} />
+							<View style={styles.developerButtonTextContainer}>
+								<Text style={styles.developerButtonTitle}>Game Developer Program</Text>
+								<Text style={styles.developerButtonSubtitle}>
+									Join the waitlist to create custom game types
+								</Text>
+							</View>
+							<Ionicons name="chevron-forward" size={18} color={Colors.text.primary} />
+						</View>
+					</LinearGradient>
+				</TouchableOpacity>
 
 				<View style={styles.infoNote}>
 					<Ionicons
@@ -177,7 +202,7 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingTop: Spacing.xl,
-		paddingBottom: Spacing.xxl,
+		paddingBottom: Spacing.xxl + Spacing.lg,
 	},
 	sectionTitle: {
 		fontSize: Typography.fontSize.h3,
@@ -225,7 +250,7 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
-		marginTop: Spacing.lg,
+		// marginTop: Spacing.lg,
 		borderWidth: 0,
 		gap: Spacing.sm,
 	},
@@ -234,6 +259,43 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.caption,
 		color: Colors.text.secondary,
 		lineHeight: Typography.fontSize.caption * Typography.lineHeight.normal,
+	},
+	developerButton: {
+		width: "100%",
+		marginTop: Spacing.lg,
+		marginBottom: Spacing.md,
+		borderRadius: BorderRadius.lg,
+		overflow: "hidden",
+		minHeight: 96,
+		...Shadows.medium,
+	},
+	developerButtonGradient: {
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.md,
+		minHeight: 96,
+		justifyContent: "center",
+	},
+	developerButtonContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+	},
+	developerButtonTextContainer: {
+		flex: 1,
+		marginLeft: Spacing.md,
+		marginRight: Spacing.sm,
+	},
+	developerButtonTitle: {
+		fontSize: Typography.fontSize.small,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.xxs,
+	},
+	developerButtonSubtitle: {
+		fontSize: Typography.fontSize.caption - 1,
+		color: Colors.text.primary,
+		opacity: 0.8,
+		lineHeight: (Typography.fontSize.caption - 1) * Typography.lineHeight.normal,
 	},
 });
 
