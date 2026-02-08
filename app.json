@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "Kracked",
 		"slug": "gear",
-		"version": "1.0.28",
+		"version": "1.0.3",
 		"orientation": "portrait",
 		"icon": "./assets/images/Kracked_logo.png",
 		"scheme": "kracked",
@@ -18,7 +18,9 @@
 			"versionCode": 1,
 			"package": "com.aakgna.gear",
 			"googleServicesFile": "./google-services.json",
-			"permissions": ["INTERNET"]
+			"permissions": [
+				"INTERNET"
+			]
 		},
 		"web": {
 			"bundler": "metro",

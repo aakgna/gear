@@ -22,6 +22,8 @@ import {
 	Modal,
 	TouchableWithoutFeedback,
 	Share,
+	Linking,
+	Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -29,6 +31,8 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import {
 	Colors,
 	Typography,
@@ -94,6 +98,7 @@ import {
 	getFCMToken,
 	registerFCMToken,
 	removeFCMToken,
+	signOut,
 } from "../config/auth";
 import { completedGameResults, setCompletedResult } from "../config/gameCompletion";
 import { fetchFollowingFeed } from "../config/social";
@@ -615,16 +620,82 @@ const FeedScreen = () => {
 		};
 	}, []);
 
+	const VERSION_ALERT_STORAGE_KEY = "lastVersionAlertShownDate";
+
+	const checkForUpdate = async () => {
+		try {
+			const user = getCurrentUser();
+			if (!user) return;
+
+			const versionDoc = await db.collection("version").doc("latest").get();
+			if (!versionDoc.exists) return;
+
+			const data = versionDoc.data();
+			const latestVersion = data?.version;
+			const currentVersion = Constants.expoConfig?.version;
+
+			if (currentVersion !== latestVersion) {
+				const now = new Date();
+				const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+				const lastShown = await AsyncStorage.getItem(VERSION_ALERT_STORAGE_KEY);
+				if (lastShown === today) return;
+
+				await AsyncStorage.setItem(VERSION_ALERT_STORAGE_KEY, today);
+
+				const storeURL =
+					Platform.OS === "ios"
+						? "https://kracked.app"
+						: "https://play.google.com/store/apps/details?id=com.aakgna.gear";
+
+				Alert.alert(
+					"Update Required",
+					"Update now to unlock the latest games and a smoother experience.",
+					[
+						{
+						text: "Later",
+						style: "cancel",
+						onPress: () => {},
+						},
+						{
+							text: "Update",
+							onPress: async () => {
+								await signOut();
+								router.replace("/" as any);
+								Linking.openURL(storeURL);
+							},
+						},
+					],
+					{ cancelable: false }
+				);
+			}
+		} catch (err) {
+			console.error("Version check failed:", err);
+		}
+	};
+
 	// Load user data and puzzles from Firestore (only once on initial mount)
 	// Since component stays mounted, this will only run once
 	useEffect(() => {
 		// Only load if we haven't loaded yet
 		if (!hasLoadedRef.current) {
 			hasLoadedRef.current = true;
+			checkForUpdate();
 			loadUserData(true); // Pass true to indicate initial load
 			loadPuzzlesFromFirestore();
 			loadFollowingFeed();
 		}
+	}, []);
+
+	// Check for app update when app comes to foreground
+	useEffect(() => {
+		const subscription = AppState.addEventListener("change", (nextAppState) => {
+			if (nextAppState === "active") {
+				checkForUpdate();
+			}
+		});
+		return () => {
+			subscription.remove();
+		};
 	}, []);
 
 	// FCM notification prompt effect
