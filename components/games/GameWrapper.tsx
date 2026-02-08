@@ -525,11 +525,11 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	// Handle share before play (from intro screen - top left share icon)
 	const handleShareBeforePlay = async () => {
 		try {
-			const gameLink = `kracked://game/${puzzle.id}`;
-			const iosAppStoreLink = "https://apps.apple.com/app/kracked/id6739000000";
-			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
-			const message = `Try this ${formatGameType(puzzle.type)} puzzle on Kracked!\n\nPlay: ${gameLink}\nOr search for game ID: ${puzzle.id} in Kracked\n\nDon't have Kracked? Download it:\niOS: ${iosAppStoreLink}\nAndroid: ${androidPlayStoreLink}`;
-			const shareOptions: any = { message };
+			const message = `Try this ${formatGameType(puzzle.type)} puzzle on Kracked!`;
+			const shareOptions: any = {
+				message,
+				url: "https://www.kracked.app/",
+			};
 			if (Platform.OS === "android") {
 				shareOptions.title = "Share Game";
 			}
@@ -564,19 +564,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	// Handle share
 	const handleShare = async () => {
 		if (!completedResult) {
-			console.log("[handleShare] No completed result");
 			return;
 		}
 
 		try {
-			console.log("[handleShare] Starting share...");
-			// Create shareable link - using game ID that can be used in the app
-			const gameLink = `kracked://game/${puzzle.id}`;
-			
-			// App store links for users without the app
-			const iosAppStoreLink = "https://apps.apple.com/app/kracked/id6739000000"; // Update with actual App Store ID
-			const androidPlayStoreLink = "https://play.google.com/store/apps/details?id=com.aakgna.gear";
-
 			let message = `I just completed ${formatGameType(
 				puzzle.type
 			)} on Kracked!\n\n`;
@@ -587,17 +578,13 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			}
 
 			message += `\nCan you beat my score?\n\n`;
-			message += `Play this game: ${gameLink}\n\n`;
-			message += `Or search for game ID: ${puzzle.id} in Kracked\n\n`;
-			message += `Don't have Kracked? Download it:\n`;
-			message += `iOS: ${iosAppStoreLink}\n`;
-			message += `Android: ${androidPlayStoreLink}`;
 
-			// Share with message - the link will be shareable as text
-			// On iOS, Share.share with message will allow sharing to iMessage, Instagram, etc.
-			// On Android, message is used for sharing
+			// Share with message and URL - URL is separate from message text
+			// On iOS, Share.share with message and url will allow sharing to iMessage, Instagram, etc.
+			// On Android, message and url are used for sharing
 			const shareOptions: any = {
 				message,
+				url: "https://www.kracked.app/",
 			};
 
 			// Add title for Android
@@ -605,34 +592,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				shareOptions.title = "Share Game Result";
 			}
 
-			console.log(
-				"[handleShare] Calling Share.share with options:",
-				JSON.stringify(shareOptions)
-			);
-
 			// Use Share API to open native share sheet
 			// The share sheet should appear immediately when Share.share is called
-			const result = await Share.share(shareOptions);
-			console.log("[handleShare] Share result:", result);
-
-			// Check if sharing was successful
-			if (result && result.action) {
-				if (result.action === Share.sharedAction) {
-					if (result.activityType) {
-						console.log("Shared with activity type:", result.activityType);
-					} else {
-						console.log("Shared successfully");
-					}
-				} else if (result.action === Share.dismissedAction) {
-					console.log("Share dismissed");
-				}
-			}
+			await Share.share(shareOptions);
 		} catch (error: any) {
 			// User cancelled sharing - this is expected, don't log as error
-			console.error("[handleShare] Error:", error);
-			if (error?.message !== "User did not share") {
-				console.error("Error sharing:", error);
-			}
+			// Silently handle errors
 		}
 	};
 	const renderGame = () => {

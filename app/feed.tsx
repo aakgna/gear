@@ -2794,7 +2794,7 @@ const applyForYouFilters = useCallback(
 													await Share.share({
 														message:
 															"Check out Kracked – swipe through puzzles, compete with friends, and sharpen your mind!",
-														url: "https://apps.apple.com/app/kracked/id6739000000",
+														url: "https://www.kracked.app/",
 													});
 												} catch (e: any) {
 													if (e?.message !== "User did not share") {
