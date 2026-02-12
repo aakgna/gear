@@ -12,7 +12,8 @@
 			"supportsTablet": true,
 			"bundleIdentifier": "com.aakgna.gear",
 			"googleServicesFile": "./GoogleService-Info.plist",
-			"buildNumber": "5"
+			"buildNumber": "6",
+			"usesAppleSignIn": true
 		},
 		"android": {
 			"versionCode": 1,

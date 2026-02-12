@@ -435,7 +435,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 			<TouchableOpacity
 				style={styles.commentItem}
 				onLongPress={() => handleCommentLongPress(item)}
-				delayLongPress={2000}
+				delayLongPress={750}
 				activeOpacity={0.7}
 			>
 				<View style={styles.commentHeader}>

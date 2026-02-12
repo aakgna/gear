@@ -1068,7 +1068,7 @@ const ProfileScreen = () => {
 							}
 						}}
 						activeOpacity={0.7}
-						delayLongPress={2000}
+						delayLongPress={750}
 					>
 						{showCompletionCount && (
 							<View style={styles.completionBadge}>

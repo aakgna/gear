@@ -528,7 +528,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			const message = `Try this ${formatGameType(puzzle.type)} puzzle on Kracked!`;
 			const shareOptions: any = {
 				message,
-				url: "https://www.kracked.app/",
+				url: "https://apps.apple.com/us/app/kracked/id6755156044/",
 			};
 			if (Platform.OS === "android") {
 				shareOptions.title = "Share Game";
@@ -584,7 +584,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			// On Android, message and url are used for sharing
 			const shareOptions: any = {
 				message,
-				url: "https://www.kracked.app/",
+				url: "https://apps.apple.com/us/app/kracked/id6755156044/",
 			};
 
 			// Add title for Android

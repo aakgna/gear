@@ -644,7 +644,7 @@ const FeedScreen = () => {
 
 				const storeURL =
 					Platform.OS === "ios"
-						? "https://kracked.app"
+						? "https://apps.apple.com/us/app/kracked/id6755156044"
 						: "https://play.google.com/store/apps/details?id=com.aakgna.gear";
 
 				Alert.alert(
@@ -2794,7 +2794,7 @@ const applyForYouFilters = useCallback(
 													await Share.share({
 														message:
 															"Check out Kracked – swipe through puzzles, compete with friends, and sharpen your mind!",
-														url: "https://www.kracked.app/",
+														url: "https://apps.apple.com/us/app/kracked/id6755156044/",
 													});
 												} catch (e: any) {
 													if (e?.message !== "User did not share") {

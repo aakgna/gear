@@ -1,6 +1,7 @@
 // Authentication service using React Native Firebase
 import auth from "@react-native-firebase/auth";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { db } from "./firebase";
 import messaging from "@react-native-firebase/messaging";
 import { Platform, PermissionsAndroid, Alert } from "react-native";
@@ -92,6 +93,50 @@ export const signInWithGoogle = async () => {
 	} catch (error: any) {
 		console.error("Google Sign-In Error:", error);
 		if (error.code === "sign_in_cancelled") {
+			throw new Error("Sign in was cancelled");
+		}
+		throw error;
+	}
+};
+
+// Sign in with Apple
+export const signInWithApple = async () => {
+	try {
+		// Apple Sign-In is only available on iOS
+		if (Platform.OS !== "ios") {
+			throw new Error("Apple Sign-In is only available on iOS");
+		}
+
+		// Request Apple authentication
+		const credential = await AppleAuthentication.signInAsync({
+			requestedScopes: [
+				AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+				AppleAuthentication.AppleAuthenticationScope.EMAIL,
+			],
+		});
+
+		// Check if identity token is available
+		if (!credential.identityToken) {
+			throw new Error("No identity token received from Apple Sign-In");
+		}
+
+		// Create Firebase credential
+		const appleCredential = auth.AppleAuthProvider.credential(
+			credential.identityToken
+		);
+
+		// Sign in to Firebase
+		const result = await auth().signInWithCredential(appleCredential);
+
+		// Create or update user document in Firestore
+		if (result.user) {
+			await createOrUpdateUserDocument(result.user);
+		}
+
+		return result.user;
+	} catch (error: any) {
+		console.error("Apple Sign-In Error:", error);
+		if (error.code === "ERR_CANCELED" || error.code === "ERR_REQUEST_CANCELED") {
 			throw new Error("Sign in was cancelled");
 		}
 		throw error;

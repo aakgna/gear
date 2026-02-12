@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Alert, Image, Linking } from "react-native";
+import { View, Text, StyleSheet, Alert, Image, Linking, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import TikTokButton from "../components/TikTokButton";
 import {
 	signInWithGoogle,
+	signInWithApple,
 	configureGoogleSignIn,
 	getUserData,
 	getCurrentUser,
@@ -20,7 +21,8 @@ import {
 
 const SignInScreen = () => {
 	const router = useRouter();
-	const [loading, setLoading] = useState(false);
+	const [googleLoading, setGoogleLoading] = useState(false);
+	const [appleLoading, setAppleLoading] = useState(false);
 
 	useEffect(() => {
 		// Configure Google Sign-In on mount
@@ -28,7 +30,7 @@ const SignInScreen = () => {
 	}, []);
 
 	const handleGoogleSignIn = async () => {
-		setLoading(true);
+		setGoogleLoading(true);
 		try {
 			const user = await signInWithGoogle();
 			if (user) {
@@ -40,18 +42,54 @@ const SignInScreen = () => {
 				// 2. User document exists but doesn't have username field (!userData.username)
 				if (!userData || !userData.username) {
 					// User needs to set username, go to username screen
-					setLoading(false);
+					setGoogleLoading(false);
 					router.replace("/username");
 				} else {
 					// User has username, go to feed
-					setLoading(false);
+					setGoogleLoading(false);
 					router.replace("/feed");
 				}
 			} else {
-				setLoading(false);
+				setGoogleLoading(false);
 			}
 		} catch (error: any) {
-			setLoading(false);
+			setGoogleLoading(false);
+			if (error.message === "Sign in was cancelled") {
+				// User cancelled, don't show error
+				return;
+			}
+			Alert.alert(
+				"Sign In Error",
+				error.message || "Failed to sign in. Please try again."
+			);
+		}
+	};
+
+	const handleAppleSignIn = async () => {
+		setAppleLoading(true);
+		try {
+			const user = await signInWithApple();
+			if (user) {
+				// Check if user document exists and has username
+				const userData = await getUserData(user.uid);
+
+				// Route to username page if:
+				// 1. User document doesn't exist (!userData)
+				// 2. User document exists but doesn't have username field (!userData.username)
+				if (!userData || !userData.username) {
+					// User needs to set username, go to username screen
+					setAppleLoading(false);
+					router.replace("/username");
+				} else {
+					// User has username, go to feed
+					setAppleLoading(false);
+					router.replace("/feed");
+				}
+			} else {
+				setAppleLoading(false);
+			}
+		} catch (error: any) {
+			setAppleLoading(false);
 			if (error.message === "Sign in was cancelled") {
 				// User cancelled, don't show error
 				return;
@@ -113,11 +151,28 @@ const SignInScreen = () => {
 					</View>
 
 					<View style={styles.buttonWrap}>
+						{Platform.OS === "ios" && (
+							<TikTokButton
+								label="Continue with Apple"
+								onPress={handleAppleSignIn}
+								disabled={googleLoading || appleLoading}
+								loading={appleLoading}
+								icon={
+									<Ionicons
+										name="logo-apple"
+										size={20}
+										color={Colors.text.white}
+									/>
+								}
+								fullWidth
+							/>
+						)}
+						{Platform.OS === "ios" && <View style={styles.buttonSpacing} />}
 						<TikTokButton
 							label="Continue with Google"
 							onPress={handleGoogleSignIn}
-							disabled={loading}
-							loading={loading}
+							disabled={googleLoading || appleLoading}
+							loading={googleLoading}
 							icon={
 								<Ionicons
 									name="logo-google"
@@ -255,6 +310,9 @@ const styles = StyleSheet.create({
 	buttonWrap: {
 		width: "100%",
 		marginBottom: Spacing.lg,
+	},
+	buttonSpacing: {
+		height: Spacing.md,
 	},
 
 	privacyText: {
