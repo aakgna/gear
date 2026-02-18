@@ -119,11 +119,25 @@ const SignInScreen = () => {
 	};
 
 	const handleSendCode = async () => {
-		const normalized = phoneNumber.replace(/\s/g, "");
+		let normalized = phoneNumber.replace(/\s/g, "");
 		if (!normalized) {
 			Alert.alert("Error", "Enter your phone number (e.g. +1 234 567 8900)");
 			return;
 		}
+		
+		// Normalize phone number based on length
+		const length = normalized.length;
+		if (length === 10) {
+			// 10 digits: add +1 prefix
+			normalized = "+1" + normalized;
+		} else if (length === 11) {
+			// 11 digits: add + prefix
+			normalized = "+" + normalized;
+		} else if (length === 12) {
+			// 12 digits: do nothing (already has +1 prefix)
+			// normalized stays as is
+		}
+		
 		setSendCodeLoading(true);
 		try {
 			const confirmation = await sendPhoneVerificationCode(normalized);

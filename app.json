@@ -1,62 +1,63 @@
 {
-	"expo": {
-		"name": "Kracked",
-		"slug": "gear",
-		"version": "1.0.0",
-		"orientation": "portrait",
-		"icon": "./assets/images/Kracked_logo.png",
-		"scheme": "kracked",
-		"userInterfaceStyle": "light",
-		"newArchEnabled": true,
-		"ios": {
-			"supportsTablet": true,
-			"bundleIdentifier": "com.aakgna.gear",
-			"googleServicesFile": "./GoogleService-Info.plist",
-			"buildNumber": "6",
-			"usesAppleSignIn": true
-		},
-		"android": {
-			"versionCode": 1,
-			"package": "com.aakgna.gear",
-			"googleServicesFile": "./google-services.json",
-			"permissions": [
-				"INTERNET"
-			]
-		},
-		"web": {
-			"bundler": "metro",
-			"output": "static",
-			"favicon": "./_transparent.png"
-		},
-		"plugins": [
-			"expo-router",
-			"@react-native-firebase/app",
-			"@react-native-firebase/auth",
-			[
-				"expo-build-properties",
-				{
-					"android": {
-						"compileSdkVersion": 34,
-						"targetSdkVersion": 34,
-						"minSdkVersion": 21
-					},
-					"ios": {
-						"useFrameworks": "static"
-					}
-				}
-			]
-		],
-		"experiments": {
-			"typedRoutes": true
-		},
-		"extra": {
-			"router": {
-				"origin": false
-			},
-			"eas": {
-				"projectId": "9c855445-1918-4f3a-a2d7-bc0852040e63"
-			}
-		},
-		"owner": "aakgna"
-	}
+  "expo": {
+    "name": "Kracked",
+    "slug": "gear",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Kracked_logo.png",
+    "scheme": "kracked",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aakgna.gear",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "buildNumber": "7",
+      "usesAppleSignIn": true,
+      "appleTeamId": "2W9F399FQ7"
+    },
+    "android": {
+      "versionCode": 1,
+      "package": "com.aakgna.gear",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./_transparent.png"
+    },
+    "plugins": [
+      "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "minSdkVersion": 21
+          },
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9c855445-1918-4f3a-a2d7-bc0852040e63"
+      }
+    },
+    "owner": "aakgna"
+  }
 }
