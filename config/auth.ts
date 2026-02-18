@@ -15,6 +15,7 @@ export interface CategoryStats {
 
 export interface UserData {
 	email: string;
+	phoneNumber?: string;
 	username?: string;
 	createdAt: any; // Firestore timestamp
 	updatedAt: any; // Firestore timestamp
@@ -143,6 +144,22 @@ export const signInWithApple = async () => {
 	}
 };
 
+// Send SMS verification code to phone (E.164 format, e.g. +1234567890)
+export const sendPhoneVerificationCode = async (phoneNumber: string) => {
+	const normalized = phoneNumber.replace(/\s/g, "");
+	if (!normalized.length) throw new Error("Enter a phone number");
+	return auth().signInWithPhoneNumber(normalized);
+};
+
+// Complete sign-in with the code user received
+export const confirmPhoneCode = async (confirmation: any, code: string) => {
+	const result = await confirmation.confirm(code);
+	if (result?.user) {
+		await createOrUpdateUserDocument(result.user);
+	}
+	return result?.user ?? null;
+};
+
 // Sign out
 export const signOut = async () => {
 	try {
@@ -168,682 +185,682 @@ const getRandomGameSet = (): string[] => {
 	try {
 		const sets = [
 			[
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s"
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s"
 			],
 			[
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS"
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS"
 			],
 			[
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR"
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR"
 			],
 			[
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C"
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C"
 			],
 			[
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7"
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7"
 			],
 			[
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd"
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd"
 			],
 			[
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE"
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE"
 			],
 			[
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"trailfinder_easy_065CONLp6F775VHVyLU6"
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"trailfinder_easy_065CONLp6F775VHVyLU6"
 			],
 			[
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ"
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ"
 			],
 			[
-			"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
-			"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
-			"trivia_easy_AowSvqDsHcSRgKU2Aabh",
-			"maze_easy_GVOjo5A8Abrpq2jYXy3G",
-			"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
-			"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
-			"riddle_easy_DIfSZFLpL56TDBFUFIYp",
-			"wordform_easy_BMalKmkZ8qP1WyszZrXy",
-			"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
-			"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
-			"riddle_easy_5XqO2TkbPygerQPofDLB",
-			"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-			"wordChain_easy_SOlplsaqt2Gh652U9FK3",
-			"maze_easy_D59nSNNglEs8SM4DP269",
-			"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
-			"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
-			"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
-			"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
-			"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
-			"inference_easy_5Aou65GSXNHV2peyE84i",
-			"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
-			"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
-			"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-			"inference_easy_MXMMUXngvEZvNxhnd9MA",
-			"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
-			"riddle_easy_76jb1tIgWFA2SB6xYhAH",
-			"quickMath_easy_05UGivOSyi04Mn0o8oTc",
-			"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
-			"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
-			"wordform_easy_7JTA0pXEt4GaHxr5IJij",
-			"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
-			"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
-			"maze_easy_5sr9LMS9mgcFuzNm478K",
-			"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
-			"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-			"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-			"sudoku_easy_QP749ofNj60kVHrSPemB",
-			"inference_easy_JhyugySsH2N4dtvplPC2",
-			"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
-			"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
-			"trivia_easy_lLk3P7gvVepWyfHClvl0",
-			"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
-			"trivia_easy_mV3b21QH4RrGqXH49EtM",
-			"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
-			"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
-			"trailfinder_easy_065CONLp6F775VHVyLU6",
-			"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-			"riddle_easy_DuDiYfThW4yD4qCMnMwd",
-			"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
-			"trivia_easy_8JEaHhqwSizvgitCNym9",
-			"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-			"inference_easy_10niV1cRwPd8tQg22GTP",
-			"wordChain_easy_Knn1rtRczTnajrrMiMHv",
-			"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
-			"maze_easy_5TheitOaVQLGeIU6grLS",
-			"riddle_easy_BimKkdo3XMGjylMOeuA1",
-			"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
-			"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
-			"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
-			"codebreaker_easy_GGRCulJNZvGprXAYBELA",
-			"maze_easy_Lkoez3ATOHMdwSLWiFZe",
-			"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
-			"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
-			"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-			"wordform_easy_DIhScTt7CXxD2aQ4JBFX"
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
+				"quickMath_easy_aMv2WFso2X2OwjHBm9HC",
+				"trivia_easy_AowSvqDsHcSRgKU2Aabh",
+				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
+				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
+				"wordChain_easy_opYtGSIoZxdjrkTBFkEf",
+				"riddle_easy_DIfSZFLpL56TDBFUFIYp",
+				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
+				"codebreaker_easy_eKydFK2Sgn7AfxvJqCRQ",
+				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
+				"riddle_easy_5XqO2TkbPygerQPofDLB",
+				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
+				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
+				"maze_easy_D59nSNNglEs8SM4DP269",
+				"sudoku_easy_jxIxqQv0xaWuie6qnPSX",
+				"codebreaker_easy_RmMWFrkUjsNfWQt6aUsB",
+				"sequencing_easy_BGx4DjHlgDRT2sNPyE9Y",
+				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
+				"trailfinder_easy_4PMjuFvhhKHCdDDyeAii",
+				"inference_easy_5Aou65GSXNHV2peyE84i",
+				"futoshiki_easy_9rsWFyXfEFYhUQU08bq7",
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
+				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
+				"inference_easy_MXMMUXngvEZvNxhnd9MA",
+				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
+				"riddle_easy_76jb1tIgWFA2SB6xYhAH",
+				"quickMath_easy_05UGivOSyi04Mn0o8oTc",
+				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
+				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
+				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
+				"futoshiki_easy_2KPb3UGl98kHpDA617Fd",
+				"wordChain_easy_0m4wpyg4P7dBbiBEovPC",
+				"maze_easy_5sr9LMS9mgcFuzNm478K",
+				"sudoku_easy_RIy4jR6oXHGgszRjXW3I",
+				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
+				"sudoku_easy_QP749ofNj60kVHrSPemB",
+				"inference_easy_JhyugySsH2N4dtvplPC2",
+				"magicSquare_easy_AUVf1rIGlG5TfoCGRdT3",
+				"quickMath_easy_mfGvIxDtOPakeykTBu7Q",
+				"trivia_easy_lLk3P7gvVepWyfHClvl0",
+				"sequencing_easy_F0P0EiezZXpSvndk9Rgx",
+				"trivia_easy_mV3b21QH4RrGqXH49EtM",
+				"sequencing_easy_8oJZwjqgUHZSpGmQhpvn",
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
+				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
+				"trivia_easy_8JEaHhqwSizvgitCNym9",
+				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
+				"inference_easy_10niV1cRwPd8tQg22GTP",
+				"wordChain_easy_Knn1rtRczTnajrrMiMHv",
+				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
+				"maze_easy_5TheitOaVQLGeIU6grLS",
+				"riddle_easy_BimKkdo3XMGjylMOeuA1",
+				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
+				"trivia_easy_rAsIzxcAjCYGVBNbHkAJ",
+				"codebreaker_easy_GGRCulJNZvGprXAYBELA",
+				"maze_easy_Lkoez3ATOHMdwSLWiFZe",
+				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
+				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX"
 			]
 		];
-		
+
 		if (sets.length === 0) {
 			console.warn("No game sets found in game_sets.json");
 			return [];
 		}
-		
+
 		// Pick a random number from 0 to 9 (or sets.length - 1)
 		const randomIndex = Math.floor(Math.random() * sets.length);
 		return sets[randomIndex] || [];
@@ -866,10 +883,11 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 		if (!userDoc.exists()) {
 			// Get a random game set for precomputed recommendations
 			const randomGameSet = getRandomGameSet();
-			
+
 			// New user - create document with initial stats
 			await userRef.set({
 				email: firebaseUser.email || "",
+				phoneNumber: firebaseUser.phoneNumber || "",
 				totalGamesPlayed: 0,
 				totalPlayTime: 0,
 				averageTimePerGame: 0,
@@ -887,13 +905,13 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
 		} else {
-			// Existing user - update email if changed and ensure counts are initialized
+			// Existing user - update email/phone if changed and ensure counts are initialized
+			const existingData = userDoc.data();
 			const updateData: any = {
 				email: firebaseUser.email || "",
+				phoneNumber: firebaseUser.phoneNumber ?? existingData?.phoneNumber ?? "",
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			};
-
-			const existingData = userDoc.data();
 			// Initialize counts if they don't exist
 			if (existingData?.followerCount === undefined) {
 				updateData.followerCount = 0;
@@ -1041,12 +1059,12 @@ export const updateUserStats = async (
 		// Sanitize to ensure they are numbers (handle corrupted data)
 		const currentTotalGames =
 			typeof userData.totalGamesPlayed === "number" &&
-			isFinite(userData.totalGamesPlayed)
+				isFinite(userData.totalGamesPlayed)
 				? userData.totalGamesPlayed
 				: 0;
 		const currentTotalTime =
 			typeof userData.totalPlayTime === "number" &&
-			isFinite(userData.totalPlayTime)
+				isFinite(userData.totalPlayTime)
 				? userData.totalPlayTime
 				: 0;
 
@@ -1128,12 +1146,12 @@ export const updateUserStats = async (
 			// Sanitize attempted and skipped to avoid NaN
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 
@@ -1184,8 +1202,7 @@ export const updateUserStats = async (
 			!isFinite(updateData.totalPlayTime)
 		) {
 			console.error(
-				`[updateUserStats] Invalid totalPlayTime value: ${
-					updateData.totalPlayTime
+				`[updateUserStats] Invalid totalPlayTime value: ${updateData.totalPlayTime
 				}, type: ${typeof updateData.totalPlayTime}. Resetting to 0.`
 			);
 			updateData.totalPlayTime = 0;
@@ -1259,22 +1276,22 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const catSkipped = skipped + 1;
@@ -1393,22 +1410,22 @@ export const moveFromSkippedToAttempted = async (
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 
@@ -1496,22 +1513,22 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-				isFinite(currentCatStats.completed)
+					isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-				isFinite(currentCatStats.attempted)
+					isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-				isFinite(currentCatStats.skipped)
+					isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-				isFinite(currentCatStats.avgTime)
+					isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const catAttempted = attempted + 1;
@@ -1726,7 +1743,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 		// iOS and Android (after permission granted)
 		await messaging().registerDeviceForRemoteMessages();
 		const authStatus = await messaging().requestPermission();
-		
+
 		return (
 			authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
 			authStatus === messaging.AuthorizationStatus.PROVISIONAL
@@ -1792,25 +1809,25 @@ const { parsePuzzleId, docExists } = require("./firebase");
 const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all users this person follows
 		const followingRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("following");
 		const followingSnapshot = await followingRef.get();
-		
+
 		// Fetch all users following this person
 		const followersRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("followers");
 		const followersSnapshot = await followersRef.get();
-		
+
 		let batch = db.batch();
 		let batchCount = 0;
 		const BATCH_SIZE = 500;
-		
+
 		// Helper to commit and create new batch
 		const commitBatch = async () => {
 			if (batchCount > 0) {
@@ -1819,7 +1836,7 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 				batchCount = 0;
 			}
 		};
-		
+
 		// Process followed users: remove from their followers list and decrement counts
 		for (const followingDoc of followingSnapshot.docs) {
 			const followedUserId = followingDoc.id;
@@ -1827,23 +1844,23 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 			const followedUserFollowersRef = followedUserRef
 				.collection("followers")
 				.doc(userId);
-			
+
 			// Remove from followed user's followers
 			batch.delete(followedUserFollowersRef);
-			
+
 			// Decrement followerCount on followed user
 			batch.update(followedUserRef, {
 				followerCount: firestore.FieldValue.increment(-1),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
-			
+
 			batchCount += 2;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Process followers: remove from their following list and decrement counts
 		for (const followerDoc of followersSnapshot.docs) {
 			const followerUserId = followerDoc.id;
@@ -1851,23 +1868,23 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 			const followerUserFollowingRef = followerUserRef
 				.collection("following")
 				.doc(userId);
-			
+
 			// Remove from follower's following
 			batch.delete(followerUserFollowingRef);
-			
+
 			// Decrement followingCount on follower
 			batch.update(followerUserRef, {
 				followingCount: firestore.FieldValue.increment(-1),
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			});
-			
+
 			batchCount += 2;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Delete user's own following and followers subcollections
 		for (const doc of followingSnapshot.docs) {
 			batch.delete(doc.ref);
@@ -1876,7 +1893,7 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 				await commitBatch();
 			}
 		}
-		
+
 		for (const doc of followersSnapshot.docs) {
 			batch.delete(doc.ref);
 			batchCount++;
@@ -1884,10 +1901,10 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 				await commitBatch();
 			}
 		}
-		
+
 		// Commit any remaining operations
 		await commitBatch();
-		
+
 		console.log(`[cleanupFollowingFollowers] Cleaned up following/followers for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupFollowingFollowers] Error:`, error);
@@ -1899,18 +1916,18 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 const cleanupLikedGames = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all liked games
 		const likedRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("liked");
 		const likedSnapshot = await likedRef.get();
-		
+
 		let batch = db.batch();
 		let batchCount = 0;
 		const BATCH_SIZE = 500;
-		
+
 		// Helper to commit and create new batch
 		const commitBatch = async () => {
 			if (batchCount > 0) {
@@ -1919,15 +1936,15 @@ const cleanupLikedGames = async (userId: string): Promise<void> => {
 				batchCount = 0;
 			}
 		};
-		
+
 		// Process each liked game
 		for (const likedDoc of likedSnapshot.docs) {
 			const gameId = likedDoc.id;
 			const parsed = parsePuzzleId(gameId);
-			
+
 			if (parsed) {
 				const { gameType, difficulty, gameId: actualGameId } = parsed;
-				
+
 				// Delete like from game's likes subcollection
 				const gameLikesRef = db
 					.collection("games")
@@ -1936,35 +1953,35 @@ const cleanupLikedGames = async (userId: string): Promise<void> => {
 					.doc(actualGameId)
 					.collection("likes")
 					.doc(userId);
-				
+
 				batch.delete(gameLikesRef);
-				
+
 				// Decrement likeCount in game stats
 				const gameRef = db
 					.collection("games")
 					.doc(gameType)
 					.collection(difficulty)
 					.doc(actualGameId);
-				
+
 				batch.update(gameRef, {
 					"stats.likeCount": firestore.FieldValue.increment(-1),
 				});
-				
+
 				batchCount += 2;
 			}
-			
+
 			// Delete from user's liked subcollection
 			batch.delete(likedDoc.ref);
 			batchCount++;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Commit any remaining operations
 		await commitBatch();
-		
+
 		console.log(`[cleanupLikedGames] Cleaned up liked games for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupLikedGames] Error:`, error);
@@ -1976,29 +1993,29 @@ const cleanupLikedGames = async (userId: string): Promise<void> => {
 const cleanupCreatedGames = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all created games
 		const createdGamesRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("createdGames");
 		const createdGamesSnapshot = await createdGamesRef.get();
-		
+
 		// Process each created game
 		for (const createdGameDoc of createdGamesSnapshot.docs) {
 			const gameData = createdGameDoc.data();
 			const gameType = gameData?.gameType;
 			const difficulty = gameData?.difficulty;
 			const actualGameId = createdGameDoc.id;
-			
+
 			if (!gameType || !difficulty) {
 				console.warn(`[cleanupCreatedGames] Invalid game data for ${actualGameId}`);
 				continue;
 			}
-			
+
 			// Construct full puzzleId
 			const puzzleId = `${gameType}_${difficulty}_${actualGameId}`;
-			
+
 			// Delete from all users' liked subcollections (reuse pattern from profile.tsx)
 			try {
 				const likesRef = db
@@ -2007,9 +2024,9 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 					.collection(difficulty)
 					.doc(actualGameId)
 					.collection("likes");
-				
+
 				const likesSnapshot = await likesRef.get();
-				
+
 				// Helper to convert lowercase gameType to camelCase
 				const toCamelCase = (gt: string): string => {
 					if (gt === "quickmath") return "quickMath";
@@ -2017,7 +2034,7 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 					if (gt === "magicsquare") return "magicSquare";
 					return gt;
 				};
-				
+
 				// Generate both lowercase and camelCase versions
 				const parts = puzzleId.split("_");
 				let camelCasePuzzleId: string | null = null;
@@ -2028,18 +2045,18 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 						camelCasePuzzleId = `${gameTypeCamel}_${parts[1]}_${parts.slice(2).join("_")}`;
 					}
 				}
-				
+
 				// Delete from each user's liked subcollection
 				for (const likeDoc of likesSnapshot.docs) {
 					const likedUserId = likeDoc.id;
-					
+
 					// Try lowercase version first
 					const userLikedRef = db
 						.collection("users")
 						.doc(likedUserId)
 						.collection("liked")
 						.doc(puzzleId);
-					
+
 					try {
 						const likedDoc = await userLikedRef.get();
 						if (docExists(likedDoc)) {
@@ -2063,7 +2080,7 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 			} catch (error) {
 				console.error(`[cleanupCreatedGames] Error deleting from liked collections:`, error);
 			}
-			
+
 			// Delete game subcollections (likes, comments)
 			try {
 				const gameRef = db
@@ -2071,25 +2088,25 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 					.doc(gameType)
 					.collection(difficulty)
 					.doc(actualGameId);
-				
+
 				const subcollections = ["likes", "comments"];
-				
+
 				for (const subcollectionName of subcollections) {
 					const subcollectionRef = gameRef.collection(subcollectionName);
 					const snapshot = await subcollectionRef.get();
-					
+
 					if (!snapshot.empty) {
 						const batchSize = 500;
 						const docs = snapshot.docs;
-						
+
 						for (let i = 0; i < docs.length; i += batchSize) {
 							const batch = db.batch();
 							const batchDocs = docs.slice(i, i + batchSize);
-							
+
 							batchDocs.forEach((doc) => {
 								batch.delete(doc.ref);
 							});
-							
+
 							await batch.commit();
 						}
 					}
@@ -2097,7 +2114,7 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 			} catch (error) {
 				console.error(`[cleanupCreatedGames] Error deleting subcollections:`, error);
 			}
-			
+
 			// Delete the game document
 			try {
 				const gameRef = db
@@ -2110,7 +2127,7 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 				console.error(`[cleanupCreatedGames] Error deleting game document:`, error);
 			}
 		}
-		
+
 		// Delete user's createdGames subcollection
 		const batch = db.batch();
 		for (const doc of createdGamesSnapshot.docs) {
@@ -2119,7 +2136,7 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 		if (!createdGamesSnapshot.empty) {
 			await batch.commit();
 		}
-		
+
 		console.log(`[cleanupCreatedGames] Cleaned up created games for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupCreatedGames] Error:`, error);
@@ -2131,14 +2148,14 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 const cleanupComments = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all games from gameHistory (any action)
 		const gameHistoryRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("gameHistory");
 		const gameHistorySnapshot = await gameHistoryRef.get();
-		
+
 		// Get unique game IDs
 		const gameIds = new Set<string>();
 		gameHistorySnapshot.forEach((doc) => {
@@ -2147,80 +2164,80 @@ const cleanupComments = async (userId: string): Promise<void> => {
 				gameIds.add(data.gameId);
 			}
 		});
-		
+
 		// Process each game
 		for (const gameId of gameIds) {
 			const parsed = parsePuzzleId(gameId);
 			if (!parsed) continue;
-			
+
 			const { gameType, difficulty, gameId: actualGameId } = parsed;
-			
+
 			const commentsRef = db
 				.collection("games")
 				.doc(gameType)
 				.collection(difficulty)
 				.doc(actualGameId)
 				.collection("comments");
-			
+
 			// Find all comments by this user
 			const userCommentsSnapshot = await commentsRef
 				.where("userId", "==", userId)
 				.get();
-			
+
 			// Delete user's comments and decrement commentCount
 			if (!userCommentsSnapshot.empty) {
 				const batch = db.batch();
 				let commentCount = 0;
-				
+
 				userCommentsSnapshot.forEach((doc) => {
 					batch.delete(doc.ref);
 					commentCount++;
 				});
-				
+
 				// Decrement commentCount in game stats
 				const gameRef = db
 					.collection("games")
 					.doc(gameType)
 					.collection(difficulty)
 					.doc(actualGameId);
-				
+
 				batch.update(gameRef, {
 					"stats.commentCount": firestore.FieldValue.increment(-commentCount),
 				});
-				
+
 				await batch.commit();
 			}
-			
+
 			// Remove user from likedBy arrays in all comments on this game
 			const allCommentsSnapshot = await commentsRef.get();
-			
+
 			if (!allCommentsSnapshot.empty) {
 				const batch = db.batch();
 				let updateCount = 0;
-				
+
 				allCommentsSnapshot.forEach((doc) => {
 					const data = doc.data();
 					const likedBy = data?.likedBy || [];
-					
+
 					if (likedBy.includes(userId)) {
 						const newLikedBy = likedBy.filter((id: string) => id !== userId);
 						const newLikes = Math.max(0, (data?.likes || 0) - 1);
-						
+
 						batch.update(doc.ref, {
 							likedBy: newLikedBy,
 							likes: newLikes,
 						});
-						
+
 						updateCount++;
 					}
 				});
-				
+
 				if (updateCount > 0) {
 					await batch.commit();
 				}
 			}
 		}
-		
+
 		console.log(`[cleanupComments] Cleaned up comments for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupComments] Error:`, error);
@@ -2232,18 +2249,18 @@ const cleanupComments = async (userId: string): Promise<void> => {
 const cleanupNotifications = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Delete all notifications from user's notifications subcollection
 		const notificationsRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("notifications");
 		const notificationsSnapshot = await notificationsRef.get();
-		
+
 		let batch = db.batch();
 		let batchCount = 0;
 		const BATCH_SIZE = 500;
-		
+
 		// Helper to commit and create new batch
 		const commitBatch = async () => {
 			if (batchCount > 0) {
@@ -2252,18 +2269,18 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 				batchCount = 0;
 			}
 		};
-		
+
 		for (const doc of notificationsSnapshot.docs) {
 			batch.delete(doc.ref);
 			batchCount++;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		await commitBatch();
-		
+
 		// Find and update grouped notifications where this user is the sender
 		// We need to query all users' notifications to find ones where fromUserId == userId
 		// This is expensive but necessary for complete cleanup
@@ -2271,44 +2288,44 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 		try {
 			// Get all users (this is expensive but necessary for complete cleanup)
 			const usersSnapshot = await db.collection("users").limit(1000).get();
-			
+
 			for (const userDoc of usersSnapshot.docs) {
 				const otherUserId = userDoc.id;
 				if (otherUserId === userId) continue;
-				
+
 				const otherNotificationsRef = db
 					.collection("users")
 					.doc(otherUserId)
 					.collection("notifications");
-				
+
 				// Find notifications where fromUserId == userId
 				const fromUserNotifications = await otherNotificationsRef
 					.where("fromUserId", "==", userId)
 					.get();
-				
+
 				// Find grouped notifications where fromUserIds contains userId
 				const groupedNotifications = await otherNotificationsRef
 					.where("fromUserIds", "array-contains", userId)
 					.get();
-				
+
 				const updateBatch = db.batch();
 				let updateCount = 0;
-				
+
 				// Process fromUserId notifications (delete them)
 				fromUserNotifications.forEach((doc) => {
 					updateBatch.delete(doc.ref);
 					updateCount++;
 				});
-				
+
 				// Process grouped notifications (remove userId from array, decrement count)
 				groupedNotifications.forEach((doc) => {
 					const data = doc.data();
 					const fromUserIds = data?.fromUserIds || [];
 					const likeCount = data?.likeCount || 0;
-					
+
 					const newFromUserIds = fromUserIds.filter((id: string) => id !== userId);
 					const newLikeCount = Math.max(0, likeCount - 1);
-					
+
 					if (newFromUserIds.length === 0 || newLikeCount === 0) {
 						// Delete notification if no users left
 						updateBatch.delete(doc.ref);
@@ -2321,7 +2338,7 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 					}
 					updateCount++;
 				});
-				
+
 				if (updateCount > 0) {
 					await updateBatch.commit();
 				}
@@ -2330,7 +2347,7 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 			console.error(`[cleanupNotifications] Error cleaning up grouped notifications:`, error);
 			// Continue - this is a best-effort cleanup
 		}
-		
+
 		console.log(`[cleanupNotifications] Cleaned up notifications for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupNotifications] Error:`, error);
@@ -2342,62 +2359,62 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 const cleanupConversations = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all conversations from user's conversations subcollection
 		const userConversationsRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("conversations");
 		const userConversationsSnapshot = await userConversationsRef.get();
-		
+
 		// Process each conversation
 		for (const conversationDoc of userConversationsSnapshot.docs) {
 			const conversationId = conversationDoc.id;
-			
+
 			try {
 				// Get conversation data to find participants
 				const conversationRef = db.collection("conversations").doc(conversationId);
 				const conversationData = (await conversationRef.get()).data();
-				
+
 				if (!conversationData) {
 					// Conversation doesn't exist, just delete from user's subcollection
 					await conversationDoc.ref.delete();
 					continue;
 				}
-				
+
 				const participants = conversationData.participants || [];
-				
+
 				// Delete all messages in the conversation (use pagination pattern)
 				const messagesRef = conversationRef.collection("messages");
 				let lastDoc: any = null;
 				const BATCH_SIZE = 500;
-				
+
 				while (true) {
 					let query = messagesRef.orderBy("createdAt", "desc").limit(BATCH_SIZE);
 					if (lastDoc) {
 						query = query.startAfter(lastDoc);
 					}
-					
+
 					const snapshot = await query.get();
 					if (snapshot.empty) {
 						break;
 					}
-					
+
 					const batch = db.batch();
 					snapshot.forEach((doc) => {
 						batch.delete(doc.ref);
 					});
 					await batch.commit();
-					
+
 					if (snapshot.size < BATCH_SIZE) {
 						break;
 					}
 					lastDoc = snapshot.docs[snapshot.docs.length - 1];
 				}
-				
+
 				// Delete conversation from main collection
 				await conversationRef.delete();
-				
+
 				// Remove conversation from other participant's conversations subcollection
 				for (const participantId of participants) {
 					if (participantId !== userId) {
@@ -2413,7 +2430,7 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 				console.error(`[cleanupConversations] Error processing conversation ${conversationId}:`, error);
 			}
 		}
-		
+
 		// Delete user's conversations subcollection
 		const batch = db.batch();
 		for (const doc of userConversationsSnapshot.docs) {
@@ -2422,7 +2439,7 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 		if (!userConversationsSnapshot.empty) {
 			await batch.commit();
 		}
-		
+
 		console.log(`[cleanupConversations] Cleaned up conversations for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupConversations] Error:`, error);
@@ -2434,25 +2451,25 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all users this person blocked
 		const blockedRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("blocked");
 		const blockedSnapshot = await blockedRef.get();
-		
+
 		// Fetch all users who blocked this person
 		const blockedByRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("blockedBy");
 		const blockedBySnapshot = await blockedByRef.get();
-		
+
 		let batch = db.batch();
 		let batchCount = 0;
 		const BATCH_SIZE = 500;
-		
+
 		// Helper to commit and create new batch
 		const commitBatch = async () => {
 			if (batchCount > 0) {
@@ -2461,7 +2478,7 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 				batchCount = 0;
 			}
 		};
-		
+
 		// Remove from blocked users' blockedBy collections
 		for (const blockedDoc of blockedSnapshot.docs) {
 			const blockedUserId = blockedDoc.id;
@@ -2470,15 +2487,15 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 				.doc(blockedUserId)
 				.collection("blockedBy")
 				.doc(userId);
-			
+
 			batch.delete(blockedUserBlockedByRef);
 			batchCount++;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Remove from blockers' blocked collections
 		for (const blockedByDoc of blockedBySnapshot.docs) {
 			const blockerUserId = blockedByDoc.id;
@@ -2487,15 +2504,15 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 				.doc(blockerUserId)
 				.collection("blocked")
 				.doc(userId);
-			
+
 			batch.delete(blockerUserBlockedRef);
 			batchCount++;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Delete user's blocked and blockedBy subcollections
 		for (const doc of blockedSnapshot.docs) {
 			batch.delete(doc.ref);
@@ -2504,7 +2521,7 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 				await commitBatch();
 			}
 		}
-		
+
 		for (const doc of blockedBySnapshot.docs) {
 			batch.delete(doc.ref);
 			batchCount++;
@@ -2512,10 +2529,10 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 				await commitBatch();
 			}
 		}
-		
+
 		// Commit any remaining operations
 		await commitBatch();
-		
+
 		console.log(`[cleanupBlockingRelationships] Cleaned up blocking relationships for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupBlockingRelationships] Error:`, error);
@@ -2527,19 +2544,19 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 const cleanupGameHistory = async (userId: string): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-		
+
 		// Fetch all game history entries
 		const gameHistoryRef = db
 			.collection("users")
 			.doc(userId)
 			.collection("gameHistory");
 		const gameHistorySnapshot = await gameHistoryRef.get();
-		
+
 		// Delete in batches
 		let batch = db.batch();
 		let batchCount = 0;
 		const BATCH_SIZE = 500;
-		
+
 		// Helper to commit and create new batch
 		const commitBatch = async () => {
 			if (batchCount > 0) {
@@ -2548,19 +2565,19 @@ const cleanupGameHistory = async (userId: string): Promise<void> => {
 				batchCount = 0;
 			}
 		};
-		
+
 		for (const doc of gameHistorySnapshot.docs) {
 			batch.delete(doc.ref);
 			batchCount++;
-			
+
 			if (batchCount >= BATCH_SIZE) {
 				await commitBatch();
 			}
 		}
-		
+
 		// Commit any remaining operations
 		await commitBatch();
-		
+
 		console.log(`[cleanupGameHistory] Cleaned up game history for user ${userId}`);
 	} catch (error) {
 		console.error(`[cleanupGameHistory] Error:`, error);
@@ -2574,7 +2591,7 @@ const cleanupDeveloperSignup = async (userId: string): Promise<void> => {
 		// Delete developer signup document if it exists
 		const developerRef = db.collection("developer").doc(userId);
 		const developerDoc = await developerRef.get();
-		
+
 		if (docExists(developerDoc)) {
 			await developerRef.delete();
 			console.log(`[cleanupDeveloperSignup] Cleaned up developer signup for user ${userId}`);
@@ -2602,7 +2619,7 @@ export const deleteAccount = async (
 		// 2. BEFORE deleting user document, clean up all related data
 		// Execute all cleanup functions (errors are logged but don't stop the process)
 		console.log(`[deleteAccount] Starting comprehensive cleanup for user ${userId}`);
-		
+
 		// Execute cleanup functions (each has its own try-catch, so errors won't stop the process)
 		const cleanupPromises = [
 			cleanupFollowingFollowers(userId),
@@ -2615,13 +2632,13 @@ export const deleteAccount = async (
 			cleanupGameHistory(userId),
 			cleanupDeveloperSignup(userId),
 		];
-		
+
 		// Wait for all cleanup operations (errors are handled within each function)
 		await Promise.all(cleanupPromises.map(p => p.catch(err => {
 			// Errors are already logged in the helper functions
 			return null;
 		})));
-		
+
 		console.log(`[deleteAccount] Completed cleanup operations for user ${userId}`);
 
 		// 3. Delete username document if it exists

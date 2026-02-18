@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Alert, Image, Linking, Platform } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Alert, Image, Linking, Platform, TextInput, Modal, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,8 @@ import TikTokButton from "../components/TikTokButton";
 import {
 	signInWithGoogle,
 	signInWithApple,
+	sendPhoneVerificationCode,
+	confirmPhoneCode,
 	configureGoogleSignIn,
 	getUserData,
 	getCurrentUser,
@@ -23,6 +25,21 @@ const SignInScreen = () => {
 	const router = useRouter();
 	const [googleLoading, setGoogleLoading] = useState(false);
 	const [appleLoading, setAppleLoading] = useState(false);
+	const [phoneStep, setPhoneStep] = useState<"idle" | "code">("idle");
+	const [phoneNumber, setPhoneNumber] = useState("");
+	const [phoneCode, setPhoneCode] = useState("");
+	const [sendCodeLoading, setSendCodeLoading] = useState(false);
+	const [verifyLoading, setVerifyLoading] = useState(false);
+	const [showPhoneModal, setShowPhoneModal] = useState(false);
+	const phoneConfirmationRef = useRef<any>(null);
+
+	const closePhoneModal = () => {
+		setShowPhoneModal(false);
+		setPhoneStep("idle");
+		setPhoneNumber("");
+		setPhoneCode("");
+		phoneConfirmationRef.current = null;
+	};
 
 	useEffect(() => {
 		// Configure Google Sign-In on mount
@@ -98,6 +115,55 @@ const SignInScreen = () => {
 				"Sign In Error",
 				error.message || "Failed to sign in. Please try again."
 			);
+		}
+	};
+
+	const handleSendCode = async () => {
+		const normalized = phoneNumber.replace(/\s/g, "");
+		if (!normalized) {
+			Alert.alert("Error", "Enter your phone number (e.g. +1 234 567 8900)");
+			return;
+		}
+		setSendCodeLoading(true);
+		try {
+			const confirmation = await sendPhoneVerificationCode(normalized);
+			phoneConfirmationRef.current = confirmation;
+			setPhoneStep("code");
+			setPhoneCode("");
+		} catch (e: any) {
+			Alert.alert("Error", e?.message ?? "Failed to send code. Check the number and try again.");
+		} finally {
+			setSendCodeLoading(false);
+		}
+	};
+
+	const handleVerifyCode = async () => {
+		const code = phoneCode.trim();
+		if (!code) {
+			Alert.alert("Error", "Enter the 6-digit code");
+			return;
+		}
+		const confirmation = phoneConfirmationRef.current;
+		if (!confirmation) {
+			Alert.alert("Error", "Session expired. Please request a new code.");
+			setPhoneStep("idle");
+			return;
+		}
+		setVerifyLoading(true);
+		try {
+			const user = await confirmPhoneCode(confirmation, code);
+			if (user) {
+				const userData = await getUserData(user.uid);
+				if (!userData || !userData.username) {
+					router.replace("/username");
+				} else {
+					router.replace("/feed");
+				}
+			}
+		} catch (e: any) {
+			Alert.alert("Error", e?.message ?? "Invalid code. Try again.");
+		} finally {
+			setVerifyLoading(false);
 		}
 	};
 
@@ -182,7 +248,84 @@ const SignInScreen = () => {
 							}
 							fullWidth
 						/>
+						<TouchableOpacity
+							style={styles.phoneLinkWrap}
+							onPress={() => setShowPhoneModal(true)}
+							activeOpacity={0.7}
+						>
+							<Text style={styles.phoneLink}>Use phone number</Text>
+						</TouchableOpacity>
 					</View>
+
+					<Modal
+						visible={showPhoneModal}
+						transparent
+						animationType="fade"
+						onRequestClose={closePhoneModal}
+					>
+						<View style={styles.modalOverlay}>
+							<View style={styles.modalContent}>
+								<TouchableOpacity
+									style={styles.modalClose}
+									onPress={closePhoneModal}
+									hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+								>
+									<Ionicons name="close" size={24} color={Colors.text.primary} />
+								</TouchableOpacity>
+								<Text style={styles.modalTitle}>Sign in with phone</Text>
+								{phoneStep === "idle" ? (
+									<>
+										<TextInput
+											style={styles.phoneInput}
+											placeholder="+1 234 567 8900"
+											placeholderTextColor={Colors.text.secondary}
+											value={phoneNumber}
+											onChangeText={setPhoneNumber}
+											keyboardType="phone-pad"
+											editable={!sendCodeLoading}
+										/>
+										<TikTokButton
+											label="Send code"
+											onPress={handleSendCode}
+											disabled={sendCodeLoading}
+											loading={sendCodeLoading}
+											fullWidth
+										/>
+									</>
+								) : (
+									<>
+										<Text style={styles.phoneSent}>Code sent to {phoneNumber}</Text>
+										<TextInput
+											style={styles.phoneInput}
+											placeholder="6-digit code"
+											placeholderTextColor={Colors.text.secondary}
+											value={phoneCode}
+											onChangeText={setPhoneCode}
+											keyboardType="number-pad"
+											maxLength={6}
+											editable={!verifyLoading}
+										/>
+										<TikTokButton
+											label="Verify"
+											onPress={handleVerifyCode}
+											disabled={verifyLoading}
+											loading={verifyLoading}
+											fullWidth
+										/>
+										<Text
+											style={styles.backToPhone}
+											onPress={() => {
+												setPhoneStep("idle");
+												phoneConfirmationRef.current = null;
+											}}
+										>
+											Use a different number
+										</Text>
+									</>
+								)}
+							</View>
+						</View>
+					</Modal>
 
 					<Text style={styles.privacyText}>
 						By continuing, you agree to our{" "}
@@ -313,6 +456,69 @@ const styles = StyleSheet.create({
 	},
 	buttonSpacing: {
 		height: Spacing.md,
+	},
+
+	phoneLinkWrap: {
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	phoneLink: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.accent,
+		textDecorationLine: "underline",
+	},
+
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+		padding: Spacing.xl,
+	},
+	modalContent: {
+		width: "100%",
+		maxWidth: 360,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.xl,
+		padding: Spacing.xl,
+		...Shadows.medium,
+	},
+	modalClose: {
+		position: "absolute",
+		top: Spacing.md,
+		right: Spacing.md,
+		zIndex: 1,
+	},
+	modalTitle: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.lg,
+		textAlign: "center",
+	},
+	phoneInput: {
+		width: "100%",
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.1)",
+		borderRadius: BorderRadius.md,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.lg,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
+	},
+	phoneSent: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.sm,
+		textAlign: "center",
+	},
+	backToPhone: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.accent,
+		textAlign: "center",
+		marginTop: Spacing.sm,
 	},
 
 	privacyText: {
