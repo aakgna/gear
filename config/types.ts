@@ -1,3 +1,5 @@
+import type { GameDefinition } from "./gameDefinition";
+
 // Puzzle types
 export type PuzzleType =
 	| "wordform"
@@ -12,7 +14,8 @@ export type PuzzleType =
 	| "sudoku"
 	| "trivia"
 	| "codebreaker"
-	| "sequencing";
+	| "sequencing"
+	| "custom";
 
 export interface Puzzle {
 	id: string;
@@ -30,7 +33,8 @@ export interface Puzzle {
 		| SudokuData
 		| TriviaData
 		| CodeBreakerData
-		| SequencingData;
+		| SequencingData
+		| CustomData;
 	difficulty: number;
 	createdAt: string;
 	username?: string;
@@ -112,6 +116,10 @@ export interface TrailFinderData {
 export interface SudokuData {
 	grid: number[]; // Flattened 1D array of complete solution (81 numbers)
 	givens: Array<{ row: number; col: number; value: number }>;
+}
+
+export interface CustomData {
+	definition: GameDefinition;
 }
 
 export interface TriviaQuestion {

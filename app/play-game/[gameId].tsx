@@ -28,6 +28,7 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	CustomData,
 } from "../../config/types";
 import {
 	db,
@@ -287,6 +288,11 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				size: gameData.size,
 				grid: gameData.grid,
 			} as SudokuData;
+			isValid = true;
+		}
+		// Handle Custom (creator-built game definition)
+		else if (normalizedGameType === "custom" && gameData.definition) {
+			puzzleData = { definition: gameData.definition } as CustomData;
 			isValid = true;
 		}
 

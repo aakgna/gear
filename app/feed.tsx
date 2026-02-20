@@ -60,6 +60,7 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	CustomData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import WelcomeCard from "../components/WelcomeCard";
@@ -406,6 +407,20 @@ function convertFirestoreGameToPuzzle(
 						grid: game.grid,
 						givens: game.givens,
 					} as SudokuData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "custom":
+			if (game.definition) {
+				return {
+					id: gameId,
+					type: "custom",
+					data: { definition: game.definition } as CustomData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -1038,6 +1053,11 @@ const FeedScreen = () => {
 							grid: gameData.grid,
 							givens: gameData.givens,
 						} as SudokuData;
+						isValid = true;
+					}
+					// Handle Custom
+					else if (game.gameType === "custom" && gameData.definition) {
+						puzzleData = { definition: gameData.definition } as CustomData;
 						isValid = true;
 					}
 

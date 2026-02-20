@@ -20,6 +20,7 @@ import {
 	PuzzleType,
 	GameResult,
 	PuzzleStats as PuzzleStatsType,
+	CustomData,
 } from "../../config/types";
 import WordFormGame from "./WordForm";
 import QuickMathGame from "./QuickMathGame";
@@ -34,6 +35,7 @@ import FutoshikiGame from "./FutoshikiGame";
 import MagicSquareGame from "./MagicSquareGame";
 import TrailFinderGame from "./TrailFinder";
 import SudokuGame from "./SudokuGame";
+import { GamePlayer } from "../../runtime/GamePlayer";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
 import CommentsModal from "../CommentsModal";
@@ -784,6 +786,19 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						startTime={gameStartTime}
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+			case "custom":
+				return (
+					<GamePlayer
+						key={puzzle.id}
+						definition={(puzzle.data as CustomData).definition}
+						puzzleId={puzzle.id}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
 						isActive={isActive && gameStarted}
 						initialCompletedResult={completedResult}
 					/>

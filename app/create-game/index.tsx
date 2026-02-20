@@ -95,7 +95,8 @@ type GameType =
 	| "sudoku"
 	| "futoshiki"
 	| "trailfinder"
-	| "maze";
+	| "maze"
+	| "custom";
 
 const gameTypes: Array<{
 	type: GameType;
@@ -114,6 +115,7 @@ const gameTypes: Array<{
 	{ type: "futoshiki", name: "Futoshiki", icon: "code-working-outline" },
 	{ type: "trailfinder", name: "TrailFinder", icon: "navigate-outline" },
 	{ type: "maze", name: "Maze", icon: "git-branch-outline" },
+	{ type: "custom", name: "Create Your Own", icon: "sparkles-outline" },
 ];
 
 const CreateGameIndex = () => {

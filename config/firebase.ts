@@ -83,6 +83,8 @@ export interface FirestoreGame {
 		description: string;
 	}>;
 	// Note: solution field is shared by Maze and Sequencing (both use number[])
+	// Custom (creator-built) structure
+	definition?: object; // GameDefinition when gameType is "custom"
 }
 
 // Game History Entry interface
@@ -113,7 +115,8 @@ export const fetchGamesFromFirestore = async (
 		| "futoshiki"
 		| "magicSquare"
 		| "trailfinder"
-		| "sudoku",
+		| "sudoku"
+		| "custom",
 	difficulty: "easy" | "medium" | "hard"
 ): Promise<FirestoreGame[]> => {
 	try {
@@ -160,6 +163,7 @@ export const fetchAllGamesForType = async (
 		| "magicSquare"
 		| "trailfinder"
 		| "sudoku"
+		| "custom"
 ): Promise<{ difficulty: string; games: FirestoreGame[] }[]> => {
 	const difficulties = ["easy", "medium", "hard"];
 	const results = await Promise.all(
@@ -189,7 +193,8 @@ export const saveGameToFirestore = async (
 		| "sudoku"
 		| "trivia"
 		| "codebreaker"
-		| "sequencing",
+		| "sequencing"
+		| "custom",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];
@@ -235,6 +240,7 @@ export const saveGameToFirestore = async (
 			minDistance?: number;
 			description: string;
 		}>;
+		definition?: unknown;
 	},
 	userId: string,
 	username?: string
