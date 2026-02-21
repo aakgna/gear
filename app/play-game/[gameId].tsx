@@ -291,8 +291,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			isValid = true;
 		}
 		// Handle Custom (creator-built game definition)
+		// Phase 5 will align the Firestore field name with CustomData.game
 		else if (normalizedGameType === "custom" && gameData.definition) {
-			puzzleData = { definition: gameData.definition } as CustomData;
+			puzzleData = { game: gameData.definition } as unknown as CustomData;
 			isValid = true;
 		}
 

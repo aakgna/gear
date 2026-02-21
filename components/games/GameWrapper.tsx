@@ -794,7 +794,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 				return (
 					<GamePlayer
 						key={puzzle.id}
-						definition={(puzzle.data as CustomData).definition}
+						game={(puzzle.data as CustomData).game}
 						puzzleId={puzzle.id}
 						onComplete={handleComplete}
 						onAttempt={onAttempt}

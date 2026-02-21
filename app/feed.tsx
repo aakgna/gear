@@ -420,7 +420,8 @@ function convertFirestoreGameToPuzzle(
 				return {
 					id: gameId,
 					type: "custom",
-					data: { definition: game.definition } as CustomData,
+					// Phase 5 will align the Firestore field name with CustomData.game
+					data: { game: game.definition } as unknown as CustomData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -1057,7 +1058,8 @@ const FeedScreen = () => {
 					}
 					// Handle Custom
 					else if (game.gameType === "custom" && gameData.definition) {
-						puzzleData = { definition: gameData.definition } as CustomData;
+						// Phase 5 will align the Firestore field name with CustomData.game
+						puzzleData = { game: gameData.definition } as unknown as CustomData;
 						isValid = true;
 					}
 
@@ -2669,6 +2671,14 @@ const applyForYouFilters = useCallback(
 						}
 					}}
 				/>
+
+				{/* DEV: engine test shortcut — remove before ship */}
+				<TouchableOpacity
+					onPress={() => router.push("/dev-game-test" as any)}
+					style={{ position: "absolute", top: insets.top + 48, left: 12, backgroundColor: "#ef4444", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, zIndex: 999 }}
+				>
+					<Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>DEV</Text>
+				</TouchableOpacity>
 
 				{/* Tabs with animated indicator */}
 				<View style={styles.tabContainer}>

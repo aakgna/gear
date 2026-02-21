@@ -1,4 +1,4 @@
-import type { GameDefinition } from "./gameDefinition";
+import type { CustomPuzzleGame } from "./customPuzzleGame";
 
 // Puzzle types
 export type PuzzleType =
@@ -119,7 +119,7 @@ export interface SudokuData {
 }
 
 export interface CustomData {
-	definition: GameDefinition;
+	game: CustomPuzzleGame;
 }
 
 export interface TriviaQuestion {

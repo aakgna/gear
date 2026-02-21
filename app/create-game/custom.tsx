@@ -1,9 +1,10 @@
 /**
- * Create your own — full GameDefinition form with modals and preview.
- * Exposes: title, description, board, timer & score, rules, instructions (how to play), content, difficulty.
+ * app/create-game/custom.tsx
+ * Custom Puzzle Game creator — 5-step scene-graph builder.
+ * Steps: Info → Scenes → Rules → Preview → Publish
  */
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
 	View,
 	Text,
@@ -16,9 +17,9 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	Modal,
-	TouchableWithoutFeedback,
-	Dimensions,
 	Switch,
+	SafeAreaView,
+	Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -34,2254 +35,1684 @@ import {
 } from "../../constants/DesignSystem";
 import { saveGameToFirestore } from "../../config/firebase";
 import { getCurrentUser, getUserData } from "../../config/auth";
-import type { GameDefinition, BoardDefinition, Rule, RuntimeEventType } from "../../config/gameDefinition";
 import { GamePlayer } from "../../runtime/GamePlayer";
 import MinimalHeader from "../../components/MinimalHeader";
+import type {
+	CustomPuzzleGame,
+	GameScene,
+	GameVariable,
+	GameRule,
+	SceneContent,
+	SceneKind,
+} from "../../config/customPuzzleGame";
 
-type Difficulty = "easy" | "medium" | "hard";
-type BoardKind = "none" | "grid" | "freeform" | "list";
+const { width: SW } = Dimensions.get("window");
 
-const DEFAULT_TIMER_SECONDS = 60;
-const DEFAULT_CELL_SIZE = 56;
-const TOTAL_STEPS = 8;
-const TAGS = ["Word", "Math", "Logic", "Memory", "Pattern", "Speed", "Deduction", "Visual"];
-const PLAY_TIME_OPTIONS = [1, 3, 5, 10, 15];
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const OBJECT_TYPES: Array<{ id: string; title: string; desc: string }> = [
-	{ id: "tile", title: "Tile", desc: "Grid cell object" },
-	{ id: "token", title: "Token", desc: "Movable piece" },
-	{ id: "card", title: "Card", desc: "Flip to reveal" },
-	{ id: "bubble", title: "Bubble", desc: "Tap target" },
-	{ id: "text", title: "Text Label", desc: "Static text" },
-	{ id: "input", title: "Input Field", desc: "Player input" },
-	{ id: "button", title: "Button", desc: "Action button" },
-	{ id: "choice", title: "Choice", desc: "MCQ option" },
+function uid() {
+	return Math.random().toString(36).slice(2, 9);
+}
+
+const STEPS = ["Info", "Scenes", "Rules", "Preview", "Publish"] as const;
+
+const DIFFICULTY_LABELS: Record<1 | 2 | 3, string> = {
+	1: "Easy",
+	2: "Medium",
+	3: "Hard",
+};
+
+const SCENE_KIND_OPTIONS: Array<{
+	kind: SceneKind;
+	label: string;
+	icon: keyof typeof Ionicons.glyphMap;
+	desc: string;
+}> = [
+	{ kind: "MCQ",              label: "Multiple Choice",   icon: "radio-button-on-outline",   desc: "Question with 2–4 answer choices" },
+	{ kind: "INFO",             label: "Info Card",         icon: "information-circle-outline", desc: "Display text, player taps to continue" },
+	{ kind: "TEXT_INPUT",       label: "Text Answer",       icon: "create-outline",             desc: "Player types the correct answer" },
+	{ kind: "WORD_GUESS",       label: "Word Guess",        icon: "text-outline",               desc: "Guess letters one at a time (hangman)" },
+	{ kind: "WORDLE",           label: "Wordle",            icon: "grid-outline",               desc: "Guess word with colour feedback" },
+	{ kind: "SEQUENCE",         label: "Sequence",          icon: "reorder-four-outline",       desc: "Put items in the correct order" },
+	{ kind: "MEMORY",           label: "Memory Match",      icon: "copy-outline",               desc: "Flip cards to match pairs" },
+	{ kind: "MCQ_MULTI",        label: "Quiz (Multi-Q)",    icon: "list-outline",               desc: "Several MCQ questions in one scene" },
+	{ kind: "TEXT_INPUT_MULTI", label: "Multi Text",        icon: "pencil-outline",             desc: "Multiple typed-answer rounds" },
+	{ kind: "CATEGORY",         label: "Connections",       icon: "apps-outline",               desc: "Sort items into labelled categories" },
+	{ kind: "CODEBREAKER",      label: "CodeBreaker",       icon: "color-palette-outline",      desc: "Crack the hidden colour sequence" },
+	{ kind: "NUMBER_GRID",      label: "Number Grid",       icon: "calculator-outline",         desc: "Fill a number grid (magic square etc.)" },
 ];
 
-const RULE_TRIGGERS = ["GAME_START", "TIMER_TICK", "OBJECT_TAP", "OBJECT_DROP", "INPUT_SUBMIT", "ROUND_START", "ROUND_END", "SCORE_CHANGE"] as const;
+const SCENE_KIND_LABELS: Record<SceneKind, string> = {
+	MCQ: "Multiple Choice",
+	MCQ_MULTI: "Quiz (Multi-Q)",
+	TEXT_INPUT: "Text Answer",
+	TEXT_INPUT_MULTI: "Multi Text",
+	WORD_GUESS: "Word Guess",
+	WORDLE: "Wordle",
+	SEQUENCE: "Sequence",
+	CATEGORY: "Connections",
+	NUMBER_GRID: "Number Grid",
+	PATH: "Path",
+	CODEBREAKER: "CodeBreaker",
+	MEMORY: "Memory Match",
+	INFO: "Info Card",
+};
 
-const WIN_CONDITION_TYPES: Array<{ id: string; label: string }> = [
-	{ id: "score", label: "Reach score >= X" },
-	{ id: "targets", label: "Complete all targets" },
-	{ id: "solve_board", label: "Solve board (all correct)" },
-	{ id: "survive_timer", label: "Survive until timer ends" },
-	{ id: "rounds", label: "Complete N rounds" },
-	{ id: "streak", label: "Achieve streak >= N" },
-];
-const LOSE_CONDITION_TYPES: Array<{ id: string; label: string }> = [
-	{ id: "time_out", label: "Time runs out" },
-	{ id: "lives_zero", label: "Lives reach 0" },
-	{ id: "mistakes", label: "Mistakes >= N" },
-	{ id: "invalid_move", label: "Invalid move ends game" },
-];
+const CB_COLORS = [
+	"red","blue","green","yellow","purple","orange","white","black","pink","brown",
+] as const;
 
-const CONTENT_PACK_TYPES: Array<{ id: string; title: string; subtitle: string; icon: string }> = [
-	{ id: "wordlist", title: "Word List", subtitle: "Words for puzzles", icon: "document-text" },
-	{ id: "questionbank", title: "Question Bank", subtitle: "Trivia/riddles", icon: "help-circle" },
-	{ id: "numberset", title: "Number Set", subtitle: "Number ranges", icon: "pricetag" },
-	{ id: "patternsequence", title: "Pattern Sequence", subtitle: "Memory patterns", icon: "bulb" },
-];
+const CB_EMOJI: Record<string, string> = {
+	red: "🔴", blue: "🔵", green: "🟢", yellow: "🟡", orange: "🟠",
+	purple: "🟣", white: "⚪", black: "⚫", pink: "💗", brown: "🟤",
+};
 
-const PUBLISH_REQUIRED_LABELS = ["Metadata", "Board", "Objects", "Interactions", "Behavior", "Rules", "Conditions", "Content"];
+const GROUP_COLORS = ["#f59e0b","#3b82f6","#10b981","#ef4444","#8b5cf6","#ec4899"];
 
-const CreateCustomPage = () => {
+function defaultContent(kind: SceneKind): SceneContent {
+	switch (kind) {
+		case "MCQ":
+			return { kind, question: "", choices: [{ id: "a", label: "" }, { id: "b", label: "" }], correctId: "a" };
+		case "MCQ_MULTI":
+			return { kind, questions: [{ question: "", choices: [{ id: "a", label: "" }, { id: "b", label: "" }], correctId: "a" }], pointsPerCorrect: 1 };
+		case "TEXT_INPUT":
+			return { kind, prompt: "", answer: "", caseSensitive: false };
+		case "TEXT_INPUT_MULTI":
+			return { kind, rounds: [{ prompt: "", answer: "" }], pointsPerCorrect: 1 };
+		case "WORD_GUESS":
+			return { kind, word: "", maxWrongGuesses: 6 };
+		case "WORDLE":
+			return { kind, word: "", wordLength: 5, maxAttempts: 6 };
+		case "SEQUENCE":
+			return { kind, items: ["", "", ""], solution: [0, 1, 2] };
+		case "CATEGORY":
+			return { kind, groups: [{ id: "g1", label: "", color: "#f59e0b" }, { id: "g2", label: "", color: "#3b82f6" }], items: [] };
+		case "NUMBER_GRID":
+			return { kind, size: 3, gridType: "free", solution: Array(9).fill(0), givens: [] };
+		case "PATH":
+			return { kind, rows: 3, cols: 3, cells: [], solution: [] };
+		case "CODEBREAKER":
+			return { kind, secretCode: ["red", "blue", "green", "yellow"], options: ["red", "blue", "green", "yellow", "purple", "orange"], maxGuesses: 6 };
+		case "MEMORY": {
+			const id = uid();
+			return { kind, pairs: [{ id: `${id}a`, value: "🐶", matchId: `${id}b` }, { id: `${id}b`, value: "🐶", matchId: `${id}a` }], cols: 4 };
+		}
+		case "INFO":
+			return { kind, text: "", continueLabel: "Continue" };
+	}
+}
+
+function getScenePreview(content: SceneContent): string {
+	switch (content.kind) {
+		case "MCQ":              return content.question || "(no question)";
+		case "MCQ_MULTI":        return `${content.questions.length} question${content.questions.length !== 1 ? "s" : ""}`;
+		case "TEXT_INPUT":       return content.prompt || "(no prompt)";
+		case "TEXT_INPUT_MULTI": return `${content.rounds.length} round${content.rounds.length !== 1 ? "s" : ""}`;
+		case "INFO":             return content.text || "(no text)";
+		case "WORD_GUESS":       return content.word ? `Word: ${content.word}` : "(no word set)";
+		case "WORDLE":           return content.word ? `Word: ${content.word}` : "(no word set)";
+		case "SEQUENCE":         return `${content.items.length} items`;
+		case "CATEGORY":         return `${content.groups.length} groups, ${content.items.length} items`;
+		case "NUMBER_GRID":      return `${content.size}×${content.size} ${content.gridType}`;
+		case "PATH":             return `${content.rows}×${content.cols} path grid`;
+		case "CODEBREAKER":      return `Code: ${content.secretCode.join(", ")}`;
+		case "MEMORY":           return `${content.pairs.length / 2} pair${content.pairs.length / 2 !== 1 ? "s" : ""}`;
+		default:                 return "";
+	}
+}
+
+// ─── Shared form primitives ───────────────────────────────────────────────────
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+	return (
+		<View style={fc.field}>
+			<Text style={fc.label}>{label}</Text>
+			{children}
+		</View>
+	);
+}
+
+function FInput(props: React.ComponentProps<typeof TextInput>) {
+	return (
+		<TextInput
+			style={fc.input}
+			placeholderTextColor={Colors.text.inactive}
+			{...props}
+		/>
+	);
+}
+
+function PillRow<T extends string>({
+	options,
+	value,
+	onSelect,
+}: {
+	options: Array<{ value: T; label: string }>;
+	value: T;
+	onSelect: (v: T) => void;
+}) {
+	return (
+		<View style={{ flexDirection: "row", gap: Spacing.sm, flexWrap: "wrap" }}>
+			{options.map((o) => (
+				<TouchableOpacity
+					key={o.value}
+					style={[fc.pill, value === o.value && fc.pillActive]}
+					onPress={() => onSelect(o.value)}
+				>
+					<Text style={[fc.pillText, value === o.value && fc.pillTextActive]}>{o.label}</Text>
+				</TouchableOpacity>
+			))}
+		</View>
+	);
+}
+
+// ─── Scene editors ────────────────────────────────────────────────────────────
+
+function MCQEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "MCQ" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const updateChoice = (idx: number, label: string) =>
+		u({ choices: content.choices.map((c, i) => (i === idx ? { ...c, label } : c)) });
+	const addChoice = () => {
+		if (content.choices.length >= 4) return;
+		const ids = ["a", "b", "c", "d"];
+		u({ choices: [...content.choices, { id: ids[content.choices.length], label: "" }] });
+	};
+	const removeChoice = (idx: number) => {
+		if (content.choices.length <= 2) return;
+		const choices = content.choices.filter((_, i) => i !== idx);
+		const correctId = choices.some((c) => c.id === content.correctId) ? content.correctId : choices[0].id;
+		u({ choices, correctId });
+	};
+
+	return (
+		<>
+			<Field label="Question *">
+				<FInput placeholder="Enter your question…" value={content.question} onChangeText={(t) => u({ question: t })} multiline />
+			</Field>
+			<Field label="Choices (tap circle to mark correct)">
+				{content.choices.map((c, i) => (
+					<View key={c.id} style={fc.row}>
+						<TouchableOpacity
+							style={[fc.radio, content.correctId === c.id && fc.radioActive]}
+							onPress={() => u({ correctId: c.id })}
+						>
+							{content.correctId === c.id && <View style={fc.radioDot} />}
+						</TouchableOpacity>
+						<TextInput
+							style={[fc.input, { flex: 1, marginBottom: 0 }]}
+							placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+							placeholderTextColor={Colors.text.inactive}
+							value={c.label}
+							onChangeText={(t) => updateChoice(i, t)}
+						/>
+						{content.choices.length > 2 && (
+							<TouchableOpacity onPress={() => removeChoice(i)} style={{ padding: 6 }}>
+								<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+							</TouchableOpacity>
+						)}
+					</View>
+				))}
+				{content.choices.length < 4 && (
+					<TouchableOpacity style={fc.addBtn} onPress={addChoice}>
+						<Ionicons name="add" size={16} color={Colors.accent} />
+						<Text style={fc.addBtnText}>Add choice</Text>
+					</TouchableOpacity>
+				)}
+			</Field>
+			<Field label="Hint (optional)">
+				<FInput placeholder="Shown after a wrong answer" value={content.hint ?? ""} onChangeText={(t) => u({ hint: t || undefined })} />
+			</Field>
+		</>
+	);
+}
+
+function InfoEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "INFO" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Main Text *">
+				<FInput placeholder="What should the player read?" value={content.text} onChangeText={(t) => u({ text: t })} multiline />
+			</Field>
+			<Field label="Subtext (optional)">
+				<FInput placeholder="e.g. Round 1 of 3" value={content.subtext ?? ""} onChangeText={(t) => u({ subtext: t || undefined })} />
+			</Field>
+			<Field label="Continue Button Label">
+				<FInput placeholder="Continue" value={content.continueLabel ?? ""} onChangeText={(t) => u({ continueLabel: t || "Continue" })} />
+			</Field>
+		</>
+	);
+}
+
+function TextInputEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "TEXT_INPUT" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Prompt *">
+				<FInput placeholder="e.g. What is 2 + 2?" value={content.prompt} onChangeText={(t) => u({ prompt: t })} />
+			</Field>
+			<Field label="Correct Answer *">
+				<FInput placeholder="e.g. 4" value={content.answer} onChangeText={(t) => u({ answer: t })} />
+			</Field>
+			<Field label="Hint (optional)">
+				<FInput placeholder="Shown after a wrong answer" value={content.hint ?? ""} onChangeText={(t) => u({ hint: t || undefined })} />
+			</Field>
+			<View style={[fc.row, { justifyContent: "space-between" }]}>
+				<Text style={fc.label}>Case Sensitive</Text>
+				<Switch
+					value={content.caseSensitive ?? false}
+					onValueChange={(v) => u({ caseSensitive: v })}
+					trackColor={{ true: Colors.accent, false: Colors.borders.subtle }}
+					thumbColor={Colors.background.primary}
+				/>
+			</View>
+		</>
+	);
+}
+
+function WordGuessEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "WORD_GUESS" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Secret Word * (uppercase letters only)">
+				<FInput
+					placeholder="e.g. PLANET"
+					value={content.word}
+					onChangeText={(t) => u({ word: t.toUpperCase().replace(/[^A-Z]/g, "") })}
+					autoCapitalize="characters"
+				/>
+			</Field>
+			<Field label="Category Hint (optional)">
+				<FInput placeholder="e.g. Something in space" value={content.hint ?? ""} onChangeText={(t) => u({ hint: t || undefined })} />
+			</Field>
+			<Field label="Max Wrong Guesses">
+				<PillRow
+					options={[{ value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }, { value: "8", label: "8" }]}
+					value={String(content.maxWrongGuesses)}
+					onSelect={(v) => u({ maxWrongGuesses: Number(v) })}
+				/>
+			</Field>
+		</>
+	);
+}
+
+function WordleEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "WORDLE" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Word Length">
+				<PillRow
+					options={[{ value: "4", label: "4 letters" }, { value: "5", label: "5 letters" }, { value: "6", label: "6 letters" }]}
+					value={String(content.wordLength)}
+					onSelect={(v) => u({ wordLength: Number(v), word: "" })}
+				/>
+			</Field>
+			<Field label={`Secret Word * (${content.wordLength} uppercase letters)`}>
+				<FInput
+					placeholder={`e.g. ${"CRANE".slice(0, content.wordLength)}`}
+					value={content.word}
+					onChangeText={(t) => u({ word: t.toUpperCase().replace(/[^A-Z]/g, "").slice(0, content.wordLength) })}
+					autoCapitalize="characters"
+					maxLength={content.wordLength}
+				/>
+			</Field>
+			<Field label="Max Attempts">
+				<PillRow
+					options={[{ value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }]}
+					value={String(content.maxAttempts)}
+					onSelect={(v) => u({ maxAttempts: Number(v) })}
+				/>
+			</Field>
+			<Field label="Hint (optional)">
+				<FInput placeholder="Category or clue" value={content.hint ?? ""} onChangeText={(t) => u({ hint: t || undefined })} />
+			</Field>
+		</>
+	);
+}
+
+function SequenceEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "SEQUENCE" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+
+	const setItem = (i: number, val: string) =>
+		u({ items: content.items.map((x, j) => (j === i ? val : x)) });
+
+	const addItem = () => {
+		const items = [...content.items, ""];
+		u({ items, solution: [...content.solution, items.length - 1] });
+	};
+
+	const removeItem = (i: number) => {
+		if (content.items.length <= 2) return;
+		const items = content.items.filter((_, j) => j !== i);
+		const solution = content.solution
+			.filter((s) => s !== i)
+			.map((s) => (s > i ? s - 1 : s));
+		u({ items, solution });
+	};
+
+	// Correct order: solution[pos] = index into items[]
+	// UI: show ordered list with move up/down
+	const moveInOrder = (pos: number, dir: -1 | 1) => {
+		const next = pos + dir;
+		if (next < 0 || next >= content.solution.length) return;
+		const solution = [...content.solution];
+		[solution[pos], solution[next]] = [solution[next], solution[pos]];
+		u({ solution });
+	};
+
+	return (
+		<>
+			<Field label="Items (enter each one)">
+				{content.items.map((item, i) => (
+					<View key={i} style={fc.row}>
+						<Text style={{ color: Colors.text.secondary, width: 20, fontSize: Typography.fontSize.small }}>{i + 1}.</Text>
+						<TextInput
+							style={[fc.input, { flex: 1, marginBottom: 0 }]}
+							placeholder={`Item ${i + 1}`}
+							placeholderTextColor={Colors.text.inactive}
+							value={item}
+							onChangeText={(t) => setItem(i, t)}
+						/>
+						{content.items.length > 2 && (
+							<TouchableOpacity onPress={() => removeItem(i)} style={{ padding: 6 }}>
+								<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+							</TouchableOpacity>
+						)}
+					</View>
+				))}
+				{content.items.length < 8 && (
+					<TouchableOpacity style={fc.addBtn} onPress={addItem}>
+						<Ionicons name="add" size={16} color={Colors.accent} />
+						<Text style={fc.addBtnText}>Add item</Text>
+					</TouchableOpacity>
+				)}
+			</Field>
+			<Field label="Correct Order (use ↑↓ to arrange)">
+				{content.solution.map((itemIdx, pos) => (
+					<View key={pos} style={fc.row}>
+						<Text style={{ color: Colors.text.inactive, width: 24, fontSize: Typography.fontSize.small }}>#{pos + 1}</Text>
+						<Text style={[fc.input, { flex: 1, marginBottom: 0, paddingVertical: Spacing.sm }]}>
+							{content.items[itemIdx] || `Item ${itemIdx + 1}`}
+						</Text>
+						<View style={{ flexDirection: "row", gap: 2 }}>
+							<TouchableOpacity disabled={pos === 0} onPress={() => moveInOrder(pos, -1)} style={{ padding: 6 }}>
+								<Ionicons name="chevron-up" size={18} color={pos === 0 ? Colors.text.inactive : Colors.accent} />
+							</TouchableOpacity>
+							<TouchableOpacity disabled={pos === content.solution.length - 1} onPress={() => moveInOrder(pos, 1)} style={{ padding: 6 }}>
+								<Ionicons name="chevron-down" size={18} color={pos === content.solution.length - 1 ? Colors.text.inactive : Colors.accent} />
+							</TouchableOpacity>
+						</View>
+					</View>
+				))}
+			</Field>
+			<Field label="Hint (optional)">
+				<FInput placeholder="e.g. Order by size, smallest first" value={content.hint ?? ""} onChangeText={(t) => u({ hint: t || undefined })} />
+			</Field>
+		</>
+	);
+}
+
+function MemoryEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "MEMORY" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const pairCount = content.pairs.length / 2;
+	const pairValues = content.pairs.filter((_, i) => i % 2 === 0).map((p) => p.value);
+
+	const updatePairValue = (pairIdx: number, val: string) => {
+		const pairs = [...content.pairs];
+		pairs[pairIdx * 2] = { ...pairs[pairIdx * 2], value: val };
+		pairs[pairIdx * 2 + 1] = { ...pairs[pairIdx * 2 + 1], value: val };
+		u({ pairs });
+	};
+	const addPair = () => {
+		if (pairCount >= 8) return;
+		const id = uid();
+		u({ pairs: [...content.pairs, { id: `${id}a`, value: "⭐", matchId: `${id}b` }, { id: `${id}b`, value: "⭐", matchId: `${id}a` }] });
+	};
+	const removePair = (pairIdx: number) => {
+		if (pairCount <= 2) return;
+		u({ pairs: content.pairs.filter((_, i) => Math.floor(i / 2) !== pairIdx) });
+	};
+
+	return (
+		<>
+			<Field label="Pairs (emoji or short text — each appears twice)">
+				{pairValues.map((val, i) => (
+					<View key={i} style={fc.row}>
+						<TextInput
+							style={[fc.input, { flex: 1, marginBottom: 0 }]}
+							placeholder="🎯 or word"
+							placeholderTextColor={Colors.text.inactive}
+							value={val}
+							onChangeText={(t) => updatePairValue(i, t)}
+						/>
+						{pairCount > 2 && (
+							<TouchableOpacity onPress={() => removePair(i)} style={{ padding: 6 }}>
+								<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+							</TouchableOpacity>
+						)}
+					</View>
+				))}
+				{pairCount < 8 && (
+					<TouchableOpacity style={fc.addBtn} onPress={addPair}>
+						<Ionicons name="add" size={16} color={Colors.accent} />
+						<Text style={fc.addBtnText}>Add pair</Text>
+					</TouchableOpacity>
+				)}
+			</Field>
+			<Field label="Grid Columns">
+				<PillRow
+					options={[{ value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }]}
+					value={String(content.cols)}
+					onSelect={(v) => u({ cols: Number(v) as 2 | 3 | 4 })}
+				/>
+			</Field>
+		</>
+	);
+}
+
+function MCQMultiEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "MCQ_MULTI" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+
+	const addQuestion = () =>
+		u({ questions: [...content.questions, { question: "", choices: [{ id: "a", label: "" }, { id: "b", label: "" }], correctId: "a" }] });
+
+	const removeQuestion = (qi: number) => {
+		if (content.questions.length <= 1) return;
+		u({ questions: content.questions.filter((_, i) => i !== qi) });
+	};
+
+	const updateQuestion = (qi: number, question: string) =>
+		u({ questions: content.questions.map((q, i) => (i === qi ? { ...q, question } : q)) });
+
+	const updateChoice = (qi: number, ci: number, label: string) =>
+		u({
+			questions: content.questions.map((q, i) =>
+				i === qi ? { ...q, choices: q.choices.map((c, j) => (j === ci ? { ...c, label } : c)) } : q
+			),
+		});
+
+	const setCorrect = (qi: number, correctId: string) =>
+		u({ questions: content.questions.map((q, i) => (i === qi ? { ...q, correctId } : q)) });
+
+	return (
+		<>
+			{content.questions.map((q, qi) => (
+				<View key={qi} style={fc.subCard}>
+					<View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: Spacing.sm }}>
+						<Text style={fc.subCardTitle}>Question {qi + 1}</Text>
+						{content.questions.length > 1 && (
+							<TouchableOpacity onPress={() => removeQuestion(qi)}>
+								<Ionicons name="trash-outline" size={18} color={Colors.game.incorrect} />
+							</TouchableOpacity>
+						)}
+					</View>
+					<TextInput
+						style={fc.input}
+						placeholder="Question text"
+						placeholderTextColor={Colors.text.inactive}
+						value={q.question}
+						onChangeText={(t) => updateQuestion(qi, t)}
+					/>
+					{q.choices.map((c, ci) => (
+						<View key={c.id} style={fc.row}>
+							<TouchableOpacity
+								style={[fc.radio, q.correctId === c.id && fc.radioActive]}
+								onPress={() => setCorrect(qi, c.id)}
+							>
+								{q.correctId === c.id && <View style={fc.radioDot} />}
+							</TouchableOpacity>
+							<TextInput
+								style={[fc.input, { flex: 1, marginBottom: 0 }]}
+								placeholder={`Choice ${String.fromCharCode(65 + ci)}`}
+								placeholderTextColor={Colors.text.inactive}
+								value={c.label}
+								onChangeText={(t) => updateChoice(qi, ci, t)}
+							/>
+						</View>
+					))}
+				</View>
+			))}
+			{content.questions.length < 10 && (
+				<TouchableOpacity style={fc.addBtn} onPress={addQuestion}>
+					<Ionicons name="add" size={16} color={Colors.accent} />
+					<Text style={fc.addBtnText}>Add question</Text>
+				</TouchableOpacity>
+			)}
+		</>
+	);
+}
+
+function TextInputMultiEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "TEXT_INPUT_MULTI" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const addRound = () => u({ rounds: [...content.rounds, { prompt: "", answer: "" }] });
+	const removeRound = (i: number) => {
+		if (content.rounds.length <= 1) return;
+		u({ rounds: content.rounds.filter((_, j) => j !== i) });
+	};
+	const updateRound = (i: number, field: "prompt" | "answer", val: string) =>
+		u({ rounds: content.rounds.map((r, j) => (j === i ? { ...r, [field]: val } : r)) });
+
+	return (
+		<>
+			{content.rounds.map((r, i) => (
+				<View key={i} style={fc.subCard}>
+					<View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: Spacing.sm }}>
+						<Text style={fc.subCardTitle}>Round {i + 1}</Text>
+						{content.rounds.length > 1 && (
+							<TouchableOpacity onPress={() => removeRound(i)}>
+								<Ionicons name="trash-outline" size={18} color={Colors.game.incorrect} />
+							</TouchableOpacity>
+						)}
+					</View>
+					<TextInput style={fc.input} placeholder="Prompt" placeholderTextColor={Colors.text.inactive} value={r.prompt} onChangeText={(t) => updateRound(i, "prompt", t)} />
+					<TextInput style={[fc.input, { marginBottom: 0 }]} placeholder="Correct answer" placeholderTextColor={Colors.text.inactive} value={r.answer} onChangeText={(t) => updateRound(i, "answer", t)} />
+				</View>
+			))}
+			{content.rounds.length < 20 && (
+				<TouchableOpacity style={fc.addBtn} onPress={addRound}>
+					<Ionicons name="add" size={16} color={Colors.accent} />
+					<Text style={fc.addBtnText}>Add round</Text>
+				</TouchableOpacity>
+			)}
+		</>
+	);
+}
+
+function CategoryEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "CATEGORY" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+
+	const updateGroupLabel = (i: number, label: string) =>
+		u({ groups: content.groups.map((g, j) => (j === i ? { ...g, label } : g)) });
+
+	const addGroup = () => {
+		if (content.groups.length >= 4) return;
+		const id = `g${uid()}`;
+		const color = GROUP_COLORS[content.groups.length] ?? "#888";
+		u({ groups: [...content.groups, { id, label: "", color }] });
+	};
+	const removeGroup = (i: number) => {
+		if (content.groups.length <= 2) return;
+		const gid = content.groups[i].id;
+		u({ groups: content.groups.filter((_, j) => j !== i), items: content.items.filter((it) => it.groupId !== gid) });
+	};
+
+	const addItem = (groupId: string) => {
+		u({ items: [...content.items, { id: uid(), label: "", groupId }] });
+	};
+	const removeItem = (id: string) => u({ items: content.items.filter((it) => it.id !== id) });
+	const updateItem = (id: string, label: string) =>
+		u({ items: content.items.map((it) => (it.id === id ? { ...it, label } : it)) });
+
+	return (
+		<>
+			<Field label="Categories">
+				{content.groups.map((g, i) => (
+					<View key={g.id} style={{ marginBottom: Spacing.md }}>
+						<View style={fc.row}>
+							<View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: g.color, marginRight: Spacing.sm }} />
+							<TextInput
+								style={[fc.input, { flex: 1, marginBottom: 0 }]}
+								placeholder={`Category ${i + 1} name`}
+								placeholderTextColor={Colors.text.inactive}
+								value={g.label}
+								onChangeText={(t) => updateGroupLabel(i, t)}
+							/>
+							{content.groups.length > 2 && (
+								<TouchableOpacity onPress={() => removeGroup(i)} style={{ padding: 6 }}>
+									<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+								</TouchableOpacity>
+							)}
+						</View>
+						<View style={{ marginLeft: Spacing.lg, marginTop: Spacing.xs }}>
+							{content.items.filter((it) => it.groupId === g.id).map((it) => (
+								<View key={it.id} style={[fc.row, { marginTop: Spacing.xs }]}>
+									<TextInput
+										style={[fc.input, { flex: 1, marginBottom: 0 }]}
+										placeholder="Item label"
+										placeholderTextColor={Colors.text.inactive}
+										value={it.label}
+										onChangeText={(t) => updateItem(it.id, t)}
+									/>
+									<TouchableOpacity onPress={() => removeItem(it.id)} style={{ padding: 6 }}>
+										<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+									</TouchableOpacity>
+								</View>
+							))}
+							<TouchableOpacity style={[fc.addBtn, { marginTop: Spacing.xs }]} onPress={() => addItem(g.id)}>
+								<Ionicons name="add" size={14} color={Colors.accent} />
+								<Text style={[fc.addBtnText, { fontSize: Typography.fontSize.caption }]}>
+									Add item to "{g.label || `Category ${i + 1}`}"
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				))}
+				{content.groups.length < 4 && (
+					<TouchableOpacity style={fc.addBtn} onPress={addGroup}>
+						<Ionicons name="add" size={16} color={Colors.accent} />
+						<Text style={fc.addBtnText}>Add category</Text>
+					</TouchableOpacity>
+				)}
+			</Field>
+		</>
+	);
+}
+
+function CodebreakerEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "CODEBREAKER" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+
+	const toggleColor = (color: string) => {
+		const included = content.options.includes(color);
+		const options = included ? content.options.filter((c) => c !== color) : [...content.options, color];
+		if (options.length < content.secretCode.length) return;
+		const secretCode = content.secretCode.map((c) => (options.includes(c) ? c : options[0]));
+		u({ options, secretCode });
+	};
+
+	const setCodeSlot = (idx: number, color: string) =>
+		u({ secretCode: content.secretCode.map((c, i) => (i === idx ? color : c)) });
+
+	const setCodeLength = (len: number) =>
+		u({ secretCode: Array.from({ length: len }, (_, i) => content.secretCode[i] ?? content.options[0] ?? "red") });
+
+	return (
+		<>
+			<Field label="Available Colors">
+				<View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm }}>
+					{CB_COLORS.map((c) => (
+						<TouchableOpacity
+							key={c}
+							onPress={() => toggleColor(c)}
+							style={[
+								{ padding: 4, borderRadius: BorderRadius.sm, borderWidth: 2.5 },
+								content.options.includes(c) ? { borderColor: Colors.accent } : { borderColor: "transparent" },
+							]}
+						>
+							<Text style={{ fontSize: 26 }}>{CB_EMOJI[c]}</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			</Field>
+			<Field label="Code Length">
+				<PillRow
+					options={[{ value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }]}
+					value={String(content.secretCode.length)}
+					onSelect={(v) => setCodeLength(Number(v))}
+				/>
+			</Field>
+			<Field label="Secret Code (tap to set each slot)">
+				<View style={{ flexDirection: "row", gap: Spacing.md, flexWrap: "wrap" }}>
+					{content.secretCode.map((c, idx) => (
+						<View key={idx}>
+							<Text style={{ textAlign: "center", fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: 4 }}>
+								#{idx + 1}
+							</Text>
+							<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+								{content.options.map((opt) => (
+									<TouchableOpacity
+										key={opt}
+										onPress={() => setCodeSlot(idx, opt)}
+										style={[
+											{ borderRadius: 6, borderWidth: 2.5 },
+											c === opt ? { borderColor: Colors.accent } : { borderColor: "transparent" },
+										]}
+									>
+										<Text style={{ fontSize: 22 }}>{CB_EMOJI[opt]}</Text>
+									</TouchableOpacity>
+								))}
+							</View>
+						</View>
+					))}
+				</View>
+			</Field>
+			<Field label="Max Guesses">
+				<PillRow
+					options={[{ value: "4", label: "4" }, { value: "6", label: "6" }, { value: "8", label: "8" }, { value: "10", label: "10" }]}
+					value={String(content.maxGuesses)}
+					onSelect={(v) => u({ maxGuesses: Number(v) })}
+				/>
+			</Field>
+		</>
+	);
+}
+
+function NumberGridEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "NUMBER_GRID" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const total = content.size * content.size;
+
+	const setSolutionCell = (idx: number, val: string) => {
+		const num = parseInt(val) || 0;
+		const solution = content.solution.map((v, i) => (i === idx ? num : v));
+		const givens = content.givens.map((g) => {
+			const gIdx = g.row * content.size + g.col;
+			return gIdx === idx ? { ...g, value: num } : g;
+		});
+		u({ solution, givens });
+	};
+
+	const toggleGiven = (row: number, col: number) => {
+		const exists = content.givens.some((g) => g.row === row && g.col === col);
+		const value = content.solution[row * content.size + col];
+		const givens = exists
+			? content.givens.filter((g) => !(g.row === row && g.col === col))
+			: [...content.givens, { row, col, value }];
+		u({ givens });
+	};
+
+	const cellSize = Math.min(52, Math.floor((SW - Spacing.md * 2 - 32) / content.size));
+
+	return (
+		<>
+			<Field label="Grid Size">
+				<PillRow
+					options={[{ value: "3", label: "3×3" }, { value: "4", label: "4×4" }, { value: "5", label: "5×5" }]}
+					value={String(content.size)}
+					onSelect={(v) => {
+						const size = Number(v);
+						u({ size, solution: Array(size * size).fill(0), givens: [] });
+					}}
+				/>
+			</Field>
+			<Field label="Grid Type">
+				<PillRow
+					options={[
+						{ value: "free", label: "Free" },
+						{ value: "magic_square", label: "Magic Square" },
+						{ value: "futoshiki", label: "Futoshiki" },
+					]}
+					value={content.gridType}
+					onSelect={(v) => u({ gridType: v as typeof content.gridType })}
+				/>
+			</Field>
+			{content.gridType === "magic_square" && (
+				<Field label="Magic Constant (e.g. 15 for 3×3)">
+					<FInput
+						placeholder="15"
+						value={content.magicConstant ? String(content.magicConstant) : ""}
+						onChangeText={(t) => u({ magicConstant: parseInt(t) || undefined })}
+						keyboardType="numeric"
+					/>
+				</Field>
+			)}
+			<Field label="Solution cells (fill values, tap label to mark as pre-revealed)">
+				<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+					{Array.from({ length: total }).map((_, idx) => {
+						const row = Math.floor(idx / content.size);
+						const col = idx % content.size;
+						const isGiven = content.givens.some((g) => g.row === row && g.col === col);
+						return (
+							<View key={idx} style={{ alignItems: "center" }}>
+								<TextInput
+									style={{
+										width: cellSize,
+										height: cellSize,
+										borderWidth: 1.5,
+										borderColor: isGiven ? Colors.accent : Colors.borders.subtle,
+										borderRadius: BorderRadius.sm,
+										backgroundColor: isGiven ? Colors.accent + "22" : Colors.background.tertiary,
+										textAlign: "center",
+										fontSize: Typography.fontSize.body,
+										color: Colors.text.primary,
+									}}
+									value={content.solution[idx] ? String(content.solution[idx]) : ""}
+									onChangeText={(t) => setSolutionCell(idx, t)}
+									keyboardType="numeric"
+									maxLength={2}
+								/>
+								<TouchableOpacity onPress={() => toggleGiven(row, col)} style={{ marginTop: 3 }}>
+									<Text style={{ fontSize: 9, color: isGiven ? Colors.accent : Colors.text.inactive }}>
+										{isGiven ? "given ✓" : "given?"}
+									</Text>
+								</TouchableOpacity>
+							</View>
+						);
+					})}
+				</View>
+			</Field>
+		</>
+	);
+}
+
+function SceneEditor({
+	content,
+	onChange,
+}: {
+	content: SceneContent;
+	onChange: (c: SceneContent) => void;
+}) {
+	switch (content.kind) {
+		case "MCQ":              return <MCQEditor content={content} onChange={onChange} />;
+		case "MCQ_MULTI":        return <MCQMultiEditor content={content} onChange={onChange} />;
+		case "TEXT_INPUT":       return <TextInputEditor content={content} onChange={onChange} />;
+		case "TEXT_INPUT_MULTI": return <TextInputMultiEditor content={content} onChange={onChange} />;
+		case "INFO":             return <InfoEditor content={content} onChange={onChange} />;
+		case "WORD_GUESS":       return <WordGuessEditor content={content} onChange={onChange} />;
+		case "WORDLE":           return <WordleEditor content={content} onChange={onChange} />;
+		case "SEQUENCE":         return <SequenceEditor content={content} onChange={onChange} />;
+		case "MEMORY":           return <MemoryEditor content={content} onChange={onChange} />;
+		case "CATEGORY":         return <CategoryEditor content={content} onChange={onChange} />;
+		case "CODEBREAKER":      return <CodebreakerEditor content={content} onChange={onChange} />;
+		case "NUMBER_GRID":      return <NumberGridEditor content={content} onChange={onChange} />;
+		case "PATH":
+			return (
+				<View style={{ padding: Spacing.md }}>
+					<Text style={{ color: Colors.text.secondary, fontSize: Typography.fontSize.caption, lineHeight: 20 }}>
+						PATH scenes require a custom row/column grid with numbered cells. This is an advanced type — set up your rows, cols, cells, and solution array in the data layer.
+					</Text>
+				</View>
+			);
+		default:
+			return null;
+	}
+}
+
+// ─── Main creator component ───────────────────────────────────────────────────
+
+export default function CreateCustomGame() {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 
-	// Core
+	// ── Navigation ─────────────────────────────────────────────────────────
+	const [step, setStep] = useState(0);
+
+	// ── Step 0: Info ───────────────────────────────────────────────────────
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
-	const [prompt, setPrompt] = useState("");
-	const [choices, setChoices] = useState<string[]>(["", ""]);
-	const [correctIndex, setCorrectIndex] = useState(0);
-	const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+	const [difficulty, setDifficulty] = useState<1 | 2 | 3>(1);
 
-	// Board
-	const [boardKind, setBoardKind] = useState<BoardKind>("none");
-	const [gridRows, setGridRows] = useState(3);
-	const [gridCols, setGridCols] = useState(3);
-	const [cellSize, setCellSize] = useState(DEFAULT_CELL_SIZE);
-	const [freeformWidth, setFreeformWidth] = useState(800);
-	const [freeformHeight, setFreeformHeight] = useState(600);
-	const [listSlots, setListSlots] = useState(5);
-	const [listDragReorder, setListDragReorder] = useState(false);
-	const [gridAdjacency, setGridAdjacency] = useState<"4" | "8">("4");
-	const [freeformCollisionMode, setFreeformCollisionMode] = useState<"none" | "basic">("basic");
-	const [listOrientation, setListOrientation] = useState<"vertical" | "horizontal">("vertical");
+	// ── Step 1: Scenes ─────────────────────────────────────────────────────
+	const [scenes, setScenes] = useState<GameScene[]>([]);
+	const [showKindPicker, setShowKindPicker] = useState(false);
+	const [editingScene, setEditingScene] = useState<{ idx: number; content: SceneContent } | null>(null);
 
-	// Timer & score
-	const [timerEnabled, setTimerEnabled] = useState(false);
-	const [timerSeconds, setTimerSeconds] = useState(DEFAULT_TIMER_SECONDS);
-	const [scoreStart, setScoreStart] = useState(0);
-	const [scoreTarget, setScoreTarget] = useState<number | undefined>(undefined);
+	// ── Step 2: Rules ──────────────────────────────────────────────────────
+	const [hasScore, setHasScore] = useState(false);
+	const [hasLives, setHasLives] = useState(false);
+	const [livesCount, setLivesCount] = useState(3);
+	const [hasTimer, setHasTimer] = useState(false);
+	const [timerSeconds, setTimerSeconds] = useState(60);
 
-	// Instructions (how to play)
-	const [instructionLines, setInstructionLines] = useState<string[]>(["", ""]);
-	const [instructionExample, setInstructionExample] = useState("");
-
-	// New Game 8-step flow
-	const [currentStep, setCurrentStep] = useState(0);
-	const [showStepListModal, setShowStepListModal] = useState(false);
-	const [playTimeMinutes, setPlayTimeMinutes] = useState(1);
-	const playTimeTrackWidth = useRef(0);
-	const [selectedTags, setSelectedTags] = useState<string[]>([]);
-	const [visibility, setVisibility] = useState<"public" | "unlisted" | "draft">("draft");
-	const [useChoicesAsObjects, setUseChoicesAsObjects] = useState(true);
-	const [selectedObjectTypes, setSelectedObjectTypes] = useState<string[]>([]);
-	const [yourObjects, setYourObjects] = useState<Array<{ id: string; type: string; name: string }>>([]);
-	const [interactionModes, setInteractionModes] = useState<string[]>([]);
-	const [movementPreset, setMovementPreset] = useState<"stationary" | "drift" | "bounce" | "fall">("stationary");
-	type SpawnRule = { id: string; trigger: string; count: number; placement: string };
-	const [spawnRules, setSpawnRules] = useState<SpawnRule[]>([]);
-	type EngineRule = { id: string; trigger: string };
-	const [engineRules, setEngineRules] = useState<EngineRule[]>([]);
-	const [showTriggerPickerForRuleId, setShowTriggerPickerForRuleId] = useState<string | null>(null);
-	type WinLoseCondition = { id: string; type: string };
-	const [winConditions, setWinConditions] = useState<WinLoseCondition[]>([]);
-	const [loseConditions, setLoseConditions] = useState<WinLoseCondition[]>([]);
-	type ContentPack = { id: string; type: string; name: string };
-	const [contentPacks, setContentPacks] = useState<ContentPack[]>([]);
-
-	// Modals
-	const [showDescriptionModal, setShowDescriptionModal] = useState(false);
-	const [showBoardModal, setShowBoardModal] = useState(false);
-	const [showTimerScoreModal, setShowTimerScoreModal] = useState(false);
-	const [showRulesModal, setShowRulesModal] = useState(false);
-	const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-	const [showObjectsModal, setShowObjectsModal] = useState(false);
-	const [showWinLoseModal, setShowWinLoseModal] = useState(false);
-	const [showSpawnRulesModal, setShowSpawnRulesModal] = useState(false);
-	const [showContentPackModal, setShowContentPackModal] = useState(false);
-	const [showPreview, setShowPreview] = useState(false);
-	const [previewScreenMode, setPreviewScreenMode] = useState<"menu" | "play">("menu");
-	const [showPublishSettings, setShowPublishSettings] = useState(false);
-	const [allowRemixes, setAllowRemixes] = useState(true);
-	const [allowComments, setAllowComments] = useState(true);
-
+	// ── Step 4: Publish ────────────────────────────────────────────────────
 	const [loading, setLoading] = useState(false);
 
-	const addChoice = () => {
-		if (choices.length < 4) setChoices((prev) => [...prev, ""]);
-	};
-	const removeChoice = (index: number) => {
-		if (choices.length <= 2) return;
-		setChoices((prev) => prev.filter((_, i) => i !== index));
-		if (correctIndex >= choices.length - 1) setCorrectIndex(Math.max(0, correctIndex - 1));
-	};
-	const setChoice = (index: number, value: string) => {
-		setChoices((prev) => {
-			const next = [...prev];
-			next[index] = value;
-			return next;
-		});
-	};
+	// ── Derived game object ────────────────────────────────────────────────
+	const variables = useMemo<GameVariable[]>(() => {
+		const v: GameVariable[] = [];
+		if (hasScore) v.push({ id: "score", name: "Score", type: "number", initial: 0 });
+		if (hasLives) v.push({ id: "lives", name: "Lives", type: "number", initial: livesCount });
+		return v;
+	}, [hasScore, hasLives, livesCount]);
 
-	const addInstructionLine = () => {
-		setInstructionLines((prev) => [...prev, ""]);
-	};
-
-	const addSelectedObjectTypes = () => {
-		if (selectedObjectTypes.length === 0) return;
-		const counts: Record<string, number> = {};
-		yourObjects.forEach((o) => {
-			counts[o.type] = (counts[o.type] ?? 0) + 1;
-		});
-		const next: Array<{ id: string; type: string; name: string }> = [];
-		selectedObjectTypes.forEach((typeId) => {
-			const n = (counts[typeId] ?? 0) + 1;
-			counts[typeId] = n;
-			const title = OBJECT_TYPES.find((t) => t.id === typeId)?.title ?? typeId;
-			next.push({ id: `${typeId}_${n}`, type: typeId, name: `${typeId}_${n}` });
-		});
-		setYourObjects((prev) => [...prev, ...next]);
-		setSelectedObjectTypes([]);
-	};
-
-	const removeYourObject = (id: string) => {
-		setYourObjects((prev) => prev.filter((o) => o.id !== id));
-	};
-	const addSpawnRule = () => {
-		setSpawnRules((prev) => [...prev, { id: `rule_${Date.now()}`, trigger: "on_start", count: 1, placement: "random location" }]);
-		setShowSpawnRulesModal(true);
-	};
-	const removeSpawnRule = (id: string) => {
-		setSpawnRules((prev) => prev.filter((r) => r.id !== id));
-	};
-	const addEngineRule = () => {
-		setEngineRules((prev) => [...prev, { id: `engine_${Date.now()}`, trigger: "GAME_START" }]);
-	};
-	const removeEngineRule = (id: string) => {
-		setEngineRules((prev) => prev.filter((r) => r.id !== id));
-		if (showTriggerPickerForRuleId === id) setShowTriggerPickerForRuleId(null);
-	};
-	const setEngineRuleTrigger = (id: string, trigger: string) => {
-		setEngineRules((prev) => prev.map((r) => (r.id === id ? { ...r, trigger } : r)));
-		setShowTriggerPickerForRuleId(null);
-	};
-	const addContentPack = (typeId: string) => {
-		const typeLabel = CONTENT_PACK_TYPES.find((t) => t.id === typeId)?.title ?? typeId;
-		const base = typeLabel.replace(/\s+/g, "");
-		setContentPacks((prev) => {
-			const n = prev.filter((p) => p.type === typeId).length + 1;
-			return [...prev, { id: `pack_${Date.now()}`, type: typeId, name: `${base}_${n}` }];
-		});
-	};
-	const removeContentPack = (id: string) => {
-		setContentPacks((prev) => prev.filter((p) => p.id !== id));
-	};
-	const addWinCondition = (type: string) => {
-		setWinConditions((prev) => [...prev, { id: `win_${Date.now()}`, type }]);
-	};
-	const removeWinCondition = (id: string) => {
-		setWinConditions((prev) => prev.filter((c) => c.id !== id));
-	};
-	const addLoseCondition = (type: string) => {
-		setLoseConditions((prev) => [...prev, { id: `lose_${Date.now()}`, type }]);
-	};
-	const removeLoseCondition = (id: string) => {
-		setLoseConditions((prev) => prev.filter((c) => c.id !== id));
-	};
-	const removeInstructionLine = (index: number) => {
-		if (instructionLines.length <= 1) return;
-		setInstructionLines((prev) => prev.filter((_, i) => i !== index));
-	};
-	const setInstructionLine = (index: number, value: string) => {
-		setInstructionLines((prev) => {
-			const next = [...prev];
-			next[index] = value;
-			return next;
-		});
-	};
-
-	const stepCompleted = [
-		!!(title.trim() && description.trim() && instructionLines.some((l) => l.trim())),
-		boardKind !== "none" || !!prompt.trim(),
-		useChoicesAsObjects || boardKind === "none" || yourObjects.length > 0,
-		interactionModes.length >= 1,
-		true, // Behavior
-		true, // Rules
-		winConditions.length >= 1, // Win/Lose: at least one win condition
-		!!(prompt.trim() && choices.filter((c) => c.trim()).length >= 2),
-	];
-	const completedCount = stepCompleted.filter(Boolean).length;
-
-	const buildBoard = (): BoardDefinition => {
-		if (boardKind === "grid") {
-			return { kind: "grid", rows: gridRows, cols: gridCols, cellSize, adjacency: gridAdjacency };
+	const rules = useMemo<GameRule[]>(() => {
+		const r: GameRule[] = [];
+		if (hasScore) r.push({ id: "score-correct", on: "CORRECT", then: [{ type: "INC_VAR", variableId: "score", amount: 1 }] });
+		if (hasLives) {
+			r.push({ id: "lives-wrong", on: "WRONG", then: [{ type: "DEC_VAR", variableId: "lives", amount: 1 }] });
+			r.push({ id: "lives-lose", on: "WRONG", if: [{ variableId: "lives", op: "lte", value: 0 }], then: [{ type: "LOSE" }] });
 		}
-		if (boardKind === "freeform") {
-			return { kind: "freeform", width: freeformWidth, height: freeformHeight, collisionMode: freeformCollisionMode };
-		}
-		if (boardKind === "list") {
-			return { kind: "list", numSlots: listSlots, dragReorder: listDragReorder, orientation: listOrientation };
-		}
-		return { kind: "none" };
-	};
+		return r;
+	}, [hasScore, hasLives]);
 
-	const buildDefinition = useCallback((): GameDefinition => {
-		const choiceList = choices
-			.filter((c) => c.trim())
-			.map((label, i) => ({ id: `choice_${i}`, label: label.trim() }));
-		const correctId = choiceList[correctIndex]?.id ?? choiceList[0]?.id ?? "choice_0";
-
-		const instructions =
-			instructionLines.filter((l) => l.trim()).length > 0
-				? {
-						instructions: instructionLines.map((l) => l.trim()).filter(Boolean),
-						example: instructionExample.trim() || undefined,
-				  }
-				: undefined;
-
-		const tapRules: Rule[] =
-			choiceList.length > 0
-				? [
-						{
-							event: "OBJECT_TAP" as RuntimeEventType,
-							if: {
-								op: "eq" as const,
-								a: { from: "object" as const, path: "objectId" },
-								b: { from: "const" as const, value: correctId },
-							},
-							then: [{ type: "END_GAME", result: "win" }],
-						},
-						{
-							event: "OBJECT_TAP" as RuntimeEventType,
-							if: {
-								op: "not" as const,
-								cond: {
-									op: "eq" as const,
-									a: { from: "object" as const, path: "objectId" },
-									b: { from: "const" as const, value: correctId },
-								},
-							},
-							then: [{ type: "END_GAME", result: "lose" }],
-						},
-				  ]
-				: [];
-
-		const engineRuleList: Rule[] = engineRules
-			.filter((r) => RULE_TRIGGERS.includes(r.trigger as (typeof RULE_TRIGGERS)[number]))
-			.map((r) => ({ event: r.trigger as RuntimeEventType, then: [] }));
-
-		const rules: Rule[] = [...engineRuleList, ...tapRules];
-
-		return {
-			id: "",
-			title: title.trim() || "Untitled",
-			description: description.trim() || undefined,
-			board: buildBoard(),
-			systems: {
-				timer: timerEnabled ? { seconds: timerSeconds } : undefined,
-				score: { start: scoreStart, target: scoreTarget },
-			},
+	const game = useMemo<CustomPuzzleGame>(
+		() => ({
+			id: `custom-${uid()}`,
+			meta: { title: title.trim() || "Untitled", description: description.trim() || undefined, difficulty },
+			variables,
+			scenes,
 			rules,
-			winConditions: winConditions.length > 0 ? winConditions.map((c) => c.type) : undefined,
-			loseConditions: loseConditions.length > 0 ? loseConditions.map((c) => c.type) : undefined,
-			instructions,
-			content: {
-				prompt: prompt.trim(),
-				choices: choiceList,
-				correctAnswerId: correctId,
-			},
-		};
-	}, [
-		title,
-		description,
-		choices,
-		correctIndex,
-		instructionLines,
-		instructionExample,
-		timerEnabled,
-		timerSeconds,
-		scoreStart,
-		scoreTarget,
-		boardKind,
-		gridRows,
-		gridCols,
-		cellSize,
-		gridAdjacency,
-		freeformWidth,
-		freeformHeight,
-		listSlots,
-		listDragReorder,
-		listOrientation,
-		freeformCollisionMode,
-		engineRules,
-		winConditions,
-		loseConditions,
-	]);
+			startSceneId: scenes[0]?.id ?? "",
+			systems: hasTimer ? { timer: { seconds: timerSeconds } } : undefined,
+		}),
+		[title, description, difficulty, variables, scenes, rules, hasTimer, timerSeconds]
+	);
 
-	const validate = (): boolean => {
-		if (!title.trim()) {
-			Alert.alert("Validation Error", "Please enter a title.");
-			return false;
-		}
-		if (!prompt.trim()) {
-			Alert.alert("Validation Error", "Please enter the question.");
-			return false;
-		}
-		const filled = choices.filter((c) => c.trim());
-		if (filled.length < 2) {
-			Alert.alert("Validation Error", "Add at least 2 choices.");
-			return false;
-		}
-		if (!choices[correctIndex]?.trim()) {
-			Alert.alert("Validation Error", "Mark the correct answer.");
-			return false;
-		}
+	// ── Scene helpers ──────────────────────────────────────────────────────
+	const addScene = useCallback(
+		(kind: SceneKind) => {
+			const id = `s-${uid()}`;
+			const content = defaultContent(kind);
+			setScenes((prev) => [...prev, { id, content }]);
+			setShowKindPicker(false);
+			setEditingScene({ idx: scenes.length, content });
+		},
+		[scenes.length]
+	);
+
+	const openEditor = (idx: number) => setEditingScene({ idx, content: scenes[idx].content });
+
+	const saveEditorScene = () => {
+		if (!editingScene) return;
+		setScenes((prev) => prev.map((s, i) => (i === editingScene.idx ? { ...s, content: editingScene.content } : s)));
+		setEditingScene(null);
+	};
+
+	const deleteScene = (idx: number) => {
+		Alert.alert("Remove Scene", "Delete this scene?", [
+			{ text: "Cancel", style: "cancel" },
+			{ text: "Delete", style: "destructive", onPress: () => setScenes((prev) => prev.filter((_, i) => i !== idx)) },
+		]);
+	};
+
+	const moveScene = (idx: number, dir: -1 | 1) => {
+		const next = idx + dir;
+		if (next < 0 || next >= scenes.length) return;
+		setScenes((prev) => {
+			const arr = [...prev];
+			[arr[idx], arr[next]] = [arr[next], arr[idx]];
+			return arr;
+		});
+	};
+
+	// ── Validation ─────────────────────────────────────────────────────────
+	const canProceed = (() => {
+		if (step === 0) return title.trim().length > 0;
+		if (step === 1) return scenes.length > 0;
 		return true;
-	};
+	})();
 
-	const handlePreview = () => {
-		if (!validate()) return;
-		setShowPreview(true);
-	};
-
-	const handleSubmit = async () => {
-		if (!validate()) return;
-
+	// ── Publish ────────────────────────────────────────────────────────────
+	const handlePublish = async () => {
 		const user = getCurrentUser();
-		if (!user) {
-			Alert.alert("Error", "You must be signed in to create games.");
-			router.replace("/signin");
-			return;
-		}
-
-		const userData = await getUserData(user.uid);
-		const username = userData?.username ?? undefined;
-		const definition = buildDefinition();
-
+		if (!user) { Alert.alert("Not signed in", "Please sign in to publish."); return; }
 		setLoading(true);
 		try {
-			await saveGameToFirestore("custom", difficulty, { definition }, user.uid, username);
-			Alert.alert("Success", "Your custom game was created and is pending review.", [
+			const userData = await getUserData(user.uid);
+			const difficultyLabel = difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard";
+			await saveGameToFirestore("custom", difficultyLabel, { game } as any, user.uid, userData?.username);
+			Alert.alert("Submitted!", "Your game has been submitted for review. It usually appears within 24–48 hours.", [
 				{ text: "OK", onPress: () => router.back() },
 			]);
 		} catch (e: any) {
-			Alert.alert("Error", e.message ?? "Failed to save. Please try again.");
+			Alert.alert("Error", e?.message ?? "Failed to save. Please try again.");
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const modalHeight = Math.min(400, Dimensions.get("window").height * 0.85);
-
-	const renderModal = (
-		visible: boolean,
-		onClose: () => void,
-		title: string,
-		children: React.ReactNode
-	) => (
-		<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-			<TouchableWithoutFeedback onPress={onClose}>
-				<View style={styles.modalOverlay}>
-					<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-						<View style={[styles.modalContent, { maxHeight: modalHeight }]}>
-							<View style={styles.modalHeader}>
-								<Text style={styles.modalTitle}>{title}</Text>
-								<TouchableOpacity onPress={onClose} style={styles.modalClose}>
-									<Ionicons name="close" size={24} color={Colors.text.primary} />
-								</TouchableOpacity>
-							</View>
-							<ScrollView
-								style={styles.modalScroll}
-								contentContainerStyle={styles.modalScrollContent}
-								showsVerticalScrollIndicator
-								keyboardShouldPersistTaps="handled"
-								bounces={false}
-							>
-								{children}
-							</ScrollView>
-						</View>
-					</TouchableWithoutFeedback>
-				</View>
-			</TouchableWithoutFeedback>
-		</Modal>
+	// ── Step renderers ─────────────────────────────────────────────────────
+	const renderInfo = () => (
+		<View style={s.stepContent}>
+			<Field label="Game Title *">
+				<FInput placeholder="e.g. Capital Cities Quiz" value={title} onChangeText={setTitle} />
+			</Field>
+			<Field label="Description (optional)">
+				<FInput
+					placeholder="Describe your game in one sentence…"
+					value={description}
+					onChangeText={setDescription}
+					multiline
+					style={[fc.input, { minHeight: 72 }]}
+				/>
+			</Field>
+			<Field label="Difficulty">
+				<PillRow
+					options={[{ value: "1", label: "Easy" }, { value: "2", label: "Medium" }, { value: "3", label: "Hard" }]}
+					value={String(difficulty)}
+					onSelect={(v) => setDifficulty(Number(v) as 1 | 2 | 3)}
+				/>
+			</Field>
+		</View>
 	);
 
-	return (
-		<View style={styles.container}>
-			<StatusBar style="dark" />
-			{/* New Game header: back, title, progress, hamburger, green preview */}
-			<View style={[styles.newGameHeader, { paddingTop: insets.top + Spacing.sm }]}>
-				<TouchableOpacity onPress={() => router.back()} style={styles.newGameBack}>
-					<Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
-				</TouchableOpacity>
-				<View style={styles.newGameHeaderCenter}>
-					<Text style={styles.newGameTitle}>New Game</Text>
-					<Text style={styles.newGameProgress}>{completedCount}/{TOTAL_STEPS} completed</Text>
-					<View style={styles.progressBarTrack}>
-						<View style={[styles.progressBarFill, { width: `${(completedCount / TOTAL_STEPS) * 100}%` }]} />
+	const renderScenes = () => (
+		<View style={s.stepContent}>
+			{scenes.length === 0 && (
+				<View style={s.emptyState}>
+					<Ionicons name="layers-outline" size={44} color={Colors.text.inactive} />
+					<Text style={s.emptyTitle}>No scenes yet</Text>
+					<Text style={s.emptySub}>Scenes are the stages of your game. Add your first one below.</Text>
+				</View>
+			)}
+			{scenes.map((scene, idx) => (
+				<View key={scene.id} style={s.sceneCard}>
+					<View style={s.sceneRow}>
+						<View style={[s.sceneBadge, { backgroundColor: Colors.accent + "22" }]}>
+							<Text style={[s.sceneBadgeText, { color: Colors.accent }]}>{idx + 1}</Text>
+						</View>
+						<View style={{ flex: 1 }}>
+							<Text style={s.sceneKind}>{SCENE_KIND_LABELS[scene.content.kind]}</Text>
+							<Text style={s.scenePreview} numberOfLines={1}>
+								{getScenePreview(scene.content)}
+							</Text>
+						</View>
+						<View style={{ flexDirection: "row", gap: 2 }}>
+							<TouchableOpacity disabled={idx === 0} onPress={() => moveScene(idx, -1)} style={s.iconBtn}>
+								<Ionicons name="chevron-up" size={18} color={idx === 0 ? Colors.text.inactive : Colors.text.secondary} />
+							</TouchableOpacity>
+							<TouchableOpacity disabled={idx === scenes.length - 1} onPress={() => moveScene(idx, 1)} style={s.iconBtn}>
+								<Ionicons name="chevron-down" size={18} color={idx === scenes.length - 1 ? Colors.text.inactive : Colors.text.secondary} />
+							</TouchableOpacity>
+							<TouchableOpacity onPress={() => openEditor(idx)} style={s.iconBtn}>
+								<Ionicons name="create-outline" size={18} color={Colors.accent} />
+							</TouchableOpacity>
+							<TouchableOpacity onPress={() => deleteScene(idx)} style={s.iconBtn}>
+								<Ionicons name="trash-outline" size={18} color={Colors.game.incorrect} />
+							</TouchableOpacity>
+						</View>
 					</View>
 				</View>
-				<View style={styles.newGameHeaderRight}>
-					<TouchableOpacity onPress={() => setShowStepListModal(true)} style={styles.newGameIconBtn}>
-						<Ionicons name="menu" size={24} color={Colors.text.primary} />
-					</TouchableOpacity>
-					<TouchableOpacity onPress={handlePreview} style={styles.previewIconBtn}>
-						<Ionicons name="eye-outline" size={22} color="#fff" />
-					</TouchableOpacity>
+			))}
+			<TouchableOpacity style={s.addSceneBtn} onPress={() => setShowKindPicker(true)}>
+				<Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
+				<Text style={s.addSceneBtnText}>Add Scene</Text>
+			</TouchableOpacity>
+		</View>
+	);
+
+	const renderRules = () => (
+		<View style={s.stepContent}>
+			<Text style={s.sectionNote}>
+				Add optional variables and rules. The game automatically advances through scenes and wins when all are complete — no extra rule needed.
+			</Text>
+
+			<View style={s.ruleCard}>
+				<View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs }}>
+					<Text style={{ fontSize: 20, marginRight: Spacing.sm }}>⭐</Text>
+					<Text style={s.ruleCardTitle}>Score</Text>
+				</View>
+				<Text style={s.ruleCardSub}>Adds +1 for every correct answer.</Text>
+				<View style={s.toggleRow}>
+					<Text style={s.toggleLabel}>Enable Score</Text>
+					<Switch value={hasScore} onValueChange={setHasScore} trackColor={{ true: Colors.accent, false: Colors.borders.subtle }} thumbColor={Colors.background.primary} />
 				</View>
 			</View>
 
-			<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboard}>
+			<View style={s.ruleCard}>
+				<View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs }}>
+					<Text style={{ fontSize: 20, marginRight: Spacing.sm }}>❤️</Text>
+					<Text style={s.ruleCardTitle}>Lives</Text>
+				</View>
+				<Text style={s.ruleCardSub}>Player loses a life on each wrong answer; game over at zero.</Text>
+				<View style={s.toggleRow}>
+					<Text style={s.toggleLabel}>Enable Lives</Text>
+					<Switch value={hasLives} onValueChange={setHasLives} trackColor={{ true: Colors.accent, false: Colors.borders.subtle }} thumbColor={Colors.background.primary} />
+				</View>
+				{hasLives && (
+					<View style={[s.toggleRow, { marginTop: Spacing.sm }]}>
+						<Text style={s.toggleLabel}>Starting Lives</Text>
+						<PillRow
+							options={[{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "5", label: "5" }]}
+							value={String(livesCount)}
+							onSelect={(v) => setLivesCount(Number(v))}
+						/>
+					</View>
+				)}
+			</View>
+
+			<View style={s.ruleCard}>
+				<View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs }}>
+					<Text style={{ fontSize: 20, marginRight: Spacing.sm }}>⏱️</Text>
+					<Text style={s.ruleCardTitle}>Timer</Text>
+				</View>
+				<Text style={s.ruleCardSub}>Countdown timer displayed during play.</Text>
+				<View style={s.toggleRow}>
+					<Text style={s.toggleLabel}>Enable Timer</Text>
+					<Switch value={hasTimer} onValueChange={setHasTimer} trackColor={{ true: Colors.accent, false: Colors.borders.subtle }} thumbColor={Colors.background.primary} />
+				</View>
+				{hasTimer && (
+					<View style={[s.toggleRow, { marginTop: Spacing.sm }]}>
+						<Text style={s.toggleLabel}>Duration</Text>
+						<PillRow
+							options={[{ value: "30", label: "30s" }, { value: "60", label: "1m" }, { value: "120", label: "2m" }, { value: "300", label: "5m" }]}
+							value={String(timerSeconds)}
+							onSelect={(v) => setTimerSeconds(Number(v))}
+						/>
+					</View>
+				)}
+			</View>
+		</View>
+	);
+
+	const renderPreview = () => (
+		<View style={{ flex: 1, minHeight: 400 }}>
+			{scenes.length === 0 ? (
+				<View style={s.emptyState}>
+					<Ionicons name="play-circle-outline" size={44} color={Colors.text.inactive} />
+					<Text style={s.emptyTitle}>Nothing to preview</Text>
+					<Text style={s.emptySub}>Go back to Scenes and add at least one scene.</Text>
+				</View>
+			) : (
+				<GamePlayer
+					key={`preview-${scenes.map((s) => s.id).join("-")}`}
+					game={{ ...game, id: `preview-${Date.now()}` }}
+					puzzleId="preview"
+					isActive
+					onComplete={() => {}}
+				/>
+			)}
+		</View>
+	);
+
+	const renderPublish = () => (
+		<View style={s.stepContent}>
+			<View style={s.summaryCard}>
+				<Text style={s.summaryTitle}>{title || "Untitled"}</Text>
+				{description ? <Text style={s.summarySub}>{description}</Text> : null}
+				<View style={s.summaryMeta}>
+					<View style={s.metaPill}>
+						<Ionicons name="layers-outline" size={13} color={Colors.text.secondary} />
+						<Text style={s.metaText}>{scenes.length} scene{scenes.length !== 1 ? "s" : ""}</Text>
+					</View>
+					<View style={s.metaPill}>
+						<Ionicons name="speedometer-outline" size={13} color={Colors.text.secondary} />
+						<Text style={s.metaText}>{DIFFICULTY_LABELS[difficulty]}</Text>
+					</View>
+					{hasScore && (
+						<View style={s.metaPill}>
+							<Ionicons name="star-outline" size={13} color={Colors.text.secondary} />
+							<Text style={s.metaText}>Score</Text>
+						</View>
+					)}
+					{hasLives && (
+						<View style={s.metaPill}>
+							<Ionicons name="heart-outline" size={13} color={Colors.text.secondary} />
+							<Text style={s.metaText}>{livesCount} Lives</Text>
+						</View>
+					)}
+					{hasTimer && (
+						<View style={s.metaPill}>
+							<Ionicons name="timer-outline" size={13} color={Colors.text.secondary} />
+							<Text style={s.metaText}>{timerSeconds}s</Text>
+						</View>
+					)}
+				</View>
+			</View>
+
+			<View style={s.infoBox}>
+				<Ionicons name="information-circle-outline" size={18} color={Colors.text.secondary} />
+				<Text style={s.infoBoxText}>
+					Your game will be submitted for review before appearing in the public feed. This usually takes 24–48 hours.
+				</Text>
+			</View>
+
+			<TouchableOpacity
+				style={[s.publishBtn, loading && { opacity: 0.55 }]}
+				onPress={handlePublish}
+				disabled={loading}
+				activeOpacity={0.85}
+			>
+				{loading ? (
+					<ActivityIndicator color={Colors.text.primary} />
+				) : (
+					<>
+						<Ionicons name="rocket-outline" size={20} color={Colors.text.primary} />
+						<Text style={s.publishBtnText}>Publish Game</Text>
+					</>
+				)}
+			</TouchableOpacity>
+		</View>
+	);
+
+	// ─────────────────────────────────────────────────────────────────────────
+	return (
+		<View style={{ flex: 1, backgroundColor: Colors.background.secondary }}>
+			<StatusBar style="dark" />
+			<MinimalHeader title="Create Custom Game" />
+
+			{/* Step indicator */}
+			<View style={s.stepBar}>
+				{STEPS.map((label, i) => (
+					<TouchableOpacity
+						key={label}
+						style={s.stepItem}
+						onPress={() => { if (i < step) setStep(i); }}
+						disabled={i >= step}
+					>
+						<View style={[s.stepDot, i === step && s.stepDotActive, i < step && s.stepDotDone]}>
+							{i < step
+								? <Ionicons name="checkmark" size={12} color="#fff" />
+								: <Text style={[s.stepNum, i === step && { color: Colors.text.primary }]}>{i + 1}</Text>
+							}
+						</View>
+						<Text style={[s.stepLabel, i === step && s.stepLabelActive]} numberOfLines={1}>{label}</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+
+			{/* Content */}
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
+				keyboardVerticalOffset={insets.top + 100}
+			>
 				<ScrollView
-					style={styles.scroll}
-					contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}
+					style={{ flex: 1 }}
+					contentContainerStyle={[s.scrollContent, step === 3 && { flexGrow: 1, paddingBottom: 0 }]}
 					keyboardShouldPersistTaps="handled"
-					showsVerticalScrollIndicator
+					showsVerticalScrollIndicator={false}
 				>
-					{/* Step 0: Game Information */}
-					{currentStep === 0 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Game Information</Text>
-							<Text style={styles.gameInfoSubtitle}>Basic details that help players discover your game</Text>
-
-							<Text style={styles.fieldLabel}>Game Title *</Text>
-							<TextInput
-								style={styles.input}
-								placeholder="My Awesome Brain Game"
-								placeholderTextColor={Colors.text.disabled}
-								value={title}
-								onChangeText={(t) => setTitle(t.slice(0, 60))}
-								maxLength={60}
-							/>
-							<View style={styles.charCountRow}>
-								<Text style={styles.charCountHint}>Max 60 chars</Text>
-								<Text style={styles.charCountValue}>{title.length}/60</Text>
-							</View>
-
-							<Text style={styles.fieldLabel}>Short Description *</Text>
-							<TextInput
-								style={[styles.input, styles.textArea]}
-								placeholder="A quick, engaging description..."
-								placeholderTextColor={Colors.text.disabled}
-								value={description}
-								onChangeText={(t) => setDescription(t.slice(0, 200))}
-								maxLength={200}
-								multiline
-							/>
-							<View style={styles.charCountRow}>
-								<Text style={styles.charCountHint}>Max 200 chars</Text>
-								<Text style={styles.charCountValue}>{description.length}/200</Text>
-							</View>
-
-							<Text style={styles.fieldLabel}>Instructions *</Text>
-							<TextInput
-								style={[styles.input, styles.instructionsArea]}
-								placeholder="How to play your game..."
-								placeholderTextColor={Colors.text.disabled}
-								value={instructionLines.join("\n")}
-								onChangeText={(t) => setInstructionLines([t.slice(0, 500)])}
-								maxLength={500}
-								multiline
-								textAlignVertical="top"
-							/>
-							<View style={styles.charCountRow}>
-								<Text style={styles.charCountHint}>Max 500 chars</Text>
-								<Text style={styles.charCountValue}>{instructionLines.join("\n").length}/500</Text>
-							</View>
-
-							<Text style={styles.sectionLabel}>Difficulty</Text>
-							<View style={styles.diffRow}>
-								{(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
-									<TouchableOpacity key={d} style={[styles.diffBtn, difficulty === d && styles.diffBtnSelected]} onPress={() => setDifficulty(d)}>
-										<Text style={[styles.diffText, difficulty === d && styles.diffTextSelected]}>{d.charAt(0).toUpperCase() + d.slice(1)}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-
-							<View style={styles.sectionSpacer} />
-							<View style={styles.sectionLabelRow}>
-								<Ionicons name="time-outline" size={18} color={Colors.text.primary} />
-								<Text style={styles.sectionLabel}>Play Time</Text>
-							</View>
-							<View
-								style={styles.sliderTrack}
-								onLayout={(e) => { playTimeTrackWidth.current = e.nativeEvent.layout.width; }}
-								onStartShouldSetResponder={() => true}
-								onResponderRelease={(e) => {
-									const w = playTimeTrackWidth.current;
-									if (w <= 0) return;
-									const x = e.nativeEvent.locationX;
-									const pct = Math.max(0, Math.min(1, x / w));
-									const idx = Math.round(pct * (PLAY_TIME_OPTIONS.length - 1));
-									setPlayTimeMinutes(PLAY_TIME_OPTIONS[idx]);
-								}}
-							>
-								<View style={[styles.sliderFill, { width: `${((PLAY_TIME_OPTIONS.indexOf(playTimeMinutes) + 1) / PLAY_TIME_OPTIONS.length) * 100}%` }]} />
-								<View style={[styles.sliderThumb, { left: `${(PLAY_TIME_OPTIONS.indexOf(playTimeMinutes) / Math.max(1, PLAY_TIME_OPTIONS.length - 1)) * 100}%` }]} />
-							</View>
-							<Text style={styles.playTimeValue}>{playTimeMinutes}m</Text>
-							<Text style={styles.playTimeAvgLabel}>Avg time</Text>
-
-							<View style={styles.sectionSpacer} />
-							<View style={styles.sectionLabelRow}>
-								<Ionicons name="pricetag-outline" size={18} color={Colors.text.primary} />
-								<Text style={styles.sectionLabel}>Tags</Text>
-							</View>
-							<Text style={styles.tagsSubtitle}>Select all that apply</Text>
-							<View style={styles.tagsRow}>
-								{TAGS.map((tag) => (
-									<TouchableOpacity
-										key={tag}
-										style={[styles.tagPill, selectedTags.includes(tag) && styles.tagPillSelected]}
-										onPress={() => setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))}
-									>
-										<Text style={styles.tagPillText}>{tag}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-
-							<View style={styles.sectionSpacer} />
-							<View style={styles.sectionLabelRow}>
-								<Ionicons name="eye-outline" size={18} color={Colors.text.primary} />
-								<Text style={styles.sectionLabel}>Visibility</Text>
-							</View>
-							<View style={styles.visibilityStack}>
-								{[
-									{ value: "public" as const, label: "Public", sub: "Anyone can find and play" },
-									{ value: "unlisted" as const, label: "Unlisted", sub: "Only people with link" },
-									{ value: "draft" as const, label: "Draft", sub: "Only you can see" },
-								].map((v) => (
-									<TouchableOpacity
-										key={v.value}
-										style={[styles.visibilityPanel, visibility === v.value && styles.visibilityPanelSelected]}
-										onPress={() => setVisibility(v.value)}
-									>
-										<Text style={styles.visibilityLabel}>{v.label}</Text>
-										<Text style={styles.visibilitySub}>{v.sub}</Text>
-										{visibility === v.value && (
-											<View style={styles.visibilityCheck}>
-												<Ionicons name="checkmark" size={20} color="#eab308" />
-											</View>
-										)}
-									</TouchableOpacity>
-								))}
-							</View>
-
-							<View style={styles.moderationBox}>
-								<Ionicons name="information-circle" size={22} color="#0ea5e9" />
-								<Text style={styles.moderationText}>Content subject to moderation{"\n"}Follow community guidelines</Text>
-							</View>
-						</View>
-					)}
-
-					{/* Step 1: Board Configuration */}
-					{currentStep === 1 && (
-						<View style={styles.boardConfigSection}>
-							<Text style={styles.boardConfigTitle}>Board Configuration</Text>
-							<Text style={styles.boardConfigSubtitle}>Choose the layout type that best fits your game mechanics</Text>
-							<Text style={styles.boardConfigRequired}>Select Board Type *</Text>
-							<View style={styles.boardCardsGrid}>
-								{[
-									{ kind: "grid" as BoardKind, title: "Grid Board", desc: "Perfect for puzzles, matching games, and grid-based logic", examples: "Sudoku, Match-3, Word Search", icon: "grid-outline" as const },
-									{ kind: "freeform" as BoardKind, title: "Freeform Board", desc: "Floating objects with physics, great for action games", examples: "Bubble Pop, Catch & Tap, Reaction Games", icon: "resize-outline" as const },
-									{ kind: "none" as BoardKind, title: "Path/Graph Board", desc: "Connected nodes and edges for traversal puzzles", examples: "Maze, Connect the Dots, Flow", icon: "git-branch-outline" as const },
-									{ kind: "list" as BoardKind, title: "List/Sequence Board", desc: "Ordered slots for sequencing and memory challenges", examples: "Memory Order, Sequence Builder, Rankings", icon: "list-outline" as const },
-								].map((b) => (
-									<TouchableOpacity
-										key={b.kind}
-										style={[styles.boardCard, boardKind === b.kind && styles.boardCardSelected]}
-										onPress={() => setBoardKind(b.kind)}
-									>
-										{boardKind === b.kind && (
-											<View style={styles.boardCardCheck}>
-												<Ionicons name="checkmark" size={18} color={Colors.accent} />
-											</View>
-										)}
-										<View style={styles.boardCardIconWrap}>
-											<Ionicons name={b.icon} size={28} color={Colors.text.secondary} />
-										</View>
-										<Text style={styles.boardCardTitle}>{b.title}</Text>
-										<Text style={styles.boardCardDesc}>{b.desc}</Text>
-										<Text style={styles.boardCardExamples}>Examples: {b.examples}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-
-							{boardKind === "grid" && (
-								<View style={styles.inlineSettingsBlock}>
-									<Text style={styles.inlineSettingsTitle}>Grid Settings</Text>
-									<Text style={styles.newGameLabel}>Rows</Text>
-									<TextInput style={styles.input} value={String(gridRows)} onChangeText={(t) => setGridRows(Math.max(1, Math.min(20, parseInt(t, 10) || 3)))} keyboardType="number-pad" />
-									<Text style={styles.gridMaxHint}>Max: 20</Text>
-									<Text style={styles.newGameLabel}>Columns</Text>
-									<TextInput style={styles.input} value={String(gridCols)} onChangeText={(t) => setGridCols(Math.max(1, Math.min(20, parseInt(t, 10) || 3)))} keyboardType="number-pad" />
-									<Text style={styles.gridMaxHint}>Max: 20</Text>
-									<Text style={styles.newGameLabel}>Adjacency Rule</Text>
-									<View style={styles.segmentRow}>
-										<TouchableOpacity style={[styles.segmentBtn, gridAdjacency === "4" && styles.segmentBtnSelected]} onPress={() => setGridAdjacency("4")}>
-											<Text style={[styles.segmentBtnText, gridAdjacency === "4" && styles.segmentBtnTextSelected]}>4-Way (↑→↓←)</Text>
-										</TouchableOpacity>
-										<TouchableOpacity style={[styles.segmentBtn, gridAdjacency === "8" && styles.segmentBtnSelected]} onPress={() => setGridAdjacency("8")}>
-											<Text style={[styles.segmentBtnText, gridAdjacency === "8" && styles.segmentBtnTextSelected]}>8-Way (+ Diagonals)</Text>
-										</TouchableOpacity>
-									</View>
-									<View style={styles.gridPreviewBox}>
-										<Text style={styles.gridPreviewText}>Preview: {gridRows} x {gridCols} grid ({gridRows * gridCols} total cells)</Text>
-									</View>
-								</View>
-							)}
-
-							{boardKind === "freeform" && (
-								<View style={styles.inlineSettingsBlock}>
-									<Text style={styles.inlineSettingsTitle}>Freeform Settings</Text>
-									<Text style={styles.newGameLabel}>Width (px)</Text>
-									<TextInput style={styles.input} value={String(freeformWidth)} onChangeText={(t) => setFreeformWidth(Math.max(100, Math.min(1200, parseInt(t, 10) || 300)))} keyboardType="number-pad" />
-									<Text style={styles.newGameLabel}>Height (px)</Text>
-									<TextInput style={styles.input} value={String(freeformHeight)} onChangeText={(t) => setFreeformHeight(Math.max(100, Math.min(1000, parseInt(t, 10) || 300)))} keyboardType="number-pad" />
-									<Text style={styles.newGameLabel}>Collision Mode</Text>
-									<View style={styles.segmentRow}>
-										<TouchableOpacity style={[styles.segmentBtn, freeformCollisionMode === "none" && styles.segmentBtnSelected]} onPress={() => setFreeformCollisionMode("none")}>
-											<Text style={[styles.segmentBtnText, freeformCollisionMode === "none" && styles.segmentBtnTextSelected]}>None</Text>
-										</TouchableOpacity>
-										<TouchableOpacity style={[styles.segmentBtn, freeformCollisionMode === "basic" && styles.segmentBtnSelected]} onPress={() => setFreeformCollisionMode("basic")}>
-											<Text style={[styles.segmentBtnText, freeformCollisionMode === "basic" && styles.segmentBtnTextSelected]}>Basic</Text>
-										</TouchableOpacity>
-									</View>
-								</View>
-							)}
-
-							{boardKind === "list" && (
-								<View style={styles.inlineSettingsBlock}>
-									<Text style={styles.inlineSettingsTitle}>List Settings</Text>
-									<Text style={styles.newGameLabel}>Number of Slots</Text>
-									<TextInput style={styles.input} value={String(listSlots)} onChangeText={(t) => setListSlots(Math.max(1, Math.min(15, parseInt(t, 10) || 5)))} keyboardType="number-pad" />
-									<Text style={styles.gridMaxHint}>Max: 15 slots</Text>
-									<Text style={styles.newGameLabel}>Orientation</Text>
-									<View style={styles.segmentRow}>
-										<TouchableOpacity style={[styles.segmentBtn, listOrientation === "vertical" && styles.segmentBtnSelected]} onPress={() => setListOrientation("vertical")}>
-											<Text style={[styles.segmentBtnText, listOrientation === "vertical" && styles.segmentBtnTextSelected]}>Vertical</Text>
-										</TouchableOpacity>
-										<TouchableOpacity style={[styles.segmentBtn, listOrientation === "horizontal" && styles.segmentBtnSelected]} onPress={() => setListOrientation("horizontal")}>
-											<Text style={[styles.segmentBtnText, listOrientation === "horizontal" && styles.segmentBtnTextSelected]}>Horizontal</Text>
-										</TouchableOpacity>
-									</View>
-								</View>
-							)}
-
-							<View style={styles.platformLimitsBox}>
-								<Ionicons name="resize-outline" size={22} color={Colors.text.secondary} />
-								<View style={styles.platformLimitsContent}>
-									<Text style={styles.platformLimitsTitle}>Platform Safety Limits</Text>
-									<Text style={styles.platformLimitsBullet}>• Max board size: 20x20 grid or 1200x1000px</Text>
-									<Text style={styles.platformLimitsBullet}>• Max objects on screen: 200</Text>
-								</View>
-							</View>
-						</View>
-					)}
-
-					{/* Step 2: Objects & Assets */}
-					{currentStep === 2 && (
-						<View style={styles.objectsCard}>
-							<Text style={styles.gameInfoTitle}>Objects & Assets</Text>
-							<Text style={styles.gameInfoSubtitle}>Define the objects that will appear in your game</Text>
-
-							<Text style={styles.objectsSectionTitle}>Add Object Type</Text>
-							<View style={styles.objectTypeGrid}>
-								{OBJECT_TYPES.map((ot) => (
-									<TouchableOpacity
-										key={ot.id}
-										style={[styles.objectTypeCard, selectedObjectTypes.includes(ot.id) && styles.objectTypeCardSelected]}
-										onPress={() => setSelectedObjectTypes((prev) => (prev.includes(ot.id) ? prev.filter((x) => x !== ot.id) : [...prev, ot.id]))}
-									>
-										<Text style={styles.objectTypeCardTitle}>{ot.title}</Text>
-										<Text style={styles.objectTypeCardDesc}>{ot.desc}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-
-							<TouchableOpacity
-								style={[styles.addObjectTypeBtn, selectedObjectTypes.length === 0 && styles.addObjectTypeBtnDisabled]}
-								onPress={addSelectedObjectTypes}
-								disabled={selectedObjectTypes.length === 0}
-							>
-								<Ionicons name="add" size={20} color="#fff" />
-								<Text style={styles.addObjectTypeBtnText}>Add Selected Object Type</Text>
-							</TouchableOpacity>
-
-							<Text style={[styles.objectsSectionTitle, { marginTop: Spacing.xl }]}>Your Objects ({yourObjects.length})</Text>
-							{yourObjects.length === 0 ? (
-								<View style={styles.yourObjectsEmpty}>
-									<Ionicons name="image-outline" size={56} color={Colors.text.disabled} />
-									<Text style={styles.yourObjectsEmptyText}>No objects yet. Add your first object above.</Text>
-								</View>
-							) : (
-								<View style={styles.yourObjectsList}>
-									{yourObjects.map((obj) => (
-										<View key={obj.id} style={styles.yourObjectCard}>
-											<View style={styles.yourObjectCardContent}>
-												<Text style={styles.yourObjectCardName}>{obj.name}</Text>
-												<Text style={styles.yourObjectCardType}>Type: {OBJECT_TYPES.find((t) => t.id === obj.type)?.title ?? obj.type}</Text>
-											</View>
-											<TouchableOpacity onPress={() => removeYourObject(obj.id)} style={styles.yourObjectDelete}>
-												<Ionicons name="trash-outline" size={22} color={Colors.error} />
-											</TouchableOpacity>
-										</View>
-									))}
-								</View>
-							)}
-
-							<TouchableOpacity style={styles.rowButton} onPress={() => setShowObjectsModal(true)}>
-								<Text style={styles.rowLabel}>Use choices as objects</Text>
-								<Text style={styles.rowValue}>{useChoicesAsObjects ? "Yes (choices as tiles/slots)" : "No (empty board)"}</Text>
-								<Ionicons name="chevron-forward" size={18} color={Colors.text.secondary} />
-							</TouchableOpacity>
-						</View>
-					)}
-
-					{/* Step 3: Interaction Modes */}
-					{currentStep === 3 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Interaction Modes</Text>
-							<Text style={styles.gameInfoSubtitle}>Define how players can interact with your game objects</Text>
-							<View style={styles.interactionSection}>
-								<View style={styles.interactionSectionHeader}>
-									<View style={styles.interactionIconWrap}><Ionicons name="hand-left-outline" size={20} color={Colors.text.primary} /></View>
-									<Text style={styles.interactionSectionTitle}>Tap Interactions</Text>
-								</View>
-								<View style={styles.chipRow}>
-									{[
-										{ id: "tap_select", label: "Tap to select" },
-										{ id: "tap_toggle", label: "Tap to toggle states" },
-										{ id: "tap_reveal", label: "Tap to reveal (card flip)" },
-										{ id: "tap_sequence", label: "Tap sequence input (Simon-style)" },
-									].map(({ id, label }) => (
-										<TouchableOpacity key={id} style={[styles.interactionChip, interactionModes.includes(id) && styles.chipSelected]} onPress={() => setInteractionModes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}>
-											<Text style={styles.chipText}>{label}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-							<View style={styles.interactionSection}>
-								<View style={styles.interactionSectionHeader}>
-									<View style={styles.interactionIconWrap}><Ionicons name="move-outline" size={20} color={Colors.text.primary} /></View>
-									<Text style={styles.interactionSectionTitle}>Drag Interactions</Text>
-								</View>
-								<View style={styles.chipRow}>
-									{[
-										{ id: "drag_place_grid", label: "Drag to place on grid" },
-										{ id: "drag_reorder_list", label: "Drag to reorder list" },
-										{ id: "drag_swap", label: "Drag to swap positions" },
-									].map(({ id, label }) => (
-										<TouchableOpacity key={id} style={[styles.interactionChip, interactionModes.includes(id) && styles.chipSelected]} onPress={() => setInteractionModes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}>
-											<Text style={styles.chipText}>{label}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-							<View style={styles.interactionSection}>
-								<View style={styles.interactionSectionHeader}>
-									<View style={styles.interactionIconWrap}><Ionicons name="keypad-outline" size={20} color={Colors.text.primary} /></View>
-									<Text style={styles.interactionSectionTitle}>Type Interactions</Text>
-								</View>
-								<View style={styles.chipRow}>
-									{[
-										{ id: "type_text", label: "Text answer input" },
-										{ id: "type_numeric", label: "Numeric input" },
-										{ id: "type_letter", label: "Letter keyboard (word games)" },
-									].map(({ id, label }) => (
-										<TouchableOpacity key={id} style={[styles.interactionChip, interactionModes.includes(id) && styles.chipSelected]} onPress={() => setInteractionModes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}>
-											<Text style={styles.chipText}>{label}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-							{interactionModes.length === 0 && (
-								<View style={styles.interactionErrorBox}>
-									<Text style={styles.interactionErrorText}>Select at least one interaction mode to continue.</Text>
-								</View>
-							)}
-							<TouchableOpacity style={styles.rowButton} onPress={() => setShowTimerScoreModal(true)}>
-								<Text style={styles.rowLabel}>Timer, score, lives & rounds</Text>
-								<Text style={styles.rowValue}>{timerEnabled ? `${timerSeconds}s` : "No timer"} · Score: {scoreStart}</Text>
-								<Ionicons name="chevron-forward" size={18} color={Colors.text.secondary} />
-							</TouchableOpacity>
-						</View>
-					)}
-
-					{/* Step 4: Dynamic Behavior */}
-					{currentStep === 4 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Dynamic Behavior</Text>
-							<Text style={styles.gameInfoSubtitle}>Configure spawning, movement, and randomization</Text>
-
-							{/* Spawn Rules */}
-							<View style={[styles.behaviorSection, styles.behaviorSectionFirst]}>
-								<View style={styles.behaviorSectionHeader}>
-									<Ionicons name="flash" size={20} color={Colors.text.secondary} />
-									<Text style={styles.sectionLabel}>Spawn Rules</Text>
-									<View style={{ flex: 1 }} />
-									<TouchableOpacity style={styles.addRuleButton} onPress={addSpawnRule} activeOpacity={0.85}>
-										<Text style={styles.addRuleButtonText}>+ Add Rule</Text>
-									</TouchableOpacity>
-								</View>
-								{spawnRules.length === 0 ? (
-									<View style={styles.spawnRulesEmpty}>
-										<View style={styles.spawnRulesEmptyIconWrap}>
-											<Ionicons name="flash-outline" size={48} color={Colors.text.disabled} />
-										</View>
-										<Text style={styles.spawnRulesEmptyText}>No spawn rules yet.</Text>
-										<Text style={[styles.spawnRulesEmptyText, styles.spawnRulesEmptyTextSub]}>Objects will be placed manually.</Text>
-									</View>
-								) : (
-									<View style={styles.spawnRulesList}>
-										{spawnRules.map((rule, index) => (
-											<View key={rule.id} style={styles.spawnRuleCard}>
-												<View style={{ flex: 1 }}>
-													<Text style={styles.spawnRuleTitle}>Spawn Rule {index + 1}</Text>
-													<Text style={styles.spawnRuleDetail}>{rule.trigger} • {rule.count} object(s) • {rule.placement}</Text>
-												</View>
-												<TouchableOpacity onPress={() => removeSpawnRule(rule.id)} style={styles.spawnRuleRemove}>
-													<Ionicons name="close-circle" size={22} color={Colors.text.secondary} />
-												</TouchableOpacity>
-											</View>
-										))}
-									</View>
-								)}
-							</View>
-
-							{/* Movement Preset */}
-							<View style={[styles.behaviorSection, styles.behaviorSectionSecond]}>
-								<View style={styles.behaviorSectionHeader}>
-									<Ionicons name="location" size={20} color={Colors.text.secondary} />
-									<Text style={styles.sectionLabel}>Movement Preset</Text>
-								</View>
-								<View style={styles.movementPresetGrid}>
-									{(["stationary", "drift", "bounce", "fall"] as const).map((preset) => (
-										<TouchableOpacity
-											key={preset}
-											style={[styles.movementPresetBtn, movementPreset === preset && styles.movementPresetBtnSelected]}
-											onPress={() => setMovementPreset(preset)}
-											activeOpacity={0.85}
-										>
-											<Text style={[styles.movementPresetBtnText, movementPreset === preset && styles.movementPresetBtnTextSelected]}>
-												{preset.charAt(0).toUpperCase() + preset.slice(1)}
-											</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-						</View>
-					)}
-
-					{/* Step 5: Rule Engine */}
-					{currentStep === 5 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Rule Engine</Text>
-							<Text style={styles.gameInfoSubtitle}>Define game logic with WHEN/IF/THEN rules</Text>
-
-							<View style={styles.ruleEngineInfoBox}>
-								<Ionicons name="information-circle" size={22} color="#0ea5e9" />
-								<Text style={styles.ruleEngineInfoText}>
-									Rules execute in order from top to bottom. Drag to reorder, or use the visual builder to create complex conditions.
-								</Text>
-							</View>
-
-							<View style={styles.ruleEngineRulesHeader}>
-								<Text style={styles.sectionLabel}>Your Rules ({engineRules.length})</Text>
-								<TouchableOpacity style={styles.addRuleEngineButton} onPress={addEngineRule} activeOpacity={0.85}>
-									<Ionicons name="add" size={20} color={Colors.text.primary} />
-									<Text style={styles.addRuleEngineButtonText}>Add Rule</Text>
-								</TouchableOpacity>
-							</View>
-
-							{engineRules.length === 0 ? (
-								<View style={styles.ruleEngineEmpty}>
-									<Text style={styles.ruleEngineEmptyText}>No rules yet. Tap "Add Rule" to create one.</Text>
-								</View>
-							) : (
-								<View style={styles.ruleEngineList}>
-									{engineRules.map((rule, index) => (
-										<View key={rule.id} style={styles.ruleEngineCard}>
-											<View style={styles.ruleEngineCardHeader}>
-												<View style={styles.ruleEngineCardTitleRow}>
-													<View style={styles.ruleEngineCardNumber}>
-														<Text style={styles.ruleEngineCardNumberText}>{index + 1}</Text>
-													</View>
-													<Text style={styles.ruleEngineCardTitle}>Rule {index + 1}</Text>
-												</View>
-												<TouchableOpacity onPress={() => removeEngineRule(rule.id)} style={styles.ruleEngineCardDelete} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-													<Ionicons name="trash-outline" size={22} color={Colors.error} />
-												</TouchableOpacity>
-											</View>
-											<Text style={styles.ruleEngineCardLabel}>WHEN (Trigger)</Text>
-											<TouchableOpacity
-												style={styles.ruleEngineTriggerRow}
-												onPress={() => setShowTriggerPickerForRuleId(showTriggerPickerForRuleId === rule.id ? null : rule.id)}
-												activeOpacity={0.8}
-											>
-												<Text style={styles.ruleEngineTriggerText}>{rule.trigger}</Text>
-												<Ionicons name="chevron-down" size={20} color={Colors.text.secondary} />
-											</TouchableOpacity>
-											{showTriggerPickerForRuleId === rule.id && (
-												<View style={styles.ruleEngineTriggerDropdown}>
-													{RULE_TRIGGERS.map((t) => (
-														<TouchableOpacity
-															key={t}
-															style={styles.ruleEngineTriggerOption}
-															onPress={() => setEngineRuleTrigger(rule.id, t)}
-															activeOpacity={0.7}
-														>
-															{rule.trigger === t && <Ionicons name="checkmark" size={20} color="#22c55e" />}
-															<Text style={[styles.ruleEngineTriggerOptionText, rule.trigger === t && styles.ruleEngineTriggerOptionTextSelected]}>{t}</Text>
-														</TouchableOpacity>
-													))}
-												</View>
-											)}
-											<Text style={styles.ruleEngineCardLabel}>IF (Conditions) - Optional</Text>
-											<View style={styles.ruleEnginePlaceholder}>
-												<Text style={styles.ruleEnginePlaceholderText}>No conditions set (always execute)</Text>
-											</View>
-											<Text style={styles.ruleEngineCardLabel}>THEN (Actions)</Text>
-											<View style={styles.ruleEnginePlaceholderWarning}>
-												<Text style={styles.ruleEnginePlaceholderWarningText}>No actions set (rule does nothing)</Text>
-											</View>
-										</View>
-									))}
-								</View>
-							)}
-
-							<View style={styles.ruleEngineSummaryBar}>
-								<Text style={styles.ruleEngineSummaryText}>{engineRules.length} rule(s) defined</Text>
-							</View>
-						</View>
-					)}
-
-					{/* Step 6: Win & Lose Conditions */}
-					{currentStep === 6 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Win & Lose Conditions</Text>
-							<Text style={styles.gameInfoSubtitle}>Define how players can win or lose your game</Text>
-
-							<View style={styles.winLoseAlertBox}>
-								<Ionicons name="warning" size={24} color="#b91c1c" />
-								<View style={styles.winLoseAlertTextBlock}>
-									<Text style={styles.winLoseAlertTitle}>At least one win condition is required</Text>
-									<Text style={styles.winLoseAlertSub}>Your game must have a clear way for players to succeed</Text>
-								</View>
-							</View>
-
-							{/* Win Conditions */}
-							<View style={styles.winLoseSection}>
-								<View style={styles.winLoseSectionHeader}>
-									<Ionicons name="trophy" size={22} color="#16a34a" />
-									<Text style={styles.sectionLabel}>Win Conditions ({winConditions.length})</Text>
-								</View>
-								{winConditions.length === 0 ? (
-									<View style={styles.winLoseEmptyWin}>
-										<Text style={styles.winLoseEmptyWinText}>No win conditions yet - add at least one</Text>
-									</View>
-								) : (
-									<View style={styles.winLoseConditionList}>
-										{winConditions.map((c) => {
-											const label = WIN_CONDITION_TYPES.find((t) => t.id === c.type)?.label ?? c.type;
-											return (
-												<View key={c.id} style={styles.winLoseConditionChip}>
-													<Text style={styles.winLoseConditionChipText}>{label}</Text>
-													<TouchableOpacity onPress={() => removeWinCondition(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-														<Ionicons name="close-circle" size={20} color={Colors.text.secondary} />
-													</TouchableOpacity>
-												</View>
-											);
-										})}
-									</View>
-								)}
-								<Text style={styles.winLoseAddLabel}>Add Win Condition</Text>
-								<View style={styles.winLoseButtonGrid}>
-									{WIN_CONDITION_TYPES.map((t) => (
-										<TouchableOpacity key={t.id} style={styles.winLoseAddBtn} onPress={() => addWinCondition(t.id)} activeOpacity={0.85}>
-											<Ionicons name="add" size={20} color={Colors.text.secondary} />
-											<Text style={styles.winLoseAddBtnText}>{t.label}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-
-							<View style={styles.winLoseDivider} />
-
-							{/* Lose Conditions */}
-							<View style={styles.winLoseSection}>
-								<View style={styles.winLoseSectionHeader}>
-									<Ionicons name="warning" size={20} color="#b91c1c" />
-									<Text style={styles.sectionLabel}>Lose Conditions ({loseConditions.length})</Text>
-								</View>
-								{loseConditions.length === 0 ? (
-									<View style={styles.winLoseEmptyLose}>
-										<Text style={styles.winLoseEmptyLoseText}>No lose conditions (optional - game can only be won)</Text>
-									</View>
-								) : (
-									<View style={styles.winLoseConditionList}>
-										{loseConditions.map((c) => {
-											const label = LOSE_CONDITION_TYPES.find((t) => t.id === c.type)?.label ?? c.type;
-											return (
-												<View key={c.id} style={styles.winLoseConditionChip}>
-													<Text style={styles.winLoseConditionChipText}>{label}</Text>
-													<TouchableOpacity onPress={() => removeLoseCondition(c.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-														<Ionicons name="close-circle" size={20} color={Colors.text.secondary} />
-													</TouchableOpacity>
-												</View>
-											);
-										})}
-									</View>
-								)}
-								<Text style={styles.winLoseAddLabel}>Add Lose Condition (Optional)</Text>
-								<View style={styles.winLoseButtonGrid}>
-									{LOSE_CONDITION_TYPES.map((t) => (
-										<TouchableOpacity key={t.id} style={styles.winLoseAddBtnTwo} onPress={() => addLoseCondition(t.id)} activeOpacity={0.85}>
-											<Ionicons name="add" size={20} color={Colors.text.secondary} />
-											<Text style={styles.winLoseAddBtnText}>{t.label}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
-							</View>
-						</View>
-					)}
-
-					{/* Step 7: Content Packs */}
-					{currentStep === 7 && (
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Content Packs</Text>
-							<Text style={styles.gameInfoSubtitle}>Add word lists, questions, and other content for your game</Text>
-
-							<Text style={styles.contentPackAddLabel}>Add Content Pack</Text>
-							<View style={styles.contentPackGrid}>
-								{CONTENT_PACK_TYPES.map((t) => (
-									<TouchableOpacity key={t.id} style={styles.contentPackTypeCard} onPress={() => addContentPack(t.id)} activeOpacity={0.85}>
-										<View style={styles.contentPackTypeIconWrap}>
-											<Ionicons name={t.icon as keyof typeof Ionicons.glyphMap} size={28} color="#eab308" />
-										</View>
-										<Text style={styles.contentPackTypeTitle}>{t.title}</Text>
-										<Text style={styles.contentPackTypeSubtitle}>{t.subtitle}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-
-							<Text style={styles.contentPackYourLabel}>Your Content Packs ({contentPacks.length})</Text>
-							{contentPacks.length === 0 ? (
-								<View style={styles.contentPackEmpty}>
-									<Text style={styles.contentPackEmptyText}>No content packs yet</Text>
-								</View>
-							) : (
-								<View style={styles.contentPackList}>
-									{contentPacks.map((p) => (
-										<View key={p.id} style={styles.contentPackCard}>
-											<View style={styles.contentPackCardContent}>
-												<Text style={styles.contentPackCardTitle}>{p.name}</Text>
-												<Text style={styles.contentPackCardSubtitle}>Type: {p.type}</Text>
-											</View>
-											<TouchableOpacity onPress={() => removeContentPack(p.id)} style={styles.contentPackCardRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-												<Ionicons name="close-circle" size={22} color={Colors.text.secondary} />
-											</TouchableOpacity>
-										</View>
-									))}
-								</View>
-							)}
-
-							<Text style={[styles.newGameLabel, { marginTop: Spacing.xl }]}>Question</Text>
-							<TextInput style={[styles.input, styles.textArea]} placeholder="Your question..." placeholderTextColor={Colors.text.disabled} value={prompt} onChangeText={setPrompt} multiline />
-							<Text style={styles.newGameLabel}>Choices (tap to mark correct)</Text>
-							{choices.map((choice, index) => (
-								<View key={index} style={styles.choiceRow}>
-									<TouchableOpacity style={[styles.radio, correctIndex === index && styles.radioSelected]} onPress={() => setCorrectIndex(index)}>
-										{correctIndex === index && <Ionicons name="checkmark" size={16} color={Colors.text.primary} />}
-									</TouchableOpacity>
-									<TextInput style={styles.choiceInput} placeholder={`Choice ${index + 1}`} placeholderTextColor={Colors.text.disabled} value={choice} onChangeText={(v) => setChoice(index, v)} />
-									{choices.length > 2 && <TouchableOpacity onPress={() => removeChoice(index)} style={styles.removeBtn}><Ionicons name="close-circle" size={24} color={Colors.error} /></TouchableOpacity>}
-								</View>
-							))}
-							{choices.length < 4 && <TouchableOpacity style={styles.addChoice} onPress={addChoice}><Ionicons name="add-circle-outline" size={24} color={Colors.accent} /><Text style={styles.addChoiceText}>Add choice</Text></TouchableOpacity>}
-						</View>
-					)}
-
-					{/* Step nav: Back / Next or Publish */}
-					{currentStep > 0 && currentStep <= 7 && (
-						<View style={styles.stepNav}>
-							<TouchableOpacity style={styles.stepNavBtn} onPress={() => setCurrentStep((s) => s - 1)}>
-								<Ionicons name="chevron-back" size={20} color={Colors.accent} />
-								<Text style={styles.stepNavText}>Back</Text>
-							</TouchableOpacity>
-							<View style={{ flex: 1 }} />
-							{currentStep < TOTAL_STEPS - 1 ? (
-								<TouchableOpacity
-									style={[styles.stepNavBtnPrimary, (currentStep === 3 && interactionModes.length === 0) || (currentStep === 6 && winConditions.length === 0) ? styles.submitDisabled : null]}
-									onPress={() => setCurrentStep((s) => s + 1)}
-									disabled={(currentStep === 3 && interactionModes.length === 0) || (currentStep === 6 && winConditions.length === 0)}
-								>
-									<Text style={styles.stepNavTextPrimary}>Next</Text>
-									<Ionicons name="chevron-forward" size={20} color="#fff" />
-								</TouchableOpacity>
-							) : (
-								<TouchableOpacity style={[styles.submit, loading && styles.submitDisabled]} onPress={handleSubmit} disabled={loading}>
-									{loading ? <ActivityIndicator size="small" color={Colors.text.primary} /> : <><Ionicons name="checkmark-circle" size={24} color={Colors.text.primary} /><Text style={styles.submitText}>Publish</Text></>}
-								</TouchableOpacity>
-							)}
-						</View>
-					)}
-					{currentStep === 0 && (
-						<View style={styles.stepNav}>
-							<View style={{ flex: 1 }} />
-							<TouchableOpacity style={styles.stepNavBtnPrimary} onPress={() => setCurrentStep(1)}>
-								<Text style={styles.stepNavTextPrimary}>Next</Text>
-								<Ionicons name="chevron-forward" size={20} color="#fff" />
-							</TouchableOpacity>
-						</View>
-					)}
+					{step === 0 && renderInfo()}
+					{step === 1 && renderScenes()}
+					{step === 2 && renderRules()}
+					{step === 3 && renderPreview()}
+					{step === 4 && renderPublish()}
 				</ScrollView>
+
+				{/* Navigation bar (hidden on preview step) */}
+				{step !== 3 && (
+					<View style={[s.navBar, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
+						{step > 0 && (
+							<TouchableOpacity style={s.backBtn} onPress={() => setStep((p) => p - 1)}>
+								<Ionicons name="chevron-back" size={18} color={Colors.text.secondary} />
+								<Text style={s.backBtnText}>Back</Text>
+							</TouchableOpacity>
+						)}
+						{step < STEPS.length - 1 && (
+							<TouchableOpacity
+								style={[s.nextBtn, !canProceed && { opacity: 0.4 }]}
+								onPress={() => canProceed && setStep((p) => p + 1)}
+								disabled={!canProceed}
+							>
+								<Text style={s.nextBtnText}>{step === STEPS.length - 2 ? "Review & Publish" : "Next"}</Text>
+								<Ionicons name="chevron-forward" size={18} color={Colors.text.primary} />
+							</TouchableOpacity>
+						)}
+					</View>
+				)}
+
+				{/* Preview step: just a "Back" button */}
+				{step === 3 && (
+					<View style={[s.navBar, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
+						<TouchableOpacity style={s.backBtn} onPress={() => setStep((p) => p - 1)}>
+							<Ionicons name="chevron-back" size={18} color={Colors.text.secondary} />
+							<Text style={s.backBtnText}>Back</Text>
+						</TouchableOpacity>
+						<TouchableOpacity style={s.nextBtn} onPress={() => setStep((p) => p + 1)}>
+							<Text style={s.nextBtnText}>Next</Text>
+							<Ionicons name="chevron-forward" size={18} color={Colors.text.primary} />
+						</TouchableOpacity>
+					</View>
+				)}
 			</KeyboardAvoidingView>
 
-			{/* Step list modal (hamburger) – left-side overlay, scrollable list */}
-			<Modal visible={showStepListModal} transparent animationType="fade">
-				<View style={styles.stepListOverlay}>
-					<View style={[styles.stepListPanel, { paddingTop: insets.top + Spacing.sm }]} onStartShouldSetResponder={() => true}>
-						<View style={styles.stepListHeader}>
-							<TouchableOpacity onPress={() => setShowStepListModal(false)} style={styles.stepListHeaderBtn}>
-								<Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
-							</TouchableOpacity>
-							<Text style={styles.newGameTitle}>New Game</Text>
-							<View style={styles.stepListHeaderRight}>
-								<TouchableOpacity onPress={() => { setShowStepListModal(false); setShowPreview(true); }} style={styles.stepListHeaderBtn}>
-									<Ionicons name="eye-outline" size={22} color="#22c55e" />
-								</TouchableOpacity>
-								<TouchableOpacity onPress={() => setShowStepListModal(false)} style={styles.stepListHeaderBtn}>
-									<Ionicons name="close" size={24} color={Colors.text.primary} />
-								</TouchableOpacity>
-							</View>
-						</View>
-						<View style={styles.stepListProgressBlock}>
-							<Text style={styles.newGameProgress}>{completedCount}/{TOTAL_STEPS} completed</Text>
-							<View style={styles.progressBarTrack}><View style={[styles.progressBarFill, { width: `${(completedCount / TOTAL_STEPS) * 100}%` }]} /></View>
-						</View>
-						<ScrollView
-							style={styles.stepListScroll}
-							contentContainerStyle={styles.stepListScrollContent}
-							showsVerticalScrollIndicator
-							keyboardShouldPersistTaps="handled"
-							bounces={true}
-						>
-							{[
-								{ key: "info", label: "Game Information", icon: "information-circle-outline" as const, step: 0 },
-								{ key: "board", label: "Board", icon: "grid-outline" as const, step: 1 },
-								{ key: "objects", label: "Objects", icon: "cube-outline" as const, step: 2 },
-								{ key: "interactions", label: "Interactions", icon: "hand-left-outline" as const, step: 3 },
-								{ key: "behavior", label: "Behavior", icon: "flash-outline" as const, step: 4 },
-								{ key: "rules", label: "Rules", icon: "code-slash-outline" as const, step: 5 },
-								{ key: "winlose", label: "Win / Lose", icon: "trophy-outline" as const, step: 6 },
-								{ key: "content", label: "Content", icon: "document-text-outline" as const, step: 7 },
-								{ key: "preview", label: "Preview & Test", icon: "play-circle-outline" as const, action: "preview" as const },
-								{ key: "publish", label: "Publish", icon: "share-social-outline" as const, action: "publish" as const },
-							].map((item) => {
-								const isStep = "step" in item;
-								const stepNum = isStep ? (item as { step: number }).step : undefined;
-								const completed = stepNum !== undefined ? stepCompleted[stepNum] : false;
-								const isCurrent = stepNum !== undefined && currentStep === stepNum;
-								const action = !isStep ? (item as { action: "preview" | "publish" }).action : null;
-								const onPress = () => {
-									setShowStepListModal(false);
-									if (stepNum !== undefined) setCurrentStep(stepNum);
-									else if (action === "preview") { setPreviewScreenMode("menu"); setShowPreview(true); }
-									else if (action === "publish") setShowPublishSettings(true);
-								};
-								return (
-									<TouchableOpacity key={item.key} style={styles.stepListItem} onPress={onPress}>
-										<View style={[styles.stepListIconWrap, !completed && styles.stepListIconRedDot]}>
-											<Ionicons name={item.icon} size={22} color={Colors.text.secondary} />
-										</View>
-										<View style={styles.stepListLabel}>
-											<Text style={styles.stepListTitle}>{item.label}</Text>
-											<Text style={styles.stepListRequired}>{completed ? "Completed" : "Required"}</Text>
-										</View>
-										{isCurrent && <Ionicons name="checkmark" size={20} color={Colors.accent} />}
-									</TouchableOpacity>
-								);
-							})}
-						</ScrollView>
-					</View>
-					<TouchableOpacity style={styles.stepListBackdrop} activeOpacity={1} onPress={() => setShowStepListModal(false)} />
-				</View>
-			</Modal>
-
-			{/* Description modal */}
-			{renderModal(
-				showDescriptionModal,
-				() => setShowDescriptionModal(false),
-				"Description (max 200 characters)",
-				<>
-					<Text style={styles.modalHint}>Optional short description of your game.</Text>
-					<TextInput
-						style={[styles.input, styles.textArea]}
-						placeholder="Describe your game..."
-						placeholderTextColor={Colors.text.disabled}
-						value={description}
-						onChangeText={(t) => setDescription(t.slice(0, 200))}
-						maxLength={200}
-						multiline
-					/>
-					<Text style={styles.charHint}>{description.length}/200</Text>
-				</>
-			)}
-
-			{/* Board modal */}
-			{renderModal(
-				showBoardModal,
-				() => setShowBoardModal(false),
-				"Board type",
-				<>
-					<TouchableOpacity
-						style={[styles.optionRow, boardKind === "none" && styles.optionRowSelected]}
-						onPress={() => setBoardKind("none")}
-					>
-						<Text style={styles.optionText}>Question only (no grid)</Text>
-						{boardKind === "none" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.optionRow, boardKind === "grid" && styles.optionRowSelected]}
-						onPress={() => setBoardKind("grid")}
-					>
-						<Text style={styles.optionText}>Grid</Text>
-						{boardKind === "grid" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.optionRow, boardKind === "freeform" && styles.optionRowSelected]}
-						onPress={() => setBoardKind("freeform")}
-					>
-						<Text style={styles.optionText}>Freeform</Text>
-						{boardKind === "freeform" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.optionRow, boardKind === "list" && styles.optionRowSelected]}
-						onPress={() => setBoardKind("list")}
-					>
-						<Text style={styles.optionText}>List / Sequence</Text>
-						{boardKind === "list" && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					{boardKind === "grid" && (
-						<View style={styles.gridOptions}>
-							<Text style={styles.modalLabel}>Rows</Text>
-							<TextInput
-								style={styles.input}
-								value={String(gridRows)}
-								onChangeText={(t) => setGridRows(Math.max(1, Math.min(10, parseInt(t, 10) || 1)))}
-								keyboardType="number-pad"
-							/>
-							<Text style={styles.modalLabel}>Cols</Text>
-							<TextInput
-								style={styles.input}
-								value={String(gridCols)}
-								onChangeText={(t) => setGridCols(Math.max(1, Math.min(10, parseInt(t, 10) || 1)))}
-								keyboardType="number-pad"
-							/>
-							<Text style={styles.modalLabel}>Cell size (px)</Text>
-							<TextInput
-								style={styles.input}
-								value={String(cellSize)}
-								onChangeText={(t) => setCellSize(Math.max(32, Math.min(120, parseInt(t, 10) || DEFAULT_CELL_SIZE)))}
-								keyboardType="number-pad"
-							/>
-						</View>
-					)}
-				</>
-			)}
-
-			{/* Timer & score modal */}
-			{renderModal(
-				showTimerScoreModal,
-				() => setShowTimerScoreModal(false),
-				"Timer & score",
-				<>
-					<TouchableOpacity
-						style={[styles.optionRow, !timerEnabled && styles.optionRowSelected]}
-						onPress={() => setTimerEnabled(false)}
-					>
-						<Text style={styles.optionText}>No timer</Text>
-						{!timerEnabled && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={[styles.optionRow, timerEnabled && styles.optionRowSelected]}
-						onPress={() => setTimerEnabled(true)}
-					>
-						<Text style={styles.optionText}>Use timer</Text>
-						{timerEnabled && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					{timerEnabled && (
-						<View style={styles.timerOption}>
-							<Text style={styles.modalLabel}>Seconds</Text>
-							<TextInput
-								style={styles.input}
-								value={String(timerSeconds)}
-								onChangeText={(t) => setTimerSeconds(Math.max(5, Math.min(300, parseInt(t, 10) || DEFAULT_TIMER_SECONDS)))}
-								keyboardType="number-pad"
-							/>
-						</View>
-					)}
-					<Text style={styles.modalLabel}>Start score</Text>
-					<TextInput
-						style={styles.input}
-						value={String(scoreStart)}
-						onChangeText={(t) => setScoreStart(parseInt(t, 10) || 0)}
-						keyboardType="number-pad"
-					/>
-					<Text style={styles.modalLabel}>Target score (optional, leave empty for no target)</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="e.g. 100"
-						placeholderTextColor={Colors.text.disabled}
-						value={scoreTarget !== undefined ? String(scoreTarget) : ""}
-						onChangeText={(t) => setScoreTarget(t === "" ? undefined : Math.max(0, parseInt(t, 10) || 0))}
-						keyboardType="number-pad"
-					/>
-				</>
-			)}
-
-			{/* Rules modal (preset only for now) */}
-			{renderModal(
-				showRulesModal,
-				() => setShowRulesModal(false),
-				"Rules",
-				<>
-					<Text style={styles.modalHint}>
-						Single correct answer: tapping the correct choice wins; tapping a wrong choice loses. This is the only rule preset for now.
-					</Text>
-				</>
-			)}
-
-			{/* Instructions (how to play) modal */}
-			{renderModal(
-				showInstructionsModal,
-				() => setShowInstructionsModal(false),
-				"How to play (instructions)",
-				<>
-					<Text style={styles.modalHint}>
-						These will be shown when players tap the help icon. Add step-by-step instructions and an optional example.
-					</Text>
-					{instructionLines.map((line, index) => (
-						<View key={index} style={styles.instructionRow}>
-							<TextInput
-								style={[styles.input, styles.flex1]}
-								placeholder={`Instruction ${index + 1}`}
-								placeholderTextColor={Colors.text.disabled}
-								value={line}
-								onChangeText={(v) => setInstructionLine(index, v)}
-							/>
-							{instructionLines.length > 1 && (
-								<TouchableOpacity onPress={() => removeInstructionLine(index)}>
-									<Ionicons name="close-circle" size={24} color={Colors.error} />
-								</TouchableOpacity>
-							)}
-						</View>
-					))}
-					<TouchableOpacity style={styles.addChoice} onPress={addInstructionLine}>
-						<Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
-						<Text style={styles.addChoiceText}>Add line</Text>
-					</TouchableOpacity>
-					<Text style={styles.modalLabel}>Example (optional)</Text>
-					<TextInput
-						style={[styles.input, styles.textArea]}
-						placeholder="e.g. If the question is '2+2?', the correct choice is 4."
-						placeholderTextColor={Colors.text.disabled}
-						value={instructionExample}
-						onChangeText={setInstructionExample}
-						multiline
-					/>
-				</>
-			)}
-
-			{/* Objects modal */}
-			{renderModal(
-				showObjectsModal,
-				() => setShowObjectsModal(false),
-				"Objects on board",
-				<>
-					<Text style={styles.modalHint}>Use your choices as tiles/cards on the board so they appear in preview, or add custom objects later.</Text>
-					<TouchableOpacity style={[styles.optionRow, useChoicesAsObjects && styles.optionRowSelected]} onPress={() => setUseChoicesAsObjects(true)}>
-						<Text style={styles.optionText}>Use choices as objects (tiles/cards)</Text>
-						{useChoicesAsObjects && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-					<TouchableOpacity style={[styles.optionRow, !useChoicesAsObjects && styles.optionRowSelected]} onPress={() => setUseChoicesAsObjects(false)}>
-						<Text style={styles.optionText}>No initial objects (empty board)</Text>
-						{!useChoicesAsObjects && <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />}
-					</TouchableOpacity>
-				</>
-			)}
-
-			{/* Win / Lose modal */}
-			{renderModal(
-				showWinLoseModal,
-				() => setShowWinLoseModal(false),
-				"Win / Lose",
-				<>
-					<Text style={styles.modalHint}>Configure win and lose conditions. (UI placeholder — wire to definition when backend is ready.)</Text>
-				</>
-			)}
-
-			{/* Spawn rules modal */}
-			{renderModal(
-				showSpawnRulesModal,
-				() => setShowSpawnRulesModal(false),
-				"Spawn rules",
-				<>
-					<Text style={styles.modalHint}>Spawn objects during the game (e.g. on start, every N seconds). (UI placeholder — wire when backend is ready.)</Text>
-				</>
-			)}
-
-			{/* Content pack modal */}
-			{renderModal(
-				showContentPackModal,
-				() => setShowContentPackModal(false),
-				"Content pack",
-				<>
-					<Text style={styles.modalHint}>Optional word list or number set for your game content. (UI placeholder — wire when backend is ready.)</Text>
-				</>
-			)}
-
-			{/* Preview & Testing modal */}
-			<Modal visible={showPreview} animationType="slide">
-				<View style={styles.previewContainer}>
-					<View style={[styles.previewHeader, { paddingTop: insets.top + Spacing.sm }]}>
-						<TouchableOpacity
-							style={styles.backToEditButton}
-							onPress={() => (previewScreenMode === "play" ? setPreviewScreenMode("menu") : setShowPreview(false))}
-						>
-							<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-							<Text style={styles.backToEditText}>{previewScreenMode === "play" ? "Back" : "Back to edit"}</Text>
+			{/* ── Scene kind picker modal ─────────────────────────────────────────── */}
+			<Modal
+				visible={showKindPicker}
+				animationType="slide"
+				presentationStyle="pageSheet"
+				onRequestClose={() => setShowKindPicker(false)}
+			>
+				<SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.secondary }}>
+					<View style={s.modalHeader}>
+						<Text style={s.modalTitle}>Choose Scene Type</Text>
+						<TouchableOpacity onPress={() => setShowKindPicker(false)} style={{ padding: 4 }}>
+							<Ionicons name="close" size={22} color={Colors.text.primary} />
 						</TouchableOpacity>
 					</View>
-					{previewScreenMode === "menu" ? (
-						<ScrollView style={styles.previewScroll} contentContainerStyle={[styles.previewScrollContent, { paddingBottom: insets.bottom + Spacing.xl }]}>
-							<View style={styles.previewTestingCard}>
-								<Text style={styles.gameInfoTitle}>Preview & Testing</Text>
-								<Text style={styles.gameInfoSubtitle}>Test your game and ensure everything works correctly.</Text>
-								<View style={styles.previewTestingRow}>
-									<TouchableOpacity style={styles.previewModeCard} onPress={() => setPreviewScreenMode("play")} activeOpacity={0.85}>
-										<View style={styles.previewModeIconWrap}>
-											<Ionicons name="play" size={32} color="#ea580c" />
-										</View>
-										<Text style={styles.previewModeTitle}>Preview Mode</Text>
-										<Text style={styles.previewModeSubtitle}>Play your game in real-time</Text>
-									</TouchableOpacity>
-									<TouchableOpacity style={styles.autoTestCard} onPress={() => Alert.alert("Auto-Test", "Automated validation check — coming soon.")} activeOpacity={0.85}>
-										<View style={styles.autoTestIconWrap}>
-											<Ionicons name="flash" size={32} color="#2563eb" />
-										</View>
-										<Text style={styles.autoTestTitle}>Auto-Test</Text>
-										<Text style={styles.autoTestSubtitle}>Automated validation check</Text>
-									</TouchableOpacity>
+					<ScrollView contentContainerStyle={{ padding: Spacing.md, paddingBottom: 40, gap: Spacing.sm }}>
+						{SCENE_KIND_OPTIONS.map((sk) => (
+							<TouchableOpacity key={sk.kind} style={s.kindCard} onPress={() => addScene(sk.kind)} activeOpacity={0.75}>
+								<View style={s.kindIcon}>
+									<Ionicons name={sk.icon} size={22} color={Colors.accent} />
 								</View>
-								<View style={styles.previewDebugBanner}>
-									<Ionicons name="settings" size={22} color="#2563eb" />
-									<View style={styles.previewDebugTextBlock}>
-										<Text style={styles.previewDebugTitle}>Debug Mode Available</Text>
-										<Text style={styles.previewDebugSub}>Enable event logs, state variables, and rule execution tracking in preview</Text>
-									</View>
+								<View style={{ flex: 1 }}>
+									<Text style={s.kindLabel}>{sk.label}</Text>
+									<Text style={s.kindDesc}>{sk.desc}</Text>
 								</View>
-							</View>
-						</ScrollView>
-					) : (
-						<View style={styles.previewPlayer}>
-							<GamePlayer
-								definition={buildDefinition()}
-								onComplete={() => {}}
-								isActive={true}
-							/>
-						</View>
-					)}
-				</View>
-			</Modal>
-
-			{/* Publish Settings modal */}
-			<Modal visible={showPublishSettings} animationType="slide">
-				<View style={styles.publishSettingsContainer}>
-					<View style={[styles.publishSettingsHeader, { paddingTop: insets.top + Spacing.sm }]}>
-						<TouchableOpacity style={styles.backToEditButton} onPress={() => setShowPublishSettings(false)}>
-							<Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-							<Text style={styles.backToEditText}>Back</Text>
-						</TouchableOpacity>
-					</View>
-					<ScrollView style={styles.publishSettingsScroll} contentContainerStyle={[styles.publishSettingsScrollContent, { paddingBottom: insets.bottom + Spacing.xxl }]}>
-						<View style={styles.gameInfoCard}>
-							<Text style={styles.gameInfoTitle}>Publish Settings</Text>
-							<Text style={styles.gameInfoSubtitle}>Review and publish your game to the Kracked community</Text>
-
-							<Text style={styles.publishSectionLabel}>Required Sections</Text>
-							{stepCompleted.map((done, i) => (
-								<View key={i} style={[styles.publishSectionRow, done ? styles.publishSectionRowOk : styles.publishSectionRowError]}>
-									<Text style={[styles.publishSectionRowText, done ? styles.publishSectionRowTextOk : styles.publishSectionRowTextError]}>{PUBLISH_REQUIRED_LABELS[i]}</Text>
-									{done ? <Ionicons name="checkmark-circle" size={22} color="#16a34a" /> : <Ionicons name="alert-circle" size={22} color="#b91c1c" />}
-								</View>
-							))}
-
-							<Text style={[styles.publishSectionLabel, { marginTop: Spacing.xl }]}>Safety Checks</Text>
-							<View style={[styles.publishSectionRow, styles.publishSectionRowOk]}>
-								<Text style={styles.publishSectionRowTextOk}>No external links</Text>
-								<Ionicons name="checkmark-circle" size={22} color="#16a34a" />
-							</View>
-							<View style={[styles.publishSectionRow, styles.publishSectionRowOk]}>
-								<Text style={styles.publishSectionRowTextOk}>Content moderation passed</Text>
-								<Ionicons name="checkmark-circle" size={22} color="#16a34a" />
-							</View>
-							<View style={[styles.publishSectionRow, styles.publishSectionRowOk]}>
-								<Text style={styles.publishSectionRowTextOk}>Performance within limits</Text>
-								<Ionicons name="checkmark-circle" size={22} color="#16a34a" />
-							</View>
-							<View style={[styles.publishSectionRow, winConditions.length >= 1 ? styles.publishSectionRowOk : styles.publishSectionRowError]}>
-								<Text style={winConditions.length >= 1 ? styles.publishSectionRowTextOk : styles.publishSectionRowTextError}>Has win condition</Text>
-								{winConditions.length >= 1 ? <Ionicons name="checkmark-circle" size={22} color="#16a34a" /> : <Ionicons name="alert-circle" size={22} color="#b91c1c" />}
-							</View>
-
-							<Text style={[styles.publishSectionLabel, { marginTop: Spacing.xl }]}>Social Features</Text>
-							<View style={styles.publishSocialCard}>
-								<Ionicons name="sparkles" size={24} color="#ea580c" />
-								<View style={styles.publishSocialContent}>
-									<Text style={styles.publishSocialTitle}>Allow Remixes</Text>
-									<Text style={styles.publishSocialSub}>Let others copy and modify your game (with attribution)</Text>
-								</View>
-								<Switch value={allowRemixes} onValueChange={setAllowRemixes} trackColor={{ false: Colors.border, true: "#ea580c" }} thumbColor="#fff" />
-							</View>
-							<View style={styles.publishSocialCard}>
-								<Ionicons name="chatbubbles" size={24} color="#ea580c" />
-								<View style={styles.publishSocialContent}>
-									<Text style={styles.publishSocialTitle}>Allow Comments</Text>
-									<Text style={styles.publishSocialSub}>Enable comments and feedback on your game</Text>
-								</View>
-								<Switch value={allowComments} onValueChange={setAllowComments} trackColor={{ false: Colors.border, true: "#ea580c" }} thumbColor="#fff" />
-							</View>
-
-							{(!stepCompleted.every(Boolean) || winConditions.length < 1) && (
-								<View style={styles.publishWarningCard}>
-									<Ionicons name="warning" size={24} color="#b91c1c" />
-									<View style={styles.publishWarningContent}>
-										<Text style={styles.publishWarningTitle}>Cannot publish yet</Text>
-										<Text style={styles.publishWarningSub}>Complete all required sections and pass safety checks first</Text>
-									</View>
-								</View>
-							)}
-
-							<TouchableOpacity
-								style={[styles.publishGameButton, (!stepCompleted.every(Boolean) || winConditions.length < 1) && styles.publishGameButtonDisabled]}
-								onPress={() => { if (stepCompleted.every(Boolean) && winConditions.length >= 1) { setShowPublishSettings(false); handleSubmit(); } }}
-								disabled={!stepCompleted.every(Boolean) || winConditions.length < 1 || loading}
-							>
-								<Ionicons name="cloud-upload" size={24} color={stepCompleted.every(Boolean) && winConditions.length >= 1 ? Colors.text.primary : Colors.text.disabled} />
-								<Text style={[styles.publishGameButtonText, (!stepCompleted.every(Boolean) || winConditions.length < 1) && styles.publishGameButtonTextDisabled]}>Publish Game</Text>
+								<Ionicons name="chevron-forward" size={16} color={Colors.text.inactive} />
 							</TouchableOpacity>
-
-							<View style={styles.publishInfoCard}>
-								<Ionicons name="eye" size={24} color="#2563eb" />
-								<View style={styles.publishInfoContent}>
-									<Text style={styles.publishInfoTitle}>Your game will appear in the feed</Text>
-									<Text style={styles.publishInfoSub}>Players can play, like, comment, and remix your game once published</Text>
-								</View>
-							</View>
-						</View>
+						))}
 					</ScrollView>
-				</View>
+				</SafeAreaView>
+			</Modal>
+
+			{/* ── Scene editor modal ──────────────────────────────────────────────── */}
+			<Modal
+				visible={!!editingScene}
+				animationType="slide"
+				presentationStyle="pageSheet"
+				onRequestClose={() => setEditingScene(null)}
+			>
+				<SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.secondary }}>
+					<View style={s.modalHeader}>
+						<Text style={s.modalTitle}>
+							{editingScene ? SCENE_KIND_LABELS[editingScene.content.kind] : ""}
+						</Text>
+						<TouchableOpacity onPress={() => setEditingScene(null)} style={{ padding: 4 }}>
+							<Ionicons name="close" size={22} color={Colors.text.primary} />
+						</TouchableOpacity>
+					</View>
+					<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+						<ScrollView
+							contentContainerStyle={{ padding: Spacing.md, paddingBottom: 120, gap: Spacing.md }}
+							keyboardShouldPersistTaps="handled"
+							showsVerticalScrollIndicator={false}
+						>
+							{editingScene && (
+								<SceneEditor
+									content={editingScene.content}
+									onChange={(c) => setEditingScene((prev) => (prev ? { ...prev, content: c } : null))}
+								/>
+							)}
+						</ScrollView>
+					</KeyboardAvoidingView>
+					<View style={[s.navBar, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
+						<TouchableOpacity style={s.nextBtn} onPress={saveEditorScene}>
+							<Ionicons name="checkmark" size={18} color={Colors.text.primary} />
+							<Text style={s.nextBtnText}>Save Scene</Text>
+						</TouchableOpacity>
+					</View>
+				</SafeAreaView>
 			</Modal>
 		</View>
 	);
-};
+}
 
-const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: Colors.background.secondary },
-	keyboard: { flex: 1 },
-	scroll: { flex: 1 },
-	scrollContent: { padding: Layout.margin },
-	label: {
-		fontSize: Typography.fontSize.body,
-		fontWeight: Typography.fontWeight.semiBold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.sm,
-		marginTop: Spacing.lg,
-	},
-	input: {
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+	scrollContent: { padding: Spacing.md, paddingBottom: 40 },
+
+	// Step bar
+	stepBar: {
+		flexDirection: "row",
+		paddingHorizontal: Spacing.md,
+		paddingTop: Spacing.sm,
+		paddingBottom: Spacing.sm,
 		backgroundColor: Colors.background.primary,
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		fontSize: Typography.fontSize.body,
-		color: Colors.text.primary,
-		borderWidth: 1,
-		borderColor: Colors.border,
+		borderBottomWidth: 1,
+		borderBottomColor: Colors.borders.subtle,
+		...Shadows.light,
 	},
-	textArea: { minHeight: 80, textAlignVertical: "top" },
-	rowButton: {
+	stepItem: { flex: 1, alignItems: "center", gap: Spacing.xxs },
+	stepDot: {
+		width: 24, height: 24, borderRadius: 12,
+		backgroundColor: Colors.background.tertiary,
+		borderWidth: 1.5, borderColor: Colors.borders.subtle,
+		alignItems: "center", justifyContent: "center",
+	},
+	stepDotActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+	stepDotDone: { backgroundColor: Colors.game.correct, borderColor: Colors.game.correct },
+	stepNum: { fontSize: 11, fontWeight: Typography.fontWeight.bold, color: Colors.text.secondary },
+	stepLabel: { fontSize: 9, color: Colors.text.secondary, textAlign: "center" },
+	stepLabelActive: { color: Colors.text.primary, fontWeight: Typography.fontWeight.semiBold },
+
+	// Nav bar
+	navBar: {
+		flexDirection: "row",
+		justifyContent: "flex-end",
+		paddingHorizontal: Spacing.md,
+		paddingTop: Spacing.sm,
+		backgroundColor: Colors.background.primary,
+		borderTopWidth: 1,
+		borderTopColor: Colors.borders.subtle,
+		gap: Spacing.sm,
+		...Shadows.light,
+	},
+	backBtn: {
 		flexDirection: "row",
 		alignItems: "center",
-		backgroundColor: Colors.background.primary,
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.lg,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		gap: Spacing.sm,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
+		gap: 4,
+		marginRight: "auto",
 	},
-	rowLabel: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, flex: 0 },
-	rowValue: { flex: 1, fontSize: Typography.fontSize.body, color: Colors.text.primary },
-	choiceRow: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm, gap: Spacing.sm },
-	radio: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		borderWidth: 2,
-		borderColor: Colors.border,
+	backBtnText: { fontSize: Typography.fontSize.body, color: Colors.text.secondary, fontWeight: Typography.fontWeight.semiBold },
+	nextBtn: {
+		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "center",
+		backgroundColor: Colors.accent,
+		paddingHorizontal: Spacing.lg,
+		paddingVertical: Spacing.sm,
+		borderRadius: BorderRadius.md,
+		gap: 6,
+		...Shadows.medium,
 	},
-	radioSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "40" },
-	choiceInput: {
-		flex: 1,
+	nextBtnText: { fontSize: Typography.fontSize.body, color: Colors.text.primary, fontWeight: Typography.fontWeight.bold },
+
+	// Step content
+	stepContent: { gap: Spacing.md },
+
+	// Scene list
+	emptyState: { alignItems: "center", paddingVertical: Spacing.xxl, gap: Spacing.sm },
+	emptyTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.secondary },
+	emptySub: { fontSize: Typography.fontSize.caption, color: Colors.text.inactive, textAlign: "center", maxWidth: 260 },
+	sceneCard: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
 		padding: Spacing.md,
-		fontSize: Typography.fontSize.body,
-		color: Colors.text.primary,
-		borderWidth: 1,
-		borderColor: Colors.border,
+		...Shadows.light,
 	},
-	removeBtn: { padding: Spacing.xs },
-	addChoice: { flexDirection: "row", alignItems: "center", marginTop: Spacing.sm, gap: Spacing.sm },
-	addChoiceText: { fontSize: Typography.fontSize.body, color: Colors.accent, fontWeight: Typography.fontWeight.medium },
-	diffRow: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.sm },
-	diffBtn: {
-		flex: 1,
-		padding: Spacing.md,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.primary,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		alignItems: "center",
+	sceneRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+	sceneBadge: {
+		width: 30, height: 30, borderRadius: 15,
+		alignItems: "center", justifyContent: "center",
 	},
-	diffBtnSelected: { borderColor: "#eab308", backgroundColor: "#fef9c3" },
-	diffText: { fontSize: Typography.fontSize.body, color: Colors.text.secondary },
-	diffTextSelected: { color: Colors.accent, fontWeight: Typography.fontWeight.semiBold },
-	previewButton: {
+	sceneBadgeText: { fontSize: Typography.fontSize.small, fontWeight: Typography.fontWeight.bold },
+	sceneKind: { fontSize: Typography.fontSize.small, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
+	scenePreview: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 1 },
+	iconBtn: { padding: 6 },
+	addSceneBtn: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: Spacing.sm,
-		padding: Spacing.lg,
-		marginTop: Spacing.xl,
-		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		borderRadius: BorderRadius.md,
 		borderWidth: 2,
 		borderColor: Colors.accent,
+		borderStyle: "dashed",
+		gap: Spacing.xs,
+		marginTop: Spacing.xs,
 	},
-	previewButtonText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.accent },
-	submit: {
+	addSceneBtnText: { fontSize: Typography.fontSize.body, color: Colors.accent, fontWeight: Typography.fontWeight.semiBold },
+
+	// Rules step
+	sectionNote: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, lineHeight: 20 },
+	ruleCard: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
+		padding: Spacing.md,
+		...Shadows.light,
+		gap: Spacing.xs,
+	},
+	ruleCardTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	ruleCardSub: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
+	toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Spacing.xs },
+	toggleLabel: { fontSize: Typography.fontSize.small, color: Colors.text.primary },
+
+	// Publish step
+	summaryCard: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.lg,
+		borderWidth: 2,
+		borderColor: Colors.accent,
+		...Shadows.medium,
+		gap: Spacing.xs,
+	},
+	summaryTitle: { fontSize: Typography.fontSize.h3, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	summarySub: { fontSize: Typography.fontSize.body, color: Colors.text.secondary },
+	summaryMeta: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginTop: Spacing.xs },
+	metaPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.background.secondary, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: BorderRadius.pill },
+	metaText: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
+	infoBox: {
+		flexDirection: "row",
+		gap: Spacing.sm,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.md,
+		borderWidth: 1,
+		borderColor: Colors.borders.subtle,
+	},
+	infoBoxText: { flex: 1, fontSize: Typography.fontSize.caption, color: Colors.text.secondary, lineHeight: 20 },
+	publishBtn: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: Colors.accent,
 		borderRadius: BorderRadius.lg,
-		padding: Spacing.lg,
-		marginTop: Spacing.lg,
+		paddingVertical: Spacing.lg,
 		gap: Spacing.sm,
+		...Shadows.medium,
 	},
-	submitDisabled: { opacity: 0.6 },
-	submitText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	publishBtnText: { fontSize: Typography.fontSize.h3, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
 
 	// Modals
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.5)",
-		justifyContent: "center",
-		alignItems: "center",
-		padding: Spacing.lg,
-	},
-	modalContent: {
-		width: "100%",
-		maxWidth: 400,
-		maxHeight: "80%",
-		backgroundColor: Colors.background.secondary,
-		borderRadius: BorderRadius.lg,
-		...Shadows.heavy,
-	},
 	modalHeader: {
 		flexDirection: "row",
-		justifyContent: "space-between",
 		alignItems: "center",
-		padding: Spacing.lg,
+		justifyContent: "space-between",
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.md,
 		borderBottomWidth: 1,
-		borderBottomColor: Colors.border,
+		borderBottomColor: Colors.borders.subtle,
+		backgroundColor: Colors.background.primary,
 	},
 	modalTitle: { fontSize: Typography.fontSize.h3, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	modalClose: { padding: Spacing.xs },
-	modalScroll: { maxHeight: 400 },
-	modalScrollContent: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
-	modalHint: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: Spacing.md },
-	modalLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.medium, color: Colors.text.primary, marginTop: Spacing.md, marginBottom: Spacing.sm },
-	optionRow: {
+	kindCard: {
 		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "space-between",
-		padding: Spacing.md,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		marginBottom: Spacing.sm,
-	},
-	optionRowSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" },
-	optionText: { fontSize: Typography.fontSize.body, color: Colors.text.primary },
-	gridOptions: { marginTop: Spacing.md },
-	timerOption: { marginTop: Spacing.md },
-	instructionRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
-	flex1: { flex: 1 },
-
-	// New Game header
-	newGameHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, backgroundColor: Colors.background.primary, borderBottomWidth: 1, borderBottomColor: Colors.border },
-	newGameBack: { padding: Spacing.xs },
-	newGameHeaderCenter: { flex: 1, marginLeft: Spacing.sm },
-	newGameTitle: { fontSize: Typography.fontSize.h2, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	newGameProgress: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	progressBarTrack: { height: 6, backgroundColor: Colors.border, borderRadius: 3, marginTop: 4, overflow: "hidden" },
-	progressBarFill: { height: "100%", backgroundColor: Colors.accent, borderRadius: 3 },
-	newGameHeaderRight: { flexDirection: "row", alignItems: "center", gap: Spacing.xs },
-	newGameIconBtn: { padding: Spacing.sm },
-	previewIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#22c55e", alignItems: "center", justifyContent: "center" },
-
-	// Game Information (step 0)
-	gameInfoCard: { marginTop: Spacing.lg, padding: Spacing.lg, backgroundColor: Colors.background.primary, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border },
-	gameInfoTitle: { fontSize: Typography.fontSize.h2, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: Spacing.xs },
-	gameInfoSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: Spacing.xl },
-	newGameLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary, marginBottom: Spacing.sm },
-	fieldLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary, marginBottom: Spacing.sm },
-	charHint: { fontSize: Typography.fontSize.small, color: Colors.text.disabled, marginTop: 2, marginBottom: Spacing.sm },
-	charCountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4, marginBottom: Spacing.lg },
-	charCountHint: { fontSize: Typography.fontSize.small, color: Colors.text.disabled },
-	charCountValue: { fontSize: Typography.fontSize.small, color: Colors.text.secondary },
-	sectionLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	sectionLabelRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
-	sectionSpacer: { height: Spacing.xl },
-	instructionsArea: { minHeight: 100 },
-	playTimeRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs, marginBottom: Spacing.sm },
-	playTimeBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, backgroundColor: Colors.background.secondary, borderWidth: 1, borderColor: Colors.border },
-	playTimeBtnSelected: { borderColor: "#3b82f6", backgroundColor: "#3b82f620" },
-	playTimeBtnText: { fontSize: Typography.fontSize.caption, color: Colors.text.primary },
-	sliderTrack: { height: 8, backgroundColor: "#e5e7eb", borderRadius: 4, position: "relative", marginBottom: Spacing.sm },
-	sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#3b82f6", borderRadius: 4 },
-	sliderThumb: { position: "absolute", width: 20, height: 20, borderRadius: 10, backgroundColor: "#3b82f6", top: -6, marginLeft: -10 },
-	playTimeValue: { fontSize: 28, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	playTimeAvgLabel: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2, marginBottom: Spacing.lg },
-	tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginBottom: Spacing.sm },
-	tagsSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: Spacing.sm },
-	tagPill: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.pill, backgroundColor: Colors.background.secondary, borderWidth: 1, borderColor: Colors.border },
-	tagPillSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },
-	tagPillText: { fontSize: Typography.fontSize.caption, color: Colors.text.primary },
-	visibilityRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm },
-	visibilityStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
-	visibilityCard: { flex: 1, padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background.secondary },
-	visibilityPanel: { padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background.secondary },
-	visibilityPanelSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },
-	visibilityCardSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },
-	visibilityLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	visibilitySub: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	visibilityCheck: { position: "absolute", top: Spacing.sm, right: Spacing.sm },
-	moderationBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#eff6ff", borderWidth: 1, borderColor: "#0ea5e9", padding: Spacing.md, borderRadius: BorderRadius.md, marginTop: Spacing.xl, gap: Spacing.sm },
-	moderationText: { fontSize: Typography.fontSize.caption, color: "#0ea5e9", flex: 1 },
-
-	// Dynamic Behavior (step 4)
-	behaviorSection: { marginTop: Spacing.md },
-	behaviorSectionFirst: { marginTop: Spacing.sm },
-	behaviorSectionSecond: { marginTop: Spacing.xl },
-	behaviorSectionHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
-	addRuleButton: { backgroundColor: "#eab308", paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm + 2, borderRadius: BorderRadius.md, flexShrink: 0 },
-	addRuleButtonText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	spawnRulesEmpty: { backgroundColor: Colors.background.secondary, borderRadius: BorderRadius.md, padding: Spacing.xl, alignItems: "center", justifyContent: "center", minHeight: 140, borderWidth: 1, borderColor: Colors.border },
-	spawnRulesEmptyIconWrap: { marginBottom: Spacing.sm },
-	spawnRulesEmptyText: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
-	spawnRulesEmptyTextSub: { marginTop: 2 },
-	spawnRulesList: { gap: Spacing.sm },
-	spawnRuleCard: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.background.secondary, borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-	spawnRuleTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	spawnRuleDetail: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	spawnRuleRemove: { padding: Spacing.xs },
-	movementPresetGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-	movementPresetBtn: { flex: 1, minWidth: "47%", minHeight: 48, paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.md, backgroundColor: Colors.background.secondary, borderWidth: 1, borderColor: Colors.border, alignItems: "center", justifyContent: "center" },
-	movementPresetBtnSelected: { borderWidth: 2, borderColor: "#eab308", backgroundColor: "#fef9c3" },
-	movementPresetBtnText: { fontSize: Typography.fontSize.body, color: Colors.text.secondary },
-	movementPresetBtnTextSelected: { color: "#92400e", fontWeight: Typography.fontWeight.semiBold },
-
-	// Rule Engine (step 5)
-	ruleEngineInfoBox: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		backgroundColor: "#eff6ff",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.md,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#bfdbfe",
-	},
-	ruleEngineInfoText: { flex: 1, fontSize: Typography.fontSize.caption, color: "#1e40af", lineHeight: 20 },
-	ruleEngineRulesHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Spacing.xl, marginBottom: Spacing.sm },
-	addRuleEngineButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.xs,
-		backgroundColor: "#eab308",
-		paddingHorizontal: Spacing.lg,
-		paddingVertical: Spacing.sm + 2,
-		borderRadius: BorderRadius.md,
-	},
-	addRuleEngineButtonText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	ruleEngineEmpty: { paddingVertical: Spacing.xl, alignItems: "center" },
-	ruleEngineEmptyText: { fontSize: Typography.fontSize.body, color: Colors.text.secondary },
-	ruleEngineList: { gap: Spacing.md },
-	ruleEngineCard: {
 		backgroundColor: Colors.background.primary,
 		borderRadius: BorderRadius.md,
-		borderWidth: 2,
-		borderColor: "#eab308",
-		borderLeftWidth: 4,
 		padding: Spacing.md,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
+		gap: Spacing.md,
 		...Shadows.light,
 	},
-	ruleEngineCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.md },
-	ruleEngineCardTitleRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
-	ruleEngineCardNumber: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#eab308", alignItems: "center", justifyContent: "center" },
-	ruleEngineCardNumberText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	ruleEngineCardTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	ruleEngineCardDelete: { padding: Spacing.xs },
-	ruleEngineCardLabel: { fontSize: Typography.fontSize.caption, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.secondary, marginBottom: Spacing.xs, marginTop: Spacing.sm },
-	ruleEngineTriggerRow: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		backgroundColor: Colors.background.secondary,
-		borderRadius: BorderRadius.sm,
-		padding: Spacing.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
+	kindIcon: {
+		width: 44, height: 44, borderRadius: BorderRadius.md,
+		backgroundColor: Colors.accent + "15",
+		alignItems: "center", justifyContent: "center",
 	},
-	ruleEngineTriggerText: { fontSize: Typography.fontSize.body, color: Colors.text.primary },
-	ruleEngineTriggerDropdown: { marginTop: 4, backgroundColor: "#374151", borderRadius: BorderRadius.sm, overflow: "hidden", ...Shadows.medium },
-	ruleEngineTriggerOption: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
-	ruleEngineTriggerOptionText: { fontSize: Typography.fontSize.body, color: "#fff" },
-	ruleEngineTriggerOptionTextSelected: { fontWeight: Typography.fontWeight.semiBold },
-	ruleEnginePlaceholder: { backgroundColor: Colors.background.secondary, borderRadius: BorderRadius.sm, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border },
-	ruleEnginePlaceholderText: { fontSize: Typography.fontSize.caption, color: Colors.text.disabled },
-	ruleEnginePlaceholderWarning: { backgroundColor: "#fef2f2", borderRadius: BorderRadius.sm, padding: Spacing.md, borderWidth: 1, borderColor: "#fecaca" },
-	ruleEnginePlaceholderWarningText: { fontSize: Typography.fontSize.caption, color: "#b91c1c" },
-	ruleEngineSummaryBar: { backgroundColor: "#dcfce7", borderRadius: BorderRadius.md, padding: Spacing.md, marginTop: Spacing.xl, borderWidth: 1, borderColor: "#86efac" },
-	ruleEngineSummaryText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.medium, color: "#166534", textAlign: "center" },
-
-	// Win & Lose Conditions (step 6)
-	winLoseAlertBox: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		backgroundColor: "#fef2f2",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.md,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#fecaca",
-	},
-	winLoseAlertTextBlock: { flex: 1 },
-	winLoseAlertTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#b91c1c" },
-	winLoseAlertSub: { fontSize: Typography.fontSize.caption, color: "#b91c1c", marginTop: 2 },
-	winLoseSection: { marginTop: Spacing.xl },
-	winLoseSectionHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
-	winLoseEmptyWin: { backgroundColor: "#fef2f2", borderRadius: BorderRadius.sm, padding: Spacing.md, marginBottom: Spacing.sm },
-	winLoseEmptyWinText: { fontSize: Typography.fontSize.caption, color: "#b91c1c" },
-	winLoseEmptyLose: { backgroundColor: Colors.background.secondary, borderRadius: BorderRadius.sm, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
-	winLoseEmptyLoseText: { fontSize: Typography.fontSize.caption, color: Colors.text.disabled },
-	winLoseConditionList: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginBottom: Spacing.sm },
-	winLoseConditionChip: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, backgroundColor: Colors.background.secondary, paddingVertical: Spacing.xs, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.pill, borderWidth: 1, borderColor: Colors.border },
-	winLoseConditionChipText: { fontSize: Typography.fontSize.caption, color: Colors.text.primary },
-	winLoseAddLabel: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: Spacing.sm },
-	winLoseButtonGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-	winLoseButtonGridThree: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-	winLoseAddBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.xs,
-		backgroundColor: Colors.background.primary,
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.sm,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		minWidth: "31%",
-		flex: 1,
-		...Shadows.light,
-	},
-	winLoseAddBtnTwo: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: Spacing.xs,
-		backgroundColor: Colors.background.primary,
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.sm,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		minWidth: "47%",
-		flex: 1,
-		...Shadows.light,
-	},
-	winLoseAddBtnText: { fontSize: Typography.fontSize.caption, color: Colors.text.primary, flex: 1 },
-	winLoseDivider: { height: 1, backgroundColor: Colors.border, marginTop: Spacing.xl, marginBottom: Spacing.sm },
-
-	// Content Packs (step 7)
-	contentPackAddLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary, marginTop: Spacing.lg, marginBottom: Spacing.sm },
-	contentPackGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-	contentPackTypeCard: {
-		width: "47%",
-		minWidth: "47%",
-		backgroundColor: Colors.background.secondary,
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		...Shadows.light,
-	},
-	contentPackTypeIconWrap: { marginBottom: Spacing.sm },
-	contentPackTypeTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	contentPackTypeSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	contentPackYourLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary, marginTop: Spacing.xl, marginBottom: Spacing.sm },
-	contentPackEmpty: { paddingVertical: Spacing.md },
-	contentPackEmptyText: { fontSize: Typography.fontSize.caption, color: Colors.text.disabled },
-	contentPackList: { gap: Spacing.sm },
-	contentPackCard: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#fef9c3",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		borderWidth: 1,
-		borderColor: "#eab308",
-	},
-	contentPackCardContent: { flex: 1 },
-	contentPackCardTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	contentPackCardSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	contentPackCardRemove: { padding: Spacing.xs },
-
-	// Objects & Assets (step 2)
-	objectsCard: { marginTop: Spacing.lg, padding: Spacing.lg, backgroundColor: Colors.background.primary, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border, ...Shadows.light },
-	objectsSectionTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginTop: Spacing.lg, marginBottom: Spacing.md },
-	objectTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.md, marginBottom: Spacing.lg },
-	objectTypeCard: {
-		width: "47%",
-		padding: Spacing.md,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		backgroundColor: Colors.background.primary,
-	},
-	objectTypeCardSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "12" },
-	objectTypeCardTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: 4 },
-	objectTypeCardDesc: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
-	addObjectTypeBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: Spacing.sm,
-		backgroundColor: "#eab308",
-		paddingVertical: Spacing.md,
-		paddingHorizontal: Spacing.lg,
-		borderRadius: BorderRadius.md,
-		marginBottom: Spacing.xl,
-	},
-	addObjectTypeBtnDisabled: { opacity: 0.5 },
-	addObjectTypeBtnText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#fff" },
-	yourObjectsEmpty: {
-		padding: Spacing.xxl,
-		borderRadius: BorderRadius.md,
-		backgroundColor: Colors.background.secondary,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		borderStyle: "dashed",
-		alignItems: "center",
-		justifyContent: "center",
-		minHeight: 140,
-	},
-	yourObjectsEmptyText: { fontSize: Typography.fontSize.caption, color: Colors.text.disabled, marginTop: Spacing.md, textAlign: "center" },
-	yourObjectsList: { gap: Spacing.sm },
-	yourObjectCard: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: Spacing.md,
-		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.border,
-		backgroundColor: Colors.background.primary,
-	},
-	yourObjectCardContent: { flex: 1 },
-	yourObjectCardName: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	yourObjectCardType: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	yourObjectDelete: { padding: Spacing.sm },
-
-	// Board Configuration (step 1)
-	boardConfigSection: { marginTop: Spacing.lg },
-	boardConfigTitle: { fontSize: Typography.fontSize.h2, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: Spacing.xs },
-	boardConfigSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: Spacing.lg },
-	boardConfigRequired: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary, marginBottom: Spacing.md },
-	boardCardsGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.md, marginBottom: Spacing.lg },
-	boardCard: { width: "47%", backgroundColor: Colors.background.primary, borderRadius: BorderRadius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, ...Shadows.light },
-	boardCardSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" },
-	boardCardCheck: { position: "absolute", top: Spacing.sm, right: Spacing.sm, zIndex: 1 },
-	boardCardIconWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.background.secondary, alignItems: "center", justifyContent: "center", marginBottom: Spacing.sm },
-	boardCardTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: 4 },
-	boardCardDesc: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: 4 },
-	boardCardExamples: { fontSize: 11, color: Colors.text.disabled },
-	inlineSettingsBlock: { marginBottom: Spacing.lg },
-	inlineSettingsTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: Spacing.md },
-	gridMaxHint: { fontSize: Typography.fontSize.small, color: Colors.text.disabled, marginTop: 2, marginBottom: Spacing.sm },
-	segmentRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm },
-	segmentBtn: { flex: 1, paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.md, backgroundColor: Colors.background.secondary, borderWidth: 1, borderColor: Colors.border, alignItems: "center" },
-	segmentBtnSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "25" },
-	segmentBtnText: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
-	segmentBtnTextSelected: { color: Colors.text.primary, fontWeight: Typography.fontWeight.semiBold },
-	gridPreviewBox: { marginTop: Spacing.sm, padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: "#dcfce7" },
-	gridPreviewText: { fontSize: Typography.fontSize.body, color: Colors.text.primary },
-	platformLimitsBox: { flexDirection: "row", alignItems: "flex-start", backgroundColor: Colors.accent + "18", padding: Spacing.md, borderRadius: BorderRadius.md, gap: Spacing.sm },
-	platformLimitsContent: { flex: 1 },
-	platformLimitsTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: 4 },
-	platformLimitsBullet: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginBottom: 2 },
-
-	// Interaction Modes (step 3)
-	interactionSection: { marginTop: Spacing.lg },
-	interactionSectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm, gap: Spacing.sm },
-	interactionIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.accent + "30", alignItems: "center", justifyContent: "center" },
-	interactionSectionTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	interactionChip: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background.secondary },
-	interactionErrorBox: { marginTop: Spacing.lg, padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: "#fef2f2" },
-	interactionErrorText: { fontSize: Typography.fontSize.body, color: Colors.error },
-	chipRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs, marginBottom: Spacing.sm },
-	chip: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background.secondary },
-	chipSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },
-	chipText: { fontSize: Typography.fontSize.caption, color: Colors.text.primary },
-
-	// Step nav
-	stepNav: { flexDirection: "row", alignItems: "center", marginTop: Spacing.xl, paddingHorizontal: Spacing.md, gap: Spacing.md },
-	stepNavBtn: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, padding: Spacing.sm },
-	stepNavText: { fontSize: Typography.fontSize.body, color: Colors.accent, fontWeight: Typography.fontWeight.medium },
-	stepNavBtnPrimary: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, backgroundColor: "#22c55e", paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, borderRadius: BorderRadius.md },
-	stepNavTextPrimary: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: "#fff" },
-
-	// Step list modal (left-side overlay)
-	stepListOverlay: { flex: 1, flexDirection: "row" },
-	stepListBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-	stepListPanel: {
-		width: "85%",
-		maxWidth: 360,
-		height: "100%",
-		backgroundColor: Colors.background.primary,
-		borderTopRightRadius: 0,
-		borderBottomRightRadius: 0,
-		borderRadius: 0,
-		...Shadows.heavy,
-	},
-	stepListHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-	stepListHeaderBtn: { padding: Spacing.sm },
-	stepListHeaderRight: { flexDirection: "row", alignItems: "center" },
-	stepListProgressBlock: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-	stepListScroll: { flex: 1, minHeight: 0 },
-	stepListScrollContent: { paddingBottom: Spacing.xxl, paddingTop: Spacing.sm },
-	stepListItem: { flexDirection: "row", alignItems: "center", padding: Spacing.md, gap: Spacing.md },
-	stepListIconWrap: { width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.background.secondary, alignItems: "center", justifyContent: "center" },
-	stepListIconRedDot: { borderWidth: 2, borderColor: Colors.error },
-	stepListLabel: { flex: 1 },
-	stepListTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	stepListRequired: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
-
-	// Preview
-	previewContainer: { flex: 1, backgroundColor: Colors.background.secondary },
-	previewHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: Spacing.lg,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: Colors.border,
-		backgroundColor: Colors.background.primary,
-	},
-	backToEditButton: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, paddingVertical: Spacing.sm },
-	backToEditText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
-	previewPlayer: { flex: 1 },
-	previewScroll: { flex: 1 },
-	previewScrollContent: { padding: Layout.margin, paddingTop: Spacing.lg },
-	previewTestingCard: { backgroundColor: Colors.background.primary, borderRadius: BorderRadius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border },
-	previewTestingRow: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg },
-	previewModeCard: {
-		flex: 1,
-		backgroundColor: "#fef9c3",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.lg,
-		borderWidth: 2,
-		borderColor: "#eab308",
-		alignItems: "center",
-		minHeight: 120,
-	},
-	previewModeIconWrap: { marginBottom: Spacing.sm },
-	previewModeTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	previewModeSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 4 },
-	autoTestCard: {
-		flex: 1,
-		backgroundColor: "#dbeafe",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.lg,
-		borderWidth: 2,
-		borderColor: "#2563eb",
-		alignItems: "center",
-		minHeight: 120,
-	},
-	autoTestIconWrap: { marginBottom: Spacing.sm },
-	autoTestTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	autoTestSubtitle: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 4 },
-	previewDebugBanner: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		backgroundColor: "#dbeafe",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.xl,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#93c5fd",
-	},
-	previewDebugTextBlock: { flex: 1 },
-	previewDebugTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#1e40af" },
-	previewDebugSub: { fontSize: Typography.fontSize.caption, color: "#1e40af", marginTop: 2, lineHeight: 20 },
-
-	// Publish Settings
-	publishSettingsContainer: { flex: 1, backgroundColor: Colors.background.secondary },
-	publishSettingsHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		paddingHorizontal: Spacing.lg,
-		paddingBottom: Spacing.sm,
-		borderBottomWidth: 1,
-		borderBottomColor: Colors.border,
-		backgroundColor: Colors.background.primary,
-	},
-	publishSettingsScroll: { flex: 1 },
-	publishSettingsScrollContent: { padding: Layout.margin, paddingTop: Spacing.lg },
-	publishSectionLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: Spacing.sm },
-	publishSectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.sm, marginBottom: Spacing.xs },
-	publishSectionRowError: { backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca" },
-	publishSectionRowOk: { backgroundColor: "#dcfce7", borderWidth: 1, borderColor: "#86efac" },
-	publishSectionRowText: { fontSize: Typography.fontSize.body, color: Colors.text.primary },
-	publishSectionRowTextError: { fontSize: Typography.fontSize.body, color: "#b91c1c" },
-	publishSectionRowTextOk: { fontSize: Typography.fontSize.body, color: "#166534" },
-	publishSocialCard: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: "#fff7ed",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginBottom: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#fed7aa",
-		gap: Spacing.sm,
-	},
-	publishSocialContent: { flex: 1 },
-	publishSocialTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
-	publishSocialSub: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
-	publishWarningCard: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		backgroundColor: "#fef2f2",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.lg,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#fecaca",
-	},
-	publishWarningContent: { flex: 1 },
-	publishWarningTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#b91c1c" },
-	publishWarningSub: { fontSize: Typography.fontSize.caption, color: "#b91c1c", marginTop: 2 },
-	publishGameButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#dcfce7",
-		borderRadius: BorderRadius.lg,
-		padding: Spacing.lg,
-		marginTop: Spacing.xl,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#86efac",
-	},
-	publishGameButtonDisabled: { opacity: 0.7 },
-	publishGameButtonText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#166534" },
-	publishGameButtonTextDisabled: { color: Colors.text.disabled },
-	publishInfoCard: {
-		flexDirection: "row",
-		alignItems: "flex-start",
-		backgroundColor: "#dbeafe",
-		borderRadius: BorderRadius.md,
-		padding: Spacing.md,
-		marginTop: Spacing.lg,
-		gap: Spacing.sm,
-		borderWidth: 1,
-		borderColor: "#93c5fd",
-	},
-	publishInfoContent: { flex: 1 },
-	publishInfoTitle: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: "#1e40af" },
-	publishInfoSub: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
+	kindLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
+	kindDesc: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, marginTop: 2 },
 });
 
-export default CreateCustomPage;
+// Form component styles (shared across all scene editors)
+const fc = StyleSheet.create({
+	field: { gap: Spacing.xs },
+	label: { fontSize: Typography.fontSize.small, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
+	input: {
+		backgroundColor: Colors.background.primary,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
+		borderRadius: BorderRadius.md,
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		minHeight: 44,
+		marginBottom: Spacing.xs,
+	},
+	row: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.xs },
+	pill: {
+		paddingHorizontal: Spacing.md,
+		paddingVertical: 6,
+		borderRadius: BorderRadius.pill,
+		borderWidth: 1.5,
+		borderColor: Colors.borders.subtle,
+		backgroundColor: Colors.background.primary,
+	},
+	pillActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "18" },
+	pillText: { fontSize: Typography.fontSize.small, color: Colors.text.secondary },
+	pillTextActive: { color: Colors.accent, fontWeight: Typography.fontWeight.semiBold },
+	radio: {
+		width: 22, height: 22, borderRadius: 11,
+		borderWidth: 2, borderColor: Colors.borders.subtle,
+		backgroundColor: Colors.background.primary,
+		alignItems: "center", justifyContent: "center",
+	},
+	radioActive: { borderColor: Colors.game.correct },
+	radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.game.correct },
+	addBtn: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.md,
+		gap: 4,
+		borderRadius: BorderRadius.md,
+		borderWidth: 1.5,
+		borderColor: Colors.accent,
+		borderStyle: "dashed",
+		marginTop: Spacing.xs,
+	},
+	addBtnText: { fontSize: Typography.fontSize.small, color: Colors.accent },
+	subCard: {
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.md,
+		padding: Spacing.md,
+		borderWidth: 1,
+		borderColor: Colors.borders.subtle,
+		marginBottom: Spacing.xs,
+	},
+	subCardTitle: { fontSize: Typography.fontSize.small, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+});
