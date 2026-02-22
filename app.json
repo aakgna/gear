@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kracked",
     "slug": "gear",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/Kracked_logo.png",
     "scheme": "kracked",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.aakgna.gear",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "7",
+      "buildNumber": "2",
       "usesAppleSignIn": true,
       "appleTeamId": "2W9F399FQ7"
     },
