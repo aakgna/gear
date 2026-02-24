@@ -282,6 +282,7 @@ export const GameColors: Record<PuzzleType, string> = {
 	sequencing: "#8B5CF6", // Violet
 	codebreaker: "#F43F5E", // Rose
 	maze: "#10B981", // Emerald
+	hangman: "#F97316", // Orange
 };
 
 /**
@@ -314,6 +315,7 @@ export const formatGameType = (type: string): string => {
 		trivia: "Trivia",
 		futoshiki: "Futoshiki",
 		sequencing: "Sequencing",
+		hangman: "Hangman",
 	};
 	return specialCases[type] || formatted;
 };

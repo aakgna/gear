@@ -27,6 +27,7 @@ import RiddleGame from "./RiddleGame";
 import TriviaGame from "./TriviaGame";
 import CodeBreakerGame from "./CodeBreaker";
 import SequencingGame from "./SequencingGame";
+import HangmanGame from "./HangmanGame";
 import WordChainGame from "./WordChainGame";
 import InferenceGame from "./InferenceGame";
 import MazeGame from "./MazeGame";
@@ -676,21 +677,35 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						initialCompletedResult={completedResult}
 					/>
 				);
-			case "sequencing":
-				return (
-					<SequencingGame
-						key={puzzle.id}
-						inputData={puzzle.data as any}
-						onComplete={handleComplete}
-						onAttempt={onAttempt}
-						startTime={gameStartTime}
-						puzzleId={puzzle.id}
-						onShowStats={handleShowStats}
-						isActive={isActive && gameStarted}
-						initialCompletedResult={completedResult}
-					/>
-				);
-			case "wordChain":
+		case "sequencing":
+			return (
+				<SequencingGame
+					key={puzzle.id}
+					inputData={puzzle.data as any}
+					onComplete={handleComplete}
+					onAttempt={onAttempt}
+					startTime={gameStartTime}
+					puzzleId={puzzle.id}
+					onShowStats={handleShowStats}
+					isActive={isActive && gameStarted}
+					initialCompletedResult={completedResult}
+				/>
+			);
+		case "hangman":
+			return (
+				<HangmanGame
+					key={puzzle.id}
+					inputData={puzzle.data as any}
+					onComplete={handleComplete}
+					onAttempt={onAttempt}
+					startTime={gameStartTime}
+					puzzleId={puzzle.id}
+					onShowStats={handleShowStats}
+					isActive={isActive && gameStarted}
+					initialCompletedResult={completedResult}
+				/>
+			);
+		case "wordChain":
 				return (
 					<WordChainGame
 						key={puzzle.id}

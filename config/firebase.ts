@@ -83,6 +83,8 @@ export interface FirestoreGame {
 		description: string;
 	}>;
 	// Note: solution field is shared by Maze and Sequencing (both use number[])
+	// Hangman structure
+	word?: string;
 }
 
 // Game History Entry interface
@@ -189,7 +191,8 @@ export const saveGameToFirestore = async (
 		| "sudoku"
 		| "trivia"
 		| "codebreaker"
-		| "sequencing",
+		| "sequencing"
+		| "hangman",
 	difficulty: "easy" | "medium" | "hard",
 	gameData: {
 		questions?: string[];

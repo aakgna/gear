@@ -60,6 +60,7 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	HangmanData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import WelcomeCard from "../components/WelcomeCard";
@@ -406,6 +407,24 @@ function convertFirestoreGameToPuzzle(
 						grid: game.grid,
 						givens: game.givens,
 					} as SudokuData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+		case "hangman":
+			if (game.word) {
+				return {
+					id: gameId,
+					type: "hangman",
+					data: {
+						word: game.word.toUpperCase(),
+						hint: game.hint,
+						maxGuesses: game.maxGuesses || 6,
+					} as HangmanData,
 					difficulty: difficultyNum,
 					createdAt: new Date().toISOString(),
 					username: game.username,
@@ -3138,9 +3157,10 @@ const applyForYouFilters = useCallback(
 									"trailfinder",
 									"sudoku",
 									"trivia",
-									"codebreaker",
-									"sequencing",
-								].map((gameType) => {
+								"codebreaker",
+								"sequencing",
+								"hangman",
+							].map((gameType) => {
 									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);
 									return (
 									<TouchableOpacity

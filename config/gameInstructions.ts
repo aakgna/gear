@@ -144,6 +144,17 @@ export const gameInstructions = {
 		example:
 			"Example: Rule: 'Alice is before Bob' means Alice comes before Bob in the sequence. Rule: 'Bob is 2nd' means Bob is in position 2. Combine all rules to find the correct order.",
 	},
+
+	hangman: {
+		instructions: [
+			"Guess the hidden word one letter at a time",
+			"Tap a letter on the keyboard to guess it",
+			"Each wrong guess adds a part to the hangman drawing",
+			"Guess all letters before the drawing is complete to win",
+		],
+		example:
+			"Example: The word is 'APPLE'. You guess 'A' — it reveals A _ _ _ _. Guess wrong letters and the hangman builds up.",
+	},
 };
 
 

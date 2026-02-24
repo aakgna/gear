@@ -12,7 +12,9 @@ export type PuzzleType =
 	| "sudoku"
 	| "trivia"
 	| "codebreaker"
-	| "sequencing";
+	| "sequencing"
+	| "hangman"
+	| "custom";
 
 export interface Puzzle {
 	id: string;
@@ -30,7 +32,8 @@ export interface Puzzle {
 		| SudokuData
 		| TriviaData
 		| CodeBreakerData
-		| SequencingData;
+		| SequencingData
+		| HangmanData;
 	difficulty: number;
 	createdAt: string;
 	username?: string;
@@ -144,6 +147,12 @@ export interface SequencingData {
 	entities: string[]; // Entity names (e.g., ["Person A", "Person B", ...] or ["Monday", "Tuesday", ...])
 	rules: SequencingRule[];
 	solution: number[]; // Array of entity indices in correct order (0-based)
+}
+
+export interface HangmanData {
+	word: string; // The word to guess (stored uppercase)
+	hint?: string; // Optional hint/category
+	maxGuesses: number; // Max wrong guesses allowed (6 easy, 5 medium, 4 hard)
 }
 
 // Game result types

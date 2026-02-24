@@ -95,11 +95,13 @@ const getAnimationCount = (gameType: PuzzleType): number => {
 			return 5;
 		case "codebreaker":
 			return 6;
-		case "maze":
-			return 7;
-		default:
-			return 4;
-	}
+	case "maze":
+		return 7;
+	case "hangman":
+		return 6;
+	default:
+		return 4;
+}
 };
 
 const createAnimations = (
@@ -167,10 +169,12 @@ const renderAnimation = (
 			return renderSequencingAnimation(anims, gameColor);
 		case "codebreaker":
 			return renderCodeBreakerAnimation(anims, gameColor);
-		case "maze":
-			return renderMazeAnimation(anims, gameColor);
-		default:
-			return null;
+	case "maze":
+		return renderMazeAnimation(anims, gameColor);
+	case "hangman":
+		return renderHangmanAnimation(anims, gameColor);
+	default:
+		return null;
 	}
 };
 
@@ -991,6 +995,69 @@ const renderMazeAnimation = (anims: Animated.Value[], gameColor: string) => {
 	});
 };
 
+// Hangman: Floating letter tiles drifting across the screen
+const renderHangmanAnimation = (anims: Animated.Value[], gameColor: string) => {
+	const letters = ["A", "P", "P", "L", "E", "_"];
+	const startPositions = [
+		{ x: SCREEN_WIDTH * 0.05, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.25, y: SCREEN_HEIGHT * 0.2 },
+		{ x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.08 },
+		{ x: SCREEN_WIDTH * 0.7, y: SCREEN_HEIGHT * 0.18 },
+		{ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.1 },
+		{ x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.28 },
+	];
+	const endPositions = [
+		{ x: SCREEN_WIDTH * 0.9, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.1, y: SCREEN_HEIGHT * 0.55 },
+		{ x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.65 },
+		{ x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.7 },
+		{ x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.6 },
+		{ x: SCREEN_WIDTH * 0.95, y: SCREEN_HEIGHT * 0.5 },
+	];
+
+	return letters.map((letter, i) => {
+		const translateX =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].x - startPositions[i].x],
+			}) || 0;
+		const translateY =
+			anims[i]?.interpolate({
+				inputRange: [0, 1],
+				outputRange: [0, endPositions[i].y - startPositions[i].y],
+			}) || 0;
+		const scale =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.5, 1],
+				outputRange: [0.6, 1.2, 0.6],
+			}) || 0.6;
+		const opacity =
+			anims[i]?.interpolate({
+				inputRange: [0, 0.3, 0.7, 1],
+				outputRange: [0.4, 1, 1, 0.4],
+			}) || 0.4;
+
+		return (
+			<Animated.View
+				key={i}
+				style={[
+					styles.floatingTile,
+					{
+						left: startPositions[i].x - 20,
+						top: startPositions[i].y,
+						backgroundColor: gameColor + "65",
+						borderColor: gameColor,
+						transform: [{ translateX }, { translateY }, { scale }],
+						opacity,
+					},
+				]}
+			>
+				<Text style={[styles.floatingTileLetter, { color: gameColor }]}>{letter}</Text>
+			</Animated.View>
+		);
+	});
+};
+
 interface GameIntroScreenProps {
 	gameType: PuzzleType;
 	difficulty: number;
@@ -1648,6 +1715,19 @@ const styles = StyleSheet.create({
 		shadowColor: "transparent",
 	},
 	zipNumber: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+	},
+	floatingTile: {
+		position: "absolute",
+		width: 40,
+		height: 40,
+		borderRadius: BorderRadius.md,
+		borderWidth: 2,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	floatingTileLetter: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.bold,
 	},

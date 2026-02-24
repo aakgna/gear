@@ -114,6 +114,15 @@ export const gameTemplates: Record<string, GameTemplate[]> = {
 			description: "Classic crossword puzzle",
 			defaultConfig: { rows: 15, cols: 15 },
 		},
+		{
+			id: "hangman",
+			name: "Hangman",
+			type: "hangman",
+			category: "word",
+			icon: "text-outline",
+			description: "Guess the hidden word letter by letter",
+			defaultConfig: { maxGuesses: 6 },
+		},
 	],
 	logic: [
 		{

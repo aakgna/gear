@@ -28,6 +28,7 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	HangmanData,
 } from "../../config/types";
 import {
 	db,
@@ -176,11 +177,20 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 					minDistance: r.minDistance,
 					description: r.description,
 				})),
-				solution: gameData.solution,
-			} as SequencingData;
-			isValid = true;
-		}
-		// Handle WordChain
+			solution: gameData.solution,
+		} as SequencingData;
+		isValid = true;
+	}
+	// Handle Hangman
+	else if (normalizedGameType === "hangman" && gameData.word) {
+		puzzleData = {
+			word: gameData.word.toUpperCase(),
+			hint: gameData.hint,
+			maxGuesses: gameData.maxGuesses || 6,
+		} as HangmanData;
+		isValid = true;
+	}
+	// Handle WordChain
 		else if (
 			normalizedGameType === "wordChain" &&
 			gameData.startWord &&
