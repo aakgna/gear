@@ -23,6 +23,7 @@ import {
 	Shadows,
 	Animation,
 	Layout,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -39,6 +40,7 @@ interface WordChainGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const WordChainGame: React.FC<WordChainGameProps> = ({
@@ -49,12 +51,14 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
-	const { startWord, endWord, validWords, minSteps } = inputData;
+	const gameColor = getGameColor("wordChain"); // Get game-specific green color (#10B981)
+	const { startWord, endWord, answer, minSteps } = inputData;
 	const wordLength = startWord.length;
-	const numInputs = wordLength - 1; // n letters = n-1 input fields
+	const numInputs = wordLength - 1; // Number of steps is (word_length - 1)
 
 	const [chain, setChain] = useState<string[]>(Array(numInputs).fill(""));
 	const [chainStatus, setChainStatus] = useState<
@@ -62,6 +66,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	>(Array(numInputs).fill("empty"));
 	const [gameWon, setGameWon] = useState(false);
 	const [gameLost, setGameLost] = useState(false);
+	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [attempts, setAttempts] = useState(0);
 	const [elapsedTime, setElapsedTime] = useState(0);
@@ -78,21 +83,40 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	useEffect(() => {
 		if (puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId || "";
-			setElapsedTime(0);
-			setGameWon(false);
-			setGameLost(false);
-			setChain(Array(numInputs).fill(""));
-			setChainStatus(Array(numInputs).fill("empty"));
-			setAttempts(0);
-			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setGameWon(true);
+				setGameLost(false);
+				setAnswerRevealed(false);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setAttempts(initialCompletedResult.attempts || 0);
+				// Restore chain from answer
+				setChain([...answer]);
+				setChainStatus(Array(numInputs).fill("correct"));
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setGameWon(false);
+				setGameLost(false);
+				setAnswerRevealed(false);
+				setChain(Array(numInputs).fill(""));
+				setChainStatus(Array(numInputs).fill("empty"));
+				setAttempts(0);
+				hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			// startTime prop changed - could be initial start or resume from pause
@@ -109,7 +133,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [puzzleId, propStartTime, startTime, numInputs]);
+	}, [puzzleId, propStartTime, startTime, numInputs, initialCompletedResult, answer]);
 
 	// Timer effect (only if startTime is set and game is active)
 	useEffect(() => {
@@ -120,7 +144,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 			return;
 		}
 
-		if (gameWon || gameLost) {
+		if (gameWon || gameLost || answerRevealed) {
 			if (timerIntervalRef.current) {
 				clearInterval(timerIntervalRef.current);
 			}
@@ -148,7 +172,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		};
-	}, [gameWon, gameLost, startTime, isActive]);
+	}, [gameWon, gameLost, answerRevealed, startTime, isActive]);
 
 	// Keyboard listeners for scrolling
 	useEffect(() => {
@@ -248,8 +272,40 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 		return { isValid: allValid, statuses };
 	};
 
+	const handleShowAnswer = () => {
+		if (gameWon || gameLost || answerRevealed) return;
+
+		// Populate the chain with the answer
+		if (answer && answer.length === numInputs) {
+			setChain(answer.map((word) => word.toUpperCase()));
+			setChainStatus(Array(numInputs).fill("valid" as const));
+		}
+
+		setAnswerRevealed(true);
+		setGameWon(true);
+
+		// Stop timer
+		if (timerIntervalRef.current) {
+			clearInterval(timerIntervalRef.current);
+		}
+		const timeTaken = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
+		setElapsedTime(timeTaken);
+
+		// Mark as completed with answer revealed
+		onComplete({
+			puzzleId: puzzleId || `wordchain_${Date.now()}`,
+			completed: true,
+			timeTaken,
+			attempts: attempts + 1,
+			completedAt: new Date().toISOString(),
+			answerRevealed: true,
+		});
+	};
+
 	const handleChainSubmit = () => {
-		if (gameWon || gameLost) return;
+		if (gameWon || gameLost || answerRevealed) return;
 
 		// Check if all fields are filled
 		const allFilled = chain.every((word) => word.trim().length === wordLength);
@@ -292,7 +348,10 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				if (timerIntervalRef.current) {
 					clearInterval(timerIntervalRef.current);
 				}
-				setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+				const timeTaken = startTime
+					? Math.floor((Date.now() - startTime) / 1000)
+					: 0;
+				setElapsedTime(timeTaken);
 
 				Animated.sequence([
 					Animated.timing(successScale, {
@@ -310,7 +369,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				onComplete({
 					puzzleId: puzzleId || `wordchain_${Date.now()}`,
 					completed: true,
-					timeTaken: Math.floor((Date.now() - startTime) / 1000),
+					timeTaken,
 					attempts: newAttempts,
 					completedAt: new Date().toISOString(),
 				});
@@ -361,7 +420,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	};
 
 	const handleWordChange = (index: number, value: string) => {
-		if (gameWon || gameLost) return;
+		if (gameWon || gameLost || answerRevealed) return;
 
 		// Track first interaction (user started attempting the game)
 		if (!hasAttemptedRef.current && value.length > 0 && puzzleId) {
@@ -389,6 +448,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 	};
 
 	const handleKeyPress = (index: number, e: any) => {
+		if (gameWon || gameLost || answerRevealed) return;
 		// Move to next input on Enter/Return if current is filled
 		if (e.nativeEvent.key === "Enter" || e.nativeEvent.key === "return") {
 			if (chain[index].length === wordLength && index < chain.length - 1) {
@@ -424,6 +484,8 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				title="Word Chain"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="wordChain"
+				puzzleId={puzzleId}
 			/>
 
 			<ScrollView
@@ -443,20 +505,7 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 				keyboardDismissMode="interactive"
 				scrollEnabled={true}
 			>
-				{/* Start and End Words */}
-				<View style={styles.startEndContainer}>
-					<View style={styles.wordBox}>
-						<Text style={styles.wordLabel}>Start</Text>
-						<Text style={styles.startWord}>{startWord.toUpperCase()}</Text>
-					</View>
-					<Text style={styles.arrow}>→</Text>
-					<View style={styles.wordBox}>
-						<Text style={styles.wordLabel}>End</Text>
-						<Text style={styles.endWord}>{endWord.toUpperCase()}</Text>
-					</View>
-				</View>
-
-				{/* Chain Input Fields */}
+				{/* Vertical Chain Container */}
 				<Animated.View
 					style={[
 						styles.chainContainer,
@@ -468,8 +517,15 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 						},
 					]}
 				>
+					{/* Start Word */}
+					<View style={styles.wordBox}>
+						<Text style={styles.startWord}>{startWord.toUpperCase()}</Text>
+					</View>
+					<Text style={styles.arrow}>↓</Text>
+
+					{/* Chain Input Fields */}
 					{chain.map((word, index) => (
-						<View key={index} style={styles.chainRow}>
+						<View key={index} style={styles.chainItem}>
 							<TextInput
 								ref={(ref) => {
 									inputRefs.current[index] = ref;
@@ -480,15 +536,13 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 								onKeyPress={(e) => handleKeyPress(index, e)}
 								maxLength={wordLength}
 								autoCapitalize="characters"
-								editable={!gameWon && !gameLost}
+								editable={!gameWon && !gameLost && !answerRevealed}
 								selectTextOnFocus
 								placeholder={`Word ${index + 1}`}
 								placeholderTextColor={Colors.text.disabled}
 								onFocus={() => {
-									// Simple scroll calculation based on index
-									// Each input row is approximately 80px tall (input + margin)
-									// Start/End section is approximately 100px
-									// We want the focused input to be visible with some space above
+									// Scroll calculation for vertical chain
+									// Start word is ~100px, each chain item is ~80px
 									const estimatedY = 100 + index * 80;
 									setTimeout(() => {
 										scrollViewRef.current?.scrollTo({
@@ -498,12 +552,19 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 									}, 100);
 								}}
 							/>
+							{index < chain.length - 1 && <Text style={styles.arrow}>↓</Text>}
 						</View>
 					))}
+
+					{/* End Word */}
+					<Text style={styles.arrow}>↓</Text>
+					<View style={styles.wordBox}>
+						<Text style={styles.endWord}>{endWord.toUpperCase()}</Text>
+					</View>
 				</Animated.View>
 
 				{/* Submit Button */}
-				{!gameWon && !gameLost && (
+				{!gameWon && !gameLost && !answerRevealed && (
 					<TouchableOpacity
 						style={[
 							styles.submitButton,
@@ -526,8 +587,19 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 					</TouchableOpacity>
 				)}
 
+				{/* Show Answer Button */}
+				{!gameWon && !gameLost && !answerRevealed && (
+					<TouchableOpacity
+						style={styles.showAnswerButton}
+						onPress={handleShowAnswer}
+						activeOpacity={0.7}
+					>
+						<Text style={styles.showAnswerText}>Show Answer</Text>
+					</TouchableOpacity>
+				)}
+
 				{/* View Stats Button */}
-				{(gameWon || gameLost) && onShowStats && (
+				{(gameWon || gameLost || answerRevealed) && onShowStats && (
 					<TouchableOpacity
 						style={styles.viewStatsButton}
 						onPress={onShowStats}
@@ -544,7 +616,12 @@ const WordChainGame: React.FC<WordChainGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	header: {
 		flexDirection: "row",
@@ -563,58 +640,19 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#10B98115", // Game-specific green with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#10B98140",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#10B981", // Game-specific green
 		fontFamily: Typography.fontFamily.monospace,
-	},
-	startEndContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		marginTop: Spacing.lg,
-		marginBottom: Spacing.xl,
-		gap: Spacing.md,
-	},
-	wordBox: {
-		alignItems: "center",
-		padding: Spacing.md,
-		backgroundColor: Colors.background.tertiary,
-		borderRadius: BorderRadius.lg,
-		borderWidth: 2,
-		borderColor: Colors.accent,
-		minWidth: 100,
-	},
-	wordLabel: {
-		fontSize: Typography.fontSize.caption,
-		color: Colors.text.secondary,
-		marginBottom: Spacing.xs,
-		fontWeight: Typography.fontWeight.medium,
-	},
-	startWord: {
-		fontSize: Typography.fontSize.h2,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
-		letterSpacing: 2,
-	},
-	endWord: {
-		fontSize: Typography.fontSize.h2,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.game.correct,
-		letterSpacing: 2,
-	},
-	arrow: {
-		fontSize: Typography.fontSize.h1,
-		color: Colors.text.secondary,
-		fontWeight: Typography.fontWeight.bold,
 	},
 	scrollView: {
 		flex: 1,
@@ -625,34 +663,75 @@ const styles = StyleSheet.create({
 	},
 	chainContainer: {
 		width: "100%",
+		alignItems: "center",
+		marginTop: Spacing.lg,
 		marginBottom: Spacing.lg,
 	},
-	chainRow: {
-		width: "100%",
-		marginBottom: Spacing.md,
+	wordBox: {
 		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.xl,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.lg,
+		borderWidth: 2.5,
+		borderColor: "#10B981", // Game-specific green
+		width: "80%",
+		maxWidth: 300,
+		minHeight: 70,
+		...Shadows.medium,
+	},
+	wordLabel: {
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.xs,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	startWord: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: "#10B981", // Game-specific green
+		letterSpacing: 2,
+	},
+	endWord: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.game.correct,
+		letterSpacing: 2,
+	},
+	arrow: {
+		fontSize: Typography.fontSize.h1,
+		color: "#10B981", // Game-specific green
+		fontWeight: Typography.fontWeight.bold,
+		marginVertical: Spacing.xs,
+	},
+	chainItem: {
+		width: "100%",
+		alignItems: "center",
+		marginBottom: Spacing.xs,
 	},
 	input: {
 		width: "80%",
 		maxWidth: 300,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.sm,
 		paddingHorizontal: Spacing.lg,
-		borderRadius: BorderRadius.md,
-		borderWidth: 2,
+		borderRadius: BorderRadius.lg,
+		borderWidth: 2.5,
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
 		letterSpacing: 2,
 		textAlign: "center",
 		color: Colors.text.primary,
+		minHeight: 70,
 		...Shadows.light,
 	},
 	emptyInput: {
-		backgroundColor: Colors.background.tertiary,
-		borderColor: "rgba(255, 255, 255, 0.2)",
+		backgroundColor: Colors.background.secondary,
+		borderColor: "#E5E5E5",
 	},
 	validInput: {
-		backgroundColor: Colors.accent,
-		borderColor: Colors.accent,
+		backgroundColor: "#10B981", // Game-specific green
+		borderColor: "#10B981",
 		color: Colors.text.white,
 	},
 	invalidInput: {
@@ -660,21 +739,34 @@ const styles = StyleSheet.create({
 		borderColor: Colors.error,
 		color: Colors.text.white,
 	},
+	showAnswerButton: {
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: Spacing.xs,
+	},
+	showAnswerText: {
+		color: Colors.text.secondary,
+		fontSize: Typography.fontSize.caption,
+		fontWeight: Typography.fontWeight.medium,
+		textDecorationLine: "underline",
+	},
 	submitButton: {
-		marginTop: Spacing.xl,
-		backgroundColor: Colors.background.tertiary,
+		marginTop: Spacing.md,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
 		borderWidth: 2,
-		borderColor: "rgba(255, 255, 255, 0.2)",
+		borderColor: "#E5E5E5",
 		opacity: 0.5,
+		minHeight: 52,
 	},
 	submitButtonEnabled: {
-		backgroundColor: Colors.accent,
-		borderColor: Colors.accent,
+		backgroundColor: "#10B981", // Game-specific green
+		borderColor: "#10B981",
 		opacity: 1,
 		...Shadows.medium,
 	},
@@ -688,12 +780,13 @@ const styles = StyleSheet.create({
 	},
 	viewStatsButton: {
 		marginTop: Spacing.xl,
-		backgroundColor: Colors.accent,
+		backgroundColor: "#10B981", // Game-specific green
 		borderRadius: BorderRadius.lg,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
 		alignItems: "center",
 		justifyContent: "center",
+		minHeight: 52,
 		...Shadows.medium,
 	},
 	viewStatsButtonText: {

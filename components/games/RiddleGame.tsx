@@ -18,6 +18,7 @@ import {
 	Animation,
 	ComponentStyles,
 	Layout,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -29,6 +30,7 @@ interface RiddleGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const RiddleGame: React.FC<RiddleGameProps> = ({
@@ -39,16 +41,17 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("riddle"); // Get game-specific orange color (#F59E0B)
 	const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [attempts, setAttempts] = useState(0);
 	const [startTime, setStartTime] = useState<number | undefined>(propStartTime);
 	const [elapsedTime, setElapsedTime] = useState(0);
 	const [completed, setCompleted] = useState(false);
-	const [answerRevealed, setAnswerRevealed] = useState(false);
 	const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const puzzleIdRef = useRef<string>("");
 	const hasAttemptedRef = useRef(false); // Track if user has made first interaction
@@ -62,20 +65,35 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		// Only reset if this is a different puzzle
 		if (puzzleIdRef.current !== puzzleSignature) {
 			puzzleIdRef.current = puzzleSignature;
-			setElapsedTime(0);
-			setCompleted(false);
-			setSelectedChoice(null);
-			setFeedback(null);
-			setAttempts(0);
-			hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
-			if (timerIntervalRef.current) {
-				clearInterval(timerIntervalRef.current);
-			}
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed) {
+				setCompleted(true);
+				setSelectedChoice(inputData.answer); // Set to the correct answer
+				setElapsedTime(initialCompletedResult.timeTaken);
+				setAttempts(initialCompletedResult.attempts || 0);
+				setFeedback(null);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setCompleted(false);
+				setSelectedChoice(null);
+				setFeedback(null);
+				setAttempts(0);
+				hasAttemptedRef.current = false; // Reset attempted flag for new puzzle
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+				}
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			// startTime prop changed - could be initial start or resume from pause
@@ -92,7 +110,7 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 				clearInterval(timerIntervalRef.current);
 			}
 		}
-	}, [puzzleSignature, propStartTime, startTime]);
+	}, [puzzleSignature, propStartTime, startTime, initialCompletedResult, inputData.answer]);
 
 	// Timer effect - updates every second (only if startTime is set and game is active)
 	useEffect(() => {
@@ -144,35 +162,6 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 		const minutes = Math.floor(seconds / 60);
 		const remainingSeconds = seconds % 60;
 		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-	};
-
-	const handleShowAnswer = () => {
-		if (completed || answerRevealed) return;
-
-		const correctAnswer = inputData.answer.trim().toLowerCase();
-
-		setSelectedChoice(correctAnswer);
-		setAnswerRevealed(true);
-		setCompleted(true);
-		setFeedback("Answer revealed!");
-
-		const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-		// Stop timer
-		if (timerIntervalRef.current) {
-			clearInterval(timerIntervalRef.current);
-		}
-		setElapsedTime(timeTaken);
-
-		// Mark as completed
-		onComplete({
-			puzzleId: puzzleId || `riddle_${Date.now()}`,
-			completed: true,
-			timeTaken,
-			attempts: attempts + 1,
-			completedAt: new Date().toISOString(),
-			answerRevealed: true,
-		});
 	};
 
 	const submit = () => {
@@ -257,6 +246,8 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 				title="Riddle"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="riddle"
+				puzzleId={puzzleId}
 			/>
 
 			<ScrollView
@@ -330,27 +321,25 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 					</View>
 				)}
 
-				<TouchableOpacity
-					style={[
-						styles.submit,
-						(!selectedChoice || completed) && styles.submitDisabled,
-					]}
-					onPress={completed ? onShowStats : submit}
-					activeOpacity={0.7}
-					disabled={!selectedChoice && !completed}
-				>
-					<Text style={styles.submitText}>
-						{completed ? "Submitted, View Stats" : "Submit Answer"}
-					</Text>
-				</TouchableOpacity>
-
-				{!completed && !answerRevealed && (
+				{!completed ? (
 					<TouchableOpacity
-						style={styles.showAnswerButton}
-						onPress={handleShowAnswer}
+						style={[
+							styles.submit,
+							!selectedChoice && styles.submitDisabled,
+						]}
+						onPress={submit}
+						activeOpacity={0.7}
+						disabled={!selectedChoice}
+					>
+						<Text style={styles.submitText}>Submit Answer</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={styles.submit}
+						onPress={onShowStats}
 						activeOpacity={0.7}
 					>
-						<Text style={styles.showAnswerText}>Show Answer</Text>
+						<Text style={styles.submitText}>View Stats</Text>
 					</TouchableOpacity>
 				)}
 			</ScrollView>
@@ -361,7 +350,12 @@ const RiddleGame: React.FC<RiddleGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		backgroundColor: Colors.background.secondary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	header: {
 		flexDirection: "row",
@@ -404,11 +398,11 @@ const styles = StyleSheet.create({
 		marginBottom: Spacing.lg,
 	},
 	promptCard: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.lg,
-		padding: Spacing.lg,
-		borderWidth: 1,
-		borderColor: "rgba(255, 255, 255, 0.1)",
+		padding: Spacing.xl,
+		borderWidth: 1.5,
+		borderColor: "#E5E5E5",
 		...Shadows.medium,
 		alignItems: "center",
 	},
@@ -420,17 +414,18 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	hintContainer: {
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#F59E0B10", // Game-specific orange with opacity
 		borderRadius: BorderRadius.md,
 		padding: Spacing.md,
 		marginBottom: Spacing.lg,
-		borderWidth: 1,
-		borderColor: Colors.accent + "30",
+		borderWidth: 1.5,
+		borderColor: "#F59E0B30",
+		...Shadows.light,
 	},
 	hintLabel: {
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific orange
 		marginBottom: Spacing.xs,
 	},
 	hint: {
@@ -444,23 +439,25 @@ const styles = StyleSheet.create({
 		gap: Spacing.sm,
 	},
 	choiceButton: {
-		backgroundColor: Colors.background.tertiary,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.lg,
 		borderWidth: 2,
-		borderColor: "rgba(124, 77, 255, 0.3)",
+		borderColor: "#E5E5E5",
 		...Shadows.light,
-		minHeight: 44,
+		minHeight: 56,
 		justifyContent: "center",
 	},
 	choiceButtonSelected: {
-		backgroundColor: Colors.primary + "20",
-		borderColor: Colors.primary,
+		backgroundColor: "#F59E0B20", // Game-specific orange with opacity
+		borderColor: "#F59E0B", // Game-specific orange
+		borderWidth: 2.5,
+		...Shadows.medium,
 	},
 	choiceButtonCorrect: {
-		backgroundColor: "#10b98150",
-		borderColor: "#10b981",
+		backgroundColor: Colors.game.correct + "50",
+		borderColor: Colors.game.correct,
 		borderWidth: 3,
 	},
 	choiceButtonWrong: {
@@ -475,11 +472,11 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	choiceTextSelected: {
-		color: Colors.primary,
+		color: "#F59E0B", // Game-specific orange
 		fontWeight: Typography.fontWeight.bold,
 	},
 	choiceTextCorrect: {
-		color: "#10b981",
+		color: Colors.game.correct,
 		fontWeight: Typography.fontWeight.bold,
 	},
 	choiceTextWrong: {
@@ -487,11 +484,11 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.bold,
 	},
 	submit: {
-		backgroundColor: ComponentStyles.button.backgroundColor,
+		backgroundColor: "#F59E0B", // Game-specific orange
 		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.md,
+		paddingVertical: Spacing.lg,
 		paddingHorizontal: Spacing.xl,
-		minHeight: 48,
+		minHeight: 52,
 		alignItems: ComponentStyles.button.alignItems,
 		justifyContent: ComponentStyles.button.justifyContent,
 		width: "100%",
@@ -506,23 +503,6 @@ const styles = StyleSheet.create({
 	},
 	submitDisabled: {
 		opacity: 0.5,
-	},
-	showAnswerButton: {
-		marginTop: Spacing.xs,
-		backgroundColor: Colors.background.secondary,
-		borderRadius: ComponentStyles.button.borderRadius,
-		paddingVertical: Spacing.sm,
-		paddingHorizontal: Spacing.xl,
-		alignItems: "center",
-		justifyContent: "center",
-		width: "100%",
-		borderWidth: 1,
-		borderColor: Colors.text.secondary + "40",
-	},
-	showAnswerText: {
-		color: Colors.text.secondary,
-		fontSize: Typography.fontSize.caption,
-		fontWeight: Typography.fontWeight.semiBold,
 	},
 	feedbackContainer: {
 		marginBottom: Spacing.md,
@@ -541,21 +521,21 @@ const styles = StyleSheet.create({
 	completionContainer: {
 		marginTop: Spacing.xl,
 		padding: Spacing.xxl,
-		backgroundColor: Colors.accent + "10",
+		backgroundColor: "#F59E0B10", // Game-specific orange with opacity
 		borderRadius: BorderRadius.xl,
 		alignItems: "center",
-		borderWidth: 2,
-		borderColor: Colors.accent,
-		...Shadows.large,
+		borderWidth: 2.5,
+		borderColor: "#F59E0B", // Game-specific orange
+		...Shadows.heavy,
 	},
 	completionEmoji: {
-		fontSize: 48,
-		marginBottom: Spacing.sm,
+		fontSize: 56,
+		marginBottom: Spacing.md,
 	},
 	completionText: {
 		fontSize: Typography.fontSize.h2,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#F59E0B", // Game-specific orange
 		marginBottom: Spacing.lg,
 		letterSpacing: -0.5,
 	},

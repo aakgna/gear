@@ -57,7 +57,7 @@ const getToastConfig = (type: ToastType) => {
 		default:
 			return {
 				icon: "information-circle" as const,
-				backgroundColor: Colors.background.tertiary + "F2",
+				backgroundColor: Colors.background.primary + "F5",
 				iconColor: Colors.accent,
 			};
 	}
@@ -76,6 +76,7 @@ const CustomToast: React.FC<CustomToastProps> = ({
 
 	const config = getToastConfig(type);
 	const displayIcon = icon || config.icon;
+	const textColor = type === "info" ? Colors.text.primary : Colors.text.white;
 
 	useEffect(() => {
 		if (visible) {
@@ -139,9 +140,13 @@ const CustomToast: React.FC<CustomToastProps> = ({
 				</View>
 				<View style={styles.textContainer}>
 					{type === "coming-soon" && (
-						<Text style={styles.labelText}>Coming Soon</Text>
+						<Text style={[styles.labelText, { color: textColor }]}>
+							Coming Soon
+						</Text>
 					)}
-					<Text style={styles.messageText}>{message}</Text>
+					<Text style={[styles.messageText, { color: textColor }]}>
+						{message}
+					</Text>
 				</View>
 			</View>
 			<View style={styles.progressBar}>
@@ -179,7 +184,7 @@ const styles = StyleSheet.create({
 		width: 40,
 		height: 40,
 		borderRadius: 20,
-		backgroundColor: "rgba(255, 255, 255, 0.2)",
+		backgroundColor: Colors.accent + "20",
 		alignItems: "center",
 		justifyContent: "center",
 	},
@@ -189,7 +194,6 @@ const styles = StyleSheet.create({
 	labelText: {
 		fontSize: Typography.fontSize.small,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.white,
 		textTransform: "uppercase",
 		letterSpacing: 1,
 		opacity: 0.8,
@@ -198,15 +202,14 @@ const styles = StyleSheet.create({
 	messageText: {
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.medium,
-		color: Colors.text.white,
 	},
 	progressBar: {
 		height: 3,
-		backgroundColor: "rgba(255, 255, 255, 0.2)",
+		backgroundColor: Colors.background.tertiary,
 	},
 	progressFill: {
 		height: "100%",
-		backgroundColor: Colors.text.white,
+		backgroundColor: Colors.accent,
 	},
 });
 

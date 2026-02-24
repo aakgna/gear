@@ -7,34 +7,42 @@ import { CreateGameScreen } from "../app/create-game";
 
 const MainAppContainer = () => {
 	const pathname = usePathname();
+	
+	// Check if we're on a main app route (feed, profile, or create-game index)
+	const isFeedRoute = pathname === "/feed" || pathname === "/";
+	const isProfileRoute = pathname === "/profile";
+	const isCreateGameIndexRoute = pathname === "/create-game";
+	
+	// Check if we're on a create-game sub-route (like /create-game/wordform)
+	const isCreateGameSubRoute = pathname?.startsWith("/create-game/") && pathname !== "/create-game";
 
 	return (
 		<View style={styles.container}>
-			{/* Feed Screen - always mounted */}
+			{/* Feed Screen - always mounted, visible only on feed route */}
 			<View
 				style={[
 					styles.screen,
-					pathname === "/feed" || pathname === "/" ? styles.visible : styles.hidden,
+					isFeedRoute ? styles.visible : styles.hidden,
 				]}
 			>
 				<FeedScreen />
 			</View>
 
-			{/* Profile Screen - always mounted */}
+			{/* Profile Screen - always mounted, visible only on profile route */}
 			<View
 				style={[
 					styles.screen,
-					pathname === "/profile" ? styles.visible : styles.hidden,
+					isProfileRoute ? styles.visible : styles.hidden,
 				]}
 			>
 				<ProfileScreen />
 			</View>
 
-			{/* Create Game Screen - always mounted */}
+			{/* Create Game Screen - always mounted, visible only on create-game index route */}
 			<View
 				style={[
 					styles.screen,
-					pathname === "/create-game" ? styles.visible : styles.hidden,
+					isCreateGameIndexRoute ? styles.visible : styles.hidden,
 				]}
 			>
 				<CreateGameScreen />

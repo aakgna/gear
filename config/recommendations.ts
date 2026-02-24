@@ -1,5 +1,5 @@
 import { Puzzle } from "./types";
-import { UserData, CategoryStats, DifficultyStats } from "./auth";
+import { UserData, CategoryStats } from "./auth";
 
 // Helper to shuffle array (Fisher-Yates)
 function shuffleArray<T>(array: T[]): T[] {
@@ -11,23 +11,238 @@ function shuffleArray<T>(array: T[]): T[] {
 	return shuffled;
 }
 
+// Helper to parse Firestore timestamp to Date
+function parseFirestoreTimestamp(timestamp: any): Date | null {
+	if (!timestamp) return null;
+	
+	if (timestamp.toDate) {
+		return timestamp.toDate();
+	} else if (timestamp instanceof Date) {
+		return timestamp;
+	} else {
+		try {
+			return new Date(timestamp);
+		} catch {
+			return null;
+		}
+	}
+}
+
+// Calculate time decay factor with epsilon-style decay
+// More played games decay faster than less played games
+function calculateTimeDecay(
+	lastPlayedAt: any,
+	categoryEngagementScore: number,
+	daysSinceLastPlay?: number
+): number {
+	// If no last played date, no decay
+	if (!lastPlayedAt) return 1.0;
+
+	// Parse timestamp
+	const lastPlayedDate = parseFirestoreTimestamp(lastPlayedAt);
+	if (!lastPlayedDate) return 1.0;
+
+	// Calculate days since last play
+	const now = new Date();
+	const daysSince = daysSinceLastPlay !== undefined 
+		? daysSinceLastPlay 
+		: Math.floor((now.getTime() - lastPlayedDate.getTime()) / (1000 * 60 * 60 * 24));
+
+	// No decay if less than 7 days
+	if (daysSince < 7) return 1.0;
+
+	// Calculate base decay rate (increases with days)
+	// After 7 days: 0% decay, after 30 days: ~50% decay, after 90 days: ~80% decay
+	const daysOverThreshold = daysSince - 7;
+	const baseDecayRate = Math.min(0.8, daysOverThreshold / 100); // Max 80% decay
+
+	// Epsilon-style decay: higher engagement = faster decay
+	// Engagement score is 0-1, so we use it as a multiplier
+	// High engagement (0.8-1.0) -> decay multiplier of 1.0-1.2
+	// Low engagement (0.0-0.3) -> decay multiplier of 0.3-0.5
+	const engagementMultiplier = Math.max(0.3, Math.min(1.2, 
+		0.3 + (categoryEngagementScore * 0.9)
+	));
+
+	// Final decay: more engaged categories decay faster
+	// Formula: decay = baseDecayRate * engagementMultiplier
+	const totalDecay = baseDecayRate * engagementMultiplier;
+
+	// Return decay factor (1.0 = no decay, 0.0 = complete decay)
+	return Math.max(0.2, 1.0 - totalDecay); // Minimum 20% of original score remains
+}
+
+// Calculate engagement score for a category (used for both scoring and decay)
+function calculateCategoryEngagementScore(
+	categoryData: {
+		attempted?: number;
+		skipped?: number;
+		easy?: CategoryStats;
+		medium?: CategoryStats;
+		hard?: CategoryStats;
+	}
+): number {
+	if (!categoryData) return 0;
+
+	// Aggregate stats across all difficulties
+	let totalCompleted = 0;
+	let totalAttempted = 0;
+	let totalSkipped = 0;
+
+	["easy", "medium", "hard"].forEach((diff) => {
+		const diffStats = categoryData[diff as "easy" | "medium" | "hard"];
+		if (diffStats) {
+			totalCompleted += diffStats.completed || 0;
+			totalAttempted += diffStats.attempted || 0;
+			totalSkipped += diffStats.skipped || 0;
+		}
+	});
+
+	// Calculate metrics
+	const totalInteractions = totalAttempted + totalSkipped;
+	if (totalInteractions === 0) return 0;
+
+	// Completion rate (0-1): how often they complete vs attempt
+	const completionRate = totalAttempted > 0 ? totalCompleted / totalAttempted : 0;
+
+	// Skip rate (0-1): lower is better (inverted)
+	const skipRate = totalInteractions > 0 ? totalSkipped / totalInteractions : 0;
+	const nonSkipRate = 1 - skipRate;
+
+	// Engagement score combines completion rate and non-skip rate
+	// Weight: 60% completion rate, 40% non-skip rate
+	const engagementScore = completionRate * 0.6 + nonSkipRate * 0.4;
+
+	// Bonus for having played multiple times (shows sustained interest)
+	const volumeBonus = Math.min(totalCompleted / 10, 0.2); // Max 20% bonus
+
+	return Math.min(1.0, engagementScore + volumeBonus);
+}
+
+// Calculate difficulty preference score
+function calculateDifficultyPreference(
+	categoryData: {
+		attempted?: number;
+		skipped?: number;
+		easy?: CategoryStats;
+		medium?: CategoryStats;
+		hard?: CategoryStats;
+	},
+	difficulty: number
+): number {
+	if (!categoryData) return 0.5; // Neutral if no data
+
+	const diffKey = difficulty === 1 ? "easy" : difficulty === 2 ? "medium" : "hard";
+	const diffStats = categoryData[diffKey];
+
+	if (!diffStats) return 0.3; // Lower score if never played this difficulty
+
+	const attempted = diffStats.attempted || 0;
+	const completed = diffStats.completed || 0;
+	const skipped = diffStats.skipped || 0;
+
+	if (attempted === 0) return 0.3;
+
+	// Completion rate for this specific difficulty
+	const completionRate = completed / attempted;
+	
+	// Skip rate (inverted - lower skip rate = higher preference)
+	const skipRate = (attempted + skipped) > 0 ? skipped / (attempted + skipped) : 0;
+	const nonSkipRate = 1 - skipRate;
+
+	// Weighted score
+	return completionRate * 0.7 + nonSkipRate * 0.3;
+}
+
+// Calculate game recommendation score with time decay
+function calculateGameScore(
+	game: Puzzle,
+	userData: UserData | null,
+	completedGameIds: Set<string>
+): number {
+	if (!userData?.statsByCategory) {
+		// New user: give slight preference to easy games
+		return game.difficulty === 1 ? 0.6 : 0.4;
+	}
+
+	const categoryData = userData.statsByCategory[game.type];
+	
+	// Base engagement score for this category
+	const categoryScore = calculateCategoryEngagementScore(categoryData || {});
+	
+	// Difficulty preference within this category
+	const difficultyScore = calculateDifficultyPreference(
+		categoryData || {},
+		game.difficulty
+	);
+
+	// Calculate time decay factor
+	// More engaged categories decay faster when user hasn't played
+	const timeDecayFactor = calculateTimeDecay(
+		userData.lastPlayedAt,
+		categoryScore
+	);
+
+	// Penalty if already completed (but don't exclude completely)
+	const completionPenalty = completedGameIds.has(game.id) ? 0.3 : 1.0;
+
+	// Diversity bonus: encourage trying new categories
+	const categoryPlayCount = categoryData?.attempted || 0;
+	const diversityBonus = categoryPlayCount === 0 ? 0.2 : Math.max(0, 0.2 - categoryPlayCount / 50);
+
+	// Exploration bonus: encourage trying categories they've skipped
+	const skipCount = categoryData?.skipped || 0;
+	const explorationBonus = skipCount > 0 && skipCount < 5 ? 0.1 : 0;
+
+	// Final score formula:
+	// 50% category engagement + 30% difficulty match + 10% diversity + 10% exploration
+	// Then apply time decay and completion penalty
+	const baseScore = 
+		categoryScore * 0.5 +
+		difficultyScore * 0.3 +
+		diversityBonus * 0.1 +
+		explorationBonus * 0.1;
+
+	// Apply time decay: reduces score based on inactivity and engagement level
+	const decayedScore = baseScore * timeDecayFactor;
+
+	// Apply completion penalty
+	return decayedScore * completionPenalty;
+}
+
 // Get user's favorite category based on completion stats
+// Now aggregates across all difficulties
 function getFavoriteCategory(
-	statsByCategory?: Record<string, CategoryStats>
+	statsByCategory?: Record<string, {
+		attempted?: number;
+		skipped?: number;
+		easy?: CategoryStats;
+		medium?: CategoryStats;
+		hard?: CategoryStats;
+	}>
 ): string {
 	if (!statsByCategory || Object.keys(statsByCategory).length === 0) {
 		// No history, return random category
-		const categories = ["wordle", "riddle", "trivia", "mastermind", "sequencing", "quickMath", "wordChain", "alias", "zip", "futoshiki", "magicSquare", "hidato", "sudoku"];
+		const categories = ["wordform", "riddle", "trivia", "codebreaker", "sequencing", "quickMath", "wordChain", "inference", "maze", "futoshiki", "magicSquare", "trailfinder", "sudoku"];
 		return categories[Math.floor(Math.random() * categories.length)];
 	}
 
-	// Find category with most completions
+	// Find category with most completions across all difficulties
 	let maxCompletions = 0;
 	let favoriteCategory = "quickMath"; // default
 
-	Object.entries(statsByCategory).forEach(([category, stats]) => {
-		if (stats.completed > maxCompletions) {
-			maxCompletions = stats.completed;
+	Object.entries(statsByCategory).forEach(([category, categoryData]) => {
+		// Sum completions across all difficulties for this category
+		let totalCompletions = 0;
+		["easy", "medium", "hard"].forEach((diff) => {
+			const diffStats = categoryData[diff as "easy" | "medium" | "hard"];
+			if (diffStats && typeof diffStats.completed === "number") {
+				totalCompletions += diffStats.completed;
+			}
+		});
+
+		if (totalCompletions > maxCompletions) {
+			maxCompletions = totalCompletions;
 			favoriteCategory = category;
 		}
 	});
@@ -36,178 +251,207 @@ function getFavoriteCategory(
 }
 
 // Get user's preferred difficulty based on completion stats
+// Now looks at all categories to find most played difficulty
 function getPreferredDifficulty(
-	statsByDifficulty?: Record<string, DifficultyStats>
+	statsByCategory?: Record<string, {
+		attempted?: number;
+		skipped?: number;
+		easy?: CategoryStats;
+		medium?: CategoryStats;
+		hard?: CategoryStats;
+	}>
 ): number {
-	if (!statsByDifficulty || Object.keys(statsByDifficulty).length === 0) {
+	if (!statsByCategory || Object.keys(statsByCategory).length === 0) {
 		return 1; // Default to easy (1)
 	}
+
+	// Aggregate completions by difficulty across all categories
+	const difficultyTotals: Record<string, number> = {
+		easy: 0,
+		medium: 0,
+		hard: 0,
+	};
+
+	Object.values(statsByCategory).forEach((categoryData) => {
+		["easy", "medium", "hard"].forEach((diff) => {
+			const diffStats = categoryData[diff as "easy" | "medium" | "hard"];
+			if (diffStats && typeof diffStats.completed === "number") {
+				difficultyTotals[diff] = (difficultyTotals[diff] || 0) + diffStats.completed;
+			}
+		});
+	});
 
 	// Find difficulty with most completions
 	let maxCompletions = 0;
 	let preferredDifficulty = 1; // default to easy
 
-	Object.entries(statsByDifficulty).forEach(([difficulty, stats]) => {
-		if (stats.completed > maxCompletions) {
-			maxCompletions = stats.completed;
-			// Map difficulty string to number
-			if (difficulty === "easy") preferredDifficulty = 1;
-			else if (difficulty === "medium") preferredDifficulty = 2;
-			else if (difficulty === "hard") preferredDifficulty = 3;
-		}
-	});
+	if (difficultyTotals.easy > maxCompletions) {
+		maxCompletions = difficultyTotals.easy;
+		preferredDifficulty = 1;
+	}
+	if (difficultyTotals.medium > maxCompletions) {
+		maxCompletions = difficultyTotals.medium;
+		preferredDifficulty = 2;
+	}
+	if (difficultyTotals.hard > maxCompletions) {
+		maxCompletions = difficultyTotals.hard;
+		preferredDifficulty = 3;
+	}
 
 	return preferredDifficulty;
 }
 
-// Simple, fast recommendation function
+// Enhanced recommendation function using mathematical scoring with time decay
+export function getScoredRecommendations(
+	availableGames: Puzzle[],
+	userData: UserData | null,
+	completedGameIds: Set<string> = new Set(),
+	batchSize: number = 15
+): Puzzle[] {
+	if (availableGames.length === 0) return [];
+	if (availableGames.length <= batchSize) {
+		return shuffleArray(availableGames);
+	}
+
+	// Pre-calculate days since last play for efficiency
+	let daysSinceLastPlay: number | undefined = undefined;
+	if (userData?.lastPlayedAt) {
+		const lastPlayedDate = parseFirestoreTimestamp(userData.lastPlayedAt);
+		if (lastPlayedDate) {
+			const now = new Date();
+			daysSinceLastPlay = Math.floor(
+				(now.getTime() - lastPlayedDate.getTime()) / (1000 * 60 * 60 * 24)
+			);
+		}
+	}
+
+	// Calculate score for each game
+	const scoredGames = availableGames.map((game) => ({
+		game,
+		score: calculateGameScore(game, userData, completedGameIds),
+	}));
+
+	// Sort by score (highest first)
+	scoredGames.sort((a, b) => b.score - a.score);
+
+	// Take top games, but add some randomness to avoid always same order
+	const topCount = Math.min(batchSize * 2, scoredGames.length);
+	const topGames = scoredGames.slice(0, topCount);
+
+	// Apply soft randomization: shuffle within score ranges
+	const scoreRanges: Puzzle[][] = [];
+	let currentRange: Puzzle[] = [];
+	let lastScore = -1;
+
+	topGames.forEach(({ game, score }) => {
+		// Group games with similar scores (within 0.1)
+		if (lastScore === -1 || Math.abs(score - lastScore) < 0.1) {
+			currentRange.push(game);
+		} else {
+			if (currentRange.length > 0) {
+				scoreRanges.push([...currentRange]);
+			}
+			currentRange = [game];
+		}
+		lastScore = score;
+	});
+	if (currentRange.length > 0) {
+		scoreRanges.push(currentRange);
+	}
+
+	// Shuffle within each score range, then combine
+	const shuffledRanges = scoreRanges.map((range) => shuffleArray(range));
+	const finalGames: Puzzle[] = [];
+	for (let i = 0; i < Math.max(...shuffledRanges.map(r => r.length)); i++) {
+		shuffledRanges.forEach((range) => {
+			if (range[i]) finalGames.push(range[i]);
+		});
+	}
+
+	return finalGames.slice(0, batchSize);
+}
+
+// Hybrid recommendation: combines scoring with exploration
+export function getHybridRecommendations(
+	availableGames: Puzzle[],
+	userData: UserData | null,
+	completedGameIds: Set<string> = new Set(),
+	batchSize: number = 15,
+	explorationRatio: number = 0.25 // 25% exploration, 75% personalized
+): Puzzle[] {
+	if (availableGames.length === 0) return [];
+	if (availableGames.length <= batchSize) {
+		return shuffleArray(availableGames);
+	}
+
+	// Get scored recommendations (personalized with time decay)
+	const personalized = getScoredRecommendations(
+		availableGames,
+		userData,
+		completedGameIds,
+		Math.floor(batchSize * (1 - explorationRatio))
+	);
+
+	// Get exploration games (new categories, not completed)
+	const availableForExploration = availableGames.filter(
+		(game) => !completedGameIds.has(game.id)
+	);
+	
+	// Find categories user hasn't played much
+	const categoryPlayCounts: Record<string, number> = {};
+	if (userData?.statsByCategory) {
+		Object.entries(userData.statsByCategory).forEach(([cat, data]) => {
+			categoryPlayCounts[cat] = data.attempted || 0;
+		});
+	}
+
+	// Prefer games from categories with low play count
+	const explorationGames = availableForExploration
+		.map((game) => ({
+			game,
+			playCount: categoryPlayCounts[game.type] || 0,
+		}))
+		.sort((a, b) => a.playCount - b.playCount)
+		.map((item) => item.game);
+
+	const explorationCount = batchSize - personalized.length;
+	const selectedExploration = shuffleArray(explorationGames).slice(0, explorationCount);
+
+	// Combine and shuffle
+	return shuffleArray([...personalized, ...selectedExploration]);
+}
+
+// Simple, fast recommendation function (backward compatibility)
 // 67% preferred games (user's favorite category + difficulty)
 // 33% random exploration games (other categories, easy/medium)
+// Now uses hybrid recommendations internally
 export function getSimpleRecommendations(
 	availableGames: Puzzle[],
 	userData: UserData | null,
 	batchSize: number = 15
 ): Puzzle[] {
-	console.log(
-		`[SimpleRecs] Generating ${batchSize} recommendations from ${availableGames.length} available games`
-	);
-
-	// If no games available, return empty
-	if (availableGames.length === 0) {
-		return [];
-	}
-
-	// If not enough games, return all shuffled
-	if (availableGames.length <= batchSize) {
-		console.log("[SimpleRecs] Not enough games, returning all shuffled");
-		return shuffleArray(availableGames);
-	}
-
-	// Calculate split: 67% preferred, 33% random
-	const preferredCount = Math.floor(batchSize * 0.67);
-	const randomCount = batchSize - preferredCount;
-
-	console.log(
-		`[SimpleRecs] Target: ${preferredCount} preferred, ${randomCount} random`
-	);
-
-	// Determine user preferences
-	const favoriteCategory = getFavoriteCategory(userData?.statsByCategory);
-	const preferredDifficulty = getPreferredDifficulty(
-		userData?.statsByDifficulty
-	);
-
-	console.log(
-		`[SimpleRecs] User preferences: category=${favoriteCategory}, difficulty=${preferredDifficulty}`
-	);
-
-	// === PREFERRED GAMES (67%) ===
-	// Filter games matching favorite category
-	let preferredGames = availableGames.filter(
-		(game) => game.type === favoriteCategory
-	);
-
-	// If not enough in preferred category, use all games
-	if (preferredGames.length < preferredCount) {
-		console.log(
-			`[SimpleRecs] Not enough ${favoriteCategory} games (${preferredGames.length}), using all categories`
-		);
-		preferredGames = availableGames;
-	}
-
-	// Within preferred games, create difficulty distribution:
-	// 70% at preferred difficulty, 20% medium, 10% easy
-	const difficultyBuckets = {
-		preferred: preferredGames.filter((g) => g.difficulty === preferredDifficulty),
-		medium: preferredGames.filter((g) => g.difficulty === 2),
-		easy: preferredGames.filter((g) => g.difficulty === 1),
-	};
-
-	const preferredDiffCount = Math.floor(preferredCount * 0.7);
-	const mediumCount = Math.floor(preferredCount * 0.2);
-	const easyCount = preferredCount - preferredDiffCount - mediumCount;
-
-	const selectedPreferred: Puzzle[] = [];
-
-	// Pick from preferred difficulty
-	const shuffledPreferred = shuffleArray(difficultyBuckets.preferred);
-	selectedPreferred.push(...shuffledPreferred.slice(0, preferredDiffCount));
-
-	// Pick from medium
-	const shuffledMedium = shuffleArray(difficultyBuckets.medium);
-	selectedPreferred.push(...shuffledMedium.slice(0, mediumCount));
-
-	// Pick from easy
-	const shuffledEasy = shuffleArray(difficultyBuckets.easy);
-	selectedPreferred.push(...shuffledEasy.slice(0, easyCount));
-
-	// If we don't have enough, fill remaining from all preferred games
-	if (selectedPreferred.length < preferredCount) {
-		const remaining = preferredCount - selectedPreferred.length;
-		const selectedIds = new Set(selectedPreferred.map((g) => g.id));
-		const unselected = shuffleArray(
-			preferredGames.filter((g) => !selectedIds.has(g.id))
-		);
-		selectedPreferred.push(...unselected.slice(0, remaining));
-	}
-
-	console.log(`[SimpleRecs] Selected ${selectedPreferred.length} preferred games`);
-
-	// === RANDOM EXPLORATION GAMES (33%) ===
-	// Filter games from OTHER categories (not favorite)
-	// And only easy/medium difficulty
-	let explorationGames = availableGames.filter(
-		(game) =>
-			game.type !== favoriteCategory && (game.difficulty === 1 || game.difficulty === 2)
-	);
-
-	// If not enough exploration games, just use any other category
-	if (explorationGames.length < randomCount) {
-		explorationGames = availableGames.filter(
-			(game) => game.type !== favoriteCategory
-		);
-	}
-
-	// If still not enough, use any games not already selected
-	if (explorationGames.length < randomCount) {
-		const selectedIds = new Set(selectedPreferred.map((g) => g.id));
-		explorationGames = availableGames.filter((g) => !selectedIds.has(g.id));
-	}
-
-	// Shuffle and pick random games
-	const selectedRandom = shuffleArray(explorationGames).slice(0, randomCount);
-
-	console.log(`[SimpleRecs] Selected ${selectedRandom.length} random games`);
-
-	// Combine and shuffle final batch
-	const finalBatch = shuffleArray([...selectedPreferred, ...selectedRandom]);
-
-	console.log(
-		`[SimpleRecs] Final batch: ${finalBatch.length} games (${finalBatch.filter((g) => g.type === favoriteCategory).length} ${favoriteCategory}, ${finalBatch.filter((g) => g.type !== favoriteCategory).length} others)`
-	);
-
-	return finalBatch;
+	// Use hybrid recommendations as default (33% exploration)
+	return getHybridRecommendations(availableGames, userData, new Set(), batchSize, 0.33);
 }
 
 // Interleave games by type for visual variety
 // Takes games and arranges them so types alternate: QM → W → WC → R → QM → W ...
 export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
-	console.log(`[Interleave] Processing ${games.length} games`);
 
 	// Group by type
 	const byType: Record<string, Puzzle[]> = {
 		quickMath: [],
-		wordle: [],
+		wordform: [],
 		wordChain: [],
 		riddle: [],
 		trivia: [],
-		mastermind: [],
+		codebreaker: [],
 		sequencing: [],
-		alias: [],
-		zip: [],
+		inference: [],
+		maze: [],
 		futoshiki: [],
 		magicSquare: [],
-		hidato: [],
+		trailfinder: [],
 		sudoku: [],
 	};
 
@@ -219,7 +463,7 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 
 	// Interleave: take 1 from each type in rotation
 	const interleaved: Puzzle[] = [];
-	const types = ["quickMath", "wordle", "wordChain", "riddle", "trivia", "mastermind", "sequencing", "alias", "zip", "futoshiki", "magicSquare", "hidato", "sudoku"];
+	const types = ["quickMath", "wordform", "wordChain", "riddle", "trivia", "codebreaker", "sequencing", "inference", "maze", "futoshiki", "magicSquare", "trailfinder", "sudoku"];
 	const maxLength = Math.max(...Object.values(byType).map((arr) => arr.length));
 
 	for (let i = 0; i < maxLength; i++) {
@@ -229,12 +473,6 @@ export function interleaveGamesByType(games: Puzzle[]): Puzzle[] {
 			}
 		}
 	}
-
-	console.log(
-		`[Interleave] Result: ${interleaved.length} games`,
-		`(${byType.quickMath.length} QM, ${byType.wordle.length} W,`,
-		`${byType.wordChain.length} WC, ${byType.riddle.length} R, ${byType.trivia.length} T, ${byType.alias.length} A, ${byType.zip.length} Z, ${byType.futoshiki.length} F, ${byType.magicSquare.length} MS, ${byType.hidato.length} H, ${byType.sudoku.length} S)`
-	);
 
 	return interleaved;
 }

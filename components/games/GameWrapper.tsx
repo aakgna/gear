@@ -7,30 +7,37 @@ import {
 	Platform,
 	ScrollView,
 	TouchableOpacity,
+	TouchableWithoutFeedback,
 	Animated,
 	Dimensions,
+	Share,
+	ActivityIndicator,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import {
 	Puzzle,
+	PuzzleType,
 	GameResult,
 	PuzzleStats as PuzzleStatsType,
 } from "../../config/types";
-import WordleGame from "./WordleGame";
+import WordFormGame from "./WordForm";
 import QuickMathGame from "./QuickMathGame";
 import RiddleGame from "./RiddleGame";
 import TriviaGame from "./TriviaGame";
-import MastermindGame from "./MastermindGame";
+import CodeBreakerGame from "./CodeBreaker";
 import SequencingGame from "./SequencingGame";
 import WordChainGame from "./WordChainGame";
-import AliasGame from "./AliasGame";
-import ZipGame from "./ZipGame";
+import InferenceGame from "./InferenceGame";
+import MazeGame from "./MazeGame";
 import FutoshikiGame from "./FutoshikiGame";
 import MagicSquareGame from "./MagicSquareGame";
-import HidatoGame from "./HidatoGame";
+import TrailFinderGame from "./TrailFinder";
 import SudokuGame from "./SudokuGame";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
+import CommentsModal from "../CommentsModal";
+import ShareToDMModal from "../ShareToDMModal";
 import { getCurrentUser, addCompletedGame } from "../../config/auth";
 import { savePuzzleCompletion, fetchPuzzleStats } from "../../config/firebase";
 import {
@@ -40,43 +47,28 @@ import {
 	Typography,
 	BorderRadius,
 } from "../../constants/DesignSystem";
+import {
+	prefetchGameSocialData,
+	getCachedExtendedSocialData,
+	followUser,
+	unfollowUser,
+	likeGame,
+	unlikeGame,
+} from "../../config/social";
+import { useRouter } from "expo-router";
+import { Image, Modal } from "react-native";
+import { completedGameResults } from "../../config/gameCompletion";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Confetti particle component
-interface ConfettiParticle {
-	id: number;
-	x: number;
-	y: number;
-	color: string;
-	rotation: number;
-	scale: number;
-}
+// Global tracker for dismissed intro screens (per puzzle ID)
+// This persists across tab switches and component re-renders
+const dismissedIntros = new Set<string>();
 
-const CONFETTI_COLORS = [
-	Colors.accent,
-	Colors.secondaryAccent,
-	Colors.game.correct,
-	"#FF6B6B",
-	"#4ECDC4",
-	"#45B7D1",
-	"#96CEB4",
-	"#FFEAA7",
-];
-
-const createConfettiParticles = (): ConfettiParticle[] => {
-	const particles: ConfettiParticle[] = [];
-	for (let i = 0; i < 50; i++) {
-		particles.push({
-			id: i,
-			x: Math.random() * SCREEN_WIDTH,
-			y: -20 - Math.random() * 100,
-			color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-			rotation: Math.random() * 360,
-			scale: 0.5 + Math.random() * 0.5,
-		});
-	}
-	return particles;
+export type ShareHandlers = {
+	shareExternal: () => void;
+	shareInternal: () => void;
+	openShareMenu: () => void;
 };
 
 interface GameWrapperProps {
@@ -84,9 +76,13 @@ interface GameWrapperProps {
 	onComplete: (result: GameResult) => void;
 	onAttempt?: (puzzleId: string) => void;
 	onSkipped?: () => void;
+	onStartGame?: () => void;
 	startTime?: number;
 	isActive?: boolean;
 	onElapsedTimeUpdate?: (puzzleId: string, elapsedTime: number) => void;
+	forceShowIntro?: boolean; // Force show intro regardless of dismissal state
+	onRegisterShareHandlers?: (handlers: ShareHandlers | null, puzzleId: string) => void;
+	initialCompletedResult?: GameResult | null; // Pass completion result from Feed
 }
 
 const GameWrapper: React.FC<GameWrapperProps> = ({
@@ -94,18 +90,73 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	onComplete,
 	onAttempt,
 	onSkipped,
+	onStartGame,
 	startTime,
 	isActive = true,
 	onElapsedTimeUpdate,
+	forceShowIntro = false,
+	onRegisterShareHandlers,
+	initialCompletedResult,
 }) => {
+	const router = useRouter();
+	
+	// Format game type for display
+	const formatGameType = (type: PuzzleType): string => {
+		const formatted = type
+			.replace(/([A-Z])/g, " $1")
+			.replace(/^./, (str) => str.toUpperCase())
+			.trim();
+
+		const specialCases: Record<string, string> = {
+			quickMath: "Quick Math",
+			wordChain: "Word Chain",
+			magicSquare: "Magic Square",
+			wordform: "WordForm",
+			trailfinder: "TrailFinder",
+			maze: "Maze",
+			codebreaker: "CodeBreaker",
+			inference: "Inference",
+		};
+
+		return specialCases[type] || formatted;
+	};
+	
 	const [showStats, setShowStats] = useState(false);
 	const [puzzleStats, setPuzzleStats] = useState<PuzzleStatsType | null>(null);
 	const [loadingStats, setLoadingStats] = useState(false);
+	const [showCommentsModal, setShowCommentsModal] = useState(false);
+	const [showShareModal, setShowShareModal] = useState(false);
+	// Social overlay state - merged directly into GameWrapper for instant display
+	const [isFollowingCreator, setIsFollowingCreator] = useState(false);
+	const [isLiked, setIsLiked] = useState(false);
+	const [likeCount, setLikeCount] = useState(0);
+	const [commentCount, setCommentCount] = useState(0);
+	const [loadingFollow, setLoadingFollow] = useState(false);
+	// Removed loadingLike - optimistic updates, no loading state needed
+	const [showShareMenu, setShowShareMenu] = useState(false);
+	// Pulse animation for like button (TikTok-style)
+	const likePulseAnim = useRef(new Animated.Value(1)).current;
+
+	// Check if this puzzle was completed before
+	const globalCompletedResult = completedGameResults.get(puzzle.id);
 	const [completedResult, setCompletedResult] = useState<GameResult | null>(
-		null
+		globalCompletedResult || null
 	);
-	const [showIntro, setShowIntro] = useState(true);
-	const [gameStarted, setGameStarted] = useState(false);
+	// Track if completion happened in current session (for showing social overlay)
+	const [completedInSession, setCompletedInSession] = useState(false);
+
+	// Determine initial state based on game progress
+	// If intro was dismissed (game started), start with game shown, not intro
+	// If game was completed, don't show intro
+	// Unless forceShowIntro is true (when playing from profile page)
+	const introDismissed = dismissedIntros.has(puzzle.id);
+	const gameWasCompleted = !!globalCompletedResult;
+	const [showIntro, setShowIntro] = useState(
+		forceShowIntro || (!introDismissed && !gameWasCompleted)
+	);
+	const [gameStarted, setGameStarted] = useState(
+		!forceShowIntro && (introDismissed || gameWasCompleted)
+	);
 	const [actualStartTime, setActualStartTime] = useState<number | undefined>(
 		undefined
 	);
@@ -113,38 +164,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 	const previousIsActiveRef = React.useRef<boolean>(isActive);
 	const elapsedTimeRef = React.useRef<number>(0);
 	const lastActiveTimeRef = React.useRef<number | null>(null);
+	const completionProcessedRef = React.useRef<boolean>(false);
 
 	// Animation states
-	const [showConfetti, setShowConfetti] = useState(false);
-	const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
 	const failurePulseAnim = useRef(new Animated.Value(0)).current;
-	const confettiAnims = useRef<Animated.Value[]>([]).current;
-
-	// Trigger success animation (confetti)
-	const triggerSuccessAnimation = () => {
-		const particles = createConfettiParticles();
-		setConfettiParticles(particles);
-		setShowConfetti(true);
-
-		// Create animation values for each particle
-		const anims = particles.map(() => new Animated.Value(0));
-		confettiAnims.length = 0;
-		confettiAnims.push(...anims);
-
-		// Animate all particles
-		Animated.parallel(
-			anims.map((anim, index) =>
-				Animated.timing(anim, {
-					toValue: 1,
-					duration: 2000 + Math.random() * 1000,
-					useNativeDriver: true,
-				})
-			)
-		).start(() => {
-			setShowConfetti(false);
-			setConfettiParticles([]);
-		});
-	};
 
 	// Trigger failure animation (red pulse)
 	const triggerFailureAnimation = () => {
@@ -172,21 +195,45 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		]).start();
 	};
 
-	// Reset intro state when puzzle changes
+	// Update intro state when puzzle changes
 	React.useEffect(() => {
 		if (previousPuzzleIdRef.current !== puzzle.id) {
 			previousPuzzleIdRef.current = puzzle.id;
-			setShowIntro(true);
-			setGameStarted(false);
-			setActualStartTime(undefined);
+			// Reset completion processed flag when puzzle changes
+			completionProcessedRef.current = false;
+			// Reset session completion flag when puzzle changes
+			setCompletedInSession(false);
+
+			// Check if this puzzle has a completed result stored
+			// Prefer initialCompletedResult from Feed, then check global map
+			const storedResult = initialCompletedResult || completedGameResults.get(puzzle.id);
+			if (storedResult) {
+				// Game was completed, show the game with stats available
+				setCompletedResult(storedResult);
+				setShowIntro(false);
+				setGameStarted(true);
+			} else {
+				// Check if intro has been dismissed for this puzzle (game in progress)
+				const introDismissed = dismissedIntros.has(puzzle.id);
+				setShowIntro(!introDismissed);
+				setGameStarted(introDismissed);
+				if (!introDismissed) {
+					setActualStartTime(undefined);
+					elapsedTimeRef.current = 0;
+				}
+			}
 			previousIsActiveRef.current = isActive;
-			elapsedTimeRef.current = 0;
 		}
 	}, [puzzle.id, isActive]);
 
 	// Track elapsed time changes and report when becoming inactive
 	React.useEffect(() => {
-		if (previousIsActiveRef.current && !isActive && gameStarted && actualStartTime) {
+		if (
+			previousIsActiveRef.current &&
+			!isActive &&
+			gameStarted &&
+			actualStartTime
+		) {
 			// Game just became inactive - calculate and save elapsed time
 			// Calculate elapsed time from actualStartTime (same as game components use)
 			const now = Date.now();
@@ -196,7 +243,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			if (onElapsedTimeUpdate) {
 				onElapsedTimeUpdate(puzzle.id, currentElapsed);
 			}
-		} else if (!previousIsActiveRef.current && isActive && gameStarted && actualStartTime) {
+		} else if (
+			!previousIsActiveRef.current &&
+			isActive &&
+			gameStarted &&
+			actualStartTime
+		) {
 			// Game just became active - mark the time it became active
 			lastActiveTimeRef.current = Date.now();
 		}
@@ -205,7 +257,10 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	// Handle play button click
 	const handlePlay = () => {
+		onStartGame?.();
 		const now = Date.now();
+		// Mark intro as dismissed for this puzzle globally
+		dismissedIntros.add(puzzle.id);
 		setActualStartTime(now);
 		setShowIntro(false);
 		setGameStarted(true);
@@ -230,49 +285,131 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		}
 	}, [startTime, gameStarted, actualStartTime, isActive]);
 
+	// Load social data directly in GameWrapper when game starts
+	// This eliminates component boundary - data is ready instantly when game completes
+	React.useEffect(() => {
+		if (gameStarted && puzzle.id) {
+			const user = getCurrentUser();
+			if (!user) return;
+
+			const creatorId = puzzle.uid;
+
+			// Check cache first (instant if already prefetched)
+			const cached = getCachedExtendedSocialData(
+				puzzle.id,
+				user.uid,
+				creatorId
+			);
+			if (cached) {
+				// Cache hit - set state immediately (INSTANT!)
+				setLikeCount(cached.likeCount);
+				setCommentCount(cached.commentCount);
+				setIsLiked(cached.isLiked);
+				if (cached.isFollowing !== undefined) {
+					setIsFollowingCreator(cached.isFollowing);
+				}
+			} else {
+				// Not cached - prefetch and update state when ready
+				prefetchGameSocialData(puzzle.id, creatorId, user.uid)
+					.then(() => {
+						// After prefetch completes, get from cache and set state
+						const freshCached = getCachedExtendedSocialData(
+							puzzle.id,
+							user.uid,
+							creatorId
+						);
+						if (freshCached) {
+							setLikeCount(freshCached.likeCount);
+							setCommentCount(freshCached.commentCount);
+							setIsLiked(freshCached.isLiked);
+							if (freshCached.isFollowing !== undefined) {
+								setIsFollowingCreator(freshCached.isFollowing);
+							}
+						}
+					})
+					.catch((err) => {
+						// Silent error - prefetching is optional
+						console.log("[GameWrapper] Prefetch silent error:", err);
+					});
+			}
+		} else {
+			// Reset when game changes
+			setLikeCount(0);
+			setCommentCount(0);
+			setIsLiked(false);
+			setIsFollowingCreator(false);
+		}
+	}, [gameStarted, puzzle.id, puzzle.uid]);
+
 	// Enhanced onComplete that also tracks completion and prepares stats
+	// OPTIMIZED: Social overlay appears instantly, async operations happen in parallel
 	const handleComplete = async (result: GameResult) => {
+		// Prevent duplicate processing
+		if (completionProcessedRef.current) {
+			onComplete(result);
+			return;
+		}
+
 		const user = getCurrentUser();
 
-		// Trigger appropriate animation based on result
+		// Trigger appropriate animation/haptics based on result
+		// These are non-blocking and run in parallel
 		if (result.completed && !result.answerRevealed) {
 			// User won without revealing answer - celebrate!
-			triggerSuccessAnimation();
+			// Trigger haptic feedback for success (non-blocking)
+			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 		} else if (result.answerRevealed) {
 			// User gave up or lost - subtle failure feedback
-			triggerFailureAnimation();
+			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+			triggerFailureAnimation(); // Animation runs in parallel, doesn't block
 		}
 
 		if (user && result.completed) {
+			// Mark as processed to prevent duplicate calls
+			completionProcessedRef.current = true;
+
 			// Update result with actual puzzle ID
 			const updatedResult = {
 				...result,
 				puzzleId: puzzle.id,
 			};
 
-			// Save to user's completed games
-			await addCompletedGame(
-				user.uid,
-				puzzle.id,
-				result.timeTaken,
-				result.answerRevealed
-			);
-
-			// Save puzzle completion to Firestore for stats
-			// (skipped if answerRevealed is true)
-			// For trivia, higher score is better; for others, fewer attempts is better
-			await savePuzzleCompletion(
-				puzzle.id,
-				user.uid,
-				result.timeTaken,
-				result.attempts,
-				result.mistakes,
-				result.answerRevealed,
-				puzzle.type === "trivia" // higherIsBetter for trivia
-			);
-
-			// Store result for stats display (but don't show yet)
+			// INSTANT: Set state immediately so social overlay appears right away
+			// Don't wait for async operations!
 			setCompletedResult(updatedResult);
+			setCompletedInSession(true); // This triggers social overlay to appear INSTANTLY
+
+			// Store globally so it persists across tab switches
+			completedGameResults.set(puzzle.id, updatedResult);
+
+			// Remove from dismissed intros since it's now completed
+			dismissedIntros.delete(puzzle.id);
+
+			// Run async operations in background (fire and forget)
+			// These don't block the UI - social overlay is already showing!
+			Promise.all([
+				addCompletedGame(
+					user.uid,
+					puzzle.id,
+					result.timeTaken,
+					result.answerRevealed
+				).catch((err) =>
+					console.error("[GameWrapper] Error adding completed game:", err)
+				),
+				savePuzzleCompletion(
+					puzzle.id,
+					user.uid,
+					result.timeTaken,
+					result.attempts,
+					result.mistakes,
+					result.answerRevealed,
+					puzzle.type === "trivia" // higherIsBetter for trivia
+				).catch((err) =>
+					console.error("[GameWrapper] Error saving puzzle completion:", err)
+				),
+			]).catch((err) =>
+				console.error("[GameWrapper] Error in background operations:", err)
+			);
 		}
 
 		// Still call the original onComplete callback
@@ -289,14 +426,189 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 		setPuzzleStats(stats);
 		setLoadingStats(false);
 	};
+
+	// Format time helper
+	const formatTime = (seconds: number): string => {
+		if (seconds < 60) {
+			return `${seconds}s`;
+		}
+		const minutes = Math.floor(seconds / 60);
+		const remainingSeconds = seconds % 60;
+		return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+	};
+
+	// Social overlay handlers - merged directly into GameWrapper
+	const handleFollowPress = async () => {
+		const user = getCurrentUser();
+		const creatorId = puzzle.uid;
+		if (!user || !creatorId || user.uid === creatorId) return;
+
+		setLoadingFollow(true);
+		try {
+			if (isFollowingCreator) {
+				await unfollowUser(user.uid, creatorId);
+				setIsFollowingCreator(false);
+			} else {
+				await followUser(user.uid, creatorId);
+				setIsFollowingCreator(true);
+			}
+		} catch (error) {
+			console.error("[GameWrapper] Error following/unfollowing:", error);
+		} finally {
+			setLoadingFollow(false);
+		}
+	};
+
+	const handleCreatorPress = () => {
+		if (puzzle.username) {
+			router.push(`/user/${puzzle.username}`);
+		} else if (puzzle.uid) {
+			router.push(`/user/${puzzle.uid}`);
+		}
+	};
+
+	const handleLikePress = () => {
+		const user = getCurrentUser();
+		if (!user) return;
+
+		// Optimistic update - update UI immediately, process in background
+		const wasLiked = isLiked;
+		const newLikedState = !wasLiked;
+		const currentLikeCount = likeCount;
+		const newLikeCount = wasLiked
+			? Math.max(0, currentLikeCount - 1)
+			: currentLikeCount + 1;
+
+		// TikTok-style haptic feedback and pulse animation (only on like, not unlike)
+		if (!wasLiked) {
+			// Haptic feedback for like - medium impact for satisfying feel
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+			// TikTok-style pulse animation - quick bounce, heart doesn't stay big for more than 0.5s
+			Animated.sequence([
+				Animated.timing(likePulseAnim, {
+					toValue: 1.4,
+					duration: 150, // Quick scale up in 150ms
+					useNativeDriver: true,
+				}),
+				Animated.timing(likePulseAnim, {
+					toValue: 1,
+					duration: 300, // Scale back down in 300ms (total < 500ms)
+					useNativeDriver: true,
+				}),
+			]).start();
+		}
+
+		// Update UI instantly (no loading state)
+		setIsLiked(newLikedState);
+		setLikeCount(newLikeCount);
+
+		// Process in background (fire and forget)
+		// Works even if user switches games - operation continues
+		if (wasLiked) {
+			unlikeGame(puzzle.id, user.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[GameWrapper] Error unliking:", error);
+				setIsLiked(true);
+				setLikeCount(currentLikeCount);
+			});
+		} else {
+			likeGame(puzzle.id, user.uid).catch((error) => {
+				// On error, revert optimistic update
+				console.error("[GameWrapper] Error liking:", error);
+				setIsLiked(false);
+				setLikeCount(currentLikeCount);
+			});
+		}
+	};
+
+	// Handle share before play (from intro screen - top left share icon)
+	const handleShareBeforePlay = async () => {
+		try {
+			const message = `Try this ${formatGameType(puzzle.type)} puzzle on Kracked!`;
+			const shareOptions: any = {
+				message,
+				url: "https://apps.apple.com/us/app/kracked/id6755156044/",
+			};
+			if (Platform.OS === "android") {
+				shareOptions.title = "Share Game";
+			}
+			await Share.share(shareOptions);
+		} catch (error: any) {
+			if (error?.message !== "User did not share") {
+				console.error("Error sharing:", error);
+			}
+		}
+	};
+
+	// Register share handlers with feed so fixed share pill can trigger intro share
+	useEffect(() => {
+		if (!onRegisterShareHandlers) return;
+		if (showIntro && isActive) {
+			onRegisterShareHandlers(
+				{
+					shareExternal: handleShareBeforePlay,
+					shareInternal: () => setShowShareModal(true),
+					openShareMenu: () => setShowShareMenu(true),
+				},
+				puzzle.id
+			);
+		} else {
+			onRegisterShareHandlers(null, puzzle.id);
+		}
+		return () => {
+			onRegisterShareHandlers(null, puzzle.id);
+		};
+	}, [showIntro, isActive, puzzle.id, onRegisterShareHandlers]);
+
+	// Handle share
+	const handleShare = async () => {
+		if (!completedResult) {
+			return;
+		}
+
+		try {
+			let message = `I just completed ${formatGameType(
+				puzzle.type
+			)} on Kracked!\n\n`;
+			message += `Time: ${formatTime(completedResult.timeTaken)}\n`;
+
+			if (completedResult.attempts !== undefined) {
+				message += `Tries: ${completedResult.attempts}\n`;
+			}
+
+			message += `\nCan you beat my score?\n\n`;
+
+			// Share with message and URL - URL is separate from message text
+			// On iOS, Share.share with message and url will allow sharing to iMessage, Instagram, etc.
+			// On Android, message and url are used for sharing
+			const shareOptions: any = {
+				message,
+				url: "https://apps.apple.com/us/app/kracked/id6755156044/",
+			};
+
+			// Add title for Android
+			if (Platform.OS === "android") {
+				shareOptions.title = "Share Game Result";
+			}
+
+			// Use Share API to open native share sheet
+			// The share sheet should appear immediately when Share.share is called
+			await Share.share(shareOptions);
+		} catch (error: any) {
+			// User cancelled sharing - this is expected, don't log as error
+			// Silently handle errors
+		}
+	};
 	const renderGame = () => {
-		// Use actualStartTime if game has started, otherwise don't pass startTime
-		const gameStartTime = gameStarted ? actualStartTime : undefined;
-		
+		// Use actualStartTime if game has started and not completed, otherwise don't pass startTime
+		// This prevents timers from running on completed games
+		const gameStartTime = (gameStarted && !completedResult) ? actualStartTime : undefined;
+
 		switch (puzzle.type) {
-			case "wordle":
+			case "wordform":
 				return (
-					<WordleGame
+					<WordFormGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -305,6 +617,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "quickMath":
@@ -318,6 +631,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "riddle":
@@ -331,48 +645,52 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
-		case "trivia":
-			return (
-				<TriviaGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "mastermind":
-			return (
-				<MastermindGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "sequencing":
-			return (
-				<SequencingGame
-					key={puzzle.id}
-					inputData={puzzle.data as any}
-					onComplete={handleComplete}
-					onAttempt={onAttempt}
-					startTime={gameStartTime}
-					puzzleId={puzzle.id}
-					onShowStats={handleShowStats}
-					isActive={isActive && gameStarted}
-				/>
-			);
-		case "wordChain":
+			case "trivia":
+				return (
+					<TriviaGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+			case "codebreaker":
+				return (
+					<CodeBreakerGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+			case "sequencing":
+				return (
+					<SequencingGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+			case "wordChain":
 				return (
 					<WordChainGame
 						key={puzzle.id}
@@ -383,11 +701,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
-			case "alias":
+			case "inference":
 				return (
-					<AliasGame
+					<InferenceGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -396,11 +715,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
-			case "zip":
+			case "maze":
 				return (
-					<ZipGame
+					<MazeGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -409,6 +729,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "futoshiki":
@@ -422,6 +743,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "magicSquare":
@@ -435,11 +757,12 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
-			case "hidato":
+			case "trailfinder":
 				return (
-					<HidatoGame
+					<TrailFinderGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}
@@ -448,6 +771,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			case "sudoku":
@@ -461,6 +785,7 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						puzzleId={puzzle.id}
 						onShowStats={handleShowStats}
 						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
 					/>
 				);
 			default:
@@ -480,109 +805,390 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 
 	return (
 		<Animated.View
-			style={[
-				styles.container,
-				{ backgroundColor: failurePulseColor },
-			]}
+			style={[styles.container, { backgroundColor: failurePulseColor }]}
 		>
-				{/* Confetti Overlay */}
-				{showConfetti && (
-					<View style={styles.confettiContainer} pointerEvents="none">
-						{confettiParticles.map((particle, index) => {
-							const anim = confettiAnims[index];
-							if (!anim) return null;
+			{/* Game Intro Screen or Game Container */}
+			{showIntro ? (
+				<View style={styles.gameContainer}>
+					<GameIntroScreen
+						gameType={puzzle.type}
+						difficulty={puzzle.difficulty}
+						username={puzzle.username}
+						onPlay={handlePlay}
+					/>
+				</View>
+			) : (
+				gameStarted && (
+					<View
+						style={styles.gameContainer}
+					>
+						{renderGame()}
+						{/* Social Overlay - rendered directly in GameWrapper for instant display */}
+						{gameStarted &&
+							completedResult &&
+							getCurrentUser() && (
+								<View style={socialOverlayStyles.container}>
+									{/* Creator Profile Button */}
+									{puzzle.uid && (
+										<View style={socialOverlayStyles.creatorButton}>
+											<View style={socialOverlayStyles.avatarContainer}>
+												<TouchableOpacity
+													onPress={handleCreatorPress}
+													activeOpacity={0.7}
+													style={socialOverlayStyles.avatarTouchable}
+												>
+													{puzzle.profilePicture ? (
+														<Image
+															source={{ uri: puzzle.profilePicture }}
+															style={socialOverlayStyles.avatar}
+														/>
+													) : (
+														<View style={socialOverlayStyles.avatarPlaceholder}>
+															<Ionicons
+																name="person"
+																size={28}
+																color={Colors.text.secondary}
+															/>
+														</View>
+													)}
+												</TouchableOpacity>
+												{getCurrentUser()?.uid !== puzzle.uid && (
+													<TouchableOpacity
+														style={socialOverlayStyles.followBadge}
+														onPress={handleFollowPress}
+														activeOpacity={0.7}
+														disabled={loadingFollow}
+													>
+														{loadingFollow ? (
+															<ActivityIndicator
+																size="small"
+																color={Colors.text.white}
+															/>
+														) : (
+															<Ionicons
+																name={
+																	isFollowingCreator ? "checkmark" : "add"
+																}
+																size={14}
+																color={Colors.text.white}
+															/>
+														)}
+													</TouchableOpacity>
+												)}
+											</View>
+										</View>
+									)}
 
-							const translateY = anim.interpolate({
-								inputRange: [0, 1],
-								outputRange: [particle.y, SCREEN_HEIGHT + 50],
-							});
+									{/* Like Button - Optimistic updates with TikTok-style pulse */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={handleLikePress}
+										activeOpacity={0.7}
+									>
+										<Animated.View
+											style={{
+												transform: [{ scale: likePulseAnim }],
+											}}
+										>
+											<Ionicons
+												name={isLiked ? "heart" : "heart-outline"}
+												size={28}
+												color={isLiked ? Colors.accent : Colors.text.primary}
+											/>
+										</Animated.View>
+										<Text style={socialOverlayStyles.actionCount}>
+											{likeCount}
+										</Text>
+									</TouchableOpacity>
 
-							const rotate = anim.interpolate({
-								inputRange: [0, 1],
-								outputRange: [`${particle.rotation}deg`, `${particle.rotation + 720}deg`],
-							});
+									{/* Comment Button */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={() => setShowCommentsModal(true)}
+										activeOpacity={0.7}
+									>
+										<Ionicons
+											name="chatbubble-outline"
+											size={28}
+											color={Colors.text.primary}
+										/>
+										<Text style={socialOverlayStyles.actionCount}>
+											{commentCount}
+										</Text>
+									</TouchableOpacity>
 
-							const opacity = anim.interpolate({
-								inputRange: [0, 0.8, 1],
-								outputRange: [1, 1, 0],
-							});
+									{/* Share Button */}
+									<TouchableOpacity
+										style={socialOverlayStyles.actionButton}
+										onPress={() => setShowShareMenu(true)}
+										activeOpacity={0.7}
+									>
+										<Ionicons
+											name="share-social-outline"
+											size={28}
+											color={Colors.text.primary}
+										/>
+									</TouchableOpacity>
 
-							return (
-								<Animated.View
-									key={particle.id}
-									style={[
-										styles.confettiParticle,
-										{
-											left: particle.x,
-											backgroundColor: particle.color,
-											transform: [
-												{ translateY },
-												{ rotate },
-												{ scale: particle.scale },
-											],
-											opacity,
-										},
-									]}
-								/>
-							);
-						})}
+									{/* Share Menu Modal */}
+									<Modal
+										visible={showShareMenu}
+										transparent={true}
+										animationType="fade"
+										onRequestClose={() => setShowShareMenu(false)}
+									>
+										<TouchableOpacity
+											style={socialOverlayStyles.shareMenuOverlay}
+											activeOpacity={1}
+											onPress={() => setShowShareMenu(false)}
+										>
+											<View style={socialOverlayStyles.shareMenuContainer}>
+												<TouchableOpacity
+													style={socialOverlayStyles.shareMenuItem}
+													onPress={() => {
+														setShowShareMenu(false);
+														setShowShareModal(true);
+													}}
+													activeOpacity={0.7}
+												>
+													<Ionicons
+														name="chatbubbles-outline"
+														size={24}
+														color={Colors.text.primary}
+													/>
+													<Text style={socialOverlayStyles.shareMenuText}>
+														Send to Friend
+													</Text>
+												</TouchableOpacity>
+												{completedResult && (
+													<TouchableOpacity
+														style={socialOverlayStyles.shareMenuItem}
+														onPress={async () => {
+															setShowShareMenu(false);
+															setTimeout(async () => {
+																try {
+																	await handleShare();
+																} catch (error) {
+																	console.error(
+																		"[GameWrapper] Error calling handleShare:",
+																		error
+																	);
+																}
+															}, 300);
+														}}
+														activeOpacity={0.7}
+													>
+														<Ionicons
+															name="share-outline"
+															size={24}
+															color={Colors.text.primary}
+														/>
+														<Text style={socialOverlayStyles.shareMenuText}>
+															Share Externally
+														</Text>
+													</TouchableOpacity>
+												)}
+											</View>
+										</TouchableOpacity>
+									</Modal>
+								</View>
+							)}
 					</View>
-				)}
+				)
+			)}
 
-				{/* Game Intro Screen or Game Container */}
-				{showIntro ? (
-					<View style={styles.gameContainer}>
-						<GameIntroScreen
-							gameType={puzzle.type}
-							difficulty={puzzle.difficulty}
-							username={puzzle.username}
-							onPlay={handlePlay}
-						/>
-					</View>
-				) : (
-					gameStarted && (
-						<View
-							style={[
-								styles.gameContainer,
-								showStats && styles.gameContainerWithStats,
-							]}
-						>
-							{renderGame()}
-						</View>
-					)
-				)}
-
-				{/* Stats Container - always visible when shown, fixed at bottom */}
-				{showStats && completedResult && (
-					<View style={styles.statsContainer}>
-						<View style={styles.statsHeader}>
-							<Text style={styles.statsHeaderText}>Comparison Stats</Text>
+			{/* Share menu when on intro (opened from feed pill) - same flow as sidebar so Share.share works */}
+			{showIntro && (
+				<Modal
+					visible={showShareMenu}
+					transparent={true}
+					animationType="fade"
+					onRequestClose={() => setShowShareMenu(false)}
+				>
+					<TouchableOpacity
+						style={socialOverlayStyles.shareMenuOverlay}
+						activeOpacity={1}
+						onPress={() => setShowShareMenu(false)}
+					>
+						<View style={socialOverlayStyles.shareMenuContainer}>
 							<TouchableOpacity
-								onPress={() => setShowStats(false)}
-								style={styles.closeButton}
+								style={socialOverlayStyles.shareMenuItem}
+								onPress={() => {
+									setShowShareMenu(false);
+									setShowShareModal(true);
+								}}
+								activeOpacity={0.7}
 							>
-								<Ionicons name="close" size={24} color={Colors.text.primary} />
+								<Ionicons name="chatbubbles-outline" size={24} color={Colors.text.primary} />
+								<Text style={socialOverlayStyles.shareMenuText}>Send to Friend</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={socialOverlayStyles.shareMenuItem}
+								onPress={() => {
+									setShowShareMenu(false);
+									handleShareBeforePlay();
+								}}
+								activeOpacity={0.7}
+							>
+								<Ionicons name="share-outline" size={24} color={Colors.text.primary} />
+								<Text style={socialOverlayStyles.shareMenuText}>Share Externally</Text>
 							</TouchableOpacity>
 						</View>
-						<ScrollView
-							style={styles.statsScrollView}
-							contentContainerStyle={styles.statsContent}
-							showsVerticalScrollIndicator={true}
-						>
-							<PuzzleStats
-								stats={puzzleStats}
-								puzzleType={puzzle.type}
-								loading={loadingStats}
-								userTime={completedResult.timeTaken}
-								userAttempts={completedResult.attempts}
-								userMistakes={completedResult.mistakes}
-							/>
-						</ScrollView>
+					</TouchableOpacity>
+				</Modal>
+			)}
+
+			{/* Stats Modal */}
+			<Modal
+				visible={showStats && !!completedResult}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => setShowStats(false)}
+			>
+				<TouchableWithoutFeedback onPress={() => setShowStats(false)}>
+					<View style={styles.modalOverlay}>
+						<TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+							<View style={styles.statsModal}>
+								<View style={styles.statsHeader}>
+									<Text style={styles.statsHeaderText}>Comparison Stats</Text>
+									<TouchableOpacity
+										onPress={() => setShowStats(false)}
+										style={styles.closeButton}
+									>
+										<Ionicons name="close" size={24} color={Colors.text.primary} />
+									</TouchableOpacity>
+								</View>
+								<ScrollView
+									style={styles.statsScrollView}
+									contentContainerStyle={styles.statsContent}
+									showsVerticalScrollIndicator={true}
+								>
+									<PuzzleStats
+										stats={puzzleStats}
+										puzzleType={puzzle.type}
+										loading={loadingStats}
+										userTime={completedResult?.timeTaken ?? 0}
+										userAttempts={completedResult?.attempts}
+										userMistakes={completedResult?.mistakes}
+									/>
+								</ScrollView>
+							</View>
+						</TouchableWithoutFeedback>
 					</View>
-				)}
+				</TouchableWithoutFeedback>
+			</Modal>
+
+			{/* Comments Modal */}
+			<CommentsModal
+				visible={showCommentsModal}
+				gameId={puzzle.id}
+				onClose={() => setShowCommentsModal(false)}
+				onCommentAdded={() => {
+					// Optimistically increment comment count
+					setCommentCount((prev) => prev + 1);
+				}}
+			/>
+
+			{/* Share to DM Modal */}
+			<ShareToDMModal
+				visible={showShareModal}
+				gameId={puzzle.id}
+				onClose={() => setShowShareModal(false)}
+			/>
 		</Animated.View>
 	);
 };
+
+// Social overlay styles - merged directly into GameWrapper for instant rendering
+const socialOverlayStyles = StyleSheet.create({
+	container: {
+		position: "absolute",
+		right: Spacing.md,
+		bottom: 120,
+		alignItems: "center",
+		gap: Spacing.lg,
+		zIndex: 10,
+	},
+	creatorButton: {
+		alignItems: "center",
+		marginBottom: Spacing.md,
+	},
+	avatarContainer: {
+		position: "relative",
+		width: 56,
+		height: 56,
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	avatarTouchable: {
+		width: 52,
+		height: 52,
+	},
+	avatar: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		borderWidth: 2,
+		borderColor: Colors.background.primary,
+	},
+	avatarPlaceholder: {
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: Colors.background.tertiary,
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 2,
+		borderColor: Colors.background.primary,
+	},
+	followBadge: {
+		position: "absolute",
+		bottom: -2,
+		right: -2,
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: Colors.accent,
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 2.5,
+		borderColor: Colors.background.primary,
+	},
+	actionButton: {
+		alignItems: "center",
+		gap: Spacing.xs,
+	},
+	actionCount: {
+		fontSize: Typography.fontSize.small,
+		fontWeight: Typography.fontWeight.medium,
+		color: Colors.text.primary,
+	},
+	shareMenuOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	shareMenuContainer: {
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.sm,
+		minWidth: 200,
+		...Shadows.heavy,
+	},
+	shareMenuItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.md,
+		borderRadius: BorderRadius.md,
+	},
+	shareMenuText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+});
 
 const styles = StyleSheet.create({
 	container: {
@@ -591,26 +1197,43 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.background.secondary,
 		flexDirection: "column",
 		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	gameContainer: {
 		flex: 1,
 		overflow: "hidden",
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	gameContainerWithStats: {
 		flex: 0.55, // Takes 55% when stats are shown
 	},
-	statsContainer: {
-		flex: 0.45, // Takes 45% when shown
-		backgroundColor: Colors.background.secondary,
-		borderTopWidth: 2,
-		borderTopColor: Colors.accent,
-		...Shadows.heavy,
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.4)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	statsModal: {
+		width: "85%",
+		maxHeight: "75%",
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		...Shadows.medium,
 	},
 	statsHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
 		alignItems: "center",
 		padding: Spacing.lg,
+		paddingBottom: Spacing.md,
 		borderBottomWidth: 1,
 		borderBottomColor: "rgba(255, 255, 255, 0.1)",
 	},
@@ -623,10 +1246,11 @@ const styles = StyleSheet.create({
 		padding: Spacing.xs,
 	},
 	statsScrollView: {
-		flex: 1,
+		maxHeight: 400,
 	},
 	statsContent: {
-		paddingBottom: Spacing.xl,
+		padding: Spacing.lg,
+		paddingTop: Spacing.md,
 	},
 	error: {
 		flex: 1,
@@ -634,21 +1258,13 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		backgroundColor: Colors.background.secondary,
 	},
-	confettiContainer: {
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		zIndex: 1000,
-		pointerEvents: "none",
-	},
-	confettiParticle: {
-		position: "absolute",
-		width: 10,
-		height: 10,
-		borderRadius: 2,
-	},
 });
 
-export default GameWrapper;
+export default React.memo(GameWrapper, (prevProps, nextProps) => {
+	// Only re-render if puzzle ID changes or active state changes
+	return (
+		prevProps.puzzle.id === nextProps.puzzle.id &&
+		prevProps.isActive === nextProps.isActive &&
+		prevProps.startTime === nextProps.startTime
+	);
+});

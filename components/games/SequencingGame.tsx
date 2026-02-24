@@ -16,6 +16,7 @@ import {
 	BorderRadius,
 	Shadows,
 	ComponentStyles,
+	getGameColor,
 } from "../../constants/DesignSystem";
 import GameHeader from "../GameHeader";
 
@@ -27,6 +28,7 @@ interface SequencingGameProps {
 	puzzleId?: string;
 	onShowStats?: () => void;
 	isActive?: boolean;
+	initialCompletedResult?: GameResult | null;
 }
 
 const SequencingGame: React.FC<SequencingGameProps> = ({
@@ -37,9 +39,11 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	puzzleId,
 	onShowStats,
 	isActive = true,
+	initialCompletedResult,
 }) => {
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
+	const gameColor = getGameColor("sequencing"); // Get game-specific violet color (#8B5CF6)
 	// currentPlacement: index is slot position, value is entity index or null
 	const [currentPlacement, setCurrentPlacement] = useState<(number | null)[]>(
 		new Array(inputData.numSlots).fill(null)
@@ -68,10 +72,12 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		if (currentPlacement.some((idx) => idx === null)) {
 			return false;
 		}
-		
+
 		// Compare current placement to solution
 		// Solution is array of entity indices in correct order (0-based)
-		return JSON.stringify(currentPlacement) === JSON.stringify(inputData.solution);
+		return (
+			JSON.stringify(currentPlacement) === JSON.stringify(inputData.solution)
+		);
 	};
 
 	// Setup timer and puzzleId tracking
@@ -85,18 +91,36 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 		// Reset if puzzle changed
 		if (puzzleId && puzzleIdRef.current !== puzzleId) {
 			puzzleIdRef.current = puzzleId;
-			setElapsedTime(0);
-			setCompleted(false);
-			setCurrentPlacement(new Array(inputData.numSlots).fill(null));
-			setSelectedEntity(null);
-			setIsCorrect(false);
-			setPlacementCount(0);
-			hasAttemptedRef.current = false;
-			// Only set startTime if propStartTime is provided
-			if (propStartTime) {
-				setStartTime(propStartTime);
-			} else {
+			
+			// Restore from initialCompletedResult if provided
+			if (initialCompletedResult && initialCompletedResult.completed && !initialCompletedResult.answerRevealed) {
+				setCompleted(true);
+				setIsCorrect(true);
+				setElapsedTime(initialCompletedResult.timeTaken);
+				// Restore placement from solution
+				setCurrentPlacement([...inputData.solution]);
+				setSelectedEntity(null);
+				setPlacementCount(inputData.numSlots);
+				hasAttemptedRef.current = true;
+				if (timerIntervalRef.current) {
+					clearInterval(timerIntervalRef.current);
+					timerIntervalRef.current = null;
+				}
 				setStartTime(undefined);
+			} else {
+				setElapsedTime(0);
+				setCompleted(false);
+				setCurrentPlacement(new Array(inputData.numSlots).fill(null));
+				setSelectedEntity(null);
+				setIsCorrect(false);
+				setPlacementCount(0);
+				hasAttemptedRef.current = false;
+				// Only set startTime if propStartTime is provided
+				if (propStartTime) {
+					setStartTime(propStartTime);
+				} else {
+					setStartTime(undefined);
+				}
 			}
 		} else if (propStartTime && startTime !== propStartTime) {
 			setStartTime(propStartTime);
@@ -120,13 +144,13 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				timerIntervalRef.current = null;
 			}
 		};
-	}, [puzzleId, propStartTime, inputData.numSlots]);
+	}, [puzzleId, propStartTime, inputData.numSlots, initialCompletedResult, inputData.solution]);
 
 	// Validate on placement change
 	useEffect(() => {
 		const correct = validatePlacement();
 		setIsCorrect(correct);
-		
+
 		// Check completion
 		if (!completed && correct) {
 			handleGameComplete();
@@ -185,7 +209,9 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 			clearInterval(timerIntervalRef.current);
 		}
 
-		const finalTime = Math.floor((Date.now() - startTime) / 1000);
+		const finalTime = startTime
+			? Math.floor((Date.now() - startTime) / 1000)
+			: 0;
 
 		onComplete({
 			puzzleId: puzzleIdRef.current || "",
@@ -218,7 +244,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 	const bottomPadding = BOTTOM_NAV_HEIGHT + insets.bottom + Spacing.lg;
 
 	return (
-		<ScrollView 
+		<ScrollView
 			style={styles.container}
 			contentContainerStyle={[
 				styles.scrollContent,
@@ -231,7 +257,9 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				title="Sequencing"
 				elapsedTime={elapsedTime}
 				showDifficulty={false}
+				gameType="sequencing"
 				subtitle={`Placements: ${placementCount}`}
+				puzzleId={puzzleId}
 			/>
 
 			{/* Rules Display */}
@@ -240,9 +268,7 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				<ScrollView style={styles.rulesScroll}>
 					{inputData.rules.map((rule, idx) => (
 						<View key={idx} style={styles.ruleItem}>
-							<Text style={styles.ruleText}>
-								• {rule.description}
-							</Text>
+							<Text style={styles.ruleText}>• {rule.description}</Text>
 						</View>
 					))}
 				</ScrollView>
@@ -250,36 +276,52 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 
 			{/* Slots */}
 			<View style={styles.slotsContainer}>
-				<Text style={styles.sectionLabel}>Slots:</Text>
-				<View style={styles.slotsGrid}>
+				<Text style={styles.sectionLabel}>Slots (flow: left → right):</Text>
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={true}
+					contentContainerStyle={styles.slotsScrollContent}
+				>
 					{currentPlacement.map((entityIdx, slotIdx) => {
-						// Check if this slot has the correct entity
-						const slotIsCorrect = allSlotsFilled && entityIdx === inputData.solution[slotIdx];
-						const slotIsIncorrect = allSlotsFilled && !slotIsCorrect && entityIdx !== null;
-						
+						const slotIsCorrect =
+							allSlotsFilled && entityIdx === inputData.solution[slotIdx];
+						const slotIsIncorrect =
+							allSlotsFilled && !slotIsCorrect && entityIdx !== null;
+						const isLastSlot = slotIdx === currentPlacement.length - 1;
+
 						return (
-						<TouchableOpacity
-							key={slotIdx}
-							style={[
-								styles.slot,
-								entityIdx !== null && styles.slotFilled,
-								slotIsCorrect && styles.slotValid,
-								slotIsIncorrect && styles.slotInvalid,
-							]}
-							onPress={() => handleSlotTap(slotIdx)}
-						>
-							<Text style={styles.slotLabel}>{getSlotLabel(slotIdx)}</Text>
-							{entityIdx !== null ? (
-								<Text style={styles.slotEntity}>
-									{inputData.entities[entityIdx]}
-								</Text>
-							) : (
-								<Text style={styles.slotEmpty}>Empty</Text>
-							)}
-						</TouchableOpacity>
+							<React.Fragment key={slotIdx}>
+								<TouchableOpacity
+									style={[
+										styles.slot,
+										entityIdx !== null && styles.slotFilled,
+										slotIsCorrect && styles.slotValid,
+										slotIsIncorrect && styles.slotInvalid,
+									]}
+									onPress={() => handleSlotTap(slotIdx)}
+								>
+									<Text style={styles.slotLabel}>{getSlotLabel(slotIdx)}</Text>
+									{entityIdx !== null ? (
+										<Text style={styles.slotEntity}>
+											{inputData.entities[entityIdx]}
+										</Text>
+									) : (
+										<Text style={styles.slotEmpty}>Empty</Text>
+									)}
+								</TouchableOpacity>
+								{!isLastSlot && (
+									<View style={styles.arrowContainer}>
+										<Ionicons
+											name="arrow-forward"
+											size={24}
+											color={Colors.text.secondary}
+										/>
+									</View>
+								)}
+							</React.Fragment>
 						);
 					})}
-				</View>
+				</ScrollView>
 			</View>
 
 			{/* Entity Pool */}
@@ -314,17 +356,11 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 				</View>
 			)}
 
-			{/* Completion Message */}
+			{/* View Stats Button */}
 			{completed && (
-				<View style={styles.completionContainer}>
-					<Text style={styles.completionText}>🎉 Puzzle Complete!</Text>
-					<TouchableOpacity
-						style={styles.statsButton}
-						onPress={onShowStats}
-					>
-						<Text style={styles.statsButtonText}>View Stats</Text>
-					</TouchableOpacity>
-				</View>
+				<TouchableOpacity style={styles.viewStatsButton} onPress={onShowStats}>
+					<Text style={styles.viewStatsButtonText}>View Stats</Text>
+				</TouchableOpacity>
 			)}
 		</ScrollView>
 	);
@@ -333,7 +369,12 @@ const SequencingGame: React.FC<SequencingGameProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background,
+		backgroundColor: Colors.background.secondary,
+		elevation: 0,
+		shadowOpacity: 0,
+		shadowRadius: 0,
+		shadowOffset: { width: 0, height: 0 },
+		shadowColor: "transparent",
 	},
 	scrollContent: {
 		padding: Spacing.md,
@@ -364,30 +405,31 @@ const styles = StyleSheet.create({
 		fontWeight: Typography.fontWeight.medium,
 	},
 	timerBadge: {
-		backgroundColor: Colors.accent + "20",
+		backgroundColor: "#8B5CF615", // Game-specific violet with opacity
 		paddingHorizontal: Spacing.md,
 		paddingVertical: Spacing.sm,
 		borderRadius: BorderRadius.md,
-		borderWidth: 1,
-		borderColor: Colors.accent + "40",
+		borderWidth: 1.5,
+		borderColor: "#8B5CF640",
+		...Shadows.light,
 	},
 	timer: {
 		fontSize: Typography.fontSize.h3,
 		fontWeight: Typography.fontWeight.bold,
-		color: Colors.accent,
+		color: "#8B5CF6", // Game-specific violet
 		fontFamily: Typography.fontFamily.monospace,
 	},
 	rulesContainer: {
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		padding: Spacing.sm,
 		marginBottom: Spacing.md,
-		...Shadows.small,
+		...Shadows.light,
 		maxHeight: 150,
 	},
 	rulesTitle: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		marginBottom: Spacing.xs,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
@@ -405,12 +447,12 @@ const styles = StyleSheet.create({
 	},
 	ruleText: {
 		...Typography.body,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.caption,
 		fontWeight: Typography.fontWeight.medium,
 	},
 	ruleTextViolated: {
-		color: "#FF4444",
+		color: Colors.error,
 		fontWeight: Typography.fontWeight.bold,
 		fontSize: Typography.fontSize.body,
 	},
@@ -419,15 +461,21 @@ const styles = StyleSheet.create({
 	},
 	sectionLabel: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		marginBottom: Spacing.xs,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
 	},
-	slotsGrid: {
+	slotsScrollContent: {
 		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: Spacing.sm,
+		alignItems: "center",
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.xs,
+	},
+	arrowContainer: {
+		paddingHorizontal: Spacing.xs,
+		justifyContent: "center",
+		alignItems: "center",
 	},
 	slotsCalendar: {
 		// Calendar-style layout (could be enhanced)
@@ -436,49 +484,50 @@ const styles = StyleSheet.create({
 		// Podium-style layout (could be enhanced)
 	},
 	slot: {
-		minWidth: 120,
+		minWidth: 80,
+		width: 80,
 		minHeight: 80,
-		padding: Spacing.md,
-		backgroundColor: Colors.surface,
+		padding: Spacing.sm,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 3,
-		borderColor: "#666666",
+		borderColor: "#E5E5E5",
 		alignItems: "center",
 		justifyContent: "center",
 		...Shadows.medium,
 	},
 	slotFilled: {
-		backgroundColor: "#1a1a1a",
+		backgroundColor: Colors.background.tertiary,
 		borderColor: Colors.primary,
 		borderWidth: 3,
 	},
 	slotValid: {
-		borderColor: "#4CAF50",
-		backgroundColor: "#4CAF50" + "30",
+		borderColor: Colors.game.correct,
+		backgroundColor: Colors.game.correct + "30",
 		borderWidth: 4,
 	},
 	slotInvalid: {
-		borderColor: "#FF4444",
-		backgroundColor: "#FF4444" + "30",
+		borderColor: Colors.error,
+		backgroundColor: Colors.error + "30",
 		borderWidth: 4,
 	},
 	slotLabel: {
 		...Typography.caption,
-		color: "#AAAAAA",
+		color: Colors.text.secondary,
 		fontSize: Typography.fontSize.small,
 		marginBottom: Spacing.xs,
 		fontWeight: Typography.fontWeight.medium,
 	},
 	slotEntity: {
 		...Typography.bodyBold,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.body,
 		textAlign: "center",
 		fontWeight: Typography.fontWeight.semiBold,
 	},
 	slotEmpty: {
 		...Typography.body,
-		color: "#888888",
+		color: Colors.text.secondary,
 		fontSize: Typography.fontSize.caption,
 		fontStyle: "italic",
 		fontWeight: Typography.fontWeight.medium,
@@ -494,10 +543,10 @@ const styles = StyleSheet.create({
 	entityButton: {
 		paddingVertical: Spacing.md,
 		paddingHorizontal: Spacing.lg,
-		backgroundColor: Colors.surface,
+		backgroundColor: Colors.background.secondary,
 		borderRadius: BorderRadius.md,
 		borderWidth: 3,
-		borderColor: "#666666",
+		borderColor: "#E5E5E5",
 		...Shadows.medium,
 		minHeight: 50,
 	},
@@ -508,7 +557,7 @@ const styles = StyleSheet.create({
 	},
 	entityText: {
 		...Typography.body,
-		color: "#FFFFFF",
+		color: Colors.text.primary,
 		fontSize: Typography.fontSize.body,
 		fontWeight: Typography.fontWeight.semiBold,
 	},
@@ -544,7 +593,23 @@ const styles = StyleSheet.create({
 		color: ComponentStyles.button.textColor,
 		fontWeight: Typography.fontWeight.semiBold,
 	},
+	viewStatsButton: {
+		backgroundColor: "#8B5CF6", // Game-specific violet
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.lg,
+		paddingHorizontal: Spacing.xl,
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: Spacing.lg,
+		minHeight: 52,
+		width: "100%",
+		...Shadows.medium,
+	},
+	viewStatsButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.white,
+	},
 });
 
 export default SequencingGame;
-

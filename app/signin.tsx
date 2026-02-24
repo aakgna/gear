@@ -1,19 +1,14 @@
-import React, { useState, useEffect } from "react";
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ActivityIndicator,
-	Alert,
-	Image,
-} from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Alert, Image, Linking, Platform, TextInput, Modal, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import TikTokButton from "../components/TikTokButton";
 import {
 	signInWithGoogle,
+	signInWithApple,
+	sendPhoneVerificationCode,
+	confirmPhoneCode,
 	configureGoogleSignIn,
 	getUserData,
 	getCurrentUser,
@@ -28,7 +23,23 @@ import {
 
 const SignInScreen = () => {
 	const router = useRouter();
-	const [loading, setLoading] = useState(false);
+	const [googleLoading, setGoogleLoading] = useState(false);
+	const [appleLoading, setAppleLoading] = useState(false);
+	const [phoneStep, setPhoneStep] = useState<"idle" | "code">("idle");
+	const [phoneNumber, setPhoneNumber] = useState("");
+	const [phoneCode, setPhoneCode] = useState("");
+	const [sendCodeLoading, setSendCodeLoading] = useState(false);
+	const [verifyLoading, setVerifyLoading] = useState(false);
+	const [showPhoneModal, setShowPhoneModal] = useState(false);
+	const phoneConfirmationRef = useRef<any>(null);
+
+	const closePhoneModal = () => {
+		setShowPhoneModal(false);
+		setPhoneStep("idle");
+		setPhoneNumber("");
+		setPhoneCode("");
+		phoneConfirmationRef.current = null;
+	};
 
 	useEffect(() => {
 		// Configure Google Sign-In on mount
@@ -36,7 +47,7 @@ const SignInScreen = () => {
 	}, []);
 
 	const handleGoogleSignIn = async () => {
-		setLoading(true);
+		setGoogleLoading(true);
 		try {
 			const user = await signInWithGoogle();
 			if (user) {
@@ -48,18 +59,18 @@ const SignInScreen = () => {
 				// 2. User document exists but doesn't have username field (!userData.username)
 				if (!userData || !userData.username) {
 					// User needs to set username, go to username screen
-					setLoading(false);
+					setGoogleLoading(false);
 					router.replace("/username");
 				} else {
 					// User has username, go to feed
-					setLoading(false);
+					setGoogleLoading(false);
 					router.replace("/feed");
 				}
 			} else {
-				setLoading(false);
+				setGoogleLoading(false);
 			}
 		} catch (error: any) {
-			setLoading(false);
+			setGoogleLoading(false);
 			if (error.message === "Sign in was cancelled") {
 				// User cancelled, don't show error
 				return;
@@ -71,57 +82,286 @@ const SignInScreen = () => {
 		}
 	};
 
+	const handleAppleSignIn = async () => {
+		setAppleLoading(true);
+		try {
+			const user = await signInWithApple();
+			if (user) {
+				// Check if user document exists and has username
+				const userData = await getUserData(user.uid);
+
+				// Route to username page if:
+				// 1. User document doesn't exist (!userData)
+				// 2. User document exists but doesn't have username field (!userData.username)
+				if (!userData || !userData.username) {
+					// User needs to set username, go to username screen
+					setAppleLoading(false);
+					router.replace("/username");
+				} else {
+					// User has username, go to feed
+					setAppleLoading(false);
+					router.replace("/feed");
+				}
+			} else {
+				setAppleLoading(false);
+			}
+		} catch (error: any) {
+			setAppleLoading(false);
+			if (error.message === "Sign in was cancelled") {
+				// User cancelled, don't show error
+				return;
+			}
+			Alert.alert(
+				"Sign In Error",
+				error.message || "Failed to sign in. Please try again."
+			);
+		}
+	};
+
+	const handleSendCode = async () => {
+		let normalized = phoneNumber.replace(/\s/g, "");
+		if (!normalized) {
+			Alert.alert("Error", "Enter your phone number (e.g. +1 234 567 8900)");
+			return;
+		}
+		
+		// Normalize phone number based on length
+		const length = normalized.length;
+		if (length === 10) {
+			// 10 digits: add +1 prefix
+			normalized = "+1" + normalized;
+		} else if (length === 11) {
+			// 11 digits: add + prefix
+			normalized = "+" + normalized;
+		} else if (length === 12) {
+			// 12 digits: do nothing (already has +1 prefix)
+			// normalized stays as is
+		}
+		
+		setSendCodeLoading(true);
+		try {
+			const confirmation = await sendPhoneVerificationCode(normalized);
+			phoneConfirmationRef.current = confirmation;
+			setPhoneStep("code");
+			setPhoneCode("");
+		} catch (e: any) {
+			Alert.alert("Error", e?.message ?? "Failed to send code. Check the number and try again.");
+		} finally {
+			setSendCodeLoading(false);
+		}
+	};
+
+	const handleVerifyCode = async () => {
+		const code = phoneCode.trim();
+		if (!code) {
+			Alert.alert("Error", "Enter the 6-digit code");
+			return;
+		}
+		const confirmation = phoneConfirmationRef.current;
+		if (!confirmation) {
+			Alert.alert("Error", "Session expired. Please request a new code.");
+			setPhoneStep("idle");
+			return;
+		}
+		setVerifyLoading(true);
+		try {
+			const user = await confirmPhoneCode(confirmation, code);
+			if (user) {
+				const userData = await getUserData(user.uid);
+				if (!userData || !userData.username) {
+					router.replace("/username");
+				} else {
+					router.replace("/feed");
+				}
+			}
+		} catch (e: any) {
+			Alert.alert("Error", e?.message ?? "Invalid code. Try again.");
+		} finally {
+			setVerifyLoading(false);
+		}
+	};
+
 	return (
 		<View style={styles.container}>
-			<StatusBar style="light" />
-			<LinearGradient
-				colors={Colors.background.gradient as [string, string]}
-				style={StyleSheet.absoluteFill}
-			/>
-
+			<StatusBar style="dark" />
 			<View style={styles.content}>
+				{/* Logo stays the same */}
 				<View style={styles.logoContainer}>
 					<Image
-						source={require("../assets/images/logo_transparent.png")}
+						source={require("../assets/images/kracked.png")}
 						style={styles.logoImage}
 					/>
-					<Text style={styles.subtitle}>
-						Brain training, one puzzle at a time
-					</Text>
 				</View>
 
-				<View style={styles.signInContainer}>
-					<Text style={styles.welcomeText}>Welcome!</Text>
+				{/* New: soft card container (background stays the same) */}
+				<View style={styles.card}>
+					{/* subtle accent strip (very low pop) */}
+					<View style={styles.cardAccent} />
+
 					<Text style={styles.descriptionText}>
-						Sign in to track your progress and unlock personalized puzzle
-						recommendations.
+						Start your brain training journey today!
 					</Text>
 
-					<TouchableOpacity
-						style={[styles.googleButton, loading && styles.buttonDisabled]}
-						onPress={handleGoogleSignIn}
-						disabled={loading}
-					>
-						{loading ? (
-							<ActivityIndicator color={Colors.text.primary} />
-						) : (
-							<>
+					{/* Feature bullets like screenshot 2 */}
+					<View style={styles.features}>
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>
+								Personalized puzzle recommendations
+							</Text>
+						</View>
+
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>Track your progress and streaks</Text>
+						</View>
+
+						<View style={styles.featureRow}>
+							<View style={styles.checkmarkCircle}>
+								<Ionicons name="checkmark" size={14} color="#000000" />
+							</View>
+							<Text style={styles.featureText}>
+								Compete on global leaderboards
+							</Text>
+						</View>
+					</View>
+
+					<View style={styles.buttonWrap}>
+						{Platform.OS === "ios" && (
+							<TikTokButton
+								label="Continue with Apple"
+								onPress={handleAppleSignIn}
+								disabled={googleLoading || appleLoading}
+								loading={appleLoading}
+								icon={
+									<Ionicons
+										name="logo-apple"
+										size={20}
+										color={Colors.text.white}
+									/>
+								}
+								fullWidth
+							/>
+						)}
+						{Platform.OS === "ios" && <View style={styles.buttonSpacing} />}
+						<TikTokButton
+							label="Continue with Google"
+							onPress={handleGoogleSignIn}
+							disabled={googleLoading || appleLoading}
+							loading={googleLoading}
+							icon={
 								<Ionicons
 									name="logo-google"
-									size={24}
-									color={Colors.text.primary}
+									size={20}
+									color={Colors.text.white}
 								/>
-								<Text style={styles.googleButtonText}>
-									Continue with Google
-								</Text>
-							</>
-						)}
-					</TouchableOpacity>
+							}
+							fullWidth
+						/>
+						<TouchableOpacity
+							style={styles.phoneLinkWrap}
+							onPress={() => setShowPhoneModal(true)}
+							activeOpacity={0.7}
+						>
+							<Text style={styles.phoneLink}>Use phone number</Text>
+						</TouchableOpacity>
+					</View>
+
+					<Modal
+						visible={showPhoneModal}
+						transparent
+						animationType="fade"
+						onRequestClose={closePhoneModal}
+					>
+						<View style={styles.modalOverlay}>
+							<View style={styles.modalContent}>
+								<TouchableOpacity
+									style={styles.modalClose}
+									onPress={closePhoneModal}
+									hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+								>
+									<Ionicons name="close" size={24} color={Colors.text.primary} />
+								</TouchableOpacity>
+								<Text style={styles.modalTitle}>Sign in with phone</Text>
+								{phoneStep === "idle" ? (
+									<>
+										<TextInput
+											style={styles.phoneInput}
+											placeholder="+1 234 567 8900"
+											placeholderTextColor={Colors.text.secondary}
+											value={phoneNumber}
+											onChangeText={setPhoneNumber}
+											keyboardType="phone-pad"
+											editable={!sendCodeLoading}
+										/>
+										<TikTokButton
+											label="Send code"
+											onPress={handleSendCode}
+											disabled={sendCodeLoading}
+											loading={sendCodeLoading}
+											fullWidth
+										/>
+									</>
+								) : (
+									<>
+										<Text style={styles.phoneSent}>Code sent to {phoneNumber}</Text>
+										<TextInput
+											style={styles.phoneInput}
+											placeholder="6-digit code"
+											placeholderTextColor={Colors.text.secondary}
+											value={phoneCode}
+											onChangeText={setPhoneCode}
+											keyboardType="number-pad"
+											maxLength={6}
+											editable={!verifyLoading}
+										/>
+										<TikTokButton
+											label="Verify"
+											onPress={handleVerifyCode}
+											disabled={verifyLoading}
+											loading={verifyLoading}
+											fullWidth
+										/>
+										<Text
+											style={styles.backToPhone}
+											onPress={() => {
+												setPhoneStep("idle");
+												phoneConfirmationRef.current = null;
+											}}
+										>
+											Use a different number
+										</Text>
+									</>
+								)}
+							</View>
+						</View>
+					</Modal>
 
 					<Text style={styles.privacyText}>
-						By continuing, you agree to our Terms of Service and Privacy Policy
+						By continuing, you agree to our{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/terms")}>
+							Terms of Service
+						</Text>
+						,{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/privacy")}>
+							Privacy Policy
+						</Text>
+						, and{" "}
+						<Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("https://www.kracked.app/eula")}>
+							End User License Agreement (EULA)
+						</Text>
 					</Text>
 				</View>
+
+				{/* Optional subtle footer like screenshot 2 */}
+				<Text style={styles.secureText}>
+					<Ionicons name="lock-closed" size={14} color={Colors.text.secondary} />
+					{"  "}Secure authentication powered by Google
+				</Text>
 			</View>
 		</View>
 	);
@@ -130,7 +370,8 @@ const SignInScreen = () => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.background.primary,
+		// Background stays the same as your current page
+		backgroundColor: Colors.background.secondary,
 	},
 	content: {
 		flex: 1,
@@ -141,72 +382,172 @@ const styles = StyleSheet.create({
 	logoContainer: {
 		alignItems: "center",
 		justifyContent: "center",
-		marginBottom: Spacing.xxl,
+		// Slightly tighter than before to match the card layout
+		marginTop: Spacing.xl,
+		marginBottom: Spacing.sm,
+		overflow: "visible",
 	},
 	logoImage: {
 		width: 180,
 		height: 180,
 		resizeMode: "contain",
 		marginBottom: Spacing.md,
+		transform: [{ scale: 2.5 }],
 	},
-	logo: {
-		fontSize: 48,
-		fontWeight: Typography.fontWeight.bold,
-		color: Colors.text.primary,
-		marginBottom: Spacing.sm,
-		textShadowColor: Colors.accent,
-		textShadowOffset: { width: 0, height: 0 },
-		textShadowRadius: 12,
-	},
-	subtitle: {
-		fontSize: Typography.fontSize.h3,
-		color: Colors.text.secondary,
-		textAlign: "center",
-	},
-	signInContainer: {
+
+	// New card styles (screenshot 2 vibe)
+	card: {
 		width: "100%",
-		alignItems: "center",
+		backgroundColor: Colors.background.tertiary, // your card bg (#fffcf9)
+		borderRadius: BorderRadius.xl,
+		paddingVertical: Spacing.xl,
+		paddingHorizontal: Spacing.xl,
+		...Shadows.medium,
+		overflow: "hidden",
+		marginBottom: Spacing.lg,
+
+		// very subtle separation (keeps it from "popping")
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.035)",
 	},
+
+	// Subtle accent strip (low opacity)
+	cardAccent: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		height: 5,
+		backgroundColor: Colors.accent,
+		opacity: 0.2,
+	},
+
 	welcomeText: {
 		fontSize: Typography.fontSize.h1,
 		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginBottom: Spacing.md,
+		marginBottom: Spacing.sm,
 		textAlign: "center",
 	},
 	descriptionText: {
-		fontSize: Typography.fontSize.body,
-		color: Colors.text.secondary,
-		textAlign: "center",
-		marginBottom: Spacing.xl,
-		lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.body,
+	fontSize: 24,
+	fontWeight: Typography.fontWeight.bold,
+	color: Colors.text.primary,
+	textAlign: "center",
+	marginBottom: Spacing.lg,
+	lineHeight: 30,
+	letterSpacing: 0.3,
 	},
-	googleButton: {
-		flexDirection: "row",
+
+	features: {
+		width: "100%",
+		marginBottom: Spacing.xl,
+	},
+	checkmarkCircle: {
+		width: 22,
+		height: 22,
+		borderRadius: 11,
+		backgroundColor: Colors.accent,
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: Colors.accent,
-		paddingVertical: Spacing.lg,
-		paddingHorizontal: Spacing.xl,
-		borderRadius: BorderRadius.lg,
+	},
+	featureRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: Spacing.md,
+	},
+	featureText: {
+		marginLeft: Spacing.md,
+		fontSize: 13,
+		color: Colors.text.primary,
+		opacity: 0.9,
+		flex: 1,
+	},
+
+	buttonWrap: {
 		width: "100%",
 		marginBottom: Spacing.lg,
-		...Shadows.heavy,
 	},
-	buttonDisabled: {
-		opacity: 0.7,
+	buttonSpacing: {
+		height: Spacing.md,
 	},
-	googleButtonText: {
-		fontSize: Typography.fontSize.h3,
-		fontWeight: Typography.fontWeight.semiBold,
+
+	phoneLinkWrap: {
+		marginTop: Spacing.sm,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	phoneLink: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.accent,
+		textDecorationLine: "underline",
+	},
+
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+		padding: Spacing.xl,
+	},
+	modalContent: {
+		width: "100%",
+		maxWidth: 360,
+		backgroundColor: Colors.background.tertiary,
+		borderRadius: BorderRadius.xl,
+		padding: Spacing.xl,
+		...Shadows.medium,
+	},
+	modalClose: {
+		position: "absolute",
+		top: Spacing.md,
+		right: Spacing.md,
+		zIndex: 1,
+	},
+	modalTitle: {
+		fontSize: Typography.fontSize.h2,
+		fontWeight: Typography.fontWeight.bold,
 		color: Colors.text.primary,
-		marginLeft: Spacing.md,
+		marginBottom: Spacing.lg,
+		textAlign: "center",
 	},
+	phoneInput: {
+		width: "100%",
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.1)",
+		borderRadius: BorderRadius.md,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.lg,
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.primary,
+		marginBottom: Spacing.md,
+	},
+	phoneSent: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.sm,
+		textAlign: "center",
+	},
+	backToPhone: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.accent,
+		textAlign: "center",
+		marginTop: Spacing.sm,
+	},
+
 	privacyText: {
 		fontSize: Typography.fontSize.small,
 		color: Colors.text.secondary,
 		textAlign: "center",
+		opacity: 0.85,
+	},
+
+	secureText: {
+		marginTop: Spacing.lg,
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.secondary,
 		opacity: 0.8,
+		textAlign: "center",
 	},
 });
 
