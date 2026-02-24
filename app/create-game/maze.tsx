@@ -369,7 +369,7 @@ const CreateMazePage = () => {
 			return;
 		}
 
-		if (!validateZip()) return;
+		if (!validateMaze()) return;
 
 		setLoading(true);
 		try {
