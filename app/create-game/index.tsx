@@ -139,7 +139,34 @@ const CreateGameIndex = () => {
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
 			>
-				<Text style={styles.sectionTitle}>Choose Game Type</Text>
+				{/* AI Game Builder — primary CTA */}
+				<TouchableOpacity
+					style={styles.aiBuilderButton}
+					onPress={() => router.push("/ai-game-builder")}
+					activeOpacity={0.85}
+				>
+					<LinearGradient
+						colors={[Colors.accent, Colors.secondaryAccent]}
+						style={styles.aiBuilderGradient}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 0 }}
+					>
+						<View style={styles.aiBuilderContent}>
+							<View style={styles.aiBuilderIcon}>
+								<Ionicons name="sparkles" size={24} color={Colors.text.primary} />
+							</View>
+							<View style={styles.aiBuilderTextContainer}>
+								<Text style={styles.aiBuilderTitle}>Generate with AI</Text>
+								<Text style={styles.aiBuilderSubtitle}>
+									Describe any game — maze, crossword, puzzle — and AI builds it
+								</Text>
+							</View>
+							<Ionicons name="chevron-forward" size={18} color={Colors.text.primary} />
+						</View>
+					</LinearGradient>
+				</TouchableOpacity>
+
+				<Text style={styles.sectionTitle}>Or Choose a Game Type</Text>
 				<View style={styles.gameTypeContainer}>
 					{gameTypes.map((game, index) => (
 						<GameTypeButton
@@ -231,6 +258,43 @@ const styles = StyleSheet.create({
 		...Shadows.light,
 		minHeight: 96,
 	},
+	// AI Builder button
+	aiBuilderButton: {
+		borderRadius: BorderRadius.xl,
+		marginBottom: Spacing.xl,
+		overflow: "hidden",
+		...Shadows.glowAccent,
+	},
+	aiBuilderGradient: {
+		borderRadius: BorderRadius.xl,
+	},
+	aiBuilderContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		padding: Spacing.md,
+		gap: Spacing.md,
+	},
+	aiBuilderIcon: {
+		width: 48,
+		height: 48,
+		borderRadius: BorderRadius.md,
+		backgroundColor: "rgba(255,255,255,0.2)",
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	aiBuilderTextContainer: { flex: 1 },
+	aiBuilderTitle: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+	aiBuilderSubtitle: {
+		fontSize: Typography.fontSize.small,
+		color: Colors.text.primary,
+		opacity: 0.8,
+		marginTop: 2,
+	},
+
 	gameIconWrapper: {
 		width: 48,
 		height: 48,

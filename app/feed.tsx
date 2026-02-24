@@ -2672,15 +2672,8 @@ const applyForYouFilters = useCallback(
 					}}
 				/>
 
-				{/* DEV: engine test shortcut — remove before ship */}
-				<TouchableOpacity
-					onPress={() => router.push("/dev-game-test" as any)}
-					style={{ position: "absolute", top: insets.top + 48, left: 12, backgroundColor: "#ef4444", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, zIndex: 999 }}
-				>
-					<Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>DEV</Text>
-				</TouchableOpacity>
-
-				{/* Tabs with animated indicator */}
+	
+	{/* Tabs with animated indicator */}
 				<View style={styles.tabContainer}>
 					<Animated.View
 						style={[

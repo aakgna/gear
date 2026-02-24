@@ -7,6 +7,8 @@ import React, { useEffect, useRef, useState } from "react";
 import {
 	Animated,
 	Dimensions,
+	GestureResponderEvent,
+	PanResponder,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -14,15 +16,44 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import type { GameScene } from "../config/customPuzzleGame";
+import type {
+	GameScene,
+	CrosswordScene as CrosswordSceneType,
+	WordSearchScene as WordSearchSceneType,
+	MazeScene as MazeSceneType,
+	SpellingBeeScene as SpellingBeeSceneType,
+	LetterGridScene as LetterGridSceneType,
+	NonogramScene as NonogramSceneType,
+	FlowScene as FlowSceneType,
+	SlidingPuzzleScene as SlidingPuzzleSceneType,
+	LogicGridScene as LogicGridSceneType,
+	MinesweeperScene as MinesweeperSceneType,
+	MergeGridScene as MergeGridSceneType,
+	BoardTheme,
+} from "../config/customPuzzleGame";
 import {
 	codebreakerFeedback,
 	containsLetter,
+	crosswordComplete,
 	exactMatch,
+	flowComplete,
 	groupMatch,
+	letterGridPathAdjacent,
+	letterGridPathWord,
+	mazeMoveAllowed,
+	mazeNextPosition,
+	mergeGridSwipe,
+	minesweeperBuildBoard,
+	minesweeperWon,
+	nonogramComplete,
 	sequenceCheck,
+	slidingPuzzleMove,
+	slidingPuzzleSolved,
+	spellingBeeWordValid,
 	wordleFeedback,
+	wordSearchPathValid,
 } from "./mechanicExecutor";
+import type { Direction } from "./mechanicExecutor";
 import {
 	Colors,
 	Typography,
@@ -68,6 +99,17 @@ export function SceneRenderer(props: SceneRendererProps) {
 		case "CODEBREAKER":      return <CodeBreakerScene {...props} />;
 		case "MEMORY":           return <MemoryScene {...props} />;
 		case "INFO":             return <InfoScene {...props} />;
+		case "CROSSWORD":        return <CrosswordSceneRenderer {...props} />;
+		case "WORD_SEARCH":      return <WordSearchSceneRenderer {...props} />;
+		case "MAZE":             return <MazeSceneRenderer {...props} />;
+		case "SPELLING_BEE":     return <SpellingBeeSceneRenderer {...props} />;
+		case "LETTER_GRID":      return <LetterGridSceneRenderer {...props} />;
+		case "NONOGRAM":         return <NonogramSceneRenderer {...props} />;
+		case "FLOW":             return <FlowSceneRenderer {...props} />;
+		case "SLIDING_PUZZLE":   return <SlidingPuzzleSceneRenderer {...props} />;
+		case "LOGIC_GRID":       return <LogicGridSceneRenderer {...props} />;
+		case "MINESWEEPER":      return <MinesweeperSceneRenderer {...props} />;
+		case "MERGE_GRID":       return <MergeGridSceneRenderer {...props} />;
 	}
 }
 
@@ -1850,4 +1892,1134 @@ const gs = StyleSheet.create({
 		textAlign: "center",
 		lineHeight: 30,
 	},
+});
+
+// ─── Board theme palettes ─────────────────────────────────────────────────────
+const BOARD_THEMES: Record<BoardTheme, {
+	bg: string; wall: string; path: string; accent: string; text: string;
+}> = {
+	cornfield:  { bg: "#87CEEB", wall: "#4a7c59", path: "#c8a96e", accent: "#fcd34d", text: "#2d1b00" },
+	dungeon:    { bg: "#1a1a2e", wall: "#4a4a6a", path: "#2d2d4a", accent: "#fcd34d", text: "#e0e0e0" },
+	space:      { bg: "#0a0a1a", wall: "#2a2a4a", path: "#1a1a3a", accent: "#7c3aed", text: "#c0c0ff" },
+	underwater: { bg: "#006994", wall: "#004d6e", path: "#0099cc", accent: "#00d4ff", text: "#ffffff" },
+	forest:     { bg: "#87CEEB", wall: "#2d5a27", path: "#4a7c3f", accent: "#fcd34d", text: "#1a0a00" },
+	neon:       { bg: "#0a0a0a", wall: "#ff00ff", path: "#1a1a1a", accent: "#00ff00", text: "#ffffff" },
+	minimal:    { bg: "#ffffff", wall: "#000000", path: "#f5f5f5", accent: "#000000", text: "#000000" },
+};
+
+function getTheme(theme?: BoardTheme) {
+	return BOARD_THEMES[theme ?? "minimal"];
+}
+
+// ─── CROSSWORD RENDERER ───────────────────────────────────────────────────────
+
+function CrosswordSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onWrong } = props;
+	const content = scene.content as CrosswordSceneType;
+	const [playerGrid, setPlayerGrid] = React.useState<Record<string, string>>({});
+	const [selectedCell, setSelectedCell] = React.useState<{ row: number; col: number } | null>(null);
+	const [direction, setDirection] = React.useState<"across" | "down">("across");
+	const [checked, setChecked] = React.useState(false);
+
+	const CELL = Math.min(32, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+
+	const solution = content.cells.filter((c) => !c.black && c.answer);
+
+	const handleCellPress = (row: number, col: number) => {
+		if (selectedCell?.row === row && selectedCell?.col === col) {
+			setDirection((d) => (d === "across" ? "down" : "across"));
+		} else {
+			setSelectedCell({ row, col });
+		}
+	};
+
+	const handleInput = (letter: string) => {
+		if (!selectedCell) return;
+		const key = `${selectedCell.row}_${selectedCell.col}`;
+		const val = letter.toUpperCase().slice(0, 1);
+		setPlayerGrid((g) => ({ ...g, [key]: val }));
+	};
+
+	const handleCheck = () => {
+		setChecked(true);
+		if (crosswordComplete(playerGrid, solution as any)) {
+			onSceneWin();
+		} else {
+			onWrong();
+		}
+	};
+
+	return (
+		<ScrollView contentContainerStyle={nsh.crosswordOuter} keyboardShouldPersistTaps="handled">
+			{content.clues && (
+				<View style={nsh.crosswordClueBar}>
+					<Text style={nsh.crosswordClueText} numberOfLines={2}>
+						{direction === "across"
+							? content.clues.across.find((c) =>
+									selectedCell &&
+									c.row === selectedCell.row &&
+									c.col <= selectedCell.col
+								)?.clue ?? "Select a cell"
+							: content.clues.down.find((c) =>
+									selectedCell &&
+									c.col === selectedCell.col &&
+									c.row <= selectedCell.row
+								)?.clue ?? "Select a cell"}
+					</Text>
+					<Text style={nsh.crosswordDirLabel}>{direction.toUpperCase()}</Text>
+				</View>
+			)}
+			<View style={{ marginBottom: Spacing.md }}>
+				{Array.from({ length: content.rows }, (_, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{Array.from({ length: content.cols }, (_, c) => {
+							const cellDef = content.cells.find((cell) => cell.row === r && cell.col === c);
+							const isBlack = cellDef?.black ?? true;
+							const key = `${r}_${c}`;
+							const letter = playerGrid[key] ?? "";
+							const isSelected = selectedCell?.row === r && selectedCell?.col === c;
+							const expectedLetter = cellDef?.answer ?? "";
+							const isWrong = checked && letter && letter !== expectedLetter.toUpperCase();
+							return (
+								<TouchableOpacity
+									key={c}
+									onPress={() => !isBlack && handleCellPress(r, c)}
+									style={[
+										nsh.crosswordCell,
+										{ width: CELL, height: CELL },
+										isBlack ? nsh.crosswordBlack : nsh.crosswordWhite,
+										isSelected && nsh.crosswordSelected,
+										isWrong && nsh.crosswordWrong,
+									]}
+									activeOpacity={isBlack ? 1 : 0.7}
+								>
+									{!isBlack && cellDef?.number && (
+										<Text style={[nsh.crosswordNumber, { fontSize: CELL * 0.25 }]}>
+											{cellDef.number}
+										</Text>
+									)}
+									{!isBlack && (
+										<Text style={[nsh.crosswordLetter, { fontSize: CELL * 0.5 }]}>
+											{letter}
+										</Text>
+									)}
+								</TouchableOpacity>
+							);
+						})}
+					</View>
+				))}
+			</View>
+			<TextInput
+				style={nsh.crosswordInput}
+				value=""
+				onChangeText={handleInput}
+				autoCapitalize="characters"
+				maxLength={1}
+				placeholder="Type a letter"
+				placeholderTextColor={Colors.text.inactive}
+			/>
+			{content.hint && <HintStrip text={content.hint} />}
+			<TouchableOpacity style={nsh.checkBtn} onPress={handleCheck}>
+				<Text style={nsh.checkBtnText}>Check Answers</Text>
+			</TouchableOpacity>
+		</ScrollView>
+	);
+}
+
+// ─── WORD SEARCH RENDERER ─────────────────────────────────────────────────────
+
+function WordSearchSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin } = props;
+	const content = scene.content as WordSearchSceneType;
+	const [foundWords, setFoundWords] = React.useState<Set<string>>(new Set());
+	const [selectedCells, setSelectedCells] = React.useState<Array<{ row: number; col: number }>>([]);
+	const [selecting, setSelecting] = React.useState(false);
+
+	const CELL = Math.min(34, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+
+	const handleCellStart = (row: number, col: number) => {
+		setSelecting(true);
+		setSelectedCells([{ row, col }]);
+	};
+
+	const handleCellEnter = (row: number, col: number) => {
+		if (!selecting) return;
+		setSelectedCells((prev) => {
+			const alreadyIn = prev.find((c) => c.row === row && c.col === col);
+			if (alreadyIn) return prev;
+			return [...prev, { row, col }];
+		});
+	};
+
+	const handleCellEnd = () => {
+		setSelecting(false);
+		const result = wordSearchPathValid(selectedCells, content.solutions);
+		if (result.found && result.word && !foundWords.has(result.word)) {
+			const next = new Set(foundWords);
+			next.add(result.word);
+			setFoundWords(next);
+			if (next.size === content.words.length) onSceneWin();
+		}
+		setSelectedCells([]);
+	};
+
+	const isSelected = (r: number, c: number) =>
+		selectedCells.some((cell) => cell.row === r && cell.col === c);
+
+	const isFound = (r: number, c: number) =>
+		content.solutions
+			.filter((s) => foundWords.has(s.word))
+			.some((s) => s.cells.some((cell) => cell.row === r && cell.col === c));
+
+	return (
+		<ScrollView contentContainerStyle={nsh.wsOuter} keyboardShouldPersistTaps="handled">
+			<View style={nsh.wsGrid}>
+				{content.grid.map((row, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{row.map((letter, c) => (
+							<TouchableOpacity
+								key={c}
+								onPressIn={() => handleCellStart(r, c)}
+								onPress={() => handleCellEnter(r, c)}
+								onPressOut={handleCellEnd}
+								style={[
+									nsh.wsCell,
+									{ width: CELL, height: CELL },
+									isSelected(r, c) && nsh.wsCellSelected,
+									isFound(r, c) && nsh.wsCellFound,
+								]}
+								activeOpacity={0.8}
+							>
+								<Text style={[nsh.wsLetter, { fontSize: CELL * 0.5 }]}>{letter}</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				))}
+			</View>
+			<View style={nsh.wsWordList}>
+				{content.words.map((word) => (
+					<Text
+						key={word}
+						style={[nsh.wsWord, foundWords.has(word) && nsh.wsWordFound]}
+					>
+						{word}
+					</Text>
+				))}
+			</View>
+		</ScrollView>
+	);
+}
+
+// ─── MAZE RENDERER ────────────────────────────────────────────────────────────
+
+function MazeSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin } = props;
+	const content = scene.content as MazeSceneType;
+	const theme = getTheme(content.theme);
+	const [pos, setPos] = React.useState(content.start);
+
+	const CELL = Math.min(40, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+	const WALL = 2;
+
+	const move = (dir: Direction) => {
+		if (!mazeMoveAllowed(pos, dir, content.cells)) return;
+		const next = mazeNextPosition(pos, dir);
+		setPos(next);
+		if (next.row === content.end.row && next.col === content.end.col) onSceneWin();
+	};
+
+	return (
+		<View style={[nsh.mazeOuter, { backgroundColor: theme.bg }]}>
+			<View style={nsh.mazeGrid}>
+				{Array.from({ length: content.rows }, (_, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{Array.from({ length: content.cols }, (_, c) => {
+							const cellDef = content.cells.find((cell) => cell.row === r && cell.col === c);
+							const walls = cellDef?.walls ?? { top: true, right: true, bottom: true, left: true };
+							const isPlayer = pos.row === r && pos.col === c;
+							const isEnd = content.end.row === r && content.end.col === c;
+							const isStart = content.start.row === r && content.start.col === c;
+							return (
+								<View
+									key={c}
+									style={[
+										{
+											width: CELL,
+											height: CELL,
+											backgroundColor: isEnd ? theme.accent + "40" : theme.path,
+											borderTopWidth: walls.top ? WALL : 0,
+											borderRightWidth: walls.right ? WALL : 0,
+											borderBottomWidth: walls.bottom ? WALL : 0,
+											borderLeftWidth: walls.left ? WALL : 0,
+											borderColor: theme.wall,
+											alignItems: "center",
+											justifyContent: "center",
+										},
+									]}
+								>
+									{isPlayer && (
+										<View style={[nsh.mazePlayer, { backgroundColor: theme.accent }]} />
+									)}
+									{isEnd && !isPlayer && (
+										<Text style={{ fontSize: CELL * 0.45 }}>🏁</Text>
+									)}
+									{isStart && !isPlayer && (
+										<View style={[nsh.mazeStart, { backgroundColor: theme.accent + "60" }]} />
+									)}
+								</View>
+							);
+						})}
+					</View>
+				))}
+			</View>
+			{content.hint && <HintStrip text={content.hint} />}
+			<View style={nsh.mazeDpad}>
+				<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => move("top")}>
+					<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▲</Text>
+				</TouchableOpacity>
+				<View style={{ flexDirection: "row" }}>
+					<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => move("left")}>
+						<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>◀</Text>
+					</TouchableOpacity>
+					<View style={{ width: 48, height: 48 }} />
+					<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => move("right")}>
+						<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▶</Text>
+					</TouchableOpacity>
+				</View>
+				<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => move("bottom")}>
+					<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▼</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
+
+// ─── SPELLING BEE RENDERER ────────────────────────────────────────────────────
+
+function SpellingBeeSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onWrong } = props;
+	const content = scene.content as SpellingBeeSceneType;
+	const [input, setInput] = React.useState("");
+	const [foundWords, setFoundWords] = React.useState<string[]>([]);
+	const [message, setMessage] = React.useState("");
+
+	const allLetters = [content.centerLetter, ...content.outerLetters];
+
+	const hexPositions = [
+		{ top: 0,   left: 56  },
+		{ top: 46,  left: 112 },
+		{ top: 92,  left: 56  },
+		{ top: 92,  left: 0   },
+		{ top: 46,  left: -56 },
+		{ top: 0,   left: 0   },
+	];
+
+	const handleLetter = (letter: string) => setInput((i) => i + letter);
+	const handleDelete  = () => setInput((i) => i.slice(0, -1));
+
+	const handleSubmit = () => {
+		const result = spellingBeeWordValid(
+			input, content.centerLetter, content.outerLetters, content.validWords
+		);
+		if (!result.valid) {
+			setMessage(result.reason ?? "Invalid");
+			setTimeout(() => setMessage(""), 1500);
+			onWrong();
+		} else if (foundWords.includes(input.toUpperCase())) {
+			setMessage("Already found!");
+			setTimeout(() => setMessage(""), 1500);
+		} else {
+			const next = [...foundWords, input.toUpperCase()];
+			setFoundWords(next);
+			setMessage("Nice!");
+			setTimeout(() => setMessage(""), 1200);
+			setInput("");
+			if (next.length >= content.wordsToWin) onSceneWin();
+		}
+	};
+
+	return (
+		<ScrollView contentContainerStyle={nsh.beeOuter}>
+			<Text style={nsh.beeInput}>{input || "..."}</Text>
+			{message ? <Text style={nsh.beeMessage}>{message}</Text> : null}
+			<View style={[nsh.beeHexContainer, { height: 200 }]}>
+				<View style={[nsh.beeHex, nsh.beeHexCenter]}>
+					<TouchableOpacity onPress={() => handleLetter(content.centerLetter)}>
+						<Text style={nsh.beeHexLetter}>{content.centerLetter.toUpperCase()}</Text>
+					</TouchableOpacity>
+				</View>
+				{content.outerLetters.slice(0, 6).map((letter, i) => (
+					<View
+						key={i}
+						style={[
+							nsh.beeHex,
+							{
+								position: "absolute",
+								top: hexPositions[i].top,
+								left: 60 + hexPositions[i].left,
+							},
+						]}
+					>
+						<TouchableOpacity onPress={() => handleLetter(letter)}>
+							<Text style={nsh.beeHexLetter}>{letter.toUpperCase()}</Text>
+						</TouchableOpacity>
+					</View>
+				))}
+			</View>
+			<View style={nsh.beeActions}>
+				<TouchableOpacity style={nsh.beeActionBtn} onPress={handleDelete}>
+					<Text style={nsh.beeActionText}>Delete</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={[nsh.beeActionBtn, nsh.beeSubmitBtn]} onPress={handleSubmit}>
+					<Text style={[nsh.beeActionText, { color: Colors.background.primary }]}>Enter</Text>
+				</TouchableOpacity>
+			</View>
+			<Text style={nsh.beeFoundCount}>
+				{foundWords.length} / {content.wordsToWin} words found
+			</Text>
+		</ScrollView>
+	);
+}
+
+// ─── LETTER GRID RENDERER (Boggle-style) ──────────────────────────────────────
+
+function LetterGridSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin } = props;
+	const content = scene.content as LetterGridSceneType;
+	const [foundWords, setFoundWords] = React.useState<string[]>([]);
+	const [path, setPath] = React.useState<Array<{ row: number; col: number }>>([]);
+	const [isDrawing, setIsDrawing] = React.useState(false);
+
+	const CELL = Math.min(60, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+
+	const startPath = (r: number, c: number) => {
+		setIsDrawing(true);
+		setPath([{ row: r, col: c }]);
+	};
+
+	const extendPath = (r: number, c: number) => {
+		if (!isDrawing) return;
+		setPath((prev) => {
+			if (prev.find((p) => p.row === r && p.col === c)) return prev;
+			const next = [...prev, { row: r, col: c }];
+			if (!letterGridPathAdjacent(next)) return prev;
+			return next;
+		});
+	};
+
+	const endPath = () => {
+		setIsDrawing(false);
+		if (path.length >= 3) {
+			const word = letterGridPathWord(path, content.grid);
+			const valid = content.solutions.find((s) => s.word === word);
+			if (valid && !foundWords.includes(word)) {
+				const next = [...foundWords, word];
+				setFoundWords(next);
+				if (next.length >= content.words.length) onSceneWin();
+			}
+		}
+		setPath([]);
+	};
+
+	const inPath = (r: number, c: number) =>
+		path.some((p) => p.row === r && p.col === c);
+
+	const isFoundCell = (r: number, c: number) =>
+		content.solutions
+			.filter((s) => foundWords.includes(s.word))
+			.some((s) => s.cells.some((c2) => c2.row === r && c2.col === c));
+
+	return (
+		<View style={nsh.lgOuter}>
+			<View style={nsh.lgGrid}>
+				{content.grid.map((row, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{row.map((letter, c) => (
+							<TouchableOpacity
+								key={c}
+								onPressIn={() => startPath(r, c)}
+								onPress={() => extendPath(r, c)}
+								onPressOut={endPath}
+								style={[
+									nsh.lgCell,
+									{ width: CELL, height: CELL, borderRadius: CELL / 2 },
+									inPath(r, c) && nsh.lgCellActive,
+									isFoundCell(r, c) && nsh.lgCellFound,
+								]}
+								activeOpacity={0.8}
+							>
+								<Text style={[nsh.lgLetter, { fontSize: CELL * 0.42 }]}>{letter}</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				))}
+			</View>
+			<View style={nsh.wsWordList}>
+				{content.words.map((word) => (
+					<Text
+						key={word}
+						style={[nsh.wsWord, foundWords.includes(word) && nsh.wsWordFound]}
+					>
+						{word}
+					</Text>
+				))}
+			</View>
+		</View>
+	);
+}
+
+// ─── NONOGRAM RENDERER ────────────────────────────────────────────────────────
+
+function NonogramSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onWrong } = props;
+	const content = scene.content as NonogramSceneType;
+	const theme = getTheme(content.theme);
+	const [grid, setGrid] = React.useState<boolean[]>(
+		Array(content.rows * content.cols).fill(false)
+	);
+
+	const CELL = Math.min(28, Math.floor((SCREEN_WIDTH - 60) / content.cols));
+	const CLUE_W = Math.max(24, content.rowClues.reduce((m, c) => Math.max(m, c.length), 0) * 14);
+
+	const toggle = (r: number, c: number) => {
+		const idx = r * content.cols + c;
+		const next = [...grid];
+		next[idx] = !next[idx];
+		setGrid(next);
+		if (nonogramComplete(next, content.rows, content.cols, content.rowClues, content.colClues)) {
+			onSceneWin();
+		}
+	};
+
+	return (
+		<ScrollView contentContainerStyle={[nsh.nonoOuter, { backgroundColor: theme.bg }]}>
+			<View style={{ flexDirection: "row" }}>
+				<View style={{ width: CLUE_W }} />
+				{content.colClues.map((clue, c) => (
+					<View key={c} style={[nsh.nonoColClue, { width: CELL }]}>
+						{clue.map((n, i) => (
+							<Text key={i} style={[nsh.nonoClueText, { color: theme.text }]}>{n}</Text>
+						))}
+					</View>
+				))}
+			</View>
+			{Array.from({ length: content.rows }, (_, r) => (
+				<View key={r} style={{ flexDirection: "row", alignItems: "center" }}>
+					<View style={[nsh.nonoRowClue, { width: CLUE_W }]}>
+						<Text style={[nsh.nonoClueText, { color: theme.text }]}>
+							{content.rowClues[r].join(" ")}
+						</Text>
+					</View>
+					{Array.from({ length: content.cols }, (_, c) => {
+						const filled = grid[r * content.cols + c];
+						return (
+							<TouchableOpacity
+								key={c}
+								onPress={() => toggle(r, c)}
+								style={[
+									nsh.nonoCell,
+									{ width: CELL, height: CELL },
+									filled
+										? { backgroundColor: theme.wall }
+										: { backgroundColor: theme.path, borderColor: theme.wall + "80" },
+								]}
+							/>
+						);
+					})}
+				</View>
+			))}
+			{content.hint && <HintStrip text={content.hint} />}
+		</ScrollView>
+	);
+}
+
+// ─── FLOW RENDERER ───────────────────────────────────────────────────────────
+
+function FlowSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin } = props;
+	const content = scene.content as FlowSceneType;
+	const theme = getTheme(content.theme);
+	const [paths, setPaths] = React.useState<Record<string, Array<{ row: number; col: number }>>>({});
+	const [drawing, setDrawing] = React.useState<string | null>(null);
+
+	const CELL = Math.min(50, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+
+	const getDotAt = (r: number, c: number) =>
+		content.dots.find((d) => d.row === r && d.col === c);
+
+	const getPathColor = (r: number, c: number): string | null => {
+		for (const [id, path] of Object.entries(paths)) {
+			if (path.some((p) => p.row === r && p.col === c)) {
+				return content.dots.find((d) => d.id === id)?.color ?? null;
+			}
+		}
+		return null;
+	};
+
+	const handleCellPress = (r: number, c: number) => {
+		const dot = getDotAt(r, c);
+		if (dot) {
+			setDrawing(dot.id);
+			setPaths((prev) => ({ ...prev, [dot.id]: [{ row: r, col: c }] }));
+		} else if (drawing) {
+			setPaths((prev) => {
+				const current = prev[drawing] ?? [];
+				const next = [...current, { row: r, col: c }];
+				const updated = { ...prev, [drawing]: next };
+				if (flowComplete(
+					Object.entries(updated).map(([id, path]) => ({ id, path })),
+					content.dots, content.rows, content.cols
+				)) {
+					setTimeout(() => onSceneWin(), 200);
+				}
+				return updated;
+			});
+		}
+	};
+
+	return (
+		<View style={[nsh.flowOuter, { backgroundColor: theme.bg }]}>
+			{content.hint && <HintStrip text={content.hint} />}
+			<View style={nsh.flowGrid}>
+				{Array.from({ length: content.rows }, (_, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{Array.from({ length: content.cols }, (_, c) => {
+							const dot = getDotAt(r, c);
+							const pathColor = getPathColor(r, c);
+							return (
+								<TouchableOpacity
+									key={c}
+									onPress={() => handleCellPress(r, c)}
+									style={[
+										nsh.flowCell,
+										{
+											width: CELL,
+											height: CELL,
+											backgroundColor: pathColor ?? theme.path,
+											borderColor: theme.wall + "40",
+										},
+									]}
+									activeOpacity={0.8}
+								>
+									{dot && (
+										<View
+											style={[
+												nsh.flowDot,
+												{
+													width: CELL * 0.7,
+													height: CELL * 0.7,
+													borderRadius: CELL * 0.35,
+													backgroundColor: dot.color,
+												},
+											]}
+										/>
+									)}
+								</TouchableOpacity>
+							);
+						})}
+					</View>
+				))}
+			</View>
+			<TouchableOpacity style={nsh.checkBtn} onPress={() => setDrawing(null)}>
+				<Text style={nsh.checkBtnText}>Done Drawing</Text>
+			</TouchableOpacity>
+		</View>
+	);
+}
+
+// ─── SLIDING PUZZLE RENDERER ──────────────────────────────────────────────────
+
+function SlidingPuzzleSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin } = props;
+	const content = scene.content as SlidingPuzzleSceneType;
+	const theme = getTheme(content.theme);
+	const [grid, setGrid] = React.useState(content.initial);
+
+	const CELL = Math.min(80, Math.floor((SCREEN_WIDTH - 40) / content.size));
+
+	const handleTile = (idx: number) => {
+		const emptyIdx = grid.indexOf(0);
+		const row = Math.floor(idx / content.size);
+		const col = idx % content.size;
+		const eRow = Math.floor(emptyIdx / content.size);
+		const eCol = emptyIdx % content.size;
+
+		let dir: Direction | null = null;
+		if (row === eRow && col === eCol - 1) dir = "right";
+		else if (row === eRow && col === eCol + 1) dir = "left";
+		else if (row === eRow - 1 && col === eCol) dir = "bottom";
+		else if (row === eRow + 1 && col === eCol) dir = "top";
+
+		if (!dir) return;
+		const next = slidingPuzzleMove(grid, content.size, dir);
+		if (!next) return;
+		setGrid(next);
+		if (slidingPuzzleSolved(next)) onSceneWin();
+	};
+
+	return (
+		<View style={[nsh.slideOuter, { backgroundColor: theme.bg }]}>
+			{content.hint && <HintStrip text={content.hint} />}
+			<View style={nsh.slideGrid}>
+				{grid.map((val, idx) => (
+					<TouchableOpacity
+						key={idx}
+						onPress={() => val !== 0 && handleTile(idx)}
+						style={[
+							nsh.slideTile,
+							{
+								width: CELL,
+								height: CELL,
+								margin: 2,
+								backgroundColor: val === 0 ? "transparent" : theme.path,
+								borderColor: theme.wall,
+								borderWidth: val === 0 ? 0 : 1.5,
+							},
+						]}
+						activeOpacity={val === 0 ? 1 : 0.7}
+					>
+						{val !== 0 && (
+							<Text style={[nsh.slideTileText, { color: theme.text, fontSize: CELL * 0.4 }]}>
+								{val}
+							</Text>
+						)}
+					</TouchableOpacity>
+				))}
+			</View>
+		</View>
+	);
+}
+
+// ─── LOGIC GRID RENDERER ─────────────────────────────────────────────────────
+
+function LogicGridSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onWrong } = props;
+	const content = scene.content as LogicGridSceneType;
+	const primary = content.categories[0];
+	const others = content.categories.slice(1);
+
+	type CellState = "empty" | "yes" | "no";
+	const [cells, setCells] = React.useState<Record<string, CellState>>({});
+
+	const toggle = (key: string) => {
+		setCells((prev) => {
+			const cur = prev[key] ?? "empty";
+			const next: CellState = cur === "empty" ? "yes" : cur === "yes" ? "no" : "empty";
+			return { ...prev, [key]: next };
+		});
+	};
+
+	const handleCheck = () => {
+		let correct = true;
+		for (let i = 0; i < primary.items.length; i++) {
+			const entity = primary.items[i];
+			for (const cat of others) {
+				const solRow = content.solution[i];
+				const expected = solRow?.[cat.id];
+				for (const item of cat.items) {
+					const key = `${entity}_${cat.id}_${item}`;
+					const state = cells[key] ?? "empty";
+					const shouldBeYes = item === expected;
+					if (shouldBeYes && state !== "yes") correct = false;
+					if (!shouldBeYes && state === "yes") correct = false;
+				}
+			}
+		}
+		if (correct) onSceneWin();
+		else onWrong();
+	};
+
+	return (
+		<ScrollView contentContainerStyle={nsh.lgridOuter}>
+			{content.clues.map((clue, i) => (
+				<View key={i} style={nsh.lgridClue}>
+					<Text style={nsh.lgridClueText}>• {clue}</Text>
+				</View>
+			))}
+			{others.map((cat) => (
+				<View key={cat.id} style={{ marginBottom: Spacing.md }}>
+					<Text style={nsh.lgridCatLabel}>{cat.label}</Text>
+					<View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+						{primary.items.map((entity) => (
+							<View key={entity} style={nsh.lgridRow}>
+								<Text style={nsh.lgridEntityLabel}>{entity}</Text>
+								{cat.items.map((item) => {
+									const key = `${entity}_${cat.id}_${item}`;
+									const state = cells[key] ?? "empty";
+									return (
+										<TouchableOpacity
+											key={item}
+											style={[
+												nsh.lgridCell,
+												state === "yes" && nsh.lgridCellYes,
+												state === "no" && nsh.lgridCellNo,
+											]}
+											onPress={() => toggle(key)}
+										>
+											<Text style={nsh.lgridCellText}>
+												{state === "yes" ? "✓" : state === "no" ? "✗" : ""}
+											</Text>
+										</TouchableOpacity>
+									);
+								})}
+							</View>
+						))}
+					</View>
+					<View style={{ flexDirection: "row", paddingLeft: 80 }}>
+						{cat.items.map((item) => (
+							<Text key={item} style={nsh.lgridItemLabel} numberOfLines={1}>{item}</Text>
+						))}
+					</View>
+				</View>
+			))}
+			<TouchableOpacity style={nsh.checkBtn} onPress={handleCheck}>
+				<Text style={nsh.checkBtnText}>Check Solution</Text>
+			</TouchableOpacity>
+		</ScrollView>
+	);
+}
+
+// ─── MINESWEEPER RENDERER ─────────────────────────────────────────────────────
+
+function MinesweeperSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onSceneLose } = props;
+	const content = scene.content as MinesweeperSceneType;
+	const board = React.useMemo(
+		() => minesweeperBuildBoard(content.rows, content.cols, content.mines),
+		[content]
+	);
+	const [revealed, setRevealed] = React.useState<boolean[]>(
+		Array(content.rows * content.cols).fill(false)
+	);
+	const [flagged, setFlagged] = React.useState<boolean[]>(
+		Array(content.rows * content.cols).fill(false)
+	);
+	const [dead, setDead] = React.useState(false);
+
+	const CELL = Math.min(38, Math.floor((SCREEN_WIDTH - 40) / content.cols));
+
+	const reveal = (r: number, c: number) => {
+		const idx = r * content.cols + c;
+		if (revealed[idx] || flagged[idx] || dead) return;
+		if (board[idx] === -1) {
+			setDead(true);
+			onSceneLose();
+			return;
+		}
+		const next = [...revealed];
+		const flood = (ri: number, ci: number) => {
+			const i = ri * content.cols + ci;
+			if (ri < 0 || ri >= content.rows || ci < 0 || ci >= content.cols) return;
+			if (next[i]) return;
+			next[i] = true;
+			if (board[i] === 0) {
+				for (let dr = -1; dr <= 1; dr++)
+					for (let dc = -1; dc <= 1; dc++)
+						if (dr !== 0 || dc !== 0) flood(ri + dr, ci + dc);
+			}
+		};
+		flood(r, c);
+		setRevealed(next);
+		if (minesweeperWon(next, board)) onSceneWin();
+	};
+
+	const flag = (r: number, c: number) => {
+		const idx = r * content.cols + c;
+		if (revealed[idx] || dead) return;
+		const next = [...flagged];
+		next[idx] = !next[idx];
+		setFlagged(next);
+	};
+
+	const NUM_COLORS = ["", "#3B82F6","#10B981","#EF4444","#7C3AED","#F59E0B","#06B6D4","#000","#6B7280"];
+
+	return (
+		<ScrollView contentContainerStyle={nsh.mineOuter}>
+			{content.hint && <HintStrip text={content.hint} />}
+			{dead && <Text style={nsh.mineDead}>💥 Game Over — tap a safe cell to try again</Text>}
+			<View style={nsh.mineGrid}>
+				{Array.from({ length: content.rows }, (_, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{Array.from({ length: content.cols }, (_, c) => {
+							const idx = r * content.cols + c;
+							const isRev = revealed[idx];
+							const isFlag = flagged[idx];
+							const val = board[idx];
+							return (
+								<TouchableOpacity
+									key={c}
+									onPress={() => reveal(r, c)}
+									onLongPress={() => flag(r, c)}
+									style={[
+										nsh.mineCell,
+										{ width: CELL, height: CELL },
+										isRev ? nsh.mineCellRevealed : nsh.mineCellHidden,
+									]}
+									activeOpacity={0.7}
+								>
+									{isFlag && !isRev && <Text style={{ fontSize: CELL * 0.5 }}>🚩</Text>}
+									{isRev && val === -1 && <Text style={{ fontSize: CELL * 0.5 }}>💣</Text>}
+									{isRev && val > 0 && (
+										<Text style={[nsh.mineNum, { color: NUM_COLORS[val], fontSize: CELL * 0.5 }]}>
+											{val}
+										</Text>
+									)}
+								</TouchableOpacity>
+							);
+						})}
+					</View>
+				))}
+			</View>
+		</ScrollView>
+	);
+}
+
+// ─── MERGE GRID RENDERER (2048-style) ────────────────────────────────────────
+
+function MergeGridSceneRenderer(props: SceneRendererProps) {
+	const { scene, onSceneWin, onSceneLose } = props;
+	const content = scene.content as MergeGridSceneType;
+	const theme = getTheme(content.theme);
+
+	const initGrid = (): number[][] => {
+		const flat = [...content.initial];
+		return Array.from({ length: content.size }, (_, r) =>
+			flat.slice(r * content.size, r * content.size + content.size)
+		);
+	};
+
+	const [grid, setGrid] = React.useState<number[][]>(initGrid);
+	const [score, setScore] = React.useState(0);
+
+	const addRandom = (g: number[][]): number[][] => {
+		const empty: Array<[number, number]> = [];
+		g.forEach((row, r) => row.forEach((v, c) => { if (v === 0) empty.push([r, c]); }));
+		if (empty.length === 0) return g;
+		const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+		const next = g.map((row) => [...row]);
+		next[r][c] = Math.random() < 0.9 ? 2 : 4;
+		return next;
+	};
+
+	const handleSwipe = (dir: "left" | "right" | "up" | "down") => {
+		const result = mergeGridSwipe(grid, dir);
+		if (!result) return;
+		const next = addRandom(result.grid);
+		setGrid(next);
+		setScore((s) => s + result.score);
+		const maxTile = Math.max(...next.flat());
+		if (maxTile >= content.target) onSceneWin();
+	};
+
+	const CELL = Math.min(72, Math.floor((SCREEN_WIDTH - 40) / content.size));
+
+	const tileColor = (val: number): string => {
+		const colors: Record<number, string> = {
+			0: theme.path, 2: "#eee4da", 4: "#ede0c8", 8: "#f2b179",
+			16: "#f59563", 32: "#f67c5f", 64: "#f65e3b",
+			128: "#edcf72", 256: "#edcc61", 512: "#edc850",
+			1024: "#edc53f", 2048: "#edc22e",
+		};
+		return colors[val] ?? theme.accent;
+	};
+
+	return (
+		<View style={[nsh.mergeOuter, { backgroundColor: theme.bg }]}>
+			<Text style={[nsh.mergeScore, { color: theme.text }]}>
+				Score: {score}  |  Target: {content.target}
+			</Text>
+			{content.hint && <HintStrip text={content.hint} />}
+			<View style={[nsh.mergeGrid, { backgroundColor: theme.wall }]}>
+				{grid.map((row, r) => (
+					<View key={r} style={{ flexDirection: "row" }}>
+						{row.map((val, c) => (
+							<View
+								key={c}
+								style={[
+									nsh.mergeTile,
+									{ width: CELL, height: CELL, backgroundColor: tileColor(val) },
+								]}
+							>
+								{val !== 0 && (
+									<Text style={[nsh.mergeTileText, { fontSize: val >= 1000 ? CELL * 0.28 : CELL * 0.38 }]}>
+										{val}
+									</Text>
+								)}
+							</View>
+						))}
+					</View>
+				))}
+			</View>
+			<View style={nsh.mergeDpad}>
+				<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => handleSwipe("up")}>
+					<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▲</Text>
+				</TouchableOpacity>
+				<View style={{ flexDirection: "row" }}>
+					<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => handleSwipe("left")}>
+						<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>◀</Text>
+					</TouchableOpacity>
+					<View style={{ width: 48, height: 48 }} />
+					<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => handleSwipe("right")}>
+						<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▶</Text>
+					</TouchableOpacity>
+				</View>
+				<TouchableOpacity style={nsh.mazeDpadBtn} onPress={() => handleSwipe("down")}>
+					<Text style={[nsh.mazeDpadIcon, { color: theme.accent }]}>▼</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
+
+// ─── Styles for new renderers ─────────────────────────────────────────────────
+
+const nsh = StyleSheet.create({
+	// shared
+	checkBtn: {
+		backgroundColor: Colors.accent,
+		borderRadius: BorderRadius.lg,
+		paddingVertical: Spacing.md,
+		alignItems: "center",
+		marginTop: Spacing.md,
+		marginHorizontal: Spacing.md,
+		...Shadows.medium,
+	},
+	checkBtnText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+	},
+
+	// CROSSWORD
+	crosswordOuter: { padding: Spacing.md },
+	crosswordClueBar: {
+		backgroundColor: Colors.background.secondary,
+		borderRadius: BorderRadius.sm,
+		padding: Spacing.sm,
+		marginBottom: Spacing.sm,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+	},
+	crosswordClueText: {
+		flex: 1,
+		fontSize: Typography.fontSize.caption,
+		color: Colors.text.primary,
+		fontWeight: Typography.fontWeight.medium,
+	},
+	crosswordDirLabel: {
+		fontSize: Typography.fontSize.small,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.accent,
+		marginLeft: Spacing.sm,
+	},
+	crosswordCell: { borderWidth: 1, borderColor: Colors.borders.primary, alignItems: "center", justifyContent: "center" },
+	crosswordBlack: { backgroundColor: Colors.text.primary },
+	crosswordWhite: { backgroundColor: Colors.background.primary },
+	crosswordSelected: { backgroundColor: Colors.accent + "50" },
+	crosswordWrong: { backgroundColor: Colors.error + "40" },
+	crosswordNumber: { position: "absolute", top: 1, left: 2, color: Colors.text.secondary, fontWeight: Typography.fontWeight.bold },
+	crosswordLetter: { fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	crosswordInput: {
+		borderWidth: 1.5,
+		borderColor: Colors.borders.primary,
+		borderRadius: BorderRadius.sm,
+		padding: Spacing.sm,
+		fontSize: Typography.fontSize.h2,
+		textAlign: "center",
+		marginBottom: Spacing.sm,
+		backgroundColor: Colors.background.primary,
+		color: Colors.text.primary,
+	},
+
+	// WORD SEARCH
+	wsOuter: { padding: Spacing.md, alignItems: "center" },
+	wsGrid: { marginBottom: Spacing.md },
+	wsCell: { borderWidth: 0.5, borderColor: Colors.borders.subtle, alignItems: "center", justifyContent: "center" },
+	wsCellSelected: { backgroundColor: Colors.accent + "60" },
+	wsCellFound: { backgroundColor: Colors.game.correct + "40" },
+	wsLetter: { fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	wsWordList: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: Spacing.sm },
+	wsWord: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xxs, borderRadius: BorderRadius.sm, backgroundColor: Colors.background.secondary },
+	wsWordFound: { textDecorationLine: "line-through", color: Colors.game.correct, backgroundColor: Colors.game.correct + "20" },
+
+	// MAZE
+	mazeOuter: { flex: 1, alignItems: "center", padding: Spacing.md },
+	mazeGrid: { marginVertical: Spacing.md },
+	mazePlayer: { width: 16, height: 16, borderRadius: 8 },
+	mazeStart: { width: 12, height: 12, borderRadius: 6 },
+	mazeDpad: { alignItems: "center", marginTop: Spacing.md },
+	mazeDpadBtn: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+	mazeDpadIcon: { fontSize: 28, fontWeight: Typography.fontWeight.bold },
+
+	// SPELLING BEE
+	beeOuter: { alignItems: "center", padding: Spacing.lg },
+	beeInput: { fontSize: Typography.fontSize.h1, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, letterSpacing: 4, marginBottom: Spacing.sm, minHeight: 44 },
+	beeMessage: { fontSize: Typography.fontSize.body, color: Colors.game.correct, fontWeight: Typography.fontWeight.semiBold, marginBottom: Spacing.sm },
+	beeHexContainer: { width: 240, position: "relative", marginVertical: Spacing.lg },
+	beeHex: { width: 56, height: 56, backgroundColor: Colors.background.secondary, borderRadius: 12, alignItems: "center", justifyContent: "center", ...Shadows.light },
+	beeHexCenter: { position: "absolute", top: 46, left: 92, backgroundColor: Colors.accent, ...Shadows.glowAccent },
+	beeHexLetter: { fontSize: Typography.fontSize.h3, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	beeActions: { flexDirection: "row", gap: Spacing.md, marginTop: Spacing.md },
+	beeActionBtn: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: BorderRadius.pill, borderWidth: 1.5, borderColor: Colors.text.primary },
+	beeSubmitBtn: { backgroundColor: Colors.text.primary },
+	beeActionText: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, color: Colors.text.primary },
+	beeFoundCount: { marginTop: Spacing.md, fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
+
+	// LETTER GRID
+	lgOuter: { flex: 1, alignItems: "center", padding: Spacing.md },
+	lgGrid: { marginBottom: Spacing.md },
+	lgCell: { borderWidth: 1, borderColor: Colors.borders.subtle, alignItems: "center", justifyContent: "center", margin: 2, backgroundColor: Colors.background.secondary },
+	lgCellActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+	lgCellFound: { backgroundColor: Colors.game.correct + "40", borderColor: Colors.game.correct },
+	lgLetter: { fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+
+	// NONOGRAM
+	nonoOuter: { padding: Spacing.md, alignItems: "center" },
+	nonoColClue: { alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
+	nonoRowClue: { alignItems: "flex-end", justifyContent: "center", paddingRight: 4 },
+	nonoClueText: { fontSize: 11, fontWeight: Typography.fontWeight.semiBold },
+	nonoCell: { borderWidth: 0.5, margin: 0.5 },
+
+	// FLOW
+	flowOuter: { flex: 1, alignItems: "center", padding: Spacing.md },
+	flowGrid: { marginVertical: Spacing.md },
+	flowCell: { borderWidth: 0.5, alignItems: "center", justifyContent: "center" },
+	flowDot: {},
+
+	// SLIDING PUZZLE
+	slideOuter: { flex: 1, alignItems: "center", padding: Spacing.lg },
+	slideGrid: { flexDirection: "row", flexWrap: "wrap" },
+	slideTile: { alignItems: "center", justifyContent: "center", borderRadius: BorderRadius.sm },
+	slideTileText: { fontWeight: Typography.fontWeight.bold },
+
+	// LOGIC GRID
+	lgridOuter: { padding: Spacing.md },
+	lgridClue: { marginBottom: Spacing.xs },
+	lgridClueText: { fontSize: Typography.fontSize.caption, color: Colors.text.secondary },
+	lgridCatLabel: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary, marginBottom: Spacing.xs },
+	lgridRow: { flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs },
+	lgridEntityLabel: { width: 72, fontSize: Typography.fontSize.small, color: Colors.text.secondary },
+	lgridCell: { width: 36, height: 36, borderWidth: 1, borderColor: Colors.borders.primary, alignItems: "center", justifyContent: "center", marginHorizontal: 1, borderRadius: 4 },
+	lgridCellYes: { backgroundColor: Colors.game.correct + "30", borderColor: Colors.game.correct },
+	lgridCellNo:  { backgroundColor: Colors.error + "20", borderColor: Colors.error },
+	lgridCellText: { fontSize: 16, fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	lgridItemLabel: { width: 36, fontSize: 9, textAlign: "center", color: Colors.text.inactive, marginHorizontal: 1 },
+
+	// MINESWEEPER
+	mineOuter: { padding: Spacing.md, alignItems: "center" },
+	mineGrid: { marginVertical: Spacing.sm },
+	mineCell: { borderRadius: 2, alignItems: "center", justifyContent: "center", margin: 1 },
+	mineCellHidden: { backgroundColor: Colors.background.secondary, borderWidth: 1.5, borderColor: Colors.borders.primary },
+	mineCellRevealed: { backgroundColor: Colors.background.tertiary, borderWidth: 0.5, borderColor: Colors.borders.subtle },
+	mineNum: { fontWeight: Typography.fontWeight.bold },
+	mineDead: { fontSize: Typography.fontSize.caption, color: Colors.error, textAlign: "center", marginBottom: Spacing.sm },
+
+	// MERGE GRID
+	mergeOuter: { flex: 1, alignItems: "center", padding: Spacing.md },
+	mergeScore: { fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, marginBottom: Spacing.sm },
+	mergeGrid: { borderRadius: BorderRadius.sm, padding: 4, gap: 4 },
+	mergeTile: { margin: 3, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+	mergeTileText: { fontWeight: Typography.fontWeight.bold, color: Colors.text.primary },
+	mergeDpad: { alignItems: "center", marginTop: Spacing.md },
 });

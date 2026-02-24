@@ -68,18 +68,22 @@ const SCENE_KIND_OPTIONS: Array<{
 	icon: keyof typeof Ionicons.glyphMap;
 	desc: string;
 }> = [
-	{ kind: "MCQ",              label: "Multiple Choice",   icon: "radio-button-on-outline",   desc: "Question with 2–4 answer choices" },
-	{ kind: "INFO",             label: "Info Card",         icon: "information-circle-outline", desc: "Display text, player taps to continue" },
-	{ kind: "TEXT_INPUT",       label: "Text Answer",       icon: "create-outline",             desc: "Player types the correct answer" },
-	{ kind: "WORD_GUESS",       label: "Word Guess",        icon: "text-outline",               desc: "Guess letters one at a time (hangman)" },
-	{ kind: "WORDLE",           label: "Wordle",            icon: "grid-outline",               desc: "Guess word with colour feedback" },
-	{ kind: "SEQUENCE",         label: "Sequence",          icon: "reorder-four-outline",       desc: "Put items in the correct order" },
-	{ kind: "MEMORY",           label: "Memory Match",      icon: "copy-outline",               desc: "Flip cards to match pairs" },
-	{ kind: "MCQ_MULTI",        label: "Quiz (Multi-Q)",    icon: "list-outline",               desc: "Several MCQ questions in one scene" },
-	{ kind: "TEXT_INPUT_MULTI", label: "Multi Text",        icon: "pencil-outline",             desc: "Multiple typed-answer rounds" },
-	{ kind: "CATEGORY",         label: "Connections",       icon: "apps-outline",               desc: "Sort items into labelled categories" },
-	{ kind: "CODEBREAKER",      label: "CodeBreaker",       icon: "color-palette-outline",      desc: "Crack the hidden colour sequence" },
-	{ kind: "NUMBER_GRID",      label: "Number Grid",       icon: "calculator-outline",         desc: "Fill a number grid (magic square etc.)" },
+	{ kind: "INFO",           label: "Info Card",      icon: "information-circle-outline", desc: "Display text, player taps to continue" },
+	{ kind: "WORD_GUESS",     label: "Hangman",        icon: "text-outline",               desc: "Guess letters one at a time" },
+	{ kind: "WORDLE",         label: "Wordle",         icon: "grid-outline",               desc: "Guess a word with colour feedback" },
+	{ kind: "MEMORY",         label: "Memory Match",   icon: "copy-outline",               desc: "Flip cards to find matching pairs" },
+	{ kind: "CATEGORY",       label: "Connections",    icon: "apps-outline",               desc: "Sort items into labelled categories" },
+	{ kind: "CROSSWORD",      label: "Crossword",      icon: "expand-outline",             desc: "Classic crossword with across & down clues" },
+	{ kind: "WORD_SEARCH",    label: "Word Search",    icon: "search-outline",             desc: "Find hidden words in a letter grid" },
+	{ kind: "SPELLING_BEE",   label: "Spelling Bee",   icon: "flower-outline",             desc: "Build words from 7 letters" },
+	{ kind: "LETTER_GRID",    label: "Letter Grid",    icon: "keypad-outline",             desc: "Connect adjacent letters to spell words" },
+	{ kind: "NONOGRAM",       label: "Nonogram",       icon: "image-outline",              desc: "Fill cells to reveal a picture (Picross)" },
+	{ kind: "FLOW",           label: "Flow Free",      icon: "git-branch-outline",         desc: "Connect colour dot pairs with paths" },
+	{ kind: "SLIDING_PUZZLE", label: "Sliding Puzzle", icon: "move-outline",               desc: "Slide tiles into the correct order" },
+	{ kind: "LOGIC_GRID",     label: "Logic Grid",     icon: "list-outline",               desc: "Deduce answers from clues in a table" },
+	{ kind: "MINESWEEPER",    label: "Minesweeper",    icon: "nuclear-outline",            desc: "Reveal cells without hitting a mine" },
+	{ kind: "MERGE_GRID",     label: "2048",           icon: "swap-horizontal-outline",    desc: "Swipe to merge tiles to reach the target" },
+	{ kind: "MAZE",           label: "Wall Maze",      icon: "git-branch-outline",         desc: "Navigate walls from start to exit" },
 ];
 
 const SCENE_KIND_LABELS: Record<SceneKind, string> = {
@@ -96,6 +100,17 @@ const SCENE_KIND_LABELS: Record<SceneKind, string> = {
 	CODEBREAKER: "CodeBreaker",
 	MEMORY: "Memory Match",
 	INFO: "Info Card",
+	CROSSWORD: "Crossword",
+	WORD_SEARCH: "Word Search",
+	MAZE: "Maze",
+	SPELLING_BEE: "Spelling Bee",
+	LETTER_GRID: "Letter Grid",
+	NONOGRAM: "Nonogram",
+	FLOW: "Flow",
+	SLIDING_PUZZLE: "Sliding Puzzle",
+	LOGIC_GRID: "Logic Grid",
+	MINESWEEPER: "Minesweeper",
+	MERGE_GRID: "Merge Grid",
 };
 
 const CB_COLORS = [
@@ -139,6 +154,49 @@ function defaultContent(kind: SceneKind): SceneContent {
 		}
 		case "INFO":
 			return { kind, text: "", continueLabel: "Continue" };
+		case "CROSSWORD":
+			return { kind, rows: 5, cols: 5, cells: [], clues: { across: [], down: [] } };
+		case "WORD_SEARCH":
+			return { kind, rows: 8, cols: 8, grid: Array(8).fill(Array(8).fill("A")), words: [], solutions: [] };
+		case "MAZE":
+			return { kind, rows: 5, cols: 5, cells: [], start: { row: 0, col: 0 }, end: { row: 4, col: 4 }, theme: "minimal" };
+		case "SPELLING_BEE":
+			return { kind, centerLetter: "A", outerLetters: ["B","C","D","E","F","G"], validWords: ["BAD","CAD","DAB","CAB","FAD","BEAD","CAFE","BADE","FACE","DECADE"], wordsToWin: 5 };
+		case "LETTER_GRID":
+			return { kind, rows: 4, cols: 4, grid: Array(4).fill(Array(4).fill("A")), words: [], solutions: [] };
+		case "NONOGRAM":
+			return { kind, rows: 5, cols: 5, rowClues: Array(5).fill([1]), colClues: Array(5).fill([1]), solution: Array(25).fill(false) };
+		case "FLOW":
+			return { kind, rows: 5, cols: 5, dots: [], solution: [] };
+		case "SLIDING_PUZZLE":
+			return { kind, size: 3, initial: [1,2,3,4,5,6,7,0,8] };
+		case "LOGIC_GRID":
+			return {
+				kind,
+				categories: [
+					{ id: "people", label: "People", items: ["Alice", "Bob", "Charlie"] },
+					{ id: "pets", label: "Pets", items: ["Cat", "Dog", "Fish"] },
+				],
+				clues: [
+					"Alice does not have a dog",
+					"Bob does not have a cat",
+					"Charlie has the dog",
+				],
+				solution: [
+					{ pets: "Cat" },
+					{ pets: "Fish" },
+					{ pets: "Dog" },
+				],
+			};
+		case "MINESWEEPER":
+			return { kind, rows: 8, cols: 8, mines: [
+				{ row: 0, col: 5 }, { row: 1, col: 2 }, { row: 2, col: 7 },
+				{ row: 3, col: 1 }, { row: 3, col: 4 }, { row: 4, col: 6 },
+				{ row: 5, col: 0 }, { row: 5, col: 3 }, { row: 6, col: 5 },
+				{ row: 7, col: 2 },
+			] };
+		case "MERGE_GRID":
+			return { kind, size: 4, initial: [2,0,2,0, 0,4,0,2, 2,0,0,4, 0,2,4,0], target: 2048 };
 	}
 }
 
@@ -944,6 +1002,403 @@ function NumberGridEditor({
 	);
 }
 
+// ─── New scene editors ────────────────────────────────────────────────────────
+
+function AIRedirectCard({ kindLabel }: { kindLabel: string }) {
+	const router = useRouter();
+	return (
+		<View style={{ padding: Spacing.lg, alignItems: "center", gap: Spacing.md }}>
+			<Text style={{ fontSize: 32 }}>🤖</Text>
+			<Text style={{ color: Colors.text.primary, fontSize: Typography.fontSize.body, fontWeight: Typography.fontWeight.semiBold, textAlign: "center" }}>
+				{kindLabel} scenes are best built with AI
+			</Text>
+			<Text style={{ color: Colors.text.secondary, fontSize: Typography.fontSize.caption, textAlign: "center", lineHeight: 20 }}>
+				Describe what you want and the AI builder will generate the full puzzle data for you automatically.
+			</Text>
+			<TouchableOpacity
+				style={{ backgroundColor: Colors.accent, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: BorderRadius.md }}
+				onPress={() => router.push("/ai-game-builder" as never)}
+			>
+				<Text style={{ color: "#fff", fontWeight: Typography.fontWeight.semiBold }}>Open AI Builder</Text>
+			</TouchableOpacity>
+		</View>
+	);
+}
+
+function SpellingBeeEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "SPELLING_BEE" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const [newWord, setNewWord] = useState("");
+
+	const addWord = () => {
+		const w = newWord.trim().toUpperCase();
+		if (!w || content.validWords.includes(w)) return;
+		u({ validWords: [...content.validWords, w] });
+		setNewWord("");
+	};
+	const removeWord = (i: number) => u({ validWords: content.validWords.filter((_, j) => j !== i) });
+
+	const setOuter = (i: number, val: string) => {
+		const letter = val.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1);
+		const outer = [...content.outerLetters];
+		outer[i] = letter;
+		u({ outerLetters: outer });
+	};
+
+	return (
+		<>
+			<Field label="Center Letter *">
+				<FInput
+					placeholder="A"
+					value={content.centerLetter}
+					onChangeText={(t) => u({ centerLetter: t.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1) })}
+					autoCapitalize="characters"
+					maxLength={1}
+					style={{ width: 60, textAlign: "center" }}
+				/>
+			</Field>
+			<Field label="6 Outer Letters *">
+				<View style={{ flexDirection: "row", gap: Spacing.sm, flexWrap: "wrap" }}>
+					{Array.from({ length: 6 }).map((_, i) => (
+						<TextInput
+							key={i}
+							style={[fc.input, { width: 48, textAlign: "center", marginBottom: 0 }]}
+							placeholder={["B","C","D","E","F","G"][i]}
+							placeholderTextColor={Colors.text.inactive}
+							value={content.outerLetters[i] ?? ""}
+							onChangeText={(t) => setOuter(i, t)}
+							autoCapitalize="characters"
+							maxLength={1}
+						/>
+					))}
+				</View>
+			</Field>
+			<Field label="Valid Words (must contain the center letter)">
+				<View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.sm }}>
+					<TextInput
+						style={[fc.input, { flex: 1, marginBottom: 0 }]}
+						placeholder="e.g. CAFE"
+						placeholderTextColor={Colors.text.inactive}
+						value={newWord}
+						onChangeText={setNewWord}
+						autoCapitalize="characters"
+						onSubmitEditing={addWord}
+					/>
+					<TouchableOpacity style={[fc.pill, fc.pillActive, { alignSelf: "center" }]} onPress={addWord}>
+						<Text style={fc.pillTextActive}>Add</Text>
+					</TouchableOpacity>
+				</View>
+				<View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs }}>
+					{content.validWords.map((w, i) => (
+						<TouchableOpacity
+							key={i}
+							style={[fc.pill, { flexDirection: "row", alignItems: "center", gap: 4 }]}
+							onPress={() => removeWord(i)}
+						>
+							<Text style={fc.pillText}>{w}</Text>
+							<Ionicons name="close" size={12} color={Colors.text.secondary} />
+						</TouchableOpacity>
+					))}
+				</View>
+			</Field>
+			<Field label="Words needed to win">
+				<PillRow
+					options={[{ value: "3", label: "3" }, { value: "5", label: "5" }, { value: "7", label: "7" }, { value: "10", label: "10" }]}
+					value={String(content.wordsToWin)}
+					onSelect={(v) => u({ wordsToWin: Number(v) })}
+				/>
+			</Field>
+		</>
+	);
+}
+
+function MinesweeperEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "MINESWEEPER" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const [mineCount, setMineCount] = useState(content.mines.length || 10);
+
+	const randomizeMines = () => {
+		const positions: Array<{ row: number; col: number }> = [];
+		const total = content.rows * content.cols;
+		const count = Math.min(mineCount, total - 9);
+		const used = new Set<number>();
+		while (positions.length < count) {
+			const idx = Math.floor(Math.random() * total);
+			if (!used.has(idx)) {
+				used.add(idx);
+				positions.push({ row: Math.floor(idx / content.cols), col: idx % content.cols });
+			}
+		}
+		u({ mines: positions });
+	};
+
+	return (
+		<>
+			<Field label="Grid Size">
+				<PillRow
+					options={[{ value: "8x8", label: "8 × 8" }, { value: "10x10", label: "10 × 10" }, { value: "12x12", label: "12 × 12" }]}
+					value={`${content.rows}x${content.cols}`}
+					onSelect={(v) => {
+						const [r, c] = v.split("x").map(Number);
+						u({ rows: r, cols: c, mines: [] });
+					}}
+				/>
+			</Field>
+			<Field label={`Mine Count: ${mineCount}`}>
+				<PillRow
+					options={[{ value: "5", label: "5" }, { value: "10", label: "10" }, { value: "15", label: "15" }, { value: "20", label: "20" }]}
+					value={String(mineCount)}
+					onSelect={(v) => setMineCount(Number(v))}
+				/>
+			</Field>
+			<TouchableOpacity
+				style={[fc.addBtn, { justifyContent: "center" }]}
+				onPress={randomizeMines}
+			>
+				<Ionicons name="shuffle" size={16} color={Colors.accent} />
+				<Text style={fc.addBtnText}>Randomize Mine Positions ({content.mines.length} placed)</Text>
+			</TouchableOpacity>
+			{content.mines.length === 0 && (
+				<Text style={{ color: Colors.text.inactive, fontSize: Typography.fontSize.caption, marginTop: Spacing.xs }}>
+					Tap "Randomize" to place mines before publishing.
+				</Text>
+			)}
+		</>
+	);
+}
+
+function MergeGridEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "MERGE_GRID" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Grid Size">
+				<PillRow
+					options={[{ value: "3", label: "3 × 3" }, { value: "4", label: "4 × 4" }]}
+					value={String(content.size)}
+					onSelect={(v) => {
+						const size = Number(v);
+						u({ size, initial: Array(size * size).fill(0) });
+					}}
+				/>
+			</Field>
+			<Field label="Target Tile (win condition)">
+				<PillRow
+					options={[
+						{ value: "64", label: "64" },
+						{ value: "128", label: "128" },
+						{ value: "256", label: "256" },
+						{ value: "512", label: "512" },
+						{ value: "1024", label: "1024" },
+						{ value: "2048", label: "2048" },
+					].slice(0, 4)}
+					value={String(content.target)}
+					onSelect={(v) => u({ target: Number(v) })}
+				/>
+				<PillRow
+					options={[
+						{ value: "512", label: "512" },
+						{ value: "1024", label: "1024" },
+						{ value: "2048", label: "2048" },
+					]}
+					value={String(content.target)}
+					onSelect={(v) => u({ target: Number(v) })}
+				/>
+			</Field>
+			<Text style={{ color: Colors.text.secondary, fontSize: Typography.fontSize.caption, marginTop: Spacing.xs }}>
+				The game starts with a few random tiles and generates new ones as the player merges. Tiles start at 2 or 4.
+			</Text>
+		</>
+	);
+}
+
+function SlidingPuzzleEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "SLIDING_PUZZLE" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	return (
+		<>
+			<Field label="Grid Size">
+				<PillRow
+					options={[{ value: "3", label: "3 × 3 (8 tiles)" }, { value: "4", label: "4 × 4 (15 tiles)" }]}
+					value={String(content.size)}
+					onSelect={(v) => {
+						const size = Number(v);
+						const n = size * size;
+						u({ size, initial: [...Array.from({ length: n - 2 }, (_, i) => i + 1), 0, n - 1] });
+					}}
+				/>
+			</Field>
+			<Field label="Hint (optional)">
+				<FInput
+					placeholder="e.g. Slide tiles to form the picture"
+					value={(content as any).hint ?? ""}
+					onChangeText={(t) => u({ hint: t || undefined } as any)}
+				/>
+			</Field>
+			<Text style={{ color: Colors.text.secondary, fontSize: Typography.fontSize.caption, marginTop: Spacing.xs }}>
+				The puzzle is automatically scrambled for each player. Numbered tiles must be arranged 1 → {content.size * content.size - 1} with the blank in the bottom-right.
+			</Text>
+		</>
+	);
+}
+
+function LogicGridEditor({
+	content,
+	onChange,
+}: {
+	content: Extract<SceneContent, { kind: "LOGIC_GRID" }>;
+	onChange: (c: SceneContent) => void;
+}) {
+	const u = (p: Partial<typeof content>) => onChange({ ...content, ...p });
+	const primary = content.categories[0];
+	const others = content.categories.slice(1);
+
+	const updateCatLabel = (ci: number, label: string) =>
+		u({ categories: content.categories.map((c, i) => (i === ci ? { ...c, label } : c)) });
+
+	const updateCatItem = (ci: number, ii: number, val: string) =>
+		u({ categories: content.categories.map((c, i) => i === ci ? { ...c, items: c.items.map((it, j) => j === ii ? val : it) } : c) });
+
+	const addCatItem = (ci: number) =>
+		u({ categories: content.categories.map((c, i) => i === ci ? { ...c, items: [...c.items, ""] } : c) });
+
+	const removeCatItem = (ci: number, ii: number) =>
+		u({ categories: content.categories.map((c, i) => i === ci ? { ...c, items: c.items.filter((_, j) => j !== ii) } : c) });
+
+	const addCategory = () => {
+		const id = `cat${Date.now()}`;
+		u({ categories: [...content.categories, { id, label: "New Category", items: ["Item A", "Item B"] }] });
+	};
+
+	const removeCategory = (ci: number) => {
+		if (content.categories.length <= 2) return;
+		u({ categories: content.categories.filter((_, i) => i !== ci) });
+	};
+
+	const updateClue = (i: number, val: string) =>
+		u({ clues: content.clues.map((c, j) => j === i ? val : c) });
+	const addClue = () => u({ clues: [...content.clues, ""] });
+	const removeClue = (i: number) => u({ clues: content.clues.filter((_, j) => j !== i) });
+
+	const setSolution = (primaryIdx: number, catId: string, item: string) => {
+		const sol = [...(content.solution as Array<Record<string, string>>)];
+		sol[primaryIdx] = { ...sol[primaryIdx], [catId]: item };
+		u({ solution: sol });
+	};
+
+	const sol = content.solution as Array<Record<string, string>>;
+
+	return (
+		<>
+			<Field label="Categories">
+				{content.categories.map((cat, ci) => (
+					<View key={cat.id} style={fc.subCard}>
+						<View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: Spacing.sm }}>
+							<Text style={fc.subCardTitle}>{ci === 0 ? "Primary Category" : `Category ${ci + 1}`}</Text>
+							{content.categories.length > 2 && ci > 0 && (
+								<TouchableOpacity onPress={() => removeCategory(ci)}>
+									<Ionicons name="trash-outline" size={16} color={Colors.game.incorrect} />
+								</TouchableOpacity>
+							)}
+						</View>
+						<FInput
+							placeholder="Category name (e.g. People)"
+							value={cat.label}
+							onChangeText={(t) => updateCatLabel(ci, t)}
+						/>
+						{cat.items.map((item, ii) => (
+							<View key={ii} style={fc.row}>
+								<TextInput
+									style={[fc.input, { flex: 1, marginBottom: 0 }]}
+									placeholder={`Item ${ii + 1}`}
+									placeholderTextColor={Colors.text.inactive}
+									value={item}
+									onChangeText={(t) => updateCatItem(ci, ii, t)}
+								/>
+								{cat.items.length > 2 && (
+									<TouchableOpacity onPress={() => removeCatItem(ci, ii)} style={{ padding: 6 }}>
+										<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+									</TouchableOpacity>
+								)}
+							</View>
+						))}
+						<TouchableOpacity style={[fc.addBtn, { marginTop: Spacing.xs }]} onPress={() => addCatItem(ci)}>
+							<Ionicons name="add" size={14} color={Colors.accent} />
+							<Text style={fc.addBtnText}>Add item</Text>
+						</TouchableOpacity>
+					</View>
+				))}
+				{content.categories.length < 4 && (
+					<TouchableOpacity style={fc.addBtn} onPress={addCategory}>
+						<Ionicons name="add" size={16} color={Colors.accent} />
+						<Text style={fc.addBtnText}>Add category</Text>
+					</TouchableOpacity>
+				)}
+			</Field>
+
+			<Field label="Clues">
+				{content.clues.map((clue, i) => (
+					<View key={i} style={fc.row}>
+						<TextInput
+							style={[fc.input, { flex: 1, marginBottom: 0 }]}
+							placeholder="e.g. Alice does not have a dog"
+							placeholderTextColor={Colors.text.inactive}
+							value={clue}
+							onChangeText={(t) => updateClue(i, t)}
+						/>
+						<TouchableOpacity onPress={() => removeClue(i)} style={{ padding: 6 }}>
+							<Ionicons name="close-circle" size={20} color={Colors.text.inactive} />
+						</TouchableOpacity>
+					</View>
+				))}
+				<TouchableOpacity style={fc.addBtn} onPress={addClue}>
+					<Ionicons name="add" size={16} color={Colors.accent} />
+					<Text style={fc.addBtnText}>Add clue</Text>
+				</TouchableOpacity>
+			</Field>
+
+			<Field label="Solution (who has what)">
+				{primary?.items.map((entity, ei) => (
+					<View key={ei} style={[fc.subCard, { marginBottom: Spacing.sm }]}>
+						<Text style={[fc.subCardTitle, { marginBottom: Spacing.sm }]}>{entity || `Item ${ei + 1}`}</Text>
+						{others.map((cat) => (
+							<View key={cat.id} style={{ marginBottom: Spacing.sm }}>
+								<Text style={[fc.label, { marginBottom: 4 }]}>{cat.label || "Category"}</Text>
+								<PillRow
+									options={cat.items.map((item) => ({ value: item, label: item || "?" }))}
+									value={sol[ei]?.[cat.id] ?? cat.items[0] ?? ""}
+									onSelect={(v) => setSolution(ei, cat.id, v)}
+								/>
+							</View>
+						))}
+					</View>
+				))}
+			</Field>
+		</>
+	);
+}
+
+
 function SceneEditor({
 	content,
 	onChange,
@@ -972,6 +1427,17 @@ function SceneEditor({
 					</Text>
 				</View>
 			);
+		case "SPELLING_BEE":    return <SpellingBeeEditor content={content} onChange={onChange} />;
+		case "MINESWEEPER":     return <MinesweeperEditor content={content} onChange={onChange} />;
+		case "MERGE_GRID":      return <MergeGridEditor content={content} onChange={onChange} />;
+		case "SLIDING_PUZZLE":  return <SlidingPuzzleEditor content={content} onChange={onChange} />;
+		case "LOGIC_GRID":      return <LogicGridEditor content={content} onChange={onChange} />;
+		case "CROSSWORD":       return <AIRedirectCard kindLabel="Crossword" />;
+		case "WORD_SEARCH":     return <AIRedirectCard kindLabel="Word Search" />;
+		case "LETTER_GRID":     return <AIRedirectCard kindLabel="Letter Grid" />;
+		case "NONOGRAM":        return <AIRedirectCard kindLabel="Nonogram" />;
+		case "FLOW":            return <AIRedirectCard kindLabel="Flow Free" />;
+		case "MAZE":            return <AIRedirectCard kindLabel="Wall Maze" />;
 		default:
 			return null;
 	}

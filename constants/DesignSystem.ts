@@ -282,6 +282,7 @@ export const GameColors: Record<PuzzleType, string> = {
 	sequencing: "#8B5CF6", // Violet
 	codebreaker: "#F43F5E", // Rose
 	maze: "#10B981", // Emerald
+	custom: "#fcd34d",    // Golden — matches app accent
 };
 
 /**
@@ -291,6 +292,70 @@ export const GameColors: Record<PuzzleType, string> = {
  */
 export const getGameColor = (gameType: PuzzleType): string => {
 	return GameColors[gameType] || Colors.accent; // Fallback to default accent if type not found
+};
+
+// ─── Category-based colors for custom/AI scene kinds ─────────────────────────
+// All new scene kinds pull from the existing palette — no new colors introduced.
+// Groups games by mechanic family so the palette stays cohesive.
+
+export type SceneCategory =
+	| "word"       // Crossword, Word Search, Spelling Bee, Letter Grid, WordForm, WordChain
+	| "number"     // Sudoku, Nonogram, KenKen, Merge Grid, Magic Square
+	| "logic"      // Logic Grid, Futoshiki, Lights Out, Minesweeper, Inference
+	| "maze"       // Maze, Flow, Pipe Puzzle, Sliding Puzzle, TrailFinder
+	| "guessing"   // Wordle, Hangman, Codebreaker, WordGuess
+	| "trivia"     // Trivia, MCQ, Quizzes
+	| "math"       // Quick Math, KenKen math variant
+	| "sequence";  // Sequence, Connections, Ordering, Merge
+
+export const SceneCategoryColors: Record<SceneCategory, string> = {
+	word:     "#3B82F6", // Blue     — matches wordform
+	number:   "#8B5CF6", // Purple   — matches sudoku
+	logic:    "#6366F1", // Indigo   — matches futoshiki
+	maze:     "#10B981", // Emerald  — matches maze/trailfinder
+	guessing: "#EC4899", // Pink     — matches inference/codebreaker
+	trivia:   "#14B8A6", // Teal     — matches trivia
+	math:     "#EF4444", // Red      — matches quickMath
+	sequence: "#06B6D4", // Cyan     — matches magicSquare/sequencing
+};
+
+// Maps every scene kind (existing + new) to its category
+export const SceneKindCategoryMap: Record<string, SceneCategory> = {
+	// Existing kinds
+	MCQ:               "trivia",
+	MCQ_MULTI:         "trivia",
+	TEXT_INPUT:        "word",
+	TEXT_INPUT_MULTI:  "math",
+	WORD_GUESS:        "guessing",
+	WORDLE:            "guessing",
+	SEQUENCE:          "sequence",
+	CATEGORY:          "sequence",
+	NUMBER_GRID:       "number",
+	PATH:              "maze",
+	CODEBREAKER:       "guessing",
+	MEMORY:            "sequence",
+	INFO:              "trivia",
+	// New kinds
+	CROSSWORD:         "word",
+	WORD_SEARCH:       "word",
+	MAZE:              "maze",
+	SPELLING_BEE:      "word",
+	LETTER_GRID:       "word",
+	NONOGRAM:          "number",
+	FLOW:              "maze",
+	SLIDING_PUZZLE:    "maze",
+	LOGIC_GRID:        "logic",
+	MINESWEEPER:       "logic",
+	MERGE_GRID:        "number",
+};
+
+/**
+ * Returns the correct app-palette color for any scene kind.
+ * Never introduces a new color — always maps to an existing GameColors value.
+ */
+export const getSceneKindColor = (sceneKind: string): string => {
+	const category = SceneKindCategoryMap[sceneKind];
+	return category ? SceneCategoryColors[category] : Colors.accent;
 };
 
 /** Display name for a game type (single source of truth; use for UI labels) */

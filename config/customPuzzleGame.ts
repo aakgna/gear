@@ -166,6 +166,169 @@ export interface InfoScene {
 	continueLabel?: string;
 }
 
+// ─── Visual theme presets for board-based scenes ──────────────────────────────
+// Applied by the renderer — no custom art needed, just coordinated palettes.
+export type BoardTheme =
+	| "cornfield"
+	| "dungeon"
+	| "space"
+	| "underwater"
+	| "forest"
+	| "neon"
+	| "minimal";
+
+// ─── New scene kinds ──────────────────────────────────────────────────────────
+
+/** Classic black/white grid with numbered across + down clues. Crossword style. */
+export interface CrosswordScene {
+	kind: "CROSSWORD";
+	rows: number;
+	cols: number;
+	/** Flat array of cells. black:true = blocked cell. */
+	cells: Array<{
+		row: number;
+		col: number;
+		black: boolean;
+		number?: number;
+		answer?: string; // single letter at this cell
+	}>;
+	clues: {
+		across: Array<{ number: number; clue: string; answer: string; row: number; col: number }>;
+		down:   Array<{ number: number; clue: string; answer: string; row: number; col: number }>;
+	};
+	hint?: string;
+}
+
+/** Letter grid with a word list to find by dragging. Word Search style. */
+export interface WordSearchScene {
+	kind: "WORD_SEARCH";
+	rows: number;
+	cols: number;
+	/** 2D grid of uppercase letters */
+	grid: string[][];
+	words: string[];
+	/** Each word's cell path for validation */
+	solutions: Array<{
+		word: string;
+		cells: Array<{ row: number; col: number }>;
+	}>;
+	hint?: string;
+}
+
+/** Grid with wall data — actual maze with paths, start/end, optional theme. */
+export interface MazeScene {
+	kind: "MAZE";
+	rows: number;
+	cols: number;
+	/** For each cell, which sides have walls */
+	cells: Array<{
+		row: number;
+		col: number;
+		walls: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+	}>;
+	start: { row: number; col: number };
+	end:   { row: number; col: number };
+	theme?: BoardTheme;
+	hint?: string;
+}
+
+/** Hexagonal letter arrangement — tap letters to build words. Spelling Bee style. */
+export interface SpellingBeeScene {
+	kind: "SPELLING_BEE";
+	centerLetter: string;
+	outerLetters: string[]; // exactly 6
+	validWords: string[];
+	/** Minimum number of words needed to win */
+	wordsToWin: number;
+	hint?: string;
+}
+
+/** Rectangular letter grid — connect adjacent letters to form words. Boggle/Strands style. */
+export interface LetterGridScene {
+	kind: "LETTER_GRID";
+	rows: number;
+	cols: number;
+	grid: string[][];
+	words: string[];
+	solutions: Array<{
+		word: string;
+		cells: Array<{ row: number; col: number }>;
+	}>;
+	hint?: string;
+}
+
+/** Grid with row/col number clues — fill cells to reveal a picture. Picross/Nonogram style. */
+export interface NonogramScene {
+	kind: "NONOGRAM";
+	rows: number;
+	cols: number;
+	/** Clue groups per row, e.g. [[3],[1,1],[5]] */
+	rowClues: number[][];
+	colClues: number[][];
+	/** Flat solution array — true = filled, indexed [row * cols + col] */
+	solution: boolean[];
+	theme?: BoardTheme;
+	hint?: string;
+}
+
+/** Colored dots on a grid — draw paths to connect matching pairs. Flow Free style. */
+export interface FlowScene {
+	kind: "FLOW";
+	rows: number;
+	cols: number;
+	dots: Array<{ id: string; color: string; row: number; col: number }>;
+	/** Solution paths per color pair */
+	solution: Array<{
+		id: string;
+		path: Array<{ row: number; col: number }>;
+	}>;
+	theme?: BoardTheme;
+	hint?: string;
+}
+
+/** Numbered tiles on a grid — slide into the empty space to solve. 15-Puzzle style. */
+export interface SlidingPuzzleScene {
+	kind: "SLIDING_PUZZLE";
+	/** 3 = 8-puzzle (3x3), 4 = 15-puzzle (4x4) */
+	size: number;
+	/** Flat array of tile values. 0 = empty space. */
+	initial: number[];
+	theme?: BoardTheme;
+	hint?: string;
+}
+
+/** Category deduction table — mark yes/no for each combination using clues. Logic Grid style. */
+export interface LogicGridScene {
+	kind: "LOGIC_GRID";
+	/** e.g. [{id:"people", label:"People", items:["Alice","Bob","Carol"]}, ...] */
+	categories: Array<{ id: string; label: string; items: string[] }>;
+	clues: string[];
+	/** Flat solution map: entity → {categoryId: value} for each non-primary category */
+	solution: Array<Record<string, string>>;
+	hint?: string;
+}
+
+/** Hidden grid — reveal cells, avoid mines, flag suspects. Minesweeper style. */
+export interface MinesweeperScene {
+	kind: "MINESWEEPER";
+	rows: number;
+	cols: number;
+	mines: Array<{ row: number; col: number }>;
+	hint?: string;
+}
+
+/** Numbered tiles — swipe to merge matching values. 2048 style. */
+export interface MergeGridScene {
+	kind: "MERGE_GRID";
+	size: number; // usually 4
+	/** Initial tile layout — flat array, 0 = empty */
+	initial: number[];
+	/** Score/tile value the player needs to reach to win */
+	target: number;
+	theme?: BoardTheme;
+	hint?: string;
+}
+
 export type SceneContent =
 	| MCQScene
 	| MCQMultiScene
@@ -179,7 +342,18 @@ export type SceneContent =
 	| PathScene
 	| CodeBreakerScene
 	| MemoryScene
-	| InfoScene;
+	| InfoScene
+	| CrosswordScene
+	| WordSearchScene
+	| MazeScene
+	| SpellingBeeScene
+	| LetterGridScene
+	| NonogramScene
+	| FlowScene
+	| SlidingPuzzleScene
+	| LogicGridScene
+	| MinesweeperScene
+	| MergeGridScene;
 
 export interface GameScene {
 	id: string;
@@ -288,6 +462,17 @@ export const SCENE_KINDS = [
 	"CODEBREAKER",
 	"MEMORY",
 	"INFO",
+	"CROSSWORD",
+	"WORD_SEARCH",
+	"MAZE",
+	"SPELLING_BEE",
+	"LETTER_GRID",
+	"NONOGRAM",
+	"FLOW",
+	"SLIDING_PUZZLE",
+	"LOGIC_GRID",
+	"MINESWEEPER",
+	"MERGE_GRID",
 ] as const;
 
 export type SceneKind = (typeof SCENE_KINDS)[number];

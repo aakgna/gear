@@ -391,3 +391,399 @@ export function runMechanicSanityTests(): void {
 
 	console.log("[mechanic] All sanity tests complete.");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW SCENE KIND MECHANICS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── CROSSWORD ────────────────────────────────────────────────────────────────
+
+/**
+ * Checks whether a player's letter at a crossword cell matches the answer.
+ */
+export function crosswordCellCorrect(
+	input: string,
+	expected: string
+): boolean {
+	return input.trim().toUpperCase() === expected.trim().toUpperCase();
+}
+
+/**
+ * Returns true when every non-black cell in the player grid matches the solution.
+ * playerGrid is a flat Record<"row_col", string>.
+ */
+export function crosswordComplete(
+	playerGrid: Record<string, string>,
+	solution: Array<{ row: number; col: number; answer: string }>
+): boolean {
+	return solution.every(
+		(cell) =>
+			(playerGrid[`${cell.row}_${cell.col}`] ?? "").toUpperCase() ===
+			cell.answer.toUpperCase()
+	);
+}
+
+// ─── WORD SEARCH ─────────────────────────────────────────────────────────────
+
+/**
+ * Checks whether a sequence of tapped cells matches any valid solution path
+ * for the given word (direction-agnostic — path order must match).
+ */
+export function wordSearchPathValid(
+	tappedCells: Array<{ row: number; col: number }>,
+	solutions: Array<{ word: string; cells: Array<{ row: number; col: number }> }>
+): { found: boolean; word: string | null } {
+	for (const sol of solutions) {
+		if (sol.cells.length !== tappedCells.length) continue;
+		const forward = sol.cells.every(
+			(c, i) => c.row === tappedCells[i].row && c.col === tappedCells[i].col
+		);
+		const backward = sol.cells.every(
+			(c, i) =>
+				c.row === tappedCells[tappedCells.length - 1 - i].row &&
+				c.col === tappedCells[tappedCells.length - 1 - i].col
+		);
+		if (forward || backward) return { found: true, word: sol.word };
+	}
+	return { found: false, word: null };
+}
+
+// ─── MAZE ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if moving from `current` in `direction` is allowed
+ * (i.e. the wall in that direction is absent).
+ */
+export type Direction = "top" | "right" | "bottom" | "left";
+
+export function mazeMoveAllowed(
+	current: { row: number; col: number },
+	direction: Direction,
+	cells: Array<{
+		row: number;
+		col: number;
+		walls: { top: boolean; right: boolean; bottom: boolean; left: boolean };
+	}>
+): boolean {
+	const cell = cells.find(
+		(c) => c.row === current.row && c.col === current.col
+	);
+	if (!cell) return false;
+	return !cell.walls[direction];
+}
+
+/**
+ * Returns the next position after moving in the given direction.
+ */
+export function mazeNextPosition(
+	current: { row: number; col: number },
+	direction: Direction
+): { row: number; col: number } {
+	switch (direction) {
+		case "top":    return { row: current.row - 1, col: current.col };
+		case "bottom": return { row: current.row + 1, col: current.col };
+		case "left":   return { row: current.row, col: current.col - 1 };
+		case "right":  return { row: current.row, col: current.col + 1 };
+	}
+}
+
+// ─── SPELLING BEE ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the word is valid:
+ * - contains the center letter
+ * - uses only the provided letters (center + outer)
+ * - is at least 4 characters long
+ * - is in the valid word list
+ */
+export function spellingBeeWordValid(
+	word: string,
+	centerLetter: string,
+	outerLetters: string[],
+	validWords: string[]
+): { valid: boolean; reason?: string } {
+	const upper = word.toUpperCase();
+	const allowed = new Set([centerLetter.toUpperCase(), ...outerLetters.map((l) => l.toUpperCase())]);
+
+	if (upper.length < 4)
+		return { valid: false, reason: "Too short" };
+	if (!upper.includes(centerLetter.toUpperCase()))
+		return { valid: false, reason: "Must use center letter" };
+	if ([...upper].some((ch) => !allowed.has(ch)))
+		return { valid: false, reason: "Invalid letters used" };
+	if (!validWords.map((w) => w.toUpperCase()).includes(upper))
+		return { valid: false, reason: "Not a valid word" };
+
+	return { valid: true };
+}
+
+// ─── LETTER GRID (Boggle-style) ───────────────────────────────────────────────
+
+/**
+ * Returns true if every consecutive pair of cells in the path is adjacent
+ * (horizontally, vertically, or diagonally) and no cell is reused.
+ */
+export function letterGridPathAdjacent(
+	path: Array<{ row: number; col: number }>
+): boolean {
+	const seen = new Set<string>();
+	for (let i = 0; i < path.length; i++) {
+		const key = `${path[i].row}_${path[i].col}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		if (i > 0) {
+			const dr = Math.abs(path[i].row - path[i - 1].row);
+			const dc = Math.abs(path[i].col - path[i - 1].col);
+			if (dr > 1 || dc > 1) return false;
+		}
+	}
+	return true;
+}
+
+/**
+ * Extracts the word formed by reading letters along a path from a 2D grid.
+ */
+export function letterGridPathWord(
+	path: Array<{ row: number; col: number }>,
+	grid: string[][]
+): string {
+	return path.map((p) => grid[p.row]?.[p.col] ?? "").join("").toUpperCase();
+}
+
+// ─── NONOGRAM ────────────────────────────────────────────────────────────────
+
+/**
+ * Computes the clue groups for a row/column of filled cells.
+ * e.g. [true, true, false, true] → [2, 1]
+ */
+export function nonogramComputeClue(cells: boolean[]): number[] {
+	const groups: number[] = [];
+	let count = 0;
+	for (const filled of cells) {
+		if (filled) {
+			count++;
+		} else if (count > 0) {
+			groups.push(count);
+			count = 0;
+		}
+	}
+	if (count > 0) groups.push(count);
+	return groups;
+}
+
+/**
+ * Returns true if the player's filled rows/cols match all clues.
+ * playerGrid is a flat boolean array indexed [row * cols + col].
+ */
+export function nonogramComplete(
+	playerGrid: boolean[],
+	rows: number,
+	cols: number,
+	rowClues: number[][],
+	colClues: number[][]
+): boolean {
+	for (let r = 0; r < rows; r++) {
+		const rowCells = Array.from({ length: cols }, (_, c) => playerGrid[r * cols + c]);
+		const computed = nonogramComputeClue(rowCells);
+		if (JSON.stringify(computed) !== JSON.stringify(rowClues[r])) return false;
+	}
+	for (let c = 0; c < cols; c++) {
+		const colCells = Array.from({ length: rows }, (_, r) => playerGrid[r * cols + c]);
+		const computed = nonogramComputeClue(colCells);
+		if (JSON.stringify(computed) !== JSON.stringify(colClues[c])) return false;
+	}
+	return true;
+}
+
+// ─── FLOW ────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true when all flow paths are complete:
+ * - each path connects both dots of its color
+ * - all cells in the grid are covered
+ */
+export function flowComplete(
+	playerPaths: Array<{ id: string; path: Array<{ row: number; col: number }> }>,
+	dots: Array<{ id: string; row: number; col: number }>,
+	rows: number,
+	cols: number
+): boolean {
+	const totalCells = rows * cols;
+	const coveredCells = new Set<string>();
+
+	for (const pp of playerPaths) {
+		if (pp.path.length < 2) return false;
+		const dotsForId = dots.filter((d) => d.id === pp.id);
+		if (dotsForId.length !== 2) return false;
+
+		const start = pp.path[0];
+		const end = pp.path[pp.path.length - 1];
+		const [d1, d2] = dotsForId;
+
+		const connectsEndpoints =
+			(start.row === d1.row && start.col === d1.col &&
+				end.row === d2.row && end.col === d2.col) ||
+			(start.row === d2.row && start.col === d2.col &&
+				end.row === d1.row && end.col === d1.col);
+
+		if (!connectsEndpoints) return false;
+		pp.path.forEach((p) => coveredCells.add(`${p.row}_${p.col}`));
+	}
+
+	return coveredCells.size === totalCells;
+}
+
+// ─── SLIDING PUZZLE ───────────────────────────────────────────────────────────
+
+/**
+ * Returns the new flat tile array after sliding the tile adjacent to the
+ * empty space in the given direction, or null if the move is invalid.
+ */
+export function slidingPuzzleMove(
+	grid: number[],
+	size: number,
+	direction: Direction
+): number[] | null {
+	const emptyIdx = grid.indexOf(0);
+	if (emptyIdx === -1) return null;
+
+	const emptyRow = Math.floor(emptyIdx / size);
+	const emptyCol = emptyIdx % size;
+
+	let targetRow = emptyRow;
+	let targetCol = emptyCol;
+
+	// The tile that moves INTO the empty space comes from the opposite direction
+	switch (direction) {
+		case "top":    targetRow = emptyRow + 1; break;
+		case "bottom": targetRow = emptyRow - 1; break;
+		case "left":   targetCol = emptyCol + 1; break;
+		case "right":  targetCol = emptyCol - 1; break;
+	}
+
+	if (targetRow < 0 || targetRow >= size || targetCol < 0 || targetCol >= size)
+		return null;
+
+	const targetIdx = targetRow * size + targetCol;
+	const next = [...grid];
+	[next[emptyIdx], next[targetIdx]] = [next[targetIdx], next[emptyIdx]];
+	return next;
+}
+
+/**
+ * Returns true when tiles are in solved order: [1, 2, ..., n-1, 0].
+ */
+export function slidingPuzzleSolved(grid: number[]): boolean {
+	for (let i = 0; i < grid.length - 1; i++) {
+		if (grid[i] !== i + 1) return false;
+	}
+	return grid[grid.length - 1] === 0;
+}
+
+// ─── MINESWEEPER ──────────────────────────────────────────────────────────────
+
+/**
+ * Pre-computes adjacency numbers for the full board.
+ * Returns a flat array where each value is the mine count for that cell
+ * (or -1 if the cell itself is a mine).
+ */
+export function minesweeperBuildBoard(
+	rows: number,
+	cols: number,
+	mines: Array<{ row: number; col: number }>
+): number[] {
+	const mineSet = new Set(mines.map((m) => `${m.row}_${m.col}`));
+	const board: number[] = [];
+
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c < cols; c++) {
+			if (mineSet.has(`${r}_${c}`)) {
+				board.push(-1);
+				continue;
+			}
+			let count = 0;
+			for (let dr = -1; dr <= 1; dr++) {
+				for (let dc = -1; dc <= 1; dc++) {
+					if (dr === 0 && dc === 0) continue;
+					if (mineSet.has(`${r + dr}_${c + dc}`)) count++;
+				}
+			}
+			board.push(count);
+		}
+	}
+	return board;
+}
+
+/**
+ * Returns true when all non-mine cells are revealed.
+ */
+export function minesweeperWon(
+	revealed: boolean[],
+	board: number[]
+): boolean {
+	return board.every((val, i) => val === -1 || revealed[i]);
+}
+
+// ─── MERGE GRID (2048-style) ──────────────────────────────────────────────────
+
+/**
+ * Slides and merges a single row to the left.
+ * Returns the new row and the score earned from merges.
+ */
+function mergeRow(row: number[]): { row: number[]; score: number } {
+	const filtered = row.filter((v) => v !== 0);
+	let score = 0;
+	const merged: number[] = [];
+	let i = 0;
+	while (i < filtered.length) {
+		if (i + 1 < filtered.length && filtered[i] === filtered[i + 1]) {
+			const val = filtered[i] * 2;
+			merged.push(val);
+			score += val;
+			i += 2;
+		} else {
+			merged.push(filtered[i]);
+			i++;
+		}
+	}
+	while (merged.length < row.length) merged.push(0);
+	return { row: merged, score };
+}
+
+/**
+ * Applies a swipe move to a 2D merge grid.
+ * Returns the new grid and score gained, or null if nothing moved.
+ */
+export function mergeGridSwipe(
+	grid: number[][],
+	direction: "left" | "right" | "up" | "down"
+): { grid: number[][]; score: number } | null {
+	const size = grid.length;
+	let totalScore = 0;
+	const newGrid = grid.map((r) => [...r]);
+
+	const rotateRight = (g: number[][]): number[][] =>
+		g[0].map((_, c) => g.map((row) => row[c]).reverse());
+	const rotateLeft = (g: number[][]): number[][] =>
+		g[0].map((_, c) => g.map((row) => row[row.length - 1 - c]));
+
+	let working = newGrid;
+	if (direction === "right") working = working.map((r) => [...r].reverse());
+	if (direction === "up")    working = rotateLeft(working);
+	if (direction === "down")  working = rotateRight(working);
+
+	const result = working.map((row) => {
+		const { row: merged, score } = mergeRow(row);
+		totalScore += score;
+		return merged;
+	});
+
+	if (direction === "right") result.forEach((r, i) => { result[i] = r.reverse(); });
+	if (direction === "up")    { const r = rotateRight(result); result.forEach((_, i) => { result[i] = r[i]; }); }
+	if (direction === "down")  { const r = rotateLeft(result);  result.forEach((_, i) => { result[i] = r[i]; }); }
+
+	const changed = result.some((row, r) => row.some((v, c) => v !== grid[r][c]));
+	if (!changed) return null;
+
+	return { grid: result, score: totalScore };
+}
