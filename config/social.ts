@@ -1704,6 +1704,7 @@ export const addGameComment = async (
 							userId: creatorId,
 							title: "New Comment",
 							body: `${username} commented on your game: "${gameTitle}"`,
+							gameId: gameId,
 						},
 					}),
 				});
@@ -1880,6 +1881,7 @@ export const likeGameComment = async (
 									userId: commentAuthorId,
 									title: "Comment Liked",
 									body: `${username} liked your comment on "${gameTitle}"`,
+									gameId: gameId,
 								},
 							}),
 						});
@@ -2307,6 +2309,7 @@ export const likeGame = async (
 									userId: creatorId,
 									title: "Game Liked",
 									body: `${username} liked your game: ${gameTitle}`,
+									gameId: gameId,
 								},
 							}),
 						});

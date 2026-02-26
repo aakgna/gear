@@ -4,7 +4,8 @@ import {
 	ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack, usePathname } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
+import messaging from "@react-native-firebase/messaging";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -23,6 +24,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
 	const colorScheme = useColorScheme();
 	const pathname = usePathname();
+	const router = useRouter();
 	const [loaded] = useFonts({
 		SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
 	});
@@ -32,6 +34,33 @@ export default function RootLayout() {
 			SplashScreen.hideAsync();
 		}
 	}, [loaded]);
+
+	// Handle push notification taps
+	useEffect(() => {
+		// App was in the background and user tapped the notification
+		const unsubscribe = messaging().onNotificationOpenedApp((remoteMessage) => {
+			const gameId = remoteMessage.data?.gameId as string | undefined;
+			if (gameId) {
+				router.push(`/play-game/${gameId}`);
+			} else {
+				router.push("/notifications");
+			}
+		});
+
+		// App was fully closed and user tapped the notification to open it
+		messaging().getInitialNotification().then((remoteMessage) => {
+			if (remoteMessage) {
+				const gameId = remoteMessage.data?.gameId as string | undefined;
+				if (gameId) {
+					router.push(`/play-game/${gameId}`);
+				} else {
+					router.push("/notifications");
+				}
+			}
+		});
+
+		return unsubscribe;
+	}, []);
 
 	if (!loaded) {
 		return null;
