@@ -252,12 +252,14 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			normalizedGameType === "magicSquare" &&
 			gameData.size &&
 			gameData.grid &&
-			gameData.magicConstant
+			gameData.magicConstant !== undefined &&
+			gameData.givens
 		) {
 			puzzleData = {
 				size: gameData.size,
 				grid: gameData.grid,
 				magicConstant: gameData.magicConstant,
+				givens: gameData.givens,
 			} as MagicSquareData;
 			isValid = true;
 		}

@@ -48,7 +48,7 @@ const MagicSquareGame: React.FC<MagicSquareGameProps> = ({
 	const insets = useSafeAreaInsets();
 	const BOTTOM_NAV_HEIGHT = 70; // Height of bottom navigation bar
 	const gameColor = getGameColor("magicSquare"); // Get game-specific cyan color (#06B6D4)
-	const { size, grid, magicConstant, givens } = inputData;
+	const { size, grid, magicConstant, givens = [] } = inputData;
 
 	// Reconstruct 2D grid from 1D array
 	const reconstructGrid = (flatGrid: number[], size: number): number[][] => {
