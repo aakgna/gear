@@ -5,6 +5,8 @@
 expo-env.d.ts
 # @end expo-cli
 
+# Ignore env files
+.env
 node_modules/
 ios/
 android/
