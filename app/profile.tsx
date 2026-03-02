@@ -21,6 +21,9 @@ import {
 	Modal,
 	FlatList,
 	Switch,
+	TextInput,
+	KeyboardAvoidingView,
+	Platform as RNPlatform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSessionEndRefresh } from "../utils/sessionRefresh";
@@ -40,6 +43,8 @@ import {
 	getFCMToken,
 	registerFCMToken,
 	removeFCMToken,
+	sendPhoneVerificationCode,
+	reauthenticateWithPhoneCode,
 } from "../config/auth";
 import {
 	Colors,
@@ -133,6 +138,12 @@ const ProfileScreen = () => {
 	// Notification toggle state
 	const [showNotifModal, setShowNotifModal] = useState(false);
 	const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+	// Phone re-authentication state (for account deletion)
+	const [showPhoneReauthModal, setShowPhoneReauthModal] = useState(false);
+	const [phoneReauthCode, setPhoneReauthCode] = useState("");
+	const [phoneReauthConfirmation, setPhoneReauthConfirmation] = useState<any>(null);
+	const [phoneReauthLoading, setPhoneReauthLoading] = useState(false);
+	const [pendingDeleteUser, setPendingDeleteUser] = useState<{ uid: string; username?: string } | null>(null);
 	// Cache flags to track which tabs have been loaded
 	const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
 	const currentUser = getCurrentUser();
@@ -1156,6 +1167,31 @@ const ProfileScreen = () => {
 		);
 	};
 
+	const handlePhoneReauth = async () => {
+		if (!phoneReauthCode || !phoneReauthConfirmation || !pendingDeleteUser) return;
+		setPhoneReauthLoading(true);
+		try {
+			await reauthenticateWithPhoneCode(phoneReauthConfirmation.verificationId, phoneReauthCode);
+			setShowPhoneReauthModal(false);
+			setPhoneReauthCode("");
+			setPhoneReauthConfirmation(null);
+			setDeletingAccount(true);
+			await deleteAccount(pendingDeleteUser.uid, pendingDeleteUser.username);
+			setPendingDeleteUser(null);
+			resetProgress();
+			Alert.alert(
+				"Account Deleted",
+				"Your account has been successfully deleted.",
+				[{ text: "OK", onPress: () => router.replace("/signin") }]
+			);
+		} catch (error: any) {
+			Alert.alert("Error", error.message || "Verification failed. Please try again.");
+		} finally {
+			setPhoneReauthLoading(false);
+			setDeletingAccount(false);
+		}
+	};
+
 	const handleDeleteAccount = () => {
 		Alert.alert(
 			"Delete Account",
@@ -1176,17 +1212,14 @@ const ProfileScreen = () => {
 									text: "Yes, Delete",
 									style: "destructive",
 									onPress: async () => {
+										const user = getCurrentUser();
+										if (!user) {
+											Alert.alert("Error", "No user found. Please sign in again.");
+											return;
+										}
+
 										setDeletingAccount(true);
 										try {
-											const user = getCurrentUser();
-											if (!user) {
-												Alert.alert(
-													"Error",
-													"No user found. Please sign in again."
-												);
-												return;
-											}
-
 											await deleteAccount(user.uid, userData?.username);
 											resetProgress();
 											Alert.alert(
@@ -1201,11 +1234,26 @@ const ProfileScreen = () => {
 											);
 										} catch (error: any) {
 											console.error("Error deleting account:", error);
-											Alert.alert(
-												"Error",
-												error.message ||
-													"Failed to delete account. Please try again."
-											);
+											if (error?.code === "auth/requires-phone-reauth") {
+												try {
+													const phoneNumber = error.phoneNumber;
+													if (!phoneNumber) {
+														Alert.alert("Error", "Could not determine your phone number. Please sign in again.");
+														return;
+													}
+													const confirmation = await sendPhoneVerificationCode(phoneNumber);
+													setPhoneReauthConfirmation(confirmation);
+													setPendingDeleteUser({ uid: user.uid, username: userData?.username });
+													setShowPhoneReauthModal(true);
+												} catch (smsError: any) {
+													Alert.alert("Error", smsError.message || "Failed to send verification code.");
+												}
+											} else {
+												Alert.alert(
+													"Error",
+													error.message || "Failed to delete account. Please try again."
+												);
+											}
 										} finally {
 											setDeletingAccount(false);
 										}
@@ -1881,6 +1929,76 @@ const ProfileScreen = () => {
 					</View>
 				</View>
 			</Modal>
+
+			{/* Phone Re-authentication Modal (for account deletion) */}
+			<Modal
+				visible={showPhoneReauthModal}
+				transparent={true}
+				animationType="fade"
+				onRequestClose={() => {
+					if (!phoneReauthLoading) {
+						setShowPhoneReauthModal(false);
+						setPhoneReauthCode("");
+					}
+				}}
+			>
+				<KeyboardAvoidingView
+					behavior={RNPlatform.OS === "ios" ? "padding" : "height"}
+					style={styles.phoneReauthOverlay}
+				>
+					<TouchableWithoutFeedback onPress={() => {
+						if (!phoneReauthLoading) {
+							setShowPhoneReauthModal(false);
+							setPhoneReauthCode("");
+						}
+					}}>
+						<View style={StyleSheet.absoluteFill} />
+					</TouchableWithoutFeedback>
+					<View style={styles.phoneReauthContent}>
+						<Text style={styles.phoneReauthTitle}>Verify Your Identity</Text>
+						<Text style={styles.phoneReauthDesc}>
+							A verification code has been sent to your phone number. Enter it below to confirm account deletion.
+						</Text>
+						<TextInput
+							style={styles.phoneReauthInput}
+							placeholder="Enter verification code"
+							placeholderTextColor={Colors.text.secondary}
+							value={phoneReauthCode}
+							onChangeText={setPhoneReauthCode}
+							keyboardType="number-pad"
+							maxLength={6}
+							autoFocus
+						/>
+						<TouchableOpacity
+							style={[
+								styles.phoneReauthButton,
+								(!phoneReauthCode || phoneReauthLoading) && styles.phoneReauthButtonDisabled,
+							]}
+							onPress={handlePhoneReauth}
+							disabled={!phoneReauthCode || phoneReauthLoading}
+							activeOpacity={0.7}
+						>
+							{phoneReauthLoading ? (
+								<ActivityIndicator size="small" color="#fff" />
+							) : (
+								<Text style={styles.phoneReauthButtonText}>Confirm & Delete Account</Text>
+							)}
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.phoneReauthCancel}
+							onPress={() => {
+								if (!phoneReauthLoading) {
+									setShowPhoneReauthModal(false);
+									setPhoneReauthCode("");
+								}
+							}}
+							disabled={phoneReauthLoading}
+						>
+							<Text style={styles.phoneReauthCancelText}>Cancel</Text>
+						</TouchableOpacity>
+					</View>
+				</KeyboardAvoidingView>
+			</Modal>
 		</View>
 	);
 };
@@ -2464,6 +2582,68 @@ const styles = StyleSheet.create({
 		fontSize: Typography.fontSize.body,
 		color: Colors.text.secondary,
 		marginTop: Spacing.md,
+	},
+	phoneReauthOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.7)",
+		justifyContent: "center",
+		alignItems: "center",
+		padding: Spacing.lg,
+	},
+	phoneReauthContent: {
+		width: "100%",
+		maxWidth: 400,
+		backgroundColor: Colors.background.primary,
+		borderRadius: BorderRadius.lg,
+		padding: Spacing.xl,
+		...Shadows.medium,
+	},
+	phoneReauthTitle: {
+		fontSize: Typography.fontSize.h3,
+		fontWeight: Typography.fontWeight.bold,
+		color: Colors.text.primary,
+		marginBottom: Spacing.sm,
+	},
+	phoneReauthDesc: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
+		marginBottom: Spacing.lg,
+		lineHeight: 22,
+	},
+	phoneReauthInput: {
+		borderWidth: 1,
+		borderColor: Colors.border,
+		borderRadius: BorderRadius.md,
+		paddingHorizontal: Spacing.md,
+		paddingVertical: Spacing.sm,
+		fontSize: Typography.fontSize.h3,
+		color: Colors.text.primary,
+		textAlign: "center",
+		letterSpacing: 4,
+		marginBottom: Spacing.lg,
+	},
+	phoneReauthButton: {
+		backgroundColor: Colors.error,
+		borderRadius: BorderRadius.md,
+		paddingVertical: Spacing.md,
+		alignItems: "center",
+		marginBottom: Spacing.sm,
+	},
+	phoneReauthButtonDisabled: {
+		opacity: 0.5,
+	},
+	phoneReauthButtonText: {
+		fontSize: Typography.fontSize.body,
+		fontWeight: Typography.fontWeight.bold,
+		color: "#fff",
+	},
+	phoneReauthCancel: {
+		paddingVertical: Spacing.sm,
+		alignItems: "center",
+	},
+	phoneReauthCancelText: {
+		fontSize: Typography.fontSize.body,
+		color: Colors.text.secondary,
 	},
 });
 

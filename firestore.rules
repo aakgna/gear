@@ -96,7 +96,7 @@ service cloud.firestore {
         allow write: if isAuthenticated();
       }
 
-      // Notifications — owner reads and deletes their own
+      // Notifications — owner reads their own
       // Any authenticated user may create or update:
       //   • followUser creates a follow notification for the target
       //   • likeGame / addGameComment / likeGameComment create/update grouped
@@ -104,10 +104,11 @@ service cloud.firestore {
       //   • unlikeGame / unlikeGameComment update the recipient's notification
       // Any authenticated user may delete:
       //   • account-deletion cascade removes notifications the deleted user created
+      // Authenticated users may also read another user's notifications when
+      // they are the sender — required for account-deletion cleanup to locate
+      // and remove/update notifications they created in other users' feeds.
       match /notifications/{notificationId} {
-        allow read: if isOwner(userId);
-        allow create, update: if isAuthenticated();
-        allow delete: if isAuthenticated();
+        allow read, write: if isAuthenticated();
       }
 
       // Reports — owner submits and reads; immutable after creation
@@ -244,25 +245,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
-  }
-}
-
-// OLD rulesrules_version = '2';
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 3, 10);
+    // ──────────────────────────────────────────────────────────────
+    // NOTIFICATIONS  (explicit full path — account-deletion cleanup)
+    // Declared at top level so the full path is unambiguous.
+    // Any authenticated user can read/write — needed so a deleting
+    // user can locate and remove notifications they sent to others.
+    // ──────────────────────────────────────────────────────────────
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
     }
+
   }
 }

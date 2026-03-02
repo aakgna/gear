@@ -123,7 +123,7 @@ export const signInWithApple = async () => {
 
 		// Create Firebase credential
 		const appleCredential = auth.AppleAuthProvider.credential(
-			credential.identityToken
+			credential.identityToken,
 		);
 
 		// Sign in to Firebase
@@ -137,7 +137,10 @@ export const signInWithApple = async () => {
 		return result.user;
 	} catch (error: any) {
 		console.error("Apple Sign-In Error:", error);
-		if (error.code === "ERR_CANCELED" || error.code === "ERR_REQUEST_CANCELED") {
+		if (
+			error.code === "ERR_CANCELED" ||
+			error.code === "ERR_REQUEST_CANCELED"
+		) {
 			throw new Error("Sign in was cancelled");
 		}
 		throw error;
@@ -249,7 +252,7 @@ const getRandomGameSet = (): string[] => {
 				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
 				"wordform_easy_7JTA0pXEt4GaHxr5IJij",
 				"trivia_easy_mV3b21QH4RrGqXH49EtM",
-				"trailfinder_easy_3TatZW5Q9OWczle5pl9s"
+				"trailfinder_easy_3TatZW5Q9OWczle5pl9s",
 			],
 			[
 				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
@@ -316,7 +319,7 @@ const getRandomGameSet = (): string[] => {
 				"futoshiki_easy_SPGQGWQun1XdkmH3KWpV",
 				"maze_easy_5TheitOaVQLGeIU6grLS",
 				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
-				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS"
+				"inference_easy_Mq0v2cTpKQ4MHPQtbRwS",
 			],
 			[
 				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
@@ -383,7 +386,7 @@ const getRandomGameSet = (): string[] => {
 				"magicSquare_easy_XF0PWdnDSqVCFBm44QJj",
 				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
 				"quickMath_easy_ShOkOQ0Gm4tStmdCWQEV",
-				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR"
+				"trailfinder_easy_VfL1HqLRRK5va9MTWjzR",
 			],
 			[
 				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
@@ -450,7 +453,7 @@ const getRandomGameSet = (): string[] => {
 				"trivia_easy_8JEaHhqwSizvgitCNym9",
 				"maze_easy_GVOjo5A8Abrpq2jYXy3G",
 				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-				"wordform_easy_Gufam8TFDQVDSI8Yxb1C"
+				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
 			],
 			[
 				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
@@ -517,7 +520,7 @@ const getRandomGameSet = (): string[] => {
 				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
 				"maze_easy_D59nSNNglEs8SM4DP269",
 				"sequencing_easy_rMLEHSwMLgn3kXNDl4jj",
-				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7"
+				"sequencing_easy_x46dC3Hf6B6GjDPLTQk7",
 			],
 			[
 				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
@@ -584,7 +587,7 @@ const getRandomGameSet = (): string[] => {
 				"futoshiki_easy_GJy6mHwzLWLYkKo4RMQE",
 				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
 				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-				"riddle_easy_DuDiYfThW4yD4qCMnMwd"
+				"riddle_easy_DuDiYfThW4yD4qCMnMwd",
 			],
 			[
 				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
@@ -651,7 +654,7 @@ const getRandomGameSet = (): string[] => {
 				"wordChain_easy_SOlplsaqt2Gh652U9FK3",
 				"codebreaker_easy_QjhOO00ubo3NFMk2LwhF",
 				"futoshiki_easy_9vR8FcSNa3ftySkzRs07",
-				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE"
+				"codebreaker_easy_I8aqPUhDmNEaJGoq79DE",
 			],
 			[
 				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
@@ -718,7 +721,7 @@ const getRandomGameSet = (): string[] => {
 				"wordChain_easy_Ac6K6dGYxB72MbBLgt33",
 				"wordform_easy_BMalKmkZ8qP1WyszZrXy",
 				"magicSquare_easy_H6b8YCJ2sD1NX3uult6G",
-				"trailfinder_easy_065CONLp6F775VHVyLU6"
+				"trailfinder_easy_065CONLp6F775VHVyLU6",
 			],
 			[
 				"wordform_easy_PNn8xx3RiFDSGjBzHh4j",
@@ -785,7 +788,7 @@ const getRandomGameSet = (): string[] => {
 				"magicSquare_easy_Vfo9xrHwkD3CrARdNkc8",
 				"sudoku_easy_CJkC6DVXf2wi2Za1dz2M",
 				"quickMath_easy_ERYsGDH6wuLrO9AOAaFo",
-				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ"
+				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
 			],
 			[
 				"wordform_easy_Gufam8TFDQVDSI8Yxb1C",
@@ -852,8 +855,8 @@ const getRandomGameSet = (): string[] => {
 				"sudoku_easy_qhWFRAdumXlLb4XbLJcs",
 				"trailfinder_easy_XEj86SGw5HJNyngwm4Fr",
 				"magicSquare_easy_7EiP86tSTFhe9N9WidIJ",
-				"wordform_easy_DIhScTt7CXxD2aQ4JBFX"
-			]
+				"wordform_easy_DIhScTt7CXxD2aQ4JBFX",
+			],
 		];
 
 		if (sets.length === 0) {
@@ -909,7 +912,8 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 			const existingData = userDoc.data();
 			const updateData: any = {
 				email: firebaseUser.email || "",
-				phoneNumber: firebaseUser.phoneNumber ?? existingData?.phoneNumber ?? "",
+				phoneNumber:
+					firebaseUser.phoneNumber ?? existingData?.phoneNumber ?? "",
 				updatedAt: firestore.FieldValue.serverTimestamp(),
 			};
 			// Initialize counts if they don't exist
@@ -932,7 +936,7 @@ export const createOrUpdateUserDocument = async (firebaseUser: any) => {
 		console.error("Error creating/updating user document:", error);
 		if (error?.code === "firestore/permission-denied") {
 			console.warn(
-				"Firestore permission denied. Please check your Firestore security rules."
+				"Firestore permission denied. Please check your Firestore security rules.",
 			);
 		}
 		// Don't throw - allow sign-in to proceed even if document creation fails
@@ -951,7 +955,7 @@ export const getUserData = async (userId: string): Promise<UserData | null> => {
 		console.error("Error fetching user data:", error);
 		if (error?.code === "firestore/permission-denied") {
 			console.warn(
-				"Firestore permission denied. Please check your Firestore security rules."
+				"Firestore permission denied. Please check your Firestore security rules.",
 			);
 		}
 		return null;
@@ -960,7 +964,7 @@ export const getUserData = async (userId: string): Promise<UserData | null> => {
 
 // Helper to check if user data exists
 export const hasUserData = (
-	userData: UserData | null
+	userData: UserData | null,
 ): userData is UserData => {
 	return userData !== null && userData !== undefined;
 };
@@ -968,7 +972,7 @@ export const hasUserData = (
 // Helper to parse game ID and extract category and difficulty
 // Extended to support all game types
 const parseGameId = (
-	gameId: string
+	gameId: string,
 ): {
 	category: string | null;
 	difficulty: "easy" | "medium" | "hard" | null;
@@ -1040,7 +1044,7 @@ const calculateCategoryTotals = (categoryData: {
 export const updateUserStats = async (
 	userId: string,
 	gameId: string,
-	timeTaken: number // in seconds
+	timeTaken: number, // in seconds
 ) => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -1059,12 +1063,12 @@ export const updateUserStats = async (
 		// Sanitize to ensure they are numbers (handle corrupted data)
 		const currentTotalGames =
 			typeof userData.totalGamesPlayed === "number" &&
-				isFinite(userData.totalGamesPlayed)
+			isFinite(userData.totalGamesPlayed)
 				? userData.totalGamesPlayed
 				: 0;
 		const currentTotalTime =
 			typeof userData.totalPlayTime === "number" &&
-				isFinite(userData.totalPlayTime)
+			isFinite(userData.totalPlayTime)
 				? userData.totalPlayTime
 				: 0;
 
@@ -1104,7 +1108,7 @@ export const updateUserStats = async (
 
 		if (lastPlayedDate) {
 			const daysSinceLastPlay = Math.floor(
-				(now.getTime() - lastPlayedDate.getTime()) / (1000 * 60 * 60 * 24)
+				(now.getTime() - lastPlayedDate.getTime()) / (1000 * 60 * 60 * 24),
 			);
 			if (daysSinceLastPlay === 0) {
 				// Same day, keep streak (don't increment)
@@ -1146,12 +1150,12 @@ export const updateUserStats = async (
 			// Sanitize attempted and skipped to avoid NaN
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-					isFinite(currentCatStats.attempted)
+				isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-					isFinite(currentCatStats.skipped)
+				isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 
@@ -1202,8 +1206,9 @@ export const updateUserStats = async (
 			!isFinite(updateData.totalPlayTime)
 		) {
 			console.error(
-				`[updateUserStats] Invalid totalPlayTime value: ${updateData.totalPlayTime
-				}, type: ${typeof updateData.totalPlayTime}. Resetting to 0.`
+				`[updateUserStats] Invalid totalPlayTime value: ${
+					updateData.totalPlayTime
+				}, type: ${typeof updateData.totalPlayTime}. Resetting to 0.`,
 			);
 			updateData.totalPlayTime = 0;
 		}
@@ -1220,7 +1225,7 @@ export const addCompletedGame = async (
 	userId: string,
 	gameId: string,
 	timeTaken?: number, // in seconds
-	answerRevealed?: boolean // true if user used "Show Answer" feature
+	answerRevealed?: boolean, // true if user used "Show Answer" feature
 ) => {
 	try {
 		const { addGameHistory } = require("./firebase");
@@ -1276,22 +1281,22 @@ const updateSkippedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-					isFinite(currentCatStats.completed)
+				isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-					isFinite(currentCatStats.attempted)
+				isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-					isFinite(currentCatStats.avgTime)
+				isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-					isFinite(currentCatStats.skipped)
+				isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const catSkipped = skipped + 1;
@@ -1358,7 +1363,7 @@ export const addSkippedGame = async (userId: string, gameId: string) => {
 // Move a game from skipped to attempted (when user comes back and attempts a previously skipped game)
 export const moveFromSkippedToAttempted = async (
 	userId: string,
-	gameId: string
+	gameId: string,
 ): Promise<boolean> => {
 	try {
 		const { checkGameHistory, updateGameHistory } = require("./firebase");
@@ -1383,7 +1388,7 @@ export const moveFromSkippedToAttempted = async (
 
 		if (!userDoc.exists()) {
 			console.error(
-				"[moveFromSkippedToAttempted] User document does not exist"
+				"[moveFromSkippedToAttempted] User document does not exist",
 			);
 			return true; // Still return true since we updated the history
 		}
@@ -1410,22 +1415,22 @@ export const moveFromSkippedToAttempted = async (
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-					isFinite(currentCatStats.completed)
+				isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-					isFinite(currentCatStats.attempted)
+				isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-					isFinite(currentCatStats.skipped)
+				isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-					isFinite(currentCatStats.avgTime)
+				isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 
@@ -1513,22 +1518,22 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 			// Sanitize values to avoid NaN
 			const completed =
 				typeof currentCatStats.completed === "number" &&
-					isFinite(currentCatStats.completed)
+				isFinite(currentCatStats.completed)
 					? currentCatStats.completed
 					: 0;
 			const attempted =
 				typeof currentCatStats.attempted === "number" &&
-					isFinite(currentCatStats.attempted)
+				isFinite(currentCatStats.attempted)
 					? currentCatStats.attempted
 					: 0;
 			const skipped =
 				typeof currentCatStats.skipped === "number" &&
-					isFinite(currentCatStats.skipped)
+				isFinite(currentCatStats.skipped)
 					? currentCatStats.skipped
 					: 0;
 			const avgTime =
 				typeof currentCatStats.avgTime === "number" &&
-					isFinite(currentCatStats.avgTime)
+				isFinite(currentCatStats.avgTime)
 					? currentCatStats.avgTime
 					: 0;
 			const catAttempted = attempted + 1;
@@ -1573,7 +1578,7 @@ const updateAttemptedStats = async (userId: string, gameId: string) => {
 	} catch (error) {
 		console.error(
 			"[updateAttemptedStats] Error updating attempted stats:",
-			error
+			error,
 		);
 	}
 };
@@ -1597,7 +1602,7 @@ export const addAttemptedGame = async (userId: string, gameId: string) => {
 
 // Check if username is available
 export const checkUsernameAvailability = async (
-	username: string
+	username: string,
 ): Promise<boolean> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -1618,7 +1623,7 @@ export const checkUsernameAvailability = async (
 // Save username to user document and usernames collection
 export const saveUsername = async (
 	userId: string,
-	username: string
+	username: string,
 ): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -1721,6 +1726,77 @@ export const reauthenticateWithGoogle = async (): Promise<boolean> => {
 		if (error.code === "sign_in_cancelled") {
 			throw new Error("Re-authentication was cancelled");
 		}
+		if (error.code === "auth/user-mismatch") {
+			throw new Error("The Google account you signed in with doesn't match your account. Please use the same Google account.");
+		}
+		throw error;
+	}
+};
+
+// Re-authenticate user with Apple (required for sensitive operations like account deletion)
+export const reauthenticateWithApple = async (): Promise<boolean> => {
+	try {
+		if (Platform.OS !== "ios") {
+			throw new Error("Apple Sign-In is only available on iOS");
+		}
+
+		const credential = await AppleAuthentication.signInAsync({
+			requestedScopes: [
+				AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+				AppleAuthentication.AppleAuthenticationScope.EMAIL,
+			],
+		});
+
+		if (!credential.identityToken) {
+			throw new Error("No identity token received from Apple Sign-In");
+		}
+
+		const appleCredential = auth.AppleAuthProvider.credential(
+			credential.identityToken,
+		);
+		const currentUser = auth().currentUser;
+		if (!currentUser) {
+			throw new Error("No user currently signed in");
+		}
+
+		await currentUser.reauthenticateWithCredential(appleCredential);
+		return true;
+	} catch (error: any) {
+		console.error("Apple Re-authentication Error:", error);
+		if (error.code === "ERR_CANCELED" || error.code === "ERR_REQUEST_CANCELED") {
+			throw new Error("Re-authentication was cancelled");
+		}
+		if (error.code === "auth/user-mismatch") {
+			throw new Error("The Apple account you signed in with doesn't match your account. Please use the same Apple account.");
+		}
+		throw error;
+	}
+};
+
+// Re-authenticate user with phone verification code
+export const reauthenticateWithPhoneCode = async (
+	verificationId: string,
+	code: string,
+): Promise<boolean> => {
+	try {
+		const phoneCredential = auth.PhoneAuthProvider.credential(
+			verificationId,
+			code,
+		);
+		const currentUser = auth().currentUser;
+		if (!currentUser) {
+			throw new Error("No user currently signed in");
+		}
+		await currentUser.reauthenticateWithCredential(phoneCredential);
+		return true;
+	} catch (error: any) {
+		console.error("Phone Re-authentication Error:", error);
+		if (error.code === "auth/user-mismatch") {
+			throw new Error("This phone number doesn't match your account. Please use the number associated with your account.");
+		}
+		if (error.code === "auth/invalid-verification-code") {
+			throw new Error("Invalid verification code. Please check the code and try again.");
+		}
 		throw error;
 	}
 };
@@ -1733,7 +1809,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 		// Android 13+ (API 33+) needs explicit POST_NOTIFICATIONS permission
 		if (Platform.OS === "android" && Platform.Version >= 33) {
 			const granted = await PermissionsAndroid.request(
-				PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+				PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
 			);
 			if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
 				return false;
@@ -1768,7 +1844,7 @@ export const getFCMToken = async (): Promise<string | null> => {
 // Register FCM token in Firestore
 export const registerFCMToken = async (
 	userId: string,
-	token: string
+	token: string,
 ): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -1905,7 +1981,9 @@ const cleanupFollowingFollowers = async (userId: string): Promise<void> => {
 		// Commit any remaining operations
 		await commitBatch();
 
-		console.log(`[cleanupFollowingFollowers] Cleaned up following/followers for user ${userId}`);
+		console.log(
+			`[cleanupFollowingFollowers] Cleaned up following/followers for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupFollowingFollowers] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -1918,10 +1996,7 @@ const cleanupLikedGames = async (userId: string): Promise<void> => {
 		const firestore = require("@react-native-firebase/firestore").default;
 
 		// Fetch all liked games
-		const likedRef = db
-			.collection("users")
-			.doc(userId)
-			.collection("liked");
+		const likedRef = db.collection("users").doc(userId).collection("liked");
 		const likedSnapshot = await likedRef.get();
 
 		let batch = db.batch();
@@ -1982,7 +2057,9 @@ const cleanupLikedGames = async (userId: string): Promise<void> => {
 		// Commit any remaining operations
 		await commitBatch();
 
-		console.log(`[cleanupLikedGames] Cleaned up liked games for user ${userId}`);
+		console.log(
+			`[cleanupLikedGames] Cleaned up liked games for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupLikedGames] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2009,7 +2086,9 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 			const actualGameId = createdGameDoc.id;
 
 			if (!gameType || !difficulty) {
-				console.warn(`[cleanupCreatedGames] Invalid game data for ${actualGameId}`);
+				console.warn(
+					`[cleanupCreatedGames] Invalid game data for ${actualGameId}`,
+				);
 				continue;
 			}
 
@@ -2074,11 +2153,17 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 							}
 						}
 					} catch (error) {
-						console.error(`[cleanupCreatedGames] Error deleting from user ${likedUserId}:`, error);
+						console.error(
+							`[cleanupCreatedGames] Error deleting from user ${likedUserId}:`,
+							error,
+						);
 					}
 				}
 			} catch (error) {
-				console.error(`[cleanupCreatedGames] Error deleting from liked collections:`, error);
+				console.error(
+					`[cleanupCreatedGames] Error deleting from liked collections:`,
+					error,
+				);
 			}
 
 			// Delete game subcollections (likes, comments)
@@ -2112,7 +2197,10 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 					}
 				}
 			} catch (error) {
-				console.error(`[cleanupCreatedGames] Error deleting subcollections:`, error);
+				console.error(
+					`[cleanupCreatedGames] Error deleting subcollections:`,
+					error,
+				);
 			}
 
 			// Delete the game document
@@ -2124,7 +2212,10 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 					.doc(actualGameId);
 				await gameRef.delete();
 			} catch (error) {
-				console.error(`[cleanupCreatedGames] Error deleting game document:`, error);
+				console.error(
+					`[cleanupCreatedGames] Error deleting game document:`,
+					error,
+				);
 			}
 		}
 
@@ -2137,7 +2228,9 @@ const cleanupCreatedGames = async (userId: string): Promise<void> => {
 			await batch.commit();
 		}
 
-		console.log(`[cleanupCreatedGames] Cleaned up created games for user ${userId}`);
+		console.log(
+			`[cleanupCreatedGames] Cleaned up created games for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupCreatedGames] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2281,12 +2374,8 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 
 		await commitBatch();
 
-		// Find and update grouped notifications where this user is the sender
-		// We need to query all users' notifications to find ones where fromUserId == userId
-		// This is expensive but necessary for complete cleanup
-		// Note: If you have a collection group index, you could use that instead
+		// Remove notifications this user sent from other users' feeds
 		try {
-			// Get all users (this is expensive but necessary for complete cleanup)
 			const usersSnapshot = await db.collection("users").limit(1000).get();
 
 			for (const userDoc of usersSnapshot.docs) {
@@ -2298,39 +2387,31 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 					.doc(otherUserId)
 					.collection("notifications");
 
-				// Find notifications where fromUserId == userId
-				const fromUserNotifications = await otherNotificationsRef
-					.where("fromUserId", "==", userId)
-					.get();
+				const [fromUserDocs, groupedDocs] = await Promise.all([
+					otherNotificationsRef.where("fromUserId", "==", userId).get(),
+					otherNotificationsRef.where("fromUserIds", "array-contains", userId).get(),
+				]);
 
-				// Find grouped notifications where fromUserIds contains userId
-				const groupedNotifications = await otherNotificationsRef
-					.where("fromUserIds", "array-contains", userId)
-					.get();
+				if (fromUserDocs.empty && groupedDocs.empty) continue;
 
 				const updateBatch = db.batch();
 				let updateCount = 0;
 
-				// Process fromUserId notifications (delete them)
-				fromUserNotifications.forEach((doc) => {
+				fromUserDocs.forEach((doc) => {
 					updateBatch.delete(doc.ref);
 					updateCount++;
 				});
 
-				// Process grouped notifications (remove userId from array, decrement count)
-				groupedNotifications.forEach((doc) => {
+				groupedDocs.forEach((doc) => {
 					const data = doc.data();
-					const fromUserIds = data?.fromUserIds || [];
-					const likeCount = data?.likeCount || 0;
-
-					const newFromUserIds = fromUserIds.filter((id: string) => id !== userId);
+					const fromUserIds: string[] = data?.fromUserIds || [];
+					const likeCount: number = data?.likeCount || 0;
+					const newFromUserIds = fromUserIds.filter((id) => id !== userId);
 					const newLikeCount = Math.max(0, likeCount - 1);
 
 					if (newFromUserIds.length === 0 || newLikeCount === 0) {
-						// Delete notification if no users left
 						updateBatch.delete(doc.ref);
 					} else {
-						// Update notification
 						updateBatch.update(doc.ref, {
 							fromUserIds: newFromUserIds,
 							likeCount: newLikeCount,
@@ -2345,10 +2426,11 @@ const cleanupNotifications = async (userId: string): Promise<void> => {
 			}
 		} catch (error) {
 			console.error(`[cleanupNotifications] Error cleaning up grouped notifications:`, error);
-			// Continue - this is a best-effort cleanup
 		}
 
-		console.log(`[cleanupNotifications] Cleaned up notifications for user ${userId}`);
+		console.log(
+			`[cleanupNotifications] Cleaned up notifications for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupNotifications] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2373,7 +2455,9 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 
 			try {
 				// Get conversation data to find participants
-				const conversationRef = db.collection("conversations").doc(conversationId);
+				const conversationRef = db
+					.collection("conversations")
+					.doc(conversationId);
 				const conversationData = (await conversationRef.get()).data();
 
 				if (!conversationData) {
@@ -2390,7 +2474,9 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 				const BATCH_SIZE = 500;
 
 				while (true) {
-					let query = messagesRef.orderBy("createdAt", "desc").limit(BATCH_SIZE);
+					let query = messagesRef
+						.orderBy("createdAt", "desc")
+						.limit(BATCH_SIZE);
 					if (lastDoc) {
 						query = query.startAfter(lastDoc);
 					}
@@ -2427,7 +2513,10 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 					}
 				}
 			} catch (error) {
-				console.error(`[cleanupConversations] Error processing conversation ${conversationId}:`, error);
+				console.error(
+					`[cleanupConversations] Error processing conversation ${conversationId}:`,
+					error,
+				);
 			}
 		}
 
@@ -2440,7 +2529,9 @@ const cleanupConversations = async (userId: string): Promise<void> => {
 			await batch.commit();
 		}
 
-		console.log(`[cleanupConversations] Cleaned up conversations for user ${userId}`);
+		console.log(
+			`[cleanupConversations] Cleaned up conversations for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupConversations] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2453,10 +2544,7 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 		const firestore = require("@react-native-firebase/firestore").default;
 
 		// Fetch all users this person blocked
-		const blockedRef = db
-			.collection("users")
-			.doc(userId)
-			.collection("blocked");
+		const blockedRef = db.collection("users").doc(userId).collection("blocked");
 		const blockedSnapshot = await blockedRef.get();
 
 		// Fetch all users who blocked this person
@@ -2533,7 +2621,9 @@ const cleanupBlockingRelationships = async (userId: string): Promise<void> => {
 		// Commit any remaining operations
 		await commitBatch();
 
-		console.log(`[cleanupBlockingRelationships] Cleaned up blocking relationships for user ${userId}`);
+		console.log(
+			`[cleanupBlockingRelationships] Cleaned up blocking relationships for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupBlockingRelationships] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2578,7 +2668,9 @@ const cleanupGameHistory = async (userId: string): Promise<void> => {
 		// Commit any remaining operations
 		await commitBatch();
 
-		console.log(`[cleanupGameHistory] Cleaned up game history for user ${userId}`);
+		console.log(
+			`[cleanupGameHistory] Cleaned up game history for user ${userId}`,
+		);
 	} catch (error) {
 		console.error(`[cleanupGameHistory] Error:`, error);
 		// Don't throw - continue with other cleanup operations
@@ -2594,7 +2686,9 @@ const cleanupDeveloperSignup = async (userId: string): Promise<void> => {
 
 		if (docExists(developerDoc)) {
 			await developerRef.delete();
-			console.log(`[cleanupDeveloperSignup] Cleaned up developer signup for user ${userId}`);
+			console.log(
+				`[cleanupDeveloperSignup] Cleaned up developer signup for user ${userId}`,
+			);
 		}
 	} catch (error) {
 		console.error(`[cleanupDeveloperSignup] Error:`, error);
@@ -2605,11 +2699,11 @@ const cleanupDeveloperSignup = async (userId: string): Promise<void> => {
 // Delete user account (iOS App Store requirement)
 export const deleteAccount = async (
 	userId: string,
-	username?: string
+	username?: string,
 ): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
-
+		console.log("provider auth: ", auth().currentUser?.providerData);
 		// 1. Get current user FIRST (to ensure we have valid reference before any deletions)
 		const currentUser = auth().currentUser;
 		if (!currentUser) {
@@ -2618,7 +2712,9 @@ export const deleteAccount = async (
 
 		// 2. BEFORE deleting user document, clean up all related data
 		// Execute all cleanup functions (errors are logged but don't stop the process)
-		console.log(`[deleteAccount] Starting comprehensive cleanup for user ${userId}`);
+		console.log(
+			`[deleteAccount] Starting comprehensive cleanup for user ${userId}`,
+		);
 
 		// Execute cleanup functions (each has its own try-catch, so errors won't stop the process)
 		const cleanupPromises = [
@@ -2634,12 +2730,18 @@ export const deleteAccount = async (
 		];
 
 		// Wait for all cleanup operations (errors are handled within each function)
-		await Promise.all(cleanupPromises.map(p => p.catch(err => {
-			// Errors are already logged in the helper functions
-			return null;
-		})));
+		await Promise.all(
+			cleanupPromises.map((p) =>
+				p.catch((err) => {
+					// Errors are already logged in the helper functions
+					return null;
+				}),
+			),
+		);
 
-		console.log(`[deleteAccount] Completed cleanup operations for user ${userId}`);
+		console.log(
+			`[deleteAccount] Completed cleanup operations for user ${userId}`,
+		);
 
 		// 3. Delete username document if it exists
 		if (username) {
@@ -2655,15 +2757,35 @@ export const deleteAccount = async (
 		// 5. Delete Firebase Auth account (this automatically signs out the user)
 		await currentUser.delete();
 
-		console.log(`[deleteAccount] Successfully deleted account for user ${userId}`);
+		console.log(
+			`[deleteAccount] Successfully deleted account for user ${userId}`,
+		);
 		// Note: No need to call signOut() - delete() already signs out the user
 	} catch (error: any) {
 		console.error("Error deleting account:", error);
 		if (error?.code === "auth/requires-recent-login") {
-			// Re-authentication is required - try to re-authenticate automatically
+			// Detect which provider the user signed in with
+			const user = auth().currentUser;
+			const providerId = user?.providerData?.[0]?.providerId;
+
+			if (providerId === "phone") {
+				// Phone re-auth requires UI interaction — surface a typed error to the caller
+				const phoneErr = new Error(
+					"Phone verification required to delete your account",
+				) as any;
+				phoneErr.code = "auth/requires-phone-reauth";
+				phoneErr.phoneNumber = user?.phoneNumber;
+				throw phoneErr;
+			}
+
+			// For Google and Apple, re-authenticate automatically then retry delete
 			try {
-				await reauthenticateWithGoogle();
-				// After re-authentication, try to delete again
+				if (providerId === "apple.com") {
+					await reauthenticateWithApple();
+				} else {
+					// Covers google.com and any unknown providers
+					await reauthenticateWithGoogle();
+				}
 				const currentUser = auth().currentUser;
 				if (currentUser) {
 					await currentUser.delete();
@@ -2672,7 +2794,8 @@ export const deleteAccount = async (
 			} catch (reauthError: any) {
 				console.error("Re-authentication failed:", reauthError);
 				throw new Error(
-					"Please sign in again before deleting your account"
+					reauthError.message ||
+						"Please sign in again before deleting your account",
 				);
 			}
 		}
@@ -2682,7 +2805,7 @@ export const deleteAccount = async (
 			return; // Success - user is deleted
 		}
 		throw new Error(
-			error.message || "Failed to delete account. Please try again."
+			error.message || "Failed to delete account. Please try again.",
 		);
 	}
 };
@@ -2693,7 +2816,7 @@ export const saveDeveloperSignup = async (
 	username: string,
 	email: string,
 	phoneNumber: string,
-	gameIdea: string
+	gameIdea: string,
 ): Promise<void> => {
 	try {
 		const firestore = require("@react-native-firebase/firestore").default;
@@ -2709,16 +2832,18 @@ export const saveDeveloperSignup = async (
 			updatedAt: firestore.FieldValue.serverTimestamp(),
 		});
 
-		console.log(`[saveDeveloperSignup] Successfully saved developer signup for user ${userId}`);
+		console.log(
+			`[saveDeveloperSignup] Successfully saved developer signup for user ${userId}`,
+		);
 	} catch (error: any) {
 		console.error("Error saving developer signup:", error);
 		if (error?.code === "firestore/permission-denied") {
 			throw new Error(
-				"Permission denied. Please check your Firestore security rules."
+				"Permission denied. Please check your Firestore security rules.",
 			);
 		}
 		throw new Error(
-			error.message || "Failed to save developer signup. Please try again."
+			error.message || "Failed to save developer signup. Please try again.",
 		);
 	}
 };
