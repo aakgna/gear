@@ -1,0 +1,114 @@
+name: Publish Developer Games
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Every day at 2am UTC
+  workflow_dispatch:       # Manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout publishGame branch ──────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: publishGame
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python setup ─────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      # ── 3. Run the publish script ────────────────────────────────────────────
+      - name: Publish games
+        id: publish
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python scripts/publish_games.py 2>&1 | tee publish_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      # ── 4. Check if any files were changed ───────────────────────────────────
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard -- \
+            'components/games/*.tsx' 'config/*.ts' 'constants/*.ts' \
+            'app/**/*.tsx' 'app/**/*.ts')" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No new games to publish — exiting cleanly."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "New games detected — creating PR."
+          fi
+
+      # ── 5. Create branch + commit + open PR ──────────────────────────────────
+      - name: Create branch and commit
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH="game-publish/$DATE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+
+          # Stage only relevant source files — never node_modules or __pycache__
+          git add \
+            components/games/ \
+            config/ \
+            constants/ \
+            app/create-game/ \
+            "app/play-game/[gameId].tsx" \
+            app/feed.tsx
+
+          # Extract published game names for the commit message
+          PUBLISHED=$(grep "\[firestore\] Marked" publish_output.txt \
+            | sed "s/.*Marked '\(.*\)' as Published/\1/" \
+            | paste -sd ', ')
+
+          git commit -m "Publish games: ${PUBLISHED:-unknown}"
+          git push origin "$BRANCH"
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "published=$PUBLISHED" >> $GITHUB_OUTPUT
+        id: branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Open pull request
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PUBLISHED="${{ steps.branch.outputs.published }}"
+          BRANCH="${{ steps.branch.outputs.branch }}"
+
+          gh pr create \
+            --title "New games published: $PUBLISHED" \
+            --base publishGame \
+            --head "$BRANCH" \
+            --body "$(printf '%s' \
+              '## Games Published' $'\n' \
+              "$PUBLISHED" $'\n\n' \
+              '## What to review' $'\n' \
+              '- [ ] New game component files in `components/games/`' $'\n' \
+              '- [ ] Type registrations in `config/types.ts`' $'\n' \
+              '- [ ] Game renders correctly in the app' $'\n\n' \
+              '<details><summary>Full publish log</summary>' $'\n\n' \
+              '```' $'\n' \
+              "$(cat publish_output.txt)" $'\n' \
+              '```' $'\n' \
+              '</details>')"
