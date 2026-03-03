@@ -1,0 +1,119 @@
+name: Publish Developer Games
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Every day at 2am UTC
+  workflow_dispatch:       # Manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout publishGame branch ──────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: publishGame
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python setup ─────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      # ── 3. Run the publish script ────────────────────────────────────────────
+      - name: Publish games
+        id: publish
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python scripts/publish_games.py 2>&1 | tee publish_output.txt
+
+      # ── 4. Check if any files were changed ───────────────────────────────────
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only)
+          UNTRACKED=$(git ls-files --others --exclude-standard components/ config/ constants/ app/)
+          if [ -z "$CHANGED" ] && [ -z "$UNTRACKED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No new games to publish — exiting cleanly."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "New games detected — creating PR."
+          fi
+
+      # ── 5. Create branch and commit ──────────────────────────────────────────
+      - name: Create branch and commit
+        if: steps.changes.outputs.has_changes == 'true'
+        id: branch
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH="game-publish/$DATE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+
+          # Stage only relevant source files — never node_modules or __pycache__
+          git add \
+            components/games/ \
+            config/ \
+            constants/ \
+            app/create-game/ \
+            app/feed.tsx
+          git add -- 'app/play-game/[gameId].tsx'
+
+          # Extract published game names (comma-separated) for commit + PR title
+          PUBLISHED=$(grep "\[firestore\] Marked" publish_output.txt \
+            | sed "s/.*Marked '\(.*\)' as Published/\1/" \
+            | paste -sd ',')
+
+          git commit -m "Publish games: ${PUBLISHED:-unknown}"
+          git push origin "$BRANCH"
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "published=${PUBLISHED:-unknown}" >> $GITHUB_OUTPUT
+
+      # ── 6. Open pull request ─────────────────────────────────────────────────
+      - name: Open pull request
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PUBLISHED="${{ steps.branch.outputs.published }}"
+          BRANCH="${{ steps.branch.outputs.branch }}"
+
+          # Write PR body to a temp file to avoid shell quoting issues
+          cat > /tmp/pr_body.md << PREOF
+          ## Games Published
+          $PUBLISHED
+
+          ## What to review
+          - [ ] New game component files in \`components/games/\`
+          - [ ] Type registrations in \`config/types.ts\`
+          - [ ] Game renders correctly in the app
+
+          <details><summary>Full publish log</summary>
+
+          \`\`\`
+          $(cat publish_output.txt)
+          \`\`\`
+          </details>
+          PREOF
+
+          gh pr create \
+            --title "New games published: $PUBLISHED" \
+            --base publishGame \
+            --head "$BRANCH" \
+            --body-file /tmp/pr_body.md
