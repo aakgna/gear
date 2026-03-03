@@ -3163,6 +3163,9 @@ const applyForYouFilters = useCallback(
 									"trivia",
 									"codebreaker",
 									"sequencing",
+									"hangman",
+									"crossword",
+								// KRACKED_INSERT_FILTER_CHIP
 								].map((gameType) => {
 									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);
 									return (

@@ -10,9 +10,13 @@ expo-env.d.ts
 .env.local
 .env.production
 
+# Firebase service account key — never commit this
+*service-account*.json
+*firebase-adminsdk*.json
+
 # Dependencies
 node_modules/
 
 # Build artifacts
-.gradle/
+.gradle/do
 *.lock

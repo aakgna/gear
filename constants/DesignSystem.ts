@@ -282,6 +282,9 @@ export const GameColors: Record<PuzzleType, string> = {
 	sequencing: "#8B5CF6", // Violet
 	codebreaker: "#F43F5E", // Rose
 	maze: "#10B981", // Emerald
+	hangman: "#FF6B6B",
+	crossword: "#4ECDC4",
+	// KRACKED_INSERT_GAME_COLOR
 	custom: "#fcd34d",    // Golden — matches app accent
 };
 
@@ -379,6 +382,9 @@ export const formatGameType = (type: string): string => {
 		trivia: "Trivia",
 		futoshiki: "Futoshiki",
 		sequencing: "Sequencing",
+		hangman: "Hangman",
+		crossword: "Crossword",
+		// KRACKED_INSERT_FORMAT_GAME_TYPE
 	};
 	return specialCases[type] || formatted;
 };

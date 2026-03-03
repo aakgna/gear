@@ -97,6 +97,9 @@ const getAnimationCount = (gameType: PuzzleType): number => {
 			return 6;
 		case "maze":
 			return 7;
+		case "hangman": return 4;
+		case "crossword": return 4;
+		// KRACKED_INSERT_ANIM_COUNT
 		default:
 			return 4;
 	}
@@ -169,6 +172,9 @@ const renderAnimation = (
 			return renderCodeBreakerAnimation(anims, gameColor);
 		case "maze":
 			return renderMazeAnimation(anims, gameColor);
+		case "hangman": return null;
+		case "crossword": return null;
+		// KRACKED_INSERT_RENDER_ANIM
 		default:
 			return null;
 	}

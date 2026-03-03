@@ -183,6 +183,17 @@ export const gameTemplates: Record<string, GameTemplate[]> = {
 			description: "Knowledge quiz",
 			defaultConfig: { numQuestions: 5 },
 		},
+		{
+			id: "hangman",
+			name: "Hangman",
+			type: "hangman",
+			category: "word",
+			icon: "help-circle-outline",
+			description: "A Hangman game",
+			defaultConfig: {},
+		},
+
+		// KRACKED_INSERT_TEMPLATE
 	],
 };
 

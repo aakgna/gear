@@ -29,6 +29,9 @@ import {
 	CodeBreakerData,
 	SequencingData,
 	CustomData,
+	HangmanData,
+	CrosswordData,
+	// KRACKED_INSERT_DATA_IMPORT
 } from "../../config/types";
 import {
 	db,
@@ -73,6 +76,7 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 		} else if (gameType === "magicsquare") {
 			gameType = "magicSquare";
 		}
+		// KRACKED_INSERT_NORMALIZATION
 		// Other game types (wordform, riddle, trivia, codebreaker, sequencing, inference, maze, futoshiki, trailfinder, sudoku) use lowercase in both
 
 		// Fetch game from Firestore
@@ -290,6 +294,45 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 			} as SudokuData;
 			isValid = true;
 		}
+		// Handle Hangman
+		else if (
+			normalizedGameType === "hangman" &&
+			gameData.hint &&
+			gameData.theme &&
+			gameData.answer
+		) {
+			puzzleData = {
+				hint: gameData.hint,
+				theme: gameData.theme,
+				answer: gameData.answer,
+			} as HangmanData;
+			isValid = true;
+		}
+
+		// Handle Crossword
+		else if (
+			normalizedGameType === "crossword" &&
+			gameData.cols &&
+			gameData.givens &&
+			Array.isArray(gameData.givens) &&
+			gameData.title &&
+			gameData.words &&
+			Array.isArray(gameData.words) &&
+			gameData.rows &&
+			gameData.themeHint
+		) {
+			puzzleData = {
+				cols: gameData.cols,
+				givens: gameData.givens,
+				title: gameData.title,
+				words: gameData.words,
+				rows: gameData.rows,
+				themeHint: gameData.themeHint,
+			} as CrosswordData;
+			isValid = true;
+		}
+
+		// KRACKED_INSERT_DATA_PARSING
 		// Handle Custom (creator-built game definition)
 		// Phase 5 will align the Firestore field name with CustomData.game
 		else if (normalizedGameType === "custom" && gameData.definition) {

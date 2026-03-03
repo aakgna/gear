@@ -96,6 +96,9 @@ type GameType =
 	| "futoshiki"
 	| "trailfinder"
 	| "maze"
+	| "hangman"
+	| "crossword"
+	// KRACKED_INSERT_GAME_TYPE_UNION
 	| "custom";
 
 const gameTypes: Array<{
@@ -115,6 +118,9 @@ const gameTypes: Array<{
 	{ type: "futoshiki", name: "Futoshiki", icon: "code-working-outline" },
 	{ type: "trailfinder", name: "TrailFinder", icon: "navigate-outline" },
 	{ type: "maze", name: "Maze", icon: "git-branch-outline" },
+	{ type: "hangman", name: "Hangman", icon: "help-circle-outline" },
+	{ type: "crossword", name: "Crossword", icon: "text-outline" },
+	// KRACKED_INSERT_GAME_TYPES
 	{ type: "custom", name: "Create Your Own", icon: "sparkles-outline" },
 ];
 

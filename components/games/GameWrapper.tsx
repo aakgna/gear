@@ -35,6 +35,9 @@ import FutoshikiGame from "./FutoshikiGame";
 import MagicSquareGame from "./MagicSquareGame";
 import TrailFinderGame from "./TrailFinder";
 import SudokuGame from "./SudokuGame";
+import HangmanGame from "./HangmanGame";
+import CrosswordGame from "./CrosswordGame";
+// KRACKED_INSERT_GAME_IMPORT
 import { GamePlayer } from "../../runtime/GamePlayer";
 import PuzzleStats from "../PuzzleStats";
 import GameIntroScreen from "../GameIntroOverlay";
@@ -790,6 +793,37 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 						initialCompletedResult={completedResult}
 					/>
 				);
+			case "hangman":
+				return (
+					<HangmanGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+
+			case "crossword":
+				return (
+					<CrosswordGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+
+			// KRACKED_INSERT_RENDER_GAME
 			case "custom":
 				return (
 					<GamePlayer

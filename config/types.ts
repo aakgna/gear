@@ -15,6 +15,9 @@ export type PuzzleType =
 	| "trivia"
 	| "codebreaker"
 	| "sequencing"
+	| "hangman"
+	| "crossword"
+	// KRACKED_INSERT_PUZZLE_TYPE
 	| "custom";
 
 export interface Puzzle {
@@ -34,6 +37,9 @@ export interface Puzzle {
 		| TriviaData
 		| CodeBreakerData
 		| SequencingData
+		| HangmanData
+		| CrosswordData
+		// KRACKED_INSERT_DATA_UNION
 		| CustomData;
 	difficulty: number;
 	createdAt: string;
@@ -153,6 +159,23 @@ export interface SequencingData {
 	rules: SequencingRule[];
 	solution: number[]; // Array of entity indices in correct order (0-based)
 }
+
+export interface HangmanData {
+	hint: string;
+	theme: string;
+	answer: string;
+}
+
+export interface CrosswordData {
+	cols: number;
+	givens: Record<string, any>[];
+	title: string;
+	words: Record<string, any>[];
+	rows: number;
+	themeHint: string;
+}
+
+// KRACKED_INSERT_DATA_INTERFACE
 
 // Game result types
 export interface GameResult {

@@ -144,6 +144,17 @@ export const gameInstructions = {
 		example:
 			"Example: Rule: 'Alice is before Bob' means Alice comes before Bob in the sequence. Rule: 'Bob is 2nd' means Bob is in position 2. Combine all rules to find the correct order.",
 	},
+	hangman: {
+		instructions: ["Play the game to complete it"],
+		example: "",
+	},
+
+	crossword: {
+		instructions: ["Play the game to complete it"],
+		example: "",
+	},
+
+	// KRACKED_INSERT_INSTRUCTIONS
 };
 
 
