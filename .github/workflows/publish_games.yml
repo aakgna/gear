@@ -37,15 +37,14 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           python scripts/publish_games.py 2>&1 | tee publish_output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
 
       # ── 4. Check if any files were changed ───────────────────────────────────
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard -- \
-            'components/games/*.tsx' 'config/*.ts' 'constants/*.ts' \
-            'app/**/*.tsx' 'app/**/*.ts')" ]; then
+          CHANGED=$(git diff --name-only)
+          UNTRACKED=$(git ls-files --others --exclude-standard components/ config/ constants/ app/)
+          if [ -z "$CHANGED" ] && [ -z "$UNTRACKED" ]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No new games to publish — exiting cleanly."
           else
@@ -53,9 +52,10 @@ jobs:
             echo "New games detected — creating PR."
           fi
 
-      # ── 5. Create branch + commit + open PR ──────────────────────────────────
+      # ── 5. Create branch and commit ──────────────────────────────────────────
       - name: Create branch and commit
         if: steps.changes.outputs.has_changes == 'true'
+        id: branch
         run: |
           DATE=$(date +%Y-%m-%d)
           BRANCH="game-publish/$DATE"
@@ -71,23 +71,21 @@ jobs:
             config/ \
             constants/ \
             app/create-game/ \
-            "app/play-game/[gameId].tsx" \
             app/feed.tsx
+          git add -- 'app/play-game/[gameId].tsx'
 
-          # Extract published game names for the commit message
+          # Extract published game names (comma-separated) for commit + PR title
           PUBLISHED=$(grep "\[firestore\] Marked" publish_output.txt \
             | sed "s/.*Marked '\(.*\)' as Published/\1/" \
-            | paste -sd ', ')
+            | paste -sd ',')
 
           git commit -m "Publish games: ${PUBLISHED:-unknown}"
           git push origin "$BRANCH"
 
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "published=$PUBLISHED" >> $GITHUB_OUTPUT
-        id: branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "published=${PUBLISHED:-unknown}" >> $GITHUB_OUTPUT
 
+      # ── 6. Open pull request ─────────────────────────────────────────────────
       - name: Open pull request
         if: steps.changes.outputs.has_changes == 'true'
         env:
@@ -96,19 +94,26 @@ jobs:
           PUBLISHED="${{ steps.branch.outputs.published }}"
           BRANCH="${{ steps.branch.outputs.branch }}"
 
+          # Write PR body to a temp file to avoid shell quoting issues
+          cat > /tmp/pr_body.md << PREOF
+          ## Games Published
+          $PUBLISHED
+
+          ## What to review
+          - [ ] New game component files in \`components/games/\`
+          - [ ] Type registrations in \`config/types.ts\`
+          - [ ] Game renders correctly in the app
+
+          <details><summary>Full publish log</summary>
+
+          \`\`\`
+          $(cat publish_output.txt)
+          \`\`\`
+          </details>
+          PREOF
+
           gh pr create \
             --title "New games published: $PUBLISHED" \
             --base publishGame \
             --head "$BRANCH" \
-            --body "$(printf '%s' \
-              '## Games Published' $'\n' \
-              "$PUBLISHED" $'\n\n' \
-              '## What to review' $'\n' \
-              '- [ ] New game component files in `components/games/`' $'\n' \
-              '- [ ] Type registrations in `config/types.ts`' $'\n' \
-              '- [ ] Game renders correctly in the app' $'\n\n' \
-              '<details><summary>Full publish log</summary>' $'\n\n' \
-              '```' $'\n' \
-              "$(cat publish_output.txt)" $'\n' \
-              '```' $'\n' \
-              '</details>')"
+            --body-file /tmp/pr_body.md
