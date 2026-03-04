@@ -284,6 +284,7 @@ export const GameColors: Record<PuzzleType, string> = {
 	maze: "#10B981", // Emerald
 	hangman: "#FF6B6B",
 	crossword: "#4ECDC4",
+	unnamedGame: "#FF6B6B",
 	// KRACKED_INSERT_GAME_COLOR
 	custom: "#fcd34d",    // Golden — matches app accent
 };
@@ -384,6 +385,7 @@ export const formatGameType = (type: string): string => {
 		sequencing: "Sequencing",
 		hangman: "Hangman",
 		crossword: "Crossword",
+		unnamedGame: "Unnamed Game",
 		// KRACKED_INSERT_FORMAT_GAME_TYPE
 	};
 	return specialCases[type] || formatted;

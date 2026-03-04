@@ -193,6 +193,16 @@ export const gameTemplates: Record<string, GameTemplate[]> = {
 			defaultConfig: {},
 		},
 
+		{
+			id: "unnamedGame",
+			name: "Unnamed Game",
+			type: "unnamedGame",
+			category: "custom",
+			icon: "game-controller-outline",
+			description: "A Unnamed Game game",
+			defaultConfig: {},
+		},
+
 		// KRACKED_INSERT_TEMPLATE
 	],
 };

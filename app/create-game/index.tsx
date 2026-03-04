@@ -98,6 +98,7 @@ type GameType =
 	| "maze"
 	| "hangman"
 	| "crossword"
+	| "unnamedGame"
 	// KRACKED_INSERT_GAME_TYPE_UNION
 	| "custom";
 
@@ -120,6 +121,7 @@ const gameTypes: Array<{
 	{ type: "maze", name: "Maze", icon: "git-branch-outline" },
 	{ type: "hangman", name: "Hangman", icon: "help-circle-outline" },
 	{ type: "crossword", name: "Crossword", icon: "text-outline" },
+	{ type: "unnamedGame", name: "Unnamed Game", icon: "game-controller-outline" },
 	// KRACKED_INSERT_GAME_TYPES
 	{ type: "custom", name: "Create Your Own", icon: "sparkles-outline" },
 ];
