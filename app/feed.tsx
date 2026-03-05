@@ -60,13 +60,13 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	// KRACKED_INSERT_CONVERT_PUZZLE_IMPORT
 	CustomData,
 } from "../config/types";
 import GameWrapper from "../components/games/GameWrapper";
 import WelcomeCard from "../components/WelcomeCard";
 import { useGameStore } from "../stores/gameStore";
 import {
-	fetchGamesFromFirestore,
 	FirestoreGame,
 	trackGameSkipped,
 	trackGameAttempted,
@@ -84,10 +84,6 @@ import { useSessionEndRefresh } from "../utils/sessionRefresh";
 
 const COMPUTE_NEXT_RECOMMENDATIONS_URL =
 	"https://us-central1-gear-ff009.cloudfunctions.net/compute_next_recommendations";
-import {
-	getSimpleRecommendations,
-	interleaveGamesByType,
-} from "../config/recommendations";
 import {
 	getCurrentUser,
 	getUserData,
@@ -415,6 +411,7 @@ function convertFirestoreGameToPuzzle(
 				};
 			}
 			break;
+		// KRACKED_INSERT_CONVERT_PUZZLE
 		case "custom":
 			if (game.definition) {
 				return {
@@ -1628,416 +1625,6 @@ const applyForYouFilters = useCallback(
 		});
 	}, []);
 
-	// Fetch more games from Firestore for infinite scroll
-	const fetchMoreGamesFromFirestore = async () => {
-		if (isFetchingMore || !hasMoreGamesToFetch) return;
-
-		setIsFetchingMore(true);
-
-		try {
-			const user = getCurrentUser();
-			if (!user) {
-				setIsFetchingMore(false);
-				return;
-			}
-
-			// Get all game IDs currently in use (displayed + recommended pool)
-			const existingGameIds = new Set([
-				...puzzles.map((p) => p.id),
-				...allRecommendedPuzzles.map((p) => p.id),
-			]);
-
-			// Fetch ONLY completed games from gameHistory
-			// (We want to allow previously skipped games to appear again)
-			const { fetchGameHistory } = require("../config/firebase");
-			const completedHistory = await fetchGameHistory(user.uid, {
-				action: "completed",
-			});
-
-			// Create set of completed games (permanently exclude these)
-			const completedGameIds = new Set(
-				completedHistory.map((h: any) => h.gameId)
-			);
-
-			const newGames: Puzzle[] = [];
-			const difficulties: Array<"easy" | "medium" | "hard"> = [
-				"easy",
-				"medium",
-				"hard",
-			];
-
-			// Fetch more games (same logic as initial load)
-			for (const difficulty of difficulties) {
-				// Fetch QuickMath
-				const quickMathGames = await fetchGamesFromFirestore(
-					"quickMath",
-					difficulty
-				);
-				quickMathGames.forEach((game) => {
-					if (game.questions && game.answers) {
-						newGames.push({
-							id: `quickmath_${difficulty}_${game.id}`,
-							type: "quickMath",
-							data: {
-								problems: game.questions,
-								answers: game.answers,
-							} as QuickMathData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch WordForm
-				const wordformGames = await fetchGamesFromFirestore("wordform", difficulty);
-				wordformGames.forEach((game) => {
-					if (game.qna) {
-						newGames.push({
-							id: `wordform_${difficulty}_${game.id}`,
-							type: "wordform",
-							data: {
-								answer: game.qna.toUpperCase(),
-							} as WordFormData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Riddle
-				const riddleGames = await fetchGamesFromFirestore("riddle", difficulty);
-				riddleGames.forEach((game) => {
-					if (game.question && game.answer && game.choices) {
-						newGames.push({
-							id: `riddle_${difficulty}_${game.id}`,
-							type: "riddle",
-							data: {
-								prompt: game.question,
-								answer: game.answer,
-								choices: game.choices,
-							} as RiddleData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Trivia
-				const triviaGames = await fetchGamesFromFirestore("trivia", difficulty);
-				triviaGames.forEach((game) => {
-					if (game.questions && Array.isArray(game.questions)) {
-						newGames.push({
-							id: `trivia_${difficulty}_${game.id}`,
-							type: "trivia",
-							data: {
-								questions: game.questions as any,
-							} as TriviaData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch CodeBreaker
-				const codebreakerGamesPrefetch = await fetchGamesFromFirestore(
-					"codebreaker",
-					difficulty
-				);
-				codebreakerGamesPrefetch.forEach((game) => {
-					if (
-						game.secretCode &&
-						Array.isArray(game.secretCode) &&
-						game.maxGuesses
-					) {
-						newGames.push({
-							id: `codebreaker_${difficulty}_${game.id}`,
-							type: "codebreaker",
-							data: {
-								secretCode: game.secretCode,
-								maxGuesses: game.maxGuesses,
-							} as CodeBreakerData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Sequencing
-				const sequencingGamesPrefetch = await fetchGamesFromFirestore(
-					"sequencing",
-					difficulty
-				);
-				sequencingGamesPrefetch.forEach((game) => {
-					if (
-						game.theme &&
-						game.numSlots &&
-						game.entities &&
-						Array.isArray(game.entities) &&
-						game.rules &&
-						Array.isArray(game.rules) &&
-						game.solution &&
-						Array.isArray(game.solution)
-					) {
-						newGames.push({
-							id: `sequencing_${difficulty}_${game.id}`,
-							type: "sequencing",
-							data: {
-								theme: game.theme as "people" | "appointments" | "runners",
-								numSlots: game.numSlots,
-								entities: game.entities,
-								rules: game.rules.map((r: any) => ({
-									type: r.type,
-									entity1: r.entity1,
-									entity2: r.entity2,
-									position: r.position,
-									minDistance: r.minDistance,
-									description: r.description,
-								})),
-								solution: game.solution,
-							} as SequencingData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch WordChain
-				const wordChainGames = await fetchGamesFromFirestore(
-					"wordChain",
-					difficulty
-				);
-				wordChainGames.forEach((game) => {
-					if (game.startWord && game.endWord && game.answer) {
-						// Ensure answer is an array (it might be stored as string or array in Firestore)
-						const answerArray = Array.isArray(game.answer)
-							? game.answer
-							: typeof game.answer === "string"
-							? [game.answer]
-							: [];
-
-						newGames.push({
-							id: `wordchain_${difficulty}_${game.id}`,
-							type: "wordChain",
-							data: {
-								startWord: game.startWord,
-								endWord: game.endWord,
-								answer: answerArray,
-								minSteps: game.minSteps || 3,
-								hint: game.hint,
-							} as WordChainData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Inference
-				const inferenceGames = await fetchGamesFromFirestore("inference", difficulty);
-				inferenceGames.forEach((game) => {
-					if (game.definitions && game.answer) {
-						newGames.push({
-							id: `inference_${difficulty}_${game.id}`,
-							type: "inference",
-							data: {
-								definitions: game.definitions,
-								answer: game.answer,
-								hint: game.hint,
-							} as InferenceData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Maze
-				const mazeGames = await fetchGamesFromFirestore("maze", difficulty);
-				mazeGames.forEach((game) => {
-					if (game.rows && game.cols && game.cells && game.solution) {
-						newGames.push({
-							id: `maze_${difficulty}_${game.id}`,
-							type: "maze",
-							data: {
-								rows: game.rows,
-								cols: game.cols,
-								cells: game.cells,
-								solution: game.solution,
-							} as MazeData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Futoshiki
-				const futoshikiGames = await fetchGamesFromFirestore(
-					"futoshiki",
-					difficulty
-				);
-				futoshikiGames.forEach((game) => {
-					if (game.size && game.grid && game.givens && game.inequalities) {
-						newGames.push({
-							id: `futoshiki_${difficulty}_${game.id}`,
-							type: "futoshiki",
-							data: {
-								size: game.size,
-								grid: game.grid,
-								givens: game.givens,
-								inequalities: game.inequalities,
-							} as FutoshikiData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch Magic Square
-				const magicSquareGames = await fetchGamesFromFirestore(
-					"magicSquare",
-					difficulty
-				);
-				magicSquareGames.forEach((game) => {
-					if (
-						game.size &&
-						game.grid &&
-						game.magicConstant !== undefined &&
-						game.givens
-					) {
-						newGames.push({
-							id: `magicSquare_${difficulty}_${game.id}`,
-							type: "magicSquare",
-							data: {
-								size: game.size,
-								grid: game.grid,
-								magicConstant: game.magicConstant,
-								givens: game.givens,
-							} as MagicSquareData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-
-				// Fetch TrailFinder
-				const trailfinderGames = await fetchGamesFromFirestore("trailfinder", difficulty);
-				trailfinderGames.forEach((game) => {
-					if (
-						game.rows &&
-						game.cols &&
-						game.startNum !== undefined &&
-						game.endNum !== undefined &&
-						game.path &&
-						game.givens
-					) {
-						newGames.push({
-							id: `trailfinder_${difficulty}_${game.id}`,
-							type: "trailfinder",
-							data: {
-								rows: game.rows,
-								cols: game.cols,
-								startNum: game.startNum,
-								endNum: game.endNum,
-								path: game.path,
-								givens: game.givens,
-							} as TrailFinderData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-			}
-
-			// Fetch Sudoku games
-			for (const difficulty of ["easy", "medium", "hard"] as const) {
-				const sudokuGames = await fetchGamesFromFirestore("sudoku", difficulty);
-				sudokuGames.forEach((game) => {
-					if (game.grid && game.givens) {
-						newGames.push({
-							id: `sudoku_${difficulty}_${game.id}`,
-							type: "sudoku",
-							data: {
-								grid: game.grid,
-								givens: game.givens,
-							} as SudokuData,
-							difficulty:
-								difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3,
-							createdAt: new Date().toISOString(),
-							username: game.username,
-						});
-					}
-				});
-			}
-
-			if (newGames.length === 0) {
-				setHasMoreGamesToFetch(false);
-				return;
-			}
-
-			// Filter out games that:
-			// 1. We already have in our current pool (avoid immediate duplicates)
-			// 2. User has already completed (permanently done)
-			// NOTE: We DO allow previously skipped games (user might want to try again)
-			const freshGames = newGames.filter(
-				(game) =>
-					!existingGameIds.has(game.id) && !completedGameIds.has(game.id)
-			);
-
-			if (freshGames.length === 0) {
-				setHasMoreGamesToFetch(false);
-				return;
-			}
-
-			// Add fresh games to puzzles pool
-			setPuzzles((prev) => [...prev, ...freshGames]);
-
-			// Generate recommendations for fresh games
-			const recommended = getSimpleRecommendations(
-				freshGames,
-				userData,
-				freshGames.length
-			);
-			const interleaved = interleaveGamesByType(recommended);
-
-			// LAYER 3: Deduplicate before appending to ensure no overlap
-			setAllRecommendedPuzzles((prev) => {
-				// Get existing IDs
-				const existingIds = new Set(prev.map((p) => p.id));
-
-				// Filter out any games that somehow already exist
-				const newUnique = interleaved.filter((g) => !existingIds.has(g.id));
-
-				return [...prev, ...newUnique];
-			});
-		} catch (error) {
-			console.error("[Prefetch] Error fetching more games:", error);
-		} finally {
-			setIsFetchingMore(false);
-		}
-	};
-
 	// Load next batch for infinite scroll (only for "For You" tab)
 	const loadNextBatch = useCallback(async () => {
 		// Don't load more games if we're on the Following tab
@@ -2107,7 +1694,7 @@ const applyForYouFilters = useCallback(
 			return;
 		}
 
-		// PREFETCH: At 90%, fetch more games in background
+		// PREFETCH: At 90%, fetch more games via compute_next_recommendations
 		const percentageViewed =
 			displayedPuzzles.length / allRecommendedPuzzles.length;
 		const appliedHasFilters =
@@ -2119,7 +1706,63 @@ const applyForYouFilters = useCallback(
 			!isFetchingMore &&
 			hasMoreGamesToFetch
 		) {
-			fetchMoreGamesFromFirestore(); // Don't await - background operation
+			(async () => {
+				setIsFetchingMore(true);
+				try {
+					const user = getCurrentUser();
+					if (!user) return;
+
+					const idToken = await auth().currentUser?.getIdToken();
+					if (!idToken) return;
+
+					const excludeIds = allRecommendedPuzzles.map((p) => p.id);
+					const res = await fetch(COMPUTE_NEXT_RECOMMENDATIONS_URL, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${idToken}`,
+						},
+						body: JSON.stringify({
+							data: {
+								excludeGameIds: excludeIds,
+								count: 50,
+								...getAppliedFilterPayload(),
+							},
+						}),
+					});
+
+					const result = await res.json();
+					const gameIds: string[] = Array.isArray(result.result?.gameIds)
+						? result.result.gameIds
+						: [];
+
+					if (gameIds.length === 0) {
+						setHasMoreGamesToFetch(false);
+						return;
+					}
+
+					const firestoreGames = await fetchGamesByIds(gameIds);
+					const newPuzzles: Puzzle[] = [];
+					for (const gameId of gameIds) {
+						const fg = firestoreGames.find((g) => g.id === gameId);
+						if (!fg) continue;
+						const puzzle = convertFirestoreGameToPuzzle(fg, gameId);
+						if (puzzle) newPuzzles.push(puzzle);
+					}
+
+					if (newPuzzles.length === 0) {
+						setHasMoreGamesToFetch(false);
+						return;
+					}
+
+					setAllRecommendedPuzzles((prev) => [...prev, ...newPuzzles]);
+					setDisplayedPuzzles((prev) => [...prev, ...newPuzzles]);
+				} catch (error) {
+					console.error("[Prefetch 90%] Error:", error);
+				} finally {
+					setIsFetchingMore(false);
+				}
+			})();
 		}
 
 		setLoadingMore(true);

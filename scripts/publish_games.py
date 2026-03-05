@@ -263,6 +263,45 @@ def generate_instructions_entry(game_type: str) -> str:
     )
 
 
+def generate_convert_case(game_type: str, pascal_name: str, mock_data: Dict) -> str:
+    """Generate the case block for convertFirestoreGameToPuzzle in feed.tsx."""
+    switch_case = game_type.lower()
+    # uid is a top-level puzzle field, not part of data
+    data_keys = {k: v for k, v in mock_data.items() if k != "uid"}
+    conditions = []
+    assignments = []
+    for key, value in data_keys.items():
+        if isinstance(value, list):
+            conditions.append(f"game.{key} && Array.isArray(game.{key})")
+        else:
+            conditions.append(f"game.{key}")
+        assignments.append(f"\t\t\t\t\t\t{key}: game.{key},")
+
+    cond_joined = " &&\n\t\t\t\t".join(conditions)
+    assign_joined = "\n".join(assignments)
+
+    return (
+        f'\t\tcase "{switch_case}":\n'
+        f"\t\t\tif (\n"
+        f"\t\t\t\t{cond_joined}\n"
+        f"\t\t\t) {{\n"
+        f"\t\t\t\treturn {{\n"
+        f"\t\t\t\t\tid: gameId,\n"
+        f'\t\t\t\t\ttype: "{game_type}",\n'
+        f"\t\t\t\t\tdata: {{\n"
+        f"{assign_joined}\n"
+        f"\t\t\t\t\t}} as {pascal_name}Data,\n"
+        f"\t\t\t\t\tdifficulty: difficultyNum,\n"
+        f"\t\t\t\t\tcreatedAt: new Date().toISOString(),\n"
+        f"\t\t\t\t\tusername: game.username,\n"
+        f"\t\t\t\t\tuid: game.uid,\n"
+        f"\t\t\t\t\tprofilePicture: null,\n"
+        f"\t\t\t\t}};\n"
+        f"\t\t\t}}\n"
+        f"\t\t\tbreak;"
+    )
+
+
 # ── File insertion helpers ────────────────────────────────────────────────────
 
 def _find_marker_line(text: str, marker_kw: str) -> Optional[Tuple[int, str, str]]:
@@ -702,6 +741,31 @@ def publish_game(
         "feed.tsx — filter chip",
         use_prev_line_indent=True,
     )
+
+    # ── 9b. app/feed.tsx — convertFirestoreGameToPuzzle import ────────────────
+    insert_before_marker(
+        feed_file,
+        "KRACKED_INSERT_CONVERT_PUZZLE_IMPORT",
+        f"{pascal_name}Data,",
+        f"{pascal_name}Data,",
+        dry_run,
+        "feed.tsx — convert puzzle import",
+    )
+
+    # ── 9c. app/feed.tsx — convertFirestoreGameToPuzzle case ────────────────────
+    if mock_data:
+        switch_case = game_type.lower()
+        convert_case = generate_convert_case(game_type, pascal_name, mock_data)
+        insert_multiline_before_marker(
+            feed_file,
+            "KRACKED_INSERT_CONVERT_PUZZLE",
+            convert_case,
+            f'case "{switch_case}":',
+            dry_run,
+            "feed.tsx — convertFirestoreGameToPuzzle case",
+        )
+    else:
+        print(f"    [warn] No mockData — skipping convertFirestoreGameToPuzzle case for {game_type}")
 
     # ── 10. config/firebase.ts ────────────────────────────────────────────────
     firebase_file = repo_root / "config" / "firebase.ts"
