@@ -57,8 +57,13 @@ jobs:
         if: steps.changes.outputs.has_changes == 'true'
         id: branch
         run: |
+          # Extract published game names first so they can be used in branch name
+          PUBLISHED=$(grep "\[firestore\] Marked" publish_output.txt \
+            | sed "s/.*Marked '\(.*\)' as Published/\1/" \
+            | paste -sd ',')
+
           DATE=$(date +%Y-%m-%d)
-          BRANCH="game-publish/$DATE"
+          BRANCH="game-publish/${PUBLISHED:-unknown}-$DATE-run${{ github.run_number }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -73,11 +78,6 @@ jobs:
             app/create-game/ \
             app/feed.tsx
           git add -- 'app/play-game/[gameId].tsx'
-
-          # Extract published game names (comma-separated) for commit + PR title
-          PUBLISHED=$(grep "\[firestore\] Marked" publish_output.txt \
-            | sed "s/.*Marked '\(.*\)' as Published/\1/" \
-            | paste -sd ',')
 
           git commit -m "Publish games: ${PUBLISHED:-unknown}"
           git push origin "$BRANCH"
