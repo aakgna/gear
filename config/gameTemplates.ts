@@ -193,6 +193,16 @@ export const gameTemplates: Record<string, GameTemplate[]> = {
 			defaultConfig: {},
 		},
 
+		{
+			id: "snakemaze",
+			name: "SnakeMaze",
+			type: "snakemaze",
+			category: "path",
+			icon: "navigate-outline",
+			description: "A SnakeMaze game",
+			defaultConfig: {},
+		},
+
 		// KRACKED_INSERT_TEMPLATE
 	],
 };

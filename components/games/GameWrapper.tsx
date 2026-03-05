@@ -37,6 +37,7 @@ import TrailFinderGame from "./TrailFinder";
 import SudokuGame from "./SudokuGame";
 import HangmanGame from "./HangmanGame";
 import CrosswordGame from "./CrosswordGame";
+import SnakemazeGame from "./SnakemazeGame";
 // KRACKED_INSERT_GAME_IMPORT
 import { GamePlayer } from "../../runtime/GamePlayer";
 import PuzzleStats from "../PuzzleStats";
@@ -811,6 +812,21 @@ const GameWrapper: React.FC<GameWrapperProps> = ({
 			case "crossword":
 				return (
 					<CrosswordGame
+						key={puzzle.id}
+						inputData={puzzle.data as any}
+						onComplete={handleComplete}
+						onAttempt={onAttempt}
+						startTime={gameStartTime}
+						puzzleId={puzzle.id}
+						onShowStats={handleShowStats}
+						isActive={isActive && gameStarted}
+						initialCompletedResult={completedResult}
+					/>
+				);
+
+			case "snakemaze":
+				return (
+					<SnakemazeGame
 						key={puzzle.id}
 						inputData={puzzle.data as any}
 						onComplete={handleComplete}

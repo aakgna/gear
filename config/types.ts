@@ -17,6 +17,7 @@ export type PuzzleType =
 	| "sequencing"
 	| "hangman"
 	| "crossword"
+	| "snakemaze"
 	// KRACKED_INSERT_PUZZLE_TYPE
 	| "custom";
 
@@ -39,6 +40,7 @@ export interface Puzzle {
 		| SequencingData
 		| HangmanData
 		| CrosswordData
+		| SnakemazeData
 		// KRACKED_INSERT_DATA_UNION
 		| CustomData;
 	difficulty: number;
@@ -173,6 +175,16 @@ export interface CrosswordData {
 	words: Record<string, any>[];
 	rows: number;
 	themeHint: string;
+}
+
+export interface SnakemazeData {
+	end: Record<string, any>;
+	cells: Record<string, any>[];
+	walls: Record<string, any>[];
+	start: Record<string, any>;
+	solution: number[];
+	rows: number;
+	cols: number;
 }
 
 // KRACKED_INSERT_DATA_INTERFACE

@@ -154,6 +154,11 @@ export const gameInstructions = {
 		example: "",
 	},
 
+	snakemaze: {
+		instructions: ["Play the game to complete it"],
+		example: "",
+	},
+
 	// KRACKED_INSERT_INSTRUCTIONS
 };
 

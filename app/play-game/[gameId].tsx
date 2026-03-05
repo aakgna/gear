@@ -31,6 +31,7 @@ import {
 	CustomData,
 	HangmanData,
 	CrosswordData,
+	SnakemazeData,
 	// KRACKED_INSERT_DATA_IMPORT
 } from "../../config/types";
 import {
@@ -329,6 +330,32 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				rows: gameData.rows,
 				themeHint: gameData.themeHint,
 			} as CrosswordData;
+			isValid = true;
+		}
+
+		// Handle Snakemaze
+		else if (
+			normalizedGameType === "snakemaze" &&
+			gameData.end &&
+			gameData.cells &&
+			Array.isArray(gameData.cells) &&
+			gameData.walls &&
+			Array.isArray(gameData.walls) &&
+			gameData.start &&
+			gameData.solution &&
+			Array.isArray(gameData.solution) &&
+			gameData.rows &&
+			gameData.cols
+		) {
+			puzzleData = {
+				end: gameData.end,
+				cells: gameData.cells,
+				walls: gameData.walls,
+				start: gameData.start,
+				solution: gameData.solution,
+				rows: gameData.rows,
+				cols: gameData.cols,
+			} as SnakemazeData;
 			isValid = true;
 		}
 

@@ -60,6 +60,38 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	SnakemazeData,
+		case "snakemaze":
+			if (
+				game.end &&
+				game.cells && Array.isArray(game.cells) &&
+				game.walls && Array.isArray(game.walls) &&
+				game.start &&
+				game.solution && Array.isArray(game.solution) &&
+				game.rows &&
+				game.cols
+			) {
+				return {
+					id: gameId,
+					type: "snakemaze",
+					data: {
+						end: game.end,
+						cells: game.cells,
+						walls: game.walls,
+						start: game.start,
+						solution: game.solution,
+						rows: game.rows,
+						cols: game.cols,
+					} as SnakemazeData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+
 	// KRACKED_INSERT_CONVERT_PUZZLE_IMPORT
 	CustomData,
 } from "../config/types";
@@ -2808,6 +2840,7 @@ const applyForYouFilters = useCallback(
 									"sequencing",
 									"hangman",
 									"crossword",
+									"snakemaze",
 								// KRACKED_INSERT_FILTER_CHIP
 								].map((gameType) => {
 									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);
