@@ -489,6 +489,7 @@ def publish_game(
     game_data: Dict,
     user_id: str,
     game_doc_id: str,
+    ai_code_doc_id: str,
     repo_root: Path,
     db: Any,
     dry_run: bool = False,
@@ -500,7 +501,8 @@ def publish_game(
     """
     name = (game_data.get("name") or "").strip()
     game_type = name_to_game_type(name) if name else (game_data.get("gameType") or "").strip()
-    game_code = (game_data.get("gameCode") or "").strip()
+    # ai_code uses "code" field; fall back to "gameCode" for compatibility
+    game_code = (game_data.get("code") or game_data.get("gameCode") or "").strip()
     difficulty = game_data.get("difficulty", "medium")
 
     # Parse mockData — may arrive as a Firestore map or a JSON string
@@ -835,18 +837,26 @@ def publish_game(
     else:
         print(f"  [dry-run] Would write to users/{user_id}/createdGames/{full_puzzle_id}")
 
-    # ── 14. Update developerGames status ─────────────────────────────────────
+    # ── 14. Update Firestore status ───────────────────────────────────────────
     if not dry_run:
-        doc_ref = (
+        # Mark ai_code doc as published (prevents re-processing)
+        db.collection("ai_code").document(ai_code_doc_id).set(
+            {"published": True}, merge=True
+        )
+        print(f"  [firestore] Marked ai_code/{ai_code_doc_id} as published")
+
+        # Mark developerGames as Published
+        (
             db.collection("users")
             .document(user_id)
             .collection("developerGames")
             .document(game_doc_id)
+            .set({"process": "Published", "gameType": game_type}, merge=True)
         )
-        doc_ref.set({"process": "Published", "gameType": game_type}, merge=True)
-        print(f"  [firestore] Marked '{game_type}' as Published")
+        print(f"  [firestore] Marked '{game_type}' as Published in developerGames")
     else:
-        print(f"  [dry-run] Would mark '{game_type}' as Published in Firestore")
+        print(f"  [dry-run] Would mark ai_code/{ai_code_doc_id} as published")
+        print(f"  [dry-run] Would mark '{game_type}' as Published in developerGames")
 
     return True
 
@@ -912,22 +922,22 @@ def main() -> None:
     db = firestore.client()
 
     # ── Query Firestore ───────────────────────────────────────────────────────
-    print('\nQuerying Firestore for games with process == "In Review" …')
-    query = (
-        db.collection_group("developerGames")
-        .where(filter=FieldFilter("process", "==", "In Review"))
-    )
+    print("\nQuerying Firestore ai_code collection for unpublished games …")
+    all_ai_docs = list(db.collection("ai_code").stream())
+    # Skip docs already marked published=True; docs with no field or published=False are queued
+    docs = [d for d in all_ai_docs if d.to_dict().get("published") is not True]
     if args.game_type:
-        query = query.where(filter=FieldFilter("gameType", "==", args.game_type))
-
-    docs = list(query.stream())
+        docs = [
+            d for d in docs
+            if name_to_game_type((d.to_dict().get("name") or "").strip()) == args.game_type
+        ]
 
     # ── Early exit if nothing to do ───────────────────────────────────────────
     if not docs:
-        print("\nNo games found with process == 'In Review'. Nothing to publish.")
+        print("\nNo unpublished games found in ai_code. Nothing to publish.")
         sys.exit(0)
 
-    print(f"Found {len(docs)} game(s) in review.\n")
+    print(f"Found {len(docs)} unpublished game(s).\n")
 
     # ── Get existing types for duplicate checking ─────────────────────────────
     existing_types = get_existing_game_types(repo_root)
@@ -939,11 +949,13 @@ def main() -> None:
     for i, doc in enumerate(docs):
         data = doc.to_dict()
         name = (data.get("name") or "").strip()
-        game_type = name_to_game_type(name) if name else (data.get("gameType") or "").strip()
+        game_type = name_to_game_type(name) if name else ""
 
-        # Derive user_id from doc path: users/{userId}/developerGames/{docId}
-        path_parts = doc.reference.path.split("/")
-        user_id = path_parts[1] if len(path_parts) >= 4 else "unknown"
+        # Extract userId and gameId — use explicit fields if present,
+        # otherwise parse from doc ID format: {userId}_game_{rest}
+        id_parts = doc.id.split("_game_", 1)
+        user_id = data.get("userId") or (id_parts[0] if len(id_parts) > 1 else "unknown")
+        game_id = data.get("gameId") or (f"game_{id_parts[1]}" if len(id_parts) > 1 else doc.id)
 
         print(f"[{i + 1}/{len(docs)}] '{name}' — gameType='{game_type}'  user={user_id}")
 
@@ -956,9 +968,16 @@ def main() -> None:
             print(f"  [REJECTED] {msg}")
             skipped += 1
             if not args.dry_run:
-                doc.reference.set(
-                    {"process": "Rejected — duplicate type"}, merge=True
+                # Delete ai_code doc and mark developerGames as error
+                db.collection("ai_code").document(doc.id).delete()
+                (
+                    db.collection("users")
+                    .document(user_id)
+                    .collection("developerGames")
+                    .document(game_id)
+                    .set({"process": "error", "errorMessage": msg}, merge=True)
                 )
+                print(f"  [firestore] Deleted ai_code/{doc.id}, marked developerGames as error")
             continue
 
         if msg:
@@ -966,8 +985,9 @@ def main() -> None:
             print("  Proceeding (similarity is a warning only) …")
 
         # ── Validate required fields ──────────────────────────────────────────
-        if not data.get("gameCode", "").strip():
-            print(f"  [SKIP] gameCode is empty for '{game_type}'")
+        game_code = (data.get("code") or data.get("gameCode") or "").strip()
+        if not game_code:
+            print(f"  [SKIP] code is empty for '{game_type}'")
             skipped += 1
             continue
 
@@ -975,7 +995,8 @@ def main() -> None:
         success = publish_game(
             game_data=data,
             user_id=user_id,
-            game_doc_id=doc.id,
+            game_doc_id=game_id,
+            ai_code_doc_id=doc.id,
             repo_root=repo_root,
             db=db,
             dry_run=args.dry_run,
@@ -984,11 +1005,26 @@ def main() -> None:
 
         if success:
             published += 1
-            # Add to in-memory list so the next game in this batch doesn't
-            # get a false "similar" warning against itself
             existing_types.append(game_type)
         else:
             skipped += 1
+            if not args.dry_run:
+                # Delete ai_code doc and mark developerGames as error
+                db.collection("ai_code").document(doc.id).delete()
+                (
+                    db.collection("users")
+                    .document(user_id)
+                    .collection("developerGames")
+                    .document(game_id)
+                    .set(
+                        {
+                            "process": "error",
+                            "errorMessage": "Game failed to publish — please check the game code and resubmit.",
+                        },
+                        merge=True,
+                    )
+                )
+                print(f"  [firestore] Deleted ai_code/{doc.id}, marked developerGames as error")
 
     print("\n" + "=" * 60)
     print(f"  Published : {published}")
