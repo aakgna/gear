@@ -119,6 +119,7 @@ export const saveGameToFirestore = async (
 		| "sequencing"
 		| "hangman"
 		| "crossword"
+		| "unnamedGame"
 		// KRACKED_INSERT_SAVE_GAME
 		| "custom",
 	difficulty: "easy" | "medium" | "hard",
