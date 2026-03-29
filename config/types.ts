@@ -17,6 +17,7 @@ export type PuzzleType =
 	| "sequencing"
 	| "hangman"
 	| "crossword"
+	| "tileSwipe"
 	// KRACKED_INSERT_PUZZLE_TYPE
 	| "custom";
 
@@ -39,6 +40,7 @@ export interface Puzzle {
 		| SequencingData
 		| HangmanData
 		| CrosswordData
+		| TileSwipeData
 		// KRACKED_INSERT_DATA_UNION
 		| CustomData;
 	difficulty: number;
@@ -173,6 +175,10 @@ export interface CrosswordData {
 	words: Record<string, any>[];
 	rows: number;
 	themeHint: string;
+}
+
+export interface TileSwipeData {
+	words: string[];
 }
 
 // KRACKED_INSERT_DATA_INTERFACE

@@ -60,6 +60,26 @@ import {
 	TriviaData,
 	CodeBreakerData,
 	SequencingData,
+	TileSwipeData,
+		case "tileswipe":
+			if (
+				game.words && Array.isArray(game.words)
+			) {
+				return {
+					id: gameId,
+					type: "tileSwipe",
+					data: {
+						words: game.words,
+					} as TileSwipeData,
+					difficulty: difficultyNum,
+					createdAt: new Date().toISOString(),
+					username: game.username,
+					uid: game.uid,
+					profilePicture: null,
+				};
+			}
+			break;
+
 	// KRACKED_INSERT_CONVERT_PUZZLE_IMPORT
 	CustomData,
 } from "../config/types";
@@ -2808,6 +2828,7 @@ const applyForYouFilters = useCallback(
 									"sequencing",
 									"hangman",
 									"crossword",
+									"tileSwipe",
 								// KRACKED_INSERT_FILTER_CHIP
 								].map((gameType) => {
 									const isSelected = selectedGameTypes.includes(gameType as PuzzleType);

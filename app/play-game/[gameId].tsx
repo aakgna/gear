@@ -31,6 +31,7 @@ import {
 	CustomData,
 	HangmanData,
 	CrosswordData,
+	TileSwipeData,
 	// KRACKED_INSERT_DATA_IMPORT
 } from "../../config/types";
 import {
@@ -76,6 +77,9 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 		} else if (gameType === "magicsquare") {
 			gameType = "magicSquare";
 		}
+} else if (gameType === "tileswipe") {
+			gameType = "tileSwipe";
+
 		// KRACKED_INSERT_NORMALIZATION
 		// Other game types (wordform, riddle, trivia, codebreaker, sequencing, inference, maze, futoshiki, trailfinder, sudoku) use lowercase in both
 
@@ -329,6 +333,18 @@ const loadGameByPuzzleId = async (puzzleId: string): Promise<Puzzle | null> => {
 				rows: gameData.rows,
 				themeHint: gameData.themeHint,
 			} as CrosswordData;
+			isValid = true;
+		}
+
+		// Handle TileSwipe
+		else if (
+			normalizedGameType === "tileSwipe" &&
+			gameData.words &&
+			Array.isArray(gameData.words)
+		) {
+			puzzleData = {
+				words: gameData.words,
+			} as TileSwipeData;
 			isValid = true;
 		}
 
