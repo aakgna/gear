@@ -193,6 +193,16 @@ export const gameTemplates: Record<string, GameTemplate[]> = {
 			defaultConfig: {},
 		},
 
+		{
+			id: "tileSwipe",
+			name: "tile swipe",
+			type: "tileSwipe",
+			category: "custom",
+			icon: "apps-outline",
+			description: "A tile swipe game",
+			defaultConfig: {},
+		},
+
 		// KRACKED_INSERT_TEMPLATE
 	],
 };
